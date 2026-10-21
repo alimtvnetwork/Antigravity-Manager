@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.244.2-3B82F6?style=flat-square" alt="Version v4.244.2">
+    <img src="https://img.shields.io/badge/Version-v4.245.0-3B82F6?style=flat-square" alt="Version v4.245.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,11 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
+<<<<<<< HEAD
 **Bar 2: Version-Based Installation (v4.244.2)**
+=======
+**Bar 2: Version-Based Installation (v4.245.0)**
+>>>>>>> 054af6ca (Feature: telegram-fleet - backup prompt tree terminal indentation fleet caching and w1 lead alignment)
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -583,6 +587,8 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
 ## 📝 Changelog
+
+> Latest version **v4.245.0**: Dual Clipboard Engine for OneNote and Antigravity, Telegram Bot /backup & /restore Inline Keyboards, Fleet Cache Acceleration & Lead Machine Alignment, Tree View Terminal Indentation & False QUEUED Fix — Upgraded `copyAllImagesToClipboard`, `writePureImageToClipboard`, and `copySingleImageForOneNoteOrIde` in `src/components/instances/PromptTreeView/clipboard.ts` to perform simultaneous dual-writes across native Win32 OLE clipboard (`copy_image_to_clipboard` with `CF_DIB` and `PNG`) and web clipboard (`navigator.clipboard.write([item])`); untainted canvas operations via Base64 data URI pre-loading (`loadImageElement`), completely eliminating WebView2 `SecurityError` and enabling 1-click pasting of multi-image composites into both Microsoft OneNote and Google Antigravity; enhanced Telegram inbound daemon in `src-tauri/src/modules/telegram_inbound/daemon.rs` and `config.rs` with interactive inline keyboard markup buttons (`[ 📦 Backup Prompts ]`, `[ ♻️ Restore Prompts ]`, `[ 🖼️ Send with Images ]`, `[ 🌲 Expand Tree ]`, `[ ⚡ Active Prompts ]`) and added automated forwarding of attached Telegram photos into prompt injections via `![attached-image](url)`; added synchronous `localStorage` caching in `src/components/instances/fleet/useFleetMachines.ts` to eliminate stuck loading states, enforced GitMap IP primacy (`192.168.1.3` as local `Lead` node `w1`), and implemented `SendFleetPromptModal.tsx` for cross-machine prompt dispatching in the shared cluster table; added top-level project breathing room (`my-2.5`), increased child prompt indentation (`ml-5 pl-3 border-l-2`), integrated 1-click Expand/Collapse All toggle (`isAllExpanded`, `FolderPlus`/`FolderMinus`), terminal monospace branch connector glyphs (`├──`, `└──`), and modernized the 30s auto-sync interval dropdown into a custom dark-glass popover capsule in `ModalHeader.tsx`; and updated `src-tauri/src/modules/repo_db/tree_node_conv.rs` to eliminate false `QUEUED` badges on completed or idle prompts by enforcing active instance liveness and 600s TTL verification before declaring queued status. (Thanks to @aukgit)
 
 > Latest version **v4.244.0**: Boolean Logic Modernization, Affirmative Guard Decomposition, Instance Task Liveness & Zero Mixed-Operator Conditionals — Refactored conditional logic across `src/pages/instances/` adhering strictly to `01-prompts/15-cg-execute/04-booleans-and-complex-conditions.md`; replaced compound negative checks such as `if (!inst.is_running || !proj.is_running) return false;` with discrete, single-variable affirmative guard clauses in `InstanceCardProjects.tsx`; extracted and centralized `isConversationGenuinelyRunning` in `src/pages/instances/instancePageUtils.ts`, enforcing discrete boolean decomposition (affirmative running checks, explicit instance ownership matching, active task validation, and ghost conversation filtering), eliminating 4-operand chained `.some(...)` predicates across `instanceCardData.ts` (`hasActiveTask`), `InstanceCardProjects.tsx` (`isProjectRunningForInstance`), and `useInstancePage.ts` (`hasActiveTaskFor`); decomposed mixed `&&`/`||` operators into intermediate named booleans in `instancePageUtils.ts` (`isDefaultInstance`, `hasMatchingSeqNum`), `instanceCardData.ts` (`weeklyBucket` resolution), and `useInstancePage.ts` (`filteredInstances` search filtering); eliminated CSS layout defect where the Prompt Tree View left sidebar (`TreePanel`) overflowed 136px across the vertical divider line into the detail view by removing redundant fixed width constraints on `TreePanel`, adding `overflow-hidden` to the modal sidebar container, wrapping filter capsules cleanly, and expanding title truncation threshold to `max-w-3xl`; and verified all 32 unit test assertions pass in `src/pages/instances/__tests__/instanceRunningPrompts.test.ts`. (Thanks to @aukgit)
 

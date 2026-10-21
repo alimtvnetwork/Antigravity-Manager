@@ -288,7 +288,25 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
     }
 
     // 2. Command with text
-    let base_reply = process_telegram_command_text(trimmed).await;
+    let effective_text = if let Some((img_path, public_url_opt)) = saved_media_opt.as_ref() {
+        let local_str = img_path.to_string_lossy();
+        let media_ref: &str = public_url_opt.as_deref().unwrap_or(&local_str);
+        if !trimmed.contains(media_ref)
+            && (trimmed.starts_with("/prompt")
+                || trimmed.starts_with("prompt")
+                || trimmed.starts_with("/pt")
+                || trimmed.starts_with("/send")
+                || trimmed.starts_with("C0")
+                || trimmed.starts_with("P0"))
+        {
+            format!("{}\n\n![attached-image]({})", trimmed, media_ref)
+        } else {
+            trimmed.to_string()
+        }
+    } else {
+        trimmed.to_string()
+    };
+    let base_reply = process_telegram_command_text(&effective_text).await;
     let (cmd_raw, rest) = match trimmed.split_once(char::is_whitespace) {
         Some((c, r)) => (c, r.trim()),
         None => (trimmed, ""),
@@ -301,6 +319,44 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
         .to_lowercase();
 
     let mut markup_opt = match cmd_base.as_str() {
+        "backup" | "backpack" | "backup_prompt" | "backup_prompts" | "backup_running" | "brp" => {
+            Some(json!({
+                "inline_keyboard": [
+                    [
+                        { "text": "📦 Backup Prompts", "callback_data": "cmd:/backup" },
+                        { "text": "♻️ Restore Prompts", "callback_data": "cmd:/restore" }
+                    ],
+                    [
+                        { "text": "🖼️ Send with Images", "callback_data": "cmd:/send images" },
+                        { "text": "📋 Backups List", "callback_data": "cmd:/backup list" }
+                    ]
+                ]
+            }))
+        }
+        "restore" | "rrp" | "resend" => Some(json!({
+            "inline_keyboard": [
+                [
+                    { "text": "♻️ Restore Prompts", "callback_data": "cmd:/restore" },
+                    { "text": "📦 Backup Prompts", "callback_data": "cmd:/backup" }
+                ],
+                [
+                    { "text": "🌲 Tree View", "callback_data": "cmd:/tree" },
+                    { "text": "⚡ Active Prompts", "callback_data": "cmd:/active" }
+                ]
+            ]
+        })),
+        "tree" | "treeview" | "active" => Some(json!({
+            "inline_keyboard": [
+                [
+                    { "text": "🌲 Expand Tree", "callback_data": "cmd:/tree" },
+                    { "text": "⚡ Active Prompts", "callback_data": "cmd:/active" }
+                ],
+                [
+                    { "text": "📦 Backup Prompts", "callback_data": "cmd:/backup" },
+                    { "text": "♻️ Restore Prompts", "callback_data": "cmd:/restore" }
+                ]
+            ]
+        })),
         "expand" | "exp" | "inspect" | "ins" | "show" | "view" => {
             reports_b::resolve_expand_prompt_markup(rest)
         }

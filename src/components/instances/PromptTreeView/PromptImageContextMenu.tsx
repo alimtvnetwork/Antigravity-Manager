@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { Copy, Eye, Download, Link2, Check, Layers, FileText } from 'lucide-react';
-import { writeNativeImageToClipboard, copyAllImagesAsRichHtml, copyImageAsMarkdownText, copySingleImageForOneNoteOrIde } from './clipboard';
+import { writeNativeImageToClipboard, copyAllImagesToClipboard, copyImageAsMarkdownText, copySingleImageForOneNoteOrIde } from './clipboard';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 
@@ -80,7 +80,7 @@ export function PromptImageContextMenu({
                         onClose();
                     }, 1200);
                 },
-                (err) => {
+                (err: unknown) => {
                     useErrorStore.getState().trackWarning(err, {
                         source: 'PromptImageContextMenu.handleCopyImageBinary',
                         triggerAction: 'context_menu_copy_image',
@@ -105,7 +105,7 @@ export function PromptImageContextMenu({
     const handleCopyAllImages = useCallback(async () => {
         try {
             const imagesToCopy = allImages && allImages.length > 0 ? allImages : [imageSrc];
-            const isSuccess = await copyAllImagesAsRichHtml(
+            const isSuccess = await copyAllImagesToClipboard(
                 imagesToCopy,
                 () => {
                     setIsAllImagesCopied(true);
@@ -114,7 +114,7 @@ export function PromptImageContextMenu({
                         onClose();
                     }, 1200);
                 },
-                (err) => {
+                (err: unknown) => {
                     useErrorStore.getState().trackWarning(err, {
                         source: 'PromptImageContextMenu.handleCopyAllImages',
                         triggerAction: 'context_menu_copy_all_images',
@@ -148,7 +148,7 @@ export function PromptImageContextMenu({
                         onClose();
                     }, 1200);
                 },
-                (err) => {
+                (err: unknown) => {
                     useErrorStore.getState().trackWarning(err, {
                         source: 'PromptImageContextMenu.handleCopyImageAsText',
                         triggerAction: 'context_menu_copy_image_as_text',
@@ -200,7 +200,7 @@ export function PromptImageContextMenu({
                         onClose();
                     }, 1200);
                 },
-                (err) => {
+                (err: unknown) => {
                     useErrorStore.getState().trackWarning(err, {
                         source: 'PromptImageContextMenu.handleCopyForOneNote',
                         triggerAction: 'context_menu_copy_onenote',
@@ -302,7 +302,7 @@ export function PromptImageContextMenu({
                     <Layers className="w-3.5 h-3.5 text-purple-400" />
                 )}
                 <span className="font-medium">
-                    {isAllImagesCopied ? 'Copied All Images!' : 'Copy All Images (Rich HTML)'}
+                    {isAllImagesCopied ? 'Copied All Images!' : 'Copy All Images (Composite PNG)'}
                 </span>
             </button>
 

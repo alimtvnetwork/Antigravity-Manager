@@ -506,7 +506,9 @@ pub(crate) fn build_active_prompt_conv_nodes(
 
             const QUEUED_STATUSES: &[&str] = &["queued", "pending"];
             const RUNNING_STATUSES: &[&str] = &["running", "in_flight", "dispatched"];
-            let is_ap_queued = ap.status.equals_any(QUEUED_STATUSES);
+            let is_ap_queued = is_inst_alive
+                && (now - ap.updated_at <= 600)
+                && ap.status.equals_any(QUEUED_STATUSES);
             let max_allowed_ttl = if has_active_worker { 300 } else { 45 };
             let is_running_status = ap.status.equals_any(RUNNING_STATUSES);
             let is_within_ttl = (now - ap.updated_at) <= max_allowed_ttl;

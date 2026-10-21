@@ -521,6 +521,7 @@ export async function writePureImageToClipboard(
             throw new Error('Failed to convert image to valid PNG binary blob');
         }
 
+        let nativeWritten = false;
         // 0. Native Tauri OS Clipboard Path: Write native bitmap/DIB on Windows, osascript on macOS, wl-copy/xclip on Linux
         if (isTauriEnvironment()) {
             try {
@@ -537,10 +538,7 @@ export async function writePureImageToClipboard(
                 }
                 if (pathToPass) {
                     await invoke('copy_image_to_clipboard', { path: pathToPass });
-                    const msg = 'Image copied to system clipboard!';
-                    onSuccess?.(msg);
-                    showToast({ message: msg, type: 'success' });
-                    return true;
+                    nativeWritten = true;
                 }
             } catch (tauriErr) {
                 useErrorStore.getState().trackWarning(tauriErr, {
@@ -550,6 +548,7 @@ export async function writePureImageToClipboard(
             }
         }
 
+        let webWritten = false;
         ensureDocumentFocus();
         const hasFocus = typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : true;
         if (hasFocus && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
@@ -560,16 +559,20 @@ export async function writePureImageToClipboard(
                     'image/png': pngBlob,
                 });
                 await navigator.clipboard.write([item]);
-                const msg = 'Image copied to clipboard as pure PNG!';
-                onSuccess?.(msg);
-                showToast({ message: msg, type: 'success' });
-                return true;
+                webWritten = true;
             } catch (clipErr) {
                 useErrorStore.getState().trackWarning(clipErr, {
                     source: 'clipboard.writePureImageToClipboard.navigator',
                     triggerAction: 'write_pure_image',
                 });
             }
+        }
+
+        if (nativeWritten || webWritten) {
+            const msg = 'Image copied to clipboard (ready for OneNote, chat & IDEs)!';
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'success' });
+            return true;
         }
 
         // Fallback: Markdown image tag or URI via copyToClipboard
@@ -616,6 +619,25 @@ async function loadImageElement(uri: string, repoPath?: string): Promise<HTMLIma
         }
     } else {
         loadSrc = resolveImageSrc(cleanUri, repoPath);
+    }
+
+    if (!loadSrc.startsWith('data:image/')) {
+        try {
+            const res = await fetch(loadSrc);
+            if (res.ok) {
+                const blob = await res.blob();
+                const b64 = await new Promise<string>((resB64) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resB64(reader.result as string);
+                    reader.readAsDataURL(blob);
+                });
+                if (b64 && b64.startsWith('data:image/')) {
+                    loadSrc = b64;
+                }
+            }
+        } catch {
+            // Keep loadSrc as-is if fetch is unavailable
+        }
     }
 
     return await new Promise<HTMLImageElement | null>((resolve) => {
@@ -774,6 +796,7 @@ export async function copyAllImagesToClipboard(
         // 1. Primary path: Vertical composite PNG blob (pure binary to prevent Chromium drop bug)
         const compositeBlob = await stitchImagesToCompositePng(cleanUris, repoPath);
         if (compositeBlob) {
+            let nativeWritten = false;
             if (isTauriEnvironment()) {
                 try {
                     const reader = new FileReader();
@@ -784,10 +807,7 @@ export async function copyAllImagesToClipboard(
                     const b64 = await b64Promise;
                     if (b64) {
                         await invoke('copy_image_to_clipboard', { path: b64 });
-                        const msg = `Copied ${cleanUris.length} image(s) as composite PNG to system clipboard!`;
-                        onSuccess?.(msg);
-                        showToast({ message: msg, type: 'success' });
-                        return true;
+                        nativeWritten = true;
                     }
                 } catch (tauriErr) {
                     useErrorStore.getState().trackWarning(tauriErr, {
@@ -797,6 +817,7 @@ export async function copyAllImagesToClipboard(
                 }
             }
 
+            let webWritten = false;
             ensureDocumentFocus();
             const hasFocus = typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : true;
             if (hasFocus && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
@@ -805,16 +826,20 @@ export async function copyAllImagesToClipboard(
                         'image/png': compositeBlob,
                     });
                     await navigator.clipboard.write([item]);
-                    const msg = `Copied ${cleanUris.length} image(s) as composite PNG to clipboard!`;
-                    onSuccess?.(msg);
-                    showToast({ message: msg, type: 'success' });
-                    return true;
+                    webWritten = true;
                 } catch (clipErr) {
                     useErrorStore.getState().trackWarning(clipErr, {
                         source: 'clipboard.copyAllImagesToClipboard.navigator',
                         triggerAction: 'write_composite_image',
                     });
                 }
+            }
+
+            if (nativeWritten || webWritten) {
+                const msg = `Copied ${cleanUris.length} image(s) as composite PNG to clipboard (ready for OneNote & IDE)!`;
+                onSuccess?.(msg);
+                showToast({ message: msg, type: 'success' });
+                return true;
             }
         }
 
@@ -1299,6 +1324,24 @@ export async function copySingleImageForOneNoteOrIde(
         const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
         const textBlob = new Blob([mdText], { type: 'text/plain' });
         const pngBlob = await convertImageUriToPngBlob(resolvedSrc);
+
+        if (isTauriEnvironment()) {
+            try {
+                if (resolvedSrc.startsWith('data:image/')) {
+                    await invoke('copy_image_to_clipboard', { path: resolvedSrc });
+                } else {
+                    const localPath = extractLocalPathFromUri(resolvedSrc);
+                    if (localPath) {
+                        await invoke('copy_image_to_clipboard', { path: localPath });
+                    }
+                }
+            } catch (nativeErr) {
+                useErrorStore.getState().trackWarning(nativeErr, {
+                    source: 'clipboard.copySingleImageForOneNoteOrIde.native',
+                    triggerAction: 'copy_image_to_clipboard',
+                });
+            }
+        }
 
         let isWritten = false;
         ensureDocumentFocus();

@@ -1,9 +1,25 @@
 # Changelog
 
+## [v4.245.0] - 2026-10-21
+
+### Added
+- **Dual Clipboard Engine (OneNote & Antigravity IDE Parity)**: Upgraded `copyAllImagesToClipboard`, `writePureImageToClipboard`, and `copySingleImageForOneNoteOrIde` in `src/components/instances/PromptTreeView/clipboard.ts` to perform simultaneous dual-writes across native Win32 OLE clipboard (`copy_image_to_clipboard` with `CF_DIB` and `PNG`) and web clipboard (`navigator.clipboard.write([item])`). Untainted canvas operations via Base64 data URI pre-loading (`loadImageElement`), completely eliminating WebView2 `SecurityError` and enabling 1-click pasting of multi-image composites into both Microsoft OneNote and Google Antigravity. (Thanks to @aukgit)
+- **Telegram Bot /backup & /restore Inline Keyboards**: Enhanced Telegram inbound daemon in `src-tauri/src/modules/telegram_inbound/daemon.rs` and `config.rs` with interactive inline keyboard markup buttons (`[ 📦 Backup Prompts ]`, `[ ♻️ Restore Prompts ]`, `[ 🖼️ Send with Images ]`, `[ 🌲 Expand Tree ]`, `[ ⚡ Active Prompts ]`) and added automated forwarding of attached Telegram photos into prompt injections via `![attached-image](url)`. (Thanks to @aukgit)
+- **Cross-Machine Prompt Dispatch in Fleet Management**: Added interactive `[ Send Prompt ]` action button to each cluster node row in `FleetMachinesTable.tsx` and `FleetMachineRow.tsx` powered by `SendFleetPromptModal.tsx`, allowing direct cross-machine prompt routing and remote SSH execution. (Thanks to @aukgit)
+
+### Changed
+- **Fleet Cache Acceleration & Lead Machine Alignment**: Added synchronous `localStorage` caching in `src/components/instances/fleet/useFleetMachines.ts` to eliminate stuck loading states, enforced GitMap IP primacy (`192.168.1.3` as local `Lead` node `w1`), and re-aligned remote cluster node roles. (Thanks to @aukgit)
+- **Prompt Tree View Terminal Indentation & Expand/Collapse All**: Added top-level project breathing room (`my-2.5`), increased child prompt indentation (`ml-5 pl-3 border-l-2`), integrated 1-click Expand/Collapse All toggle (`isAllExpanded`, `FolderPlus`/`FolderMinus`), terminal monospace branch connector glyphs (`├──`, `└──`), and modernized the 30s auto-sync interval dropdown into a custom dark-glass popover capsule in `ModalHeader.tsx`. (Thanks to @aukgit)
+
+### Fixed
+- **Prompt Tree False QUEUED Status**: Updated `src-tauri/src/modules/repo_db/tree_node_conv.rs` to eliminate false `QUEUED` badges on completed or idle prompts by enforcing active instance liveness and 600s TTL verification before declaring queued status. (Thanks to @aukgit)
+
+---
+
 ## [v4.244.2] - 2026-10-21
 
 ### Added
-- Synchronize prompts, skills, AI scripts, and coding guidelines
+- **Synchronize prompts, skills, AI scripts, and coding guidelines**: Updated canonical V6 prompt suite and AI scripts across connected repositories. (Thanks to @aukgit)
 
 ---
 
@@ -1005,6 +1021,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.245.0 (2026-10-21)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.244.1 (2026-10-21)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
