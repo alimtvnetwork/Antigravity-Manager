@@ -16,11 +16,6 @@
   "Description": "Cross-platform reverse proxy and account manager for Antigravity (Google DeepMind agentic AI assistant / IDE).",
   "backend": "inherit",
   "frontend": "inherit",
-<<<<<<< HEAD
-  "version": "4.244.2",
-  "releaseDate": "2026-10-21"
-=======
   "version": "4.245.0",
-  "releaseDate": "2026-10-20"
->>>>>>> 054af6ca (Feature: telegram-fleet - backup prompt tree terminal indentation fleet caching and w1 lead alignment)
+  "releaseDate": "2026-10-21"
 }
