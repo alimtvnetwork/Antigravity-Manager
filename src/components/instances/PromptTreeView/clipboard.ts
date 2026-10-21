@@ -104,7 +104,6 @@ export function extractPromptImages(text: string): PromptRewriteResult {
     const images: ExtractedPromptImage[] = [];
     const imageRegex = /!\[(.*?)\]\((data:image\/([a-zA-Z0-9+.-]+);base64,[a-zA-Z0-9+/=]+|https?:\/\/[^\s)]+)\)/g;
 
-    let rewritten = text;
     let match: RegExpExecArray | null;
 
     const matcher = new RegExp(imageRegex);
@@ -142,16 +141,10 @@ export function extractPromptImages(text: string): PromptRewriteResult {
             byteLength,
             hash,
         });
-
-        // For inline Base64 data URIs, rewrite prompt to compact relative path
-        if (isBase64) {
-            const relativePath = `./.antigravity/attachments/attachment-${hash}.${ext}`;
-            rewritten = rewritten.replace(match[0], `![${alt}](${relativePath})`);
-        }
     }
 
     return {
-        rewrittenPrompt: rewritten,
+        rewrittenPrompt: text,
         hasImages: images.length > 0,
         images,
     };
@@ -527,7 +520,7 @@ export async function writePureImageToClipboard(
             try {
                 let pathToPass = '';
                 if (typeof imageUriOrBlob === 'string' && !imageUriOrBlob.startsWith('blob:') && !imageUriOrBlob.startsWith('data:')) {
-                    pathToPass = imageUriOrBlob;
+                    pathToPass = resolveToAbsolutePath(imageUriOrBlob, repoPath) || extractLocalPathFromUri(imageUriOrBlob) || imageUriOrBlob;
                 } else if (pngBlob) {
                     const reader = new FileReader();
                     const b64Promise = new Promise<string>((res) => {
@@ -546,6 +539,13 @@ export async function writePureImageToClipboard(
                     triggerAction: 'copy_image_to_clipboard',
                 });
             }
+        }
+
+        if (nativeWritten) {
+            const msg = 'Image copied to clipboard (ready for OneNote, chat & IDEs)!';
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'success' });
+            return true;
         }
 
         let webWritten = false;
@@ -568,7 +568,7 @@ export async function writePureImageToClipboard(
             }
         }
 
-        if (nativeWritten || webWritten) {
+        if (webWritten) {
             const msg = 'Image copied to clipboard (ready for OneNote, chat & IDEs)!';
             onSuccess?.(msg);
             showToast({ message: msg, type: 'success' });
@@ -793,30 +793,39 @@ export async function copyAllImagesToClipboard(
     }
 
     try {
-        // 1. Primary path: Vertical composite PNG blob (pure binary to prevent Chromium drop bug)
+        // 0. Primary Native Path (Tauri): vertical composite image + CF_HDROP file drop list
+        if (isTauriEnvironment()) {
+            try {
+                const resolvedPaths: string[] = [];
+                for (const u of cleanUris) {
+                    if (u.startsWith('data:image/')) {
+                        resolvedPaths.push(u);
+                    } else if (u.startsWith('http://') || u.startsWith('https://')) {
+                        const b64 = await convertImageUriToBase64(u, repoPath);
+                        resolvedPaths.push(b64 || u);
+                    } else {
+                        const abs = resolveToAbsolutePath(u, repoPath) || extractLocalPathFromUri(u) || u;
+                        resolvedPaths.push(abs);
+                    }
+                }
+                if (resolvedPaths.length > 0) {
+                    await invoke('copy_images_to_clipboard', { paths: resolvedPaths });
+                    const msg = `Copied ${cleanUris.length} image(s) to clipboard (ready for OneNote & IDE)!`;
+                    onSuccess?.(msg);
+                    showToast({ message: msg, type: 'success' });
+                    return true;
+                }
+            } catch (tauriErr) {
+                useErrorStore.getState().trackWarning(tauriErr, {
+                    source: 'clipboard.copyAllImagesToClipboard.tauri',
+                    triggerAction: 'copy_images_to_clipboard',
+                });
+            }
+        }
+
+        // 1. Fallback Web Path: Vertical composite PNG blob (pure binary to prevent Chromium drop bug)
         const compositeBlob = await stitchImagesToCompositePng(cleanUris, repoPath);
         if (compositeBlob) {
-            let nativeWritten = false;
-            if (isTauriEnvironment()) {
-                try {
-                    const reader = new FileReader();
-                    const b64Promise = new Promise<string>((res) => {
-                        reader.onloadend = () => res(reader.result as string);
-                        reader.readAsDataURL(compositeBlob);
-                    });
-                    const b64 = await b64Promise;
-                    if (b64) {
-                        await invoke('copy_image_to_clipboard', { path: b64 });
-                        nativeWritten = true;
-                    }
-                } catch (tauriErr) {
-                    useErrorStore.getState().trackWarning(tauriErr, {
-                        source: 'clipboard.copyAllImagesToClipboard.tauri',
-                        triggerAction: 'copy_image_to_clipboard',
-                    });
-                }
-            }
-
             let webWritten = false;
             ensureDocumentFocus();
             const hasFocus = typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : true;
@@ -835,7 +844,7 @@ export async function copyAllImagesToClipboard(
                 }
             }
 
-            if (nativeWritten || webWritten) {
+            if (webWritten) {
                 const msg = `Copied ${cleanUris.length} image(s) as composite PNG to clipboard (ready for OneNote & IDE)!`;
                 onSuccess?.(msg);
                 showToast({ message: msg, type: 'success' });
@@ -928,7 +937,8 @@ export async function copyPromptWithRichImages(
     markdownText: string,
     onSuccess?: (message: string) => void,
     onError?: (err: unknown) => void,
-    mediaPaths?: string[]
+    mediaPaths?: string[],
+    repoPath?: string
 ): Promise<boolean> {
     if (!markdownText || !markdownText.trim()) {
         return false;
@@ -964,7 +974,7 @@ export async function copyPromptWithRichImages(
             if (rawSrc.startsWith('data:image/')) {
                 srcMap.set(rawSrc, rawSrc);
             } else if (!srcMap.has(rawSrc)) {
-                const base64Uri = await convertImageUriToBase64(rawSrc);
+                const base64Uri = await convertImageUriToBase64(rawSrc, repoPath);
                 srcMap.set(rawSrc, base64Uri || rawSrc);
             }
         }
@@ -1000,20 +1010,23 @@ export async function copyPromptWithRichImages(
         // Extract first image to attach true binary image/png alongside html and text
         const { images } = extractAssets(effectiveMarkdown);
         let pngBlob: Blob | null = null;
+        let nativeWritten = false;
         if (images.length > 0) {
             const firstImg = images[0];
             const base64First = srcMap.get(firstImg) || firstImg;
-            pngBlob = await convertImageUriToPngBlob(base64First);
+            pngBlob = await convertImageUriToPngBlob(base64First, repoPath);
 
             if (isTauriEnvironment()) {
                 try {
+                    let pathToPass = '';
                     if (base64First.startsWith('data:image/')) {
-                        await invoke('copy_image_to_clipboard', { path: base64First });
+                        pathToPass = base64First;
                     } else {
-                        const localPath = extractLocalPathFromUri(base64First);
-                        if (localPath) {
-                            await invoke('copy_image_to_clipboard', { path: localPath });
-                        }
+                        pathToPass = resolveToAbsolutePath(base64First, repoPath) || extractLocalPathFromUri(base64First) || base64First;
+                    }
+                    if (pathToPass) {
+                        await invoke('copy_image_to_clipboard', { path: pathToPass });
+                        nativeWritten = true;
                     }
                 } catch (nativeErr) {
                     useErrorStore.getState().trackWarning(nativeErr, {
@@ -1022,6 +1035,13 @@ export async function copyPromptWithRichImages(
                     });
                 }
             }
+        }
+
+        if (nativeWritten) {
+            const successMsg = 'Copied full prompt with embedded rich images to clipboard!';
+            onSuccess?.(successMsg);
+            showToast({ message: successMsg, type: 'success' });
+            return true;
         }
 
         let isWritten = false;
@@ -1293,7 +1313,8 @@ export async function copySingleImageForOneNoteOrIde(
     imageUri: string,
     altText = 'Image',
     onSuccess?: (msg: string) => void,
-    onError?: (err: unknown) => void
+    onError?: (err: unknown) => void,
+    repoPath?: string
 ): Promise<boolean> {
     if (!imageUri || !imageUri.trim()) {
         return false;
@@ -1315,7 +1336,7 @@ export async function copySingleImageForOneNoteOrIde(
     }
 
     try {
-        const base64Uri = await convertImageUriToBase64(cleanUri);
+        const base64Uri = await convertImageUriToBase64(cleanUri, repoPath);
         const resolvedSrc = base64Uri || cleanUri;
 
         const htmlContent = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#222;"><p style="margin:8px 0;"><img src="${resolvedSrc}" alt="${altText}" style="max-width:100%;height:auto;border-radius:6px;display:block;box-shadow:0 2px 8px rgba(0,0,0,0.15);" /></p></body></html>`;
@@ -1323,17 +1344,20 @@ export async function copySingleImageForOneNoteOrIde(
 
         const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
         const textBlob = new Blob([mdText], { type: 'text/plain' });
-        const pngBlob = await convertImageUriToPngBlob(resolvedSrc);
+        const pngBlob = await convertImageUriToPngBlob(resolvedSrc, repoPath);
 
+        let nativeWritten = false;
         if (isTauriEnvironment()) {
             try {
+                let pathToPass = '';
                 if (resolvedSrc.startsWith('data:image/')) {
-                    await invoke('copy_image_to_clipboard', { path: resolvedSrc });
+                    pathToPass = resolvedSrc;
                 } else {
-                    const localPath = extractLocalPathFromUri(resolvedSrc);
-                    if (localPath) {
-                        await invoke('copy_image_to_clipboard', { path: localPath });
-                    }
+                    pathToPass = resolveToAbsolutePath(resolvedSrc, repoPath) || extractLocalPathFromUri(resolvedSrc) || resolvedSrc;
+                }
+                if (pathToPass) {
+                    await invoke('copy_image_to_clipboard', { path: pathToPass });
+                    nativeWritten = true;
                 }
             } catch (nativeErr) {
                 useErrorStore.getState().trackWarning(nativeErr, {
@@ -1341,6 +1365,13 @@ export async function copySingleImageForOneNoteOrIde(
                     triggerAction: 'copy_image_to_clipboard',
                 });
             }
+        }
+
+        if (nativeWritten) {
+            const msg = 'Copied image for OneNote/Word (rich media) and IDEs (Markdown)!';
+            onSuccess?.(msg);
+            showToast({ message: msg, type: 'success' });
+            return true;
         }
 
         let isWritten = false;

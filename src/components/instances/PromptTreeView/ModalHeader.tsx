@@ -10,6 +10,7 @@ import {
     PanelLeftOpen,
     ChevronDown,
     Check,
+    Image as ImageIcon,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { SyncInterval } from '../../../services/instanceService';
@@ -149,44 +150,44 @@ export function ModalHeader(props: ModalHeaderProps) {
                         isLoading={isLoading}
                     />
 
-                    {/* Segment 2: Reset Button */}
+                    {/* Segment 2: Reset Icon Button */}
                     <button
                         type="button"
                         onClick={onResetTree}
                         disabled={isLoading || isResetting}
-                        className="flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                        title="Wipe database and regenerate prompt tree and sequences fresh from disk transcripts"
+                        className="flex items-center justify-center w-7 h-7 text-slate-500 dark:text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Reset & Regenerate Tree (Wipe SQLite DB and rebuild prompt tree and sequences fresh from disk transcripts)"
+                        aria-label="Reset & Regenerate Tree"
                     >
                         <RotateCcw className={cn("w-3.5 h-3.5 text-amber-500", isResetting && "animate-spin")} />
-                        <span>{isResetting ? 'Resetting...' : 'Reset'}</span>
                     </button>
 
-                    {/* Segment 3: Refresh Button */}
+                    {/* Segment 3: Refresh Icon Button */}
                     <button
                         type="button"
                         onClick={onRefreshAll}
                         disabled={isLoading}
-                        className="flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                        title="Refresh all projects"
+                        className="flex items-center justify-center w-7 h-7 text-slate-500 dark:text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Refresh All Projects & Prompts (Scan disk transcripts and update active prompts)"
+                        aria-label="Refresh All Projects"
                     >
                         <RefreshCw className={cn("w-3.5 h-3.5 text-blue-500", (isLoading || isAutoSyncing || isRefreshing) && "animate-spin")} />
-                        <span>Refresh</span>
                     </button>
 
-                    {/* Segment 3.5: Image Filter Toggle Button */}
+                    {/* Segment 4: Image Filter Toggle Button */}
                     <button
                         type="button"
                         onClick={handleToggleImageFilter}
                         className={cn(
-                            "flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                            "flex items-center justify-center w-7 h-7 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
                             isImageFilterActive
-                                ? "bg-sky-600 text-white shadow-2xs"
-                                : "text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90"
+                                ? "bg-sky-500/25 text-sky-400 border-x border-sky-500/40 shadow-inner"
+                                : "text-slate-500 dark:text-slate-400 hover:text-sky-400 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90"
                         )}
-                        title={isImageFilterActive ? "Showing only conversations with images" : "Filter conversations with images"}
+                        title={isImageFilterActive ? "Image Filter Active: Showing only conversations with images (Click to show all)" : "Filter by Images: Show only conversations with attached or embedded images"}
+                        aria-label={isImageFilterActive ? "Image Filter Active" : "Filter by Images"}
                     >
-                        <span>🖼️</span>
-                        <span>Images</span>
+                        <ImageIcon className="w-3.5 h-3.5" />
                     </button>
 
                     {/* Segment 4: Sync Interval Selector with Modernized Dark-Glass Popover */}

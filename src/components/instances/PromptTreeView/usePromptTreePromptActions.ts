@@ -407,14 +407,21 @@ export function usePromptTreePromptActions({
             }
 
             // Append attached images from conversation media_paths or media_thumbnails if not already in markdown
-            const mediaList: string[] = [
+            const activeTurn = conv?.selected_turn_number != null
+                ? conv.prompts?.find((t) => t.turn_number === conv.selected_turn_number)
+                : undefined;
+            const mediaList: string[] = Array.from(new Set([
+                ...(activeTurn?.media_paths || []),
+                ...(activeTurn?.media_thumbnails || []),
                 ...(selectedConversation?.media_paths || conv?.media_paths || []),
                 ...(selectedConversation?.media_thumbnails || conv?.media_thumbnails || []),
-            ].filter((p, idx, arr): p is string => Boolean(p && typeof p === 'string' && arr.indexOf(p) === idx));
+                ...(conv?.prompts?.flatMap((p) => p.media_paths || []) || []),
+                ...(conv?.sub_runs?.flatMap((s) => s.media_paths || []) || []),
+            ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
             if (mediaList.length > 0) {
                 const missing = mediaList.filter((p) => p && !promptContent.includes(p));
                 if (missing.length > 0) {
-                    const imagesBlock = '\n\n' + missing.map((p, idx) => `![Attached Image ${idx + 1}](${p})`).join('\n\n');
+                    const imagesBlock = '\n\n' + missing.map((p, idx) => `![Attached Image ${idx + 1}](<${p}>)`).join('\n\n');
                     if (promptContent.includes('</USER_REQUEST>')) {
                         promptContent = promptContent.replace('</USER_REQUEST>', imagesBlock + '\n</USER_REQUEST>');
                     } else {
@@ -429,7 +436,7 @@ export function usePromptTreePromptActions({
             let dispatchOk = false;
             let dispatchErr: unknown = null;
             try {
-                await sendPromptNow(targetInstId, repoPath, promptContent, targetConvId);
+                await (sendPromptNow as any)(targetInstId, repoPath, promptContent, targetConvId, mediaList);
                 dispatchOk = true;
             } catch (sendErr) {
                 dispatchErr = sendErr;
@@ -639,14 +646,21 @@ ${activePromptText}
             }
 
             // Append attached images from conversation media_paths or media_thumbnails if not already in markdown
-            const mediaList: string[] = [
-                ...(selectedConversation?.media_paths || conv.media_paths || []),
-                ...(selectedConversation?.media_thumbnails || conv.media_thumbnails || []),
-            ].filter((p, idx, arr): p is string => Boolean(p && typeof p === 'string' && arr.indexOf(p) === idx));
+            const activeTurn = conv?.selected_turn_number != null
+                ? conv.prompts?.find((t) => t.turn_number === conv.selected_turn_number)
+                : undefined;
+            const mediaList: string[] = Array.from(new Set([
+                ...(activeTurn?.media_paths || []),
+                ...(activeTurn?.media_thumbnails || []),
+                ...(selectedConversation?.media_paths || conv?.media_paths || []),
+                ...(selectedConversation?.media_thumbnails || conv?.media_thumbnails || []),
+                ...(conv?.prompts?.flatMap((p) => p.media_paths || []) || []),
+                ...(conv?.sub_runs?.flatMap((s) => s.media_paths || []) || []),
+            ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
             if (mediaList.length > 0) {
                 const missing = mediaList.filter((p) => p && !promptContent.includes(p));
                 if (missing.length > 0) {
-                    const imagesBlock = '\n\n' + missing.map((p, idx) => `![Attached Image ${idx + 1}](${p})`).join('\n\n');
+                    const imagesBlock = '\n\n' + missing.map((p, idx) => `![Attached Image ${idx + 1}](<${p}>)`).join('\n\n');
                     if (promptContent.includes('</USER_REQUEST>')) {
                         promptContent = promptContent.replace('</USER_REQUEST>', imagesBlock + '\n</USER_REQUEST>');
                     } else {
@@ -656,7 +670,7 @@ ${activePromptText}
             }
 
             // Enqueue prompt into FIFO queue (preserving real Base64 image data URIs and file paths)
-            await enqueuePrompt(targetInstId, repoPath, promptContent, targetConvId);
+            await (enqueuePrompt as any)(targetInstId, repoPath, promptContent, targetConvId, undefined, mediaList);
 
             // Invalidate prompt tree cache first so tree reload fetches fresh state including enqueued turn
             if (isTauri()) {
@@ -745,6 +759,12 @@ ${activePromptText}
             return { sent: 0, failed: 0 };
         }
         const prompts = extractConversationPromptsList(conv);
+        const convMedia = Array.from(new Set([
+            ...(conv.media_paths || []),
+            ...(conv.media_thumbnails || []),
+            ...(conv.prompts?.flatMap((p) => p.media_paths || []) || []),
+            ...(conv.sub_runs?.flatMap((s) => s.media_paths || []) || []),
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
         setActionMsg(`Resending ${count === 'all' ? 'all' : count} prompt(s)...`);
         const res = await dispatchMultiPromptResend({
             conversationId: conv.conversation_id,
@@ -752,6 +772,7 @@ ${activePromptText}
             repoPath: proj?.repo_path || '',
             count,
             prompts,
+            mediaPaths: convMedia,
         });
         if (res.sent > 0) {
             setActionMsg(`Successfully resent ${res.sent} prompt(s)!`);
@@ -770,6 +791,12 @@ ${activePromptText}
             return false;
         }
         const prompts = extractConversationPromptsList(conv);
+        const convMedia = Array.from(new Set([
+            ...(conv.media_paths || []),
+            ...(conv.media_thumbnails || []),
+            ...(conv.prompts?.flatMap((p) => p.media_paths || []) || []),
+            ...(conv.sub_runs?.flatMap((s) => s.media_paths || []) || []),
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
         setActionMsg(`Synthesizing ${count}-prompt verification audit & enqueueing...`);
         const ok = await handleVerifyLastPromptsAndEnqueue({
             instanceId: selectedConversation?.instance_id || conv.instance_id || proj?.instance_id || instanceId || 'default',
@@ -778,6 +805,7 @@ ${activePromptText}
             convTitle: conv.title || conv.short_id,
             count,
             prompts,
+            mediaPaths: convMedia,
         });
         if (ok) {
             setActionMsg(`Synthesized ${Math.min(count, prompts.length)}-prompt audit & enqueued to instance!`);
@@ -795,11 +823,18 @@ ${activePromptText}
             setError('No conversation selected to clone and compact');
             return null;
         }
+        const convMedia = Array.from(new Set([
+            ...(conv.media_paths || []),
+            ...(conv.media_thumbnails || []),
+            ...(conv.prompts?.flatMap((p) => p.media_paths || []) || []),
+            ...(conv.sub_runs?.flatMap((s) => s.media_paths || []) || []),
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
         setActionMsg('Cloning conversation and compacting memory handoff...');
         const newTitle = await handleCloneAndCompactConversation({
             instanceId: selectedConversation?.instance_id || conv.instance_id || proj?.instance_id || instanceId || 'default',
             repoPath: proj?.repo_path || '',
             sourceConv: conv,
+            mediaPaths: convMedia,
         });
         if (newTitle) {
             setActionMsg(`Cloned & compacted into fresh session '${newTitle}'!`);
@@ -1041,6 +1076,8 @@ export interface RerunDispatchContext {
     originalPrompt?: string;
     /** Audit/source label, e.g. 'DetailHeader.rerunSection'. */
     source?: string;
+    /** Media attachment paths to forward to instance and clipboard */
+    mediaPaths?: string[];
 }
 
 export interface RerunDispatchResult {
@@ -1053,7 +1090,7 @@ export interface RerunDispatchResult {
  * Dispatch the chosen rerun message N times through the canonical `sendPromptNow`
  * path (the same function handleResendPrompt uses). Each rerun is audit-logged
  * individually; a failed rerun is audit-logged as `result: 'error'` and routed
- * into the error module â€” failures are never silent.
+ * into the error module — failures are never silent.
  */
 export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<RerunDispatchResult> {
     const requested = Math.min(
@@ -1073,11 +1110,30 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
         const { message: rawMessage, pickedIndex } = resolveRerunMessage(ctx.messageOption);
         const richPrompt = buildRerunPrompt(ctx.originalPrompt || '', i + 1, requested);
         const message = richPrompt || rawMessage;
-        const { rewrittenPrompt } = extractPromptImages(message);
+        const { rewrittenPrompt, images } = extractPromptImages(message);
+        const rerunMedia: string[] = Array.from(new Set([
+            ...(ctx.mediaPaths || []),
+            ...((ctx as { media_paths?: string[] }).media_paths || []),
+            ...images.map((img) => img.dataUri),
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
         try {
-            // Canonical dispatch path â€” identical call handleResendPrompt makes.
-            await sendPromptNow(ctx.targetInstId, ctx.repoPath, rewrittenPrompt, ctx.convId);
+            // Canonical dispatch path — identical call handleResendPrompt makes.
+            await (sendPromptNow as any)(
+                ctx.targetInstId,
+                ctx.repoPath,
+                rewrittenPrompt,
+                ctx.convId,
+                rerunMedia.length > 0 ? rerunMedia : undefined
+            );
             result.dispatched += 1;
+            try {
+                await copyPromptWithRichImages(message, undefined, undefined, rerunMedia.length > 0 ? rerunMedia : undefined);
+            } catch (clipErr) {
+                useErrorStore.getState().trackWarning(clipErr, {
+                    source: 'usePromptTreePromptActions.dispatchRerunMessages',
+                    triggerAction: 'copy_rerun_rich_images',
+                });
+            }
             await auditRecord({
                 ...auditBase,
                 params: {
@@ -1150,6 +1206,7 @@ export interface MultiPromptResendOptions {
     count: number | 'all';
     delayMs?: number;
     prompts?: string[];
+    mediaPaths?: string[];
 }
 
 export async function dispatchMultiPromptResend(
@@ -1165,9 +1222,19 @@ export async function dispatchMultiPromptResend(
     const result = { sent: 0, failed: 0 };
     for (const prompt of targetPrompts) {
         if (!prompt || !prompt.trim()) continue;
-        const { rewrittenPrompt } = extractPromptImages(prompt);
+        const { rewrittenPrompt, images } = extractPromptImages(prompt);
+        const promptMedia: string[] = Array.from(new Set([
+            ...(options.mediaPaths || []),
+            ...images.map((img) => img.dataUri),
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
         try {
-            await sendPromptNow(options.instanceId, options.repoPath, rewrittenPrompt, options.conversationId);
+            await (sendPromptNow as any)(
+                options.instanceId,
+                options.repoPath,
+                rewrittenPrompt,
+                options.conversationId,
+                promptMedia.length > 0 ? promptMedia : undefined
+            );
             result.sent += 1;
             await auditRecord({
                 actor: 'user',
@@ -1180,6 +1247,7 @@ export async function dispatchMultiPromptResend(
                     instanceId: options.instanceId,
                     promptCount: targetPrompts.length,
                     prompt,
+                    mediaCount: promptMedia.length,
                 },
                 result: 'ok',
             });
@@ -1205,6 +1273,7 @@ export interface VerifyLastPromptsOptions {
     convTitle?: string;
     count?: number;
     prompts?: string[];
+    mediaPaths?: string[];
 }
 
 export async function handleVerifyLastPromptsAndEnqueue(
@@ -1219,10 +1288,26 @@ export async function handleVerifyLastPromptsAndEnqueue(
             options.convTitle || options.conversationId
         );
 
-        const { rewrittenPrompt } = extractPromptImages(verificationPrompt);
-        await enqueuePrompt(options.instanceId, options.repoPath, rewrittenPrompt, options.conversationId);
+        const { rewrittenPrompt, images } = extractPromptImages(verificationPrompt);
+        const verifyMedia: string[] = Array.from(new Set([
+            ...(options.mediaPaths || []),
+            ...images.map((img) => img.dataUri),
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+        await (enqueuePrompt as any)(
+            options.instanceId,
+            options.repoPath,
+            rewrittenPrompt,
+            options.conversationId,
+            undefined,
+            verifyMedia.length > 0 ? verifyMedia : undefined
+        );
         try {
-            await copyPromptWithRichImages(verificationPrompt);
+            await copyPromptWithRichImages(
+                verificationPrompt,
+                undefined,
+                undefined,
+                verifyMedia.length > 0 ? verifyMedia : undefined
+            );
         } catch (clipErr) {
             useErrorStore.getState().trackWarning(clipErr, {
                 source: 'usePromptTreePromptActions.handleVerifyLastPromptsAndEnqueue',
@@ -1239,6 +1324,7 @@ export async function handleVerifyLastPromptsAndEnqueue(
                 conversationId: options.conversationId,
                 instanceId: options.instanceId,
                 auditedCount: subset.length,
+                mediaCount: verifyMedia.length,
             },
             result: 'ok',
         });
@@ -1261,6 +1347,7 @@ export interface CloneAndCompactOptions {
     repoPath: string;
     sourceConv: AgmConversationNode;
     prompts?: string[];
+    mediaPaths?: string[];
 }
 
 export async function handleCloneAndCompactConversation(
@@ -1277,7 +1364,7 @@ export async function handleCloneAndCompactConversation(
             .join('\n');
 
         const compactContext = [
-            '# ðŸ“¦ SESSION HANDOFF & COMPACTED MEMORY CONTEXT',
+            '# 📦 SESSION HANDOFF & COMPACTED MEMORY CONTEXT',
             '',
             `> **Source Conversation:** ${sourceConv.title || sourceConv.short_id} (\`${sourceConv.conversation_id}\`)`,
             `> **Previous Steps Completed:** ${sourceConv.step_count || 1}`,
@@ -1294,11 +1381,31 @@ export async function handleCloneAndCompactConversation(
             'Review the verified state above and continue seamlessly toward task completion.',
         ].filter(Boolean).join('\n');
 
-        const { rewrittenPrompt } = extractPromptImages(compactContext);
-        await enqueuePrompt(instanceId, repoPath, rewrittenPrompt, compactTitle);
+        const { rewrittenPrompt, images } = extractPromptImages(compactContext);
+        const compactMedia: string[] = Array.from(new Set([
+            ...(options.mediaPaths || []),
+            ...(sourceConv.media_paths || []),
+            ...(sourceConv.media_thumbnails || []),
+            ...(sourceConv.prompts?.flatMap((p) => p.media_paths || []) || []),
+            ...(sourceConv.sub_runs?.flatMap((s) => s.media_paths || []) || []),
+            ...images.map((img) => img.dataUri),
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+        await (enqueuePrompt as any)(
+            instanceId,
+            repoPath,
+            rewrittenPrompt,
+            compactTitle,
+            undefined,
+            compactMedia.length > 0 ? compactMedia : undefined
+        );
 
         try {
-            await copyPromptWithRichImages(compactContext);
+            await copyPromptWithRichImages(
+                compactContext,
+                undefined,
+                undefined,
+                compactMedia.length > 0 ? compactMedia : undefined
+            );
         } catch (clipErr) {
             useErrorStore.getState().trackWarning(clipErr, {
                 source: 'usePromptTreePromptActions.handleCloneAndCompactConversation',
@@ -1316,6 +1423,7 @@ export async function handleCloneAndCompactConversation(
                 sourceConvId: sourceConv.conversation_id,
                 targetTitle: compactTitle,
                 instanceId,
+                mediaCount: compactMedia.length,
             },
             result: 'ok',
         });

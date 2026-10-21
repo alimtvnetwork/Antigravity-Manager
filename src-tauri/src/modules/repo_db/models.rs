@@ -246,6 +246,10 @@ pub struct AgmConversationNode {
     pub tool_calls_summary: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub full_prompt_text: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub media_paths: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub media_thumbnails: Vec<String>,
     /// Tier 3: Chronological list of all prompt turns dispatched to this conversation
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub prompts: Vec<AgmPromptTurnNode>,

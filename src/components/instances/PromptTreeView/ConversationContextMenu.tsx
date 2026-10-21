@@ -294,7 +294,7 @@ export function ConversationContextMenu({
             : currentTitle;
         if (!textToCopy) return;
         try {
-            await copyPromptWithRichImages(textToCopy);
+            await copyPromptWithRichImages(textToCopy, undefined, undefined, undefined, repoPath);
             setIsCopyWithImagesDone(true);
             setTimeout(() => onClose(), 400);
         } catch (err) {
@@ -385,9 +385,9 @@ export function ConversationContextMenu({
 
         try {
             if (allImageUris.length === 1) {
-                await writePureImageToClipboard(allImageUris[0]);
+                await writePureImageToClipboard(allImageUris[0], undefined, undefined, repoPath);
             } else {
-                await copyAllImagesToClipboard(allImageUris);
+                await copyAllImagesToClipboard(allImageUris, repoPath);
             }
             setIsCopyImageDone(true);
             setTimeout(() => onClose(), 400);
@@ -875,7 +875,7 @@ export function ConversationContextMenu({
                     ) : (
                         <Copy className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                     )}
-                    <span>{isCopyWithImagesDone ? 'Copied Rich Content!' : 'Copy (With Images)'}</span>
+                    <span>{isCopyWithImagesDone ? 'Copied Rich Content!' : 'Copy'}</span>
                 </div>
                 <span className="text-[9px] font-mono text-indigo-400">Rich</span>
             </button>
@@ -893,7 +893,7 @@ export function ConversationContextMenu({
                     ) : (
                         <Copy className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
                     )}
-                    <span>{isCopyWithoutImagesDone ? 'Copied Plain Text!' : 'Copy (Without Images)'}</span>
+                    <span>{isCopyWithoutImagesDone ? 'Copied Plain Text!' : 'Copy Text Only'}</span>
                 </div>
                 <span className="text-[9px] font-mono text-slate-400">Plain</span>
             </button>
@@ -911,7 +911,7 @@ export function ConversationContextMenu({
                     ) : (
                         <Image className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
                     )}
-                    <span>{isCopyImageDone ? 'Copied Native PNG!' : 'Copy Images'}</span>
+                    <span>{isCopyImageDone ? 'Copied Native PNG!' : 'Copy Images (Composite)'}</span>
                 </div>
                 <span className="text-[9px] font-mono text-cyan-400">PNG</span>
             </button>

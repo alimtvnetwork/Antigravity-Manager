@@ -256,7 +256,7 @@ export function TreePanel(props: TreePanelProps) {
     return (
         <div className="w-full flex-1 min-h-0 flex flex-col overflow-hidden">
             {/* Search Input & Filter Controls */}
-            <div className="p-3 border-b border-slate-200 dark:border-[#40285e] shrink-0 space-y-2">
+            <div className="relative z-10 bg-slate-50/95 dark:bg-[#0c0817]/95 backdrop-blur-md p-3 border-b border-slate-200 dark:border-[#40285e] shrink-0 space-y-2">
                 {/* Project Scope Dropdown & Quick Pin Header */}
                 <div className="flex items-center justify-between gap-1.5 bg-white dark:bg-[#171025] px-2 py-1 rounded-lg border border-slate-200 dark:border-[#40285e]">
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -390,8 +390,8 @@ export function TreePanel(props: TreePanelProps) {
                 </div>
 
                 {/* Row 2: Status Filter Segmented Capsule & Archive Scope */}
-                <div className="flex items-center justify-between gap-1.5 pt-0.5 flex-wrap">
-                    <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-[#40285e] bg-white/80 dark:bg-[#171025]/80 backdrop-blur-xs p-0.5 shadow-2xs divide-x divide-slate-200 dark:divide-[#40285e]">
+                <div className="flex items-center justify-between gap-1.5 pt-0.5 min-w-0">
+                    <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-[#40285e] bg-white/80 dark:bg-[#171025]/80 backdrop-blur-xs p-0.5 shadow-2xs divide-x divide-slate-200 dark:divide-[#40285e] shrink-0">
                         <button
                             type="button"
                             onClick={() => setActiveFilter(activeFilter === 'running' ? 'all' : 'running')}
@@ -451,7 +451,7 @@ export function TreePanel(props: TreePanelProps) {
                         </button>
                     </div>
 
-                    <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#120d20]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-900/50 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-900/40 shadow-2xs">
+                    <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#120d20]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-900/50 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-900/40 shadow-2xs shrink-0">
                         <button
                             type="button"
                             onClick={handleToggleAutomated}

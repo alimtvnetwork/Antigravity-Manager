@@ -414,7 +414,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         setIsCopyingAllImages(true);
         try {
             const uris = attachedImages.map((img) => img.src);
-            const ok = await copyAllImagesToClipboard(uris);
+            const ok = await copyAllImagesToClipboard(uris, selectedProject?.repo_path);
             if (ok) {
                 setIsCopiedAllImages(true);
                 setActionMsg?.(`Copied all ${attachedImages.length} images to clipboard!`);
@@ -668,7 +668,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                         <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate font-mono">
                             ID: {selectedConversation.conversation_id}
                         </p>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
                             <div className="p-2 rounded-lg bg-white/80 dark:bg-[#1a1228]/80 border border-slate-200/60 dark:border-[#382352]/60">
                                 <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 block">Total Turns</span>
                                 <span className="text-sm font-bold text-slate-800 dark:text-slate-100 font-mono">
@@ -768,7 +768,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                     Click any turn chip to preview prompt
                                 </span>
                             </div>
-                            <div className="flex items-center gap-1.5 flex-wrap">
+                            <div className="flex items-center gap-x-2 gap-y-2 flex-wrap">
                                 {turns.map((turn) => {
                                     const isTurnRunning = Boolean(turn.is_running);
                                     const isTurnQueued = Boolean(turn.is_queued) || (turn.status && turn.status.toLowerCase().includes('queue'));

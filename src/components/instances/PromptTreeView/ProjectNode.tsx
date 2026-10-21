@@ -134,7 +134,7 @@ function ConversationListWithGrouping({
     return (
         <>
             {hierarchy.map((root, rIdx) => (
-                <div key={`root-${root.primaryNode.conversation_id}`} className="space-y-0.5">
+                <div key={`root-${root.primaryNode.conversation_id}`} className="space-y-1.5">
                     <ConversationNode
                         conv={root.primaryNode}
                         project={project}
@@ -151,7 +151,7 @@ function ConversationListWithGrouping({
 
                     {/* Rendering Child Sub-Points (Indented with Branch Glyphs) */}
                     {root.subagents.length > 0 && (
-                        <div className="pl-5 space-y-0.5 border-l-2 border-purple-300/40 dark:border-purple-800/40 ml-3.5 my-0.5">
+                        <div className="pl-5 space-y-1.5 border-l-2 border-purple-300/40 dark:border-purple-800/40 ml-3.5 my-1">
                             {root.subagents.map((subNode, subIdx) => {
                                 const isSubSelected = selectedConversationId === subNode.primaryNode.conversation_id;
                                 const { isRunning: isSubRunning } = getConversationStatus(subNode.primaryNode);
@@ -558,7 +558,7 @@ export function ProjectNode(props: ProjectNodeProps) {
             {/* Layer 2: Conversations List */}
             {(isExpanded || isScopedSingleProject) && (
                 <div className={cn(
-                    "space-y-1 py-1",
+                    "space-y-2 py-1",
                     !isScopedSingleProject && "ml-5 pl-3 border-l-2 border-slate-300/60 dark:border-purple-900/50"
                 )}>
                     {/* Active Conversations */}
@@ -572,7 +572,7 @@ export function ProjectNode(props: ProjectNodeProps) {
 
                     {/* Collapsible Stale / Empty Prompts Node */}
                     {staleConversations.length > 0 && (
-                        <div className="space-y-0.5 mt-1 pt-1 border-t border-slate-200/50 dark:border-[#40285e]/40">
+                        <div className="space-y-1.5 mt-1.5 pt-1.5 border-t border-slate-200/50 dark:border-[#40285e]/40">
                             <div
                                 onClick={() => onToggleStaleGroup(project.project_id)}
                                 className="group flex items-center justify-between rounded-md px-2 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#171025] cursor-pointer transition-colors"
@@ -595,7 +595,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                             </div>
 
                             {isStaleGroupExpanded && (
-                                <div className="ml-4 pl-2 border-l border-dashed border-slate-200 dark:border-[#40285e]/60 space-y-0.5 py-0.5">
+                                <div className="ml-4 pl-2 border-l border-dashed border-slate-200 dark:border-[#40285e]/60 space-y-1.5 py-0.5">
                                     <ConversationListWithGrouping convList={staleConversations} {...listProps} />
                                 </div>
                             )}

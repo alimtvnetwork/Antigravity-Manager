@@ -560,19 +560,33 @@ pub async fn send_prompt_now(
     repo_path: String,
     prompt_content: String,
     conversation_id: Option<String>,
+    media_paths: Option<Vec<String>>,
 ) -> Result<crate::modules::repo_db::ActivePrompt, String> {
     let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
     let audit_inst = resolved_id.clone();
     let audit_repo = repo_path.clone();
     let audit_conv = conversation_id.clone();
+    let media_paths_clone = media_paths.clone();
+    let media_paths_audit = media_paths.clone();
     let res = tokio::task::spawn_blocking(move || {
         run_caught_prompt_task("send_prompt_now", move || {
-            crate::modules::repo_db::send_prompt_now_for_instance(
+            let mut prompt = crate::modules::repo_db::send_prompt_now_for_instance(
                 &resolved_id,
                 &repo_path,
                 &prompt_content,
                 conversation_id.as_deref(),
-            )
+            )?;
+            if let Some(ref paths) = media_paths_clone {
+                if !paths.is_empty() {
+                    prompt.image_payload = Some(paths.join(";"));
+                    // Justification: updating image_payload in SQLite cache after successful dispatch is best-effort
+                    crate::error::record_ignored(
+                        crate::modules::repo_db::save_or_requeue_prompt(&prompt),
+                        "update prompt image payload in database",
+                    );
+                }
+            }
+            Ok(prompt)
         })
     })
     .await
@@ -591,6 +605,7 @@ pub async fn send_prompt_now(
                 "repo_path": audit_repo,
                 "conversation_id": audit_conv,
                 "prompt_id": res.as_ref().ok().map(|p| p.id.clone()),
+                "media_count": media_paths_audit.as_ref().map(|m| m.len()).unwrap_or(0),
             })),
             result: if res.is_ok() {
                 "ok".to_string()
@@ -611,19 +626,33 @@ pub async fn enqueue_prompt(
     prompt_content: String,
     conversation_id: Option<String>,
     _project_id: Option<String>,
+    media_paths: Option<Vec<String>>,
 ) -> Result<crate::modules::repo_db::ActivePrompt, String> {
     let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
     let audit_inst = resolved_id.clone();
     let audit_repo = repo_path.clone();
     let audit_conv = conversation_id.clone();
+    let media_paths_clone = media_paths.clone();
+    let media_paths_audit = media_paths.clone();
     let res = tokio::task::spawn_blocking(move || {
         run_caught_prompt_task("enqueue_prompt", move || {
-            crate::modules::repo_db::enqueue_prompt_for_instance(
+            let mut prompt = crate::modules::repo_db::enqueue_prompt_for_instance(
                 &resolved_id,
                 &repo_path,
                 &prompt_content,
                 conversation_id.as_deref(),
-            )
+            )?;
+            if let Some(ref paths) = media_paths_clone {
+                if !paths.is_empty() {
+                    prompt.image_payload = Some(paths.join(";"));
+                    // Justification: updating image_payload in SQLite cache after successful enqueue is best-effort
+                    crate::error::record_ignored(
+                        crate::modules::repo_db::save_or_requeue_prompt(&prompt),
+                        "update queued prompt image payload in database",
+                    );
+                }
+            }
+            Ok(prompt)
         })
     })
     .await
@@ -642,6 +671,7 @@ pub async fn enqueue_prompt(
                 "repo_path": audit_repo,
                 "conversation_id": audit_conv,
                 "prompt_id": res.as_ref().ok().map(|p| p.id.clone()),
+                "media_count": media_paths_audit.as_ref().map(|m| m.len()).unwrap_or(0),
             })),
             result: if res.is_ok() {
                 "ok".to_string()

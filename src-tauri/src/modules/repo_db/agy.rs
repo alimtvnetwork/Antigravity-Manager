@@ -655,6 +655,7 @@ fn run_clipboard_helper_result(
 
 /// Send a prompt immediately for a specific instance, verifying process liveness,
 /// caching PID, updating SQLite split DB, writing .antigravity_resume_task.json, and executing via agy.
+/// Direct execution invariant: immediately executes and bypasses queued scheduler items.
 pub fn send_prompt_now_for_instance(
     instance_id: &str,
     repo_path: &str,
@@ -662,7 +663,6 @@ pub fn send_prompt_now_for_instance(
     conversation_id: Option<&str>,
 ) -> Result<ActivePrompt, String> {
     crate::modules::instance::scan_and_cache_all_running_instances();
-    copy_to_system_clipboard(prompt_content);
 
     let clean_inst = if instance_id.trim().is_empty() || instance_id == "__default__" {
         "default"
@@ -726,6 +726,17 @@ pub fn send_prompt_now_for_instance(
         } else {
             initial_img = Some(format!("screenshot_id={}", ss_token));
         }
+    }
+
+    // Guard: Do not overwrite rich HTML/image clipboard primed by frontend when prompt has attached media or rich content
+    let has_rich_media = initial_img.is_some()
+        || !img_paths.is_empty()
+        || prompt_content.contains("![")
+        || prompt_content.contains("<img")
+        || prompt_content.contains("data:image/")
+        || prompt_content.contains("Attached Image");
+    if !has_rich_media {
+        copy_to_system_clipboard(prompt_content);
     }
 
     let active_prompt = ActivePrompt {
@@ -859,6 +870,8 @@ pub fn send_prompt_now_for_instance(
         }
     }
 
+    invalidate_prompt_tree_cache(Some(&canonical_inst));
+
     Ok(active_prompt)
 }
 
@@ -880,7 +893,6 @@ pub fn enqueue_prompt_for_instance(
         return Err("prompt content is empty".to_string());
     }
     crate::modules::instance::scan_and_cache_all_running_instances();
-    copy_to_system_clipboard(prompt_content);
 
     let clean_inst = if instance_id.trim().is_empty() || instance_id == "__default__" {
         "default"
@@ -911,6 +923,17 @@ pub fn enqueue_prompt_for_instance(
         } else {
             initial_img = Some(format!("screenshot_id={}", ss_token));
         }
+    }
+
+    // Guard: Do not overwrite rich HTML/image clipboard primed by frontend when prompt has attached media or rich content
+    let has_rich_media = initial_img.is_some()
+        || !img_paths.is_empty()
+        || prompt_content.contains("![")
+        || prompt_content.contains("<img")
+        || prompt_content.contains("data:image/")
+        || prompt_content.contains("Attached Image");
+    if !has_rich_media {
+        copy_to_system_clipboard(prompt_content);
     }
 
     let active_prompt = ActivePrompt {

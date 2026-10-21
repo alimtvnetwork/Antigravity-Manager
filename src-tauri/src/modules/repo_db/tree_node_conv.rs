@@ -257,6 +257,21 @@ pub(crate) fn build_transcript_conv_nodes(
                 item.status.clone()
             };
 
+            let mut conv_media_paths = Vec::new();
+            let mut conv_media_thumbnails = Vec::new();
+            for p in &item.prompts {
+                for m in &p.media_paths {
+                    if !conv_media_paths.contains(m) {
+                        conv_media_paths.push(m.clone());
+                    }
+                }
+                for t in &p.media_thumbnails {
+                    if !conv_media_thumbnails.contains(t) {
+                        conv_media_thumbnails.push(t.clone());
+                    }
+                }
+            }
+
             conv_nodes.push(AgmConversationNode {
                 seq_id: c_seq,
                 seq_code: format!("C{:03}", c_seq),
@@ -290,6 +305,8 @@ pub(crate) fn build_transcript_conv_nodes(
                 execution_results: item.execution_results.clone(),
                 tool_calls_summary: item.tool_calls_summary.clone(),
                 full_prompt_text: Some(item.prompt.clone()),
+                media_paths: conv_media_paths,
+                media_thumbnails: conv_media_thumbnails,
                 prompts: item.prompts.clone(),
             });
         }
@@ -351,6 +368,18 @@ pub(crate) fn build_active_prompt_conv_nodes(
                     let is_queued = is_alive_and_fresh && is_pending_stage;
                     let is_ap_run = is_alive_and_fresh && is_active_stage;
 
+                    let (ap_media_paths, ap_media_thumbnails) =
+                        if let Some(ref payload) = ap.image_payload {
+                            let paths: Vec<String> = payload
+                                .split(';')
+                                .map(|s| s.trim().to_string())
+                                .filter(|s| !s.is_empty())
+                                .collect();
+                            (paths.clone(), paths)
+                        } else {
+                            (Vec::new(), Vec::new())
+                        };
+
                     // Check if an existing turn already matches this prompt content
                     let existing_turn = target_conv
                         .prompts
@@ -358,6 +387,24 @@ pub(crate) fn build_active_prompt_conv_nodes(
                         .find(|p| p.prompt_text.trim() == ap.prompt_content.trim());
 
                     if let Some(turn) = existing_turn {
+                        if !ap_media_paths.is_empty() {
+                            for m in &ap_media_paths {
+                                if !turn.media_paths.contains(m) {
+                                    turn.media_paths.push(m.clone());
+                                }
+                                if !target_conv.media_paths.contains(m) {
+                                    target_conv.media_paths.push(m.clone());
+                                }
+                            }
+                            for t in &ap_media_thumbnails {
+                                if !turn.media_thumbnails.contains(t) {
+                                    turn.media_thumbnails.push(t.clone());
+                                }
+                                if !target_conv.media_thumbnails.contains(t) {
+                                    target_conv.media_thumbnails.push(t.clone());
+                                }
+                            }
+                        }
                         if is_ap_run {
                             turn.is_running = true;
                             turn.status = "RUNNING".to_string();
@@ -398,9 +445,19 @@ pub(crate) fn build_active_prompt_conv_nodes(
                             } else {
                                 ap.created_at
                             },
-                            media_paths: Vec::new(),
-                            media_thumbnails: Vec::new(),
+                            media_paths: ap_media_paths.clone(),
+                            media_thumbnails: ap_media_thumbnails.clone(),
                         };
+                        for m in &ap_media_paths {
+                            if !target_conv.media_paths.contains(m) {
+                                target_conv.media_paths.push(m.clone());
+                            }
+                        }
+                        for t in &ap_media_thumbnails {
+                            if !target_conv.media_thumbnails.contains(t) {
+                                target_conv.media_thumbnails.push(t.clone());
+                            }
+                        }
                         target_conv.prompts.push(ap_turn);
                         if is_queued {
                             target_conv.is_queued = true;
@@ -566,6 +623,18 @@ pub(crate) fn build_active_prompt_conv_nodes(
                 None
             };
 
+            let (ap_media_paths, ap_media_thumbnails) = if let Some(ref payload) = ap.image_payload
+            {
+                let paths: Vec<String> = payload
+                    .split(';')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                (paths.clone(), paths)
+            } else {
+                (Vec::new(), Vec::new())
+            };
+
             let ap_turn = AgmPromptTurnNode {
                 turn_number: 1,
                 step_index: 0,
@@ -588,8 +657,8 @@ pub(crate) fn build_active_prompt_conv_nodes(
                 } else {
                     ap.created_at
                 },
-                media_paths: Vec::new(),
-                media_thumbnails: Vec::new(),
+                media_paths: ap_media_paths.clone(),
+                media_thumbnails: ap_media_thumbnails.clone(),
             };
 
             conv_nodes.push(AgmConversationNode {
@@ -629,6 +698,8 @@ pub(crate) fn build_active_prompt_conv_nodes(
                 execution_results: None,
                 tool_calls_summary: None,
                 full_prompt_text: Some(ap.prompt_content.clone()),
+                media_paths: ap_media_paths,
+                media_thumbnails: ap_media_thumbnails,
                 prompts: vec![ap_turn],
             });
         }

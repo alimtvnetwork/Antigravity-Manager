@@ -1,5 +1,22 @@
 # Changelog
 
+## [v4.246.0] - 2026-10-21
+
+### Added
+- **Unified Action Consolidation Dropdown (`DetailHeader.tsx`)**: Compacted disjointed `Send`, `Enqueue`, and `Rerun` buttons into a single segmented split dropdown button `[ Primary Action | v ]` with mode switcher pills (`Send Immediately` [N], `Enqueue for Later`, `Rerun Turn`), preserving contextual parameters (Target: Current/New, Suffix template, Times multiplier 1..5) while keeping the adjacent `[ Copy | v ]` split button clean and minimalist. (Thanks to @aukgit)
+- **ModalHeader Iconification & Informative Hover Tooltips**: Replaced text-heavy buttons `Reset` and `Refresh` with dark-glass icon buttons rendering Lucide `RotateCcw` and `RefreshCw` with active spin animations and descriptive hover tooltips. Replaced raw emoji `🖼️ Images` toggle with Lucide `Image as ImageIcon` with dark-glass sky styling (`bg-sky-500/25 text-sky-400 border-x border-sky-500/40`) and dynamic tooltip. (Thanks to @aukgit)
+- **Win32 OLE `CF_DIB` & `CF_HDROP` Native Clipboard Engine**: Fixed PowerShell slice bug in `src-tauri/src/commands/cmd_files.rs` using `New-Object System.IO.MemoryStream($bytes, 14, ($bytes.Length - 14))` to guarantee valid non-zero DIB stream length (491KB+), and added `CF_HDROP` (`SetFileDropList`) so Antigravity IDE (VS Code) attaches copied images directly as native file attachments. Implemented `copy_images_to_clipboard` with native vertical composite bitmap stitching in `cmd_files.rs` and registered it in `src-tauri/src/lib/run.rs`. (Thanks to @aukgit)
+
+### Changed
+- **Immediate Send Bypass vs FIFO Enqueue Architecture**: Decoupled immediate session injection (`handleResendPrompt` / `sendPromptNow`) from FIFO background queue scheduling (`handleEnqueuePrompt` / `enqueuePrompt`). Send immediately injects to the active instance session (via direct loopback CDP prompt submission or agy CLI spawn), bypassing any queued turns. Enqueue inserts into `active_prompts` with status `'queued'`, strictly respecting FIFO execution order (`ORDER BY created_at ASC, id ASC`) so that pending turns execute sequentially after running tasks complete. (Thanks to @aukgit)
+- **Attached Image Markdown & Multimodal Forwarding**: Aggregated attached image paths and media payloads across active turns, conversation nodes, and full prompt histories in `usePromptTreePromptActions.ts`. Attached image file paths are appended in CommonMark syntax with angle-bracket enclosures (`![Attached Image N](<path>)`) preventing Windows path whitespace breakage, and forwarded in Tauri IPC commands (`send_prompt_now`, `enqueue_prompt`) and `ActivePrompt.image_payload`. Added `media_paths` and `media_thumbnails` to `AgmConversationNode` in `src-tauri/src/modules/repo_db/models.rs` and populated them in `tree_node_conv.rs`. (Thanks to @aukgit)
+- **Frontend Clipboard Race Condition Elimination**: In `src/components/instances/PromptTreeView/clipboard.ts`, immediately returned upon native write success to prevent WebView2's `EmptyClipboard()` from wiping native Win32 clipboard formats (`CF_DIB`, `CF_BITMAP`, `CF_HDROP`). Simplified button labels across menus to strictly "Copy" and "Copy Text Only". (Thanks to @aukgit)
+
+### Fixed
+- **TreePanel & Detail View Layout Overlap Fixes**: Added `relative z-10 bg-slate-50/95 dark:bg-[#0c0817]/95 backdrop-blur-md` to the `TreePanel.tsx` search/filter header container to eliminate conversation card bleed-through and clipping over the dividing border. Enforced non-wrapping layout in Row 2 to prevent awkward overlap of the `Hide Auto` toggle pill. Increased conversation card vertical spacing in `ProjectNode.tsx` (`space-y-1.5` / `space-y-2`) and turn chip gaps in `PromptInstructionView.tsx` (`gap-x-2 gap-y-2`) to eliminate relative time badge clumping (`1d`, `2d`, `5d`). (Thanks to @aukgit)
+
+---
+
 ## [v4.245.0] - 2026-10-21
 
 ### Added
@@ -1021,6 +1038,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.246.0 (2026-10-21)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.245.0 (2026-10-21)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

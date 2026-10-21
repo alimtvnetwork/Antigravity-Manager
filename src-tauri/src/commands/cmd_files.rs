@@ -85,62 +85,123 @@ pub fn copy_text_to_clipboard(text: String) -> Result<(), String> {
     crate::modules::repo_db::copy_text_to_clipboard_sync(&text)
 }
 
-/// Copy an image file or base64 image data directly to system clipboard as native OS image format
-/// (CF_DIB / CF_BITMAP on Windows). This guarantees pasting into OneNote, Paint, Word, Antigravity, etc.
+/// Copy multiple image files or base64 image data directly to system clipboard as native OS image formats
+/// (CF_BITMAP, CF_DIB, PNG, and CF_HDROP on Windows).
+/// - For a single image: sets CF_BITMAP, CF_DIB, PNG, and CF_HDROP (file drop list).
+/// - For multiple images: stitches them vertically into a composite bitmap (with 16px gap and high-quality smoothing)
+///   and puts the composite into CF_BITMAP, CF_DIB, PNG (for OneNote, Word, Paint), and puts all individual file paths
+///   into CF_HDROP (so Antigravity IDE and chat inputs attach all image files directly).
 #[tauri::command]
-pub fn copy_image_to_clipboard(path: String) -> Result<(), String> {
-    let raw = path.trim();
-    let target_file_path: PathBuf = if raw.starts_with("data:image/") {
-        // Decode base64 and write to temp file
-        let comma_pos = raw
-            .find(',')
-            .ok_or_else(|| "invalid data URI: missing comma".to_string())?;
-        let b64_str = &raw[comma_pos + 1..];
-        use base64::Engine;
-        let bytes = base64::engine::general_purpose::STANDARD
-            .decode(b64_str.trim())
-            .map_err(|e| format!("failed to decode base64 image: {e}"))?;
-        let temp_path = std::env::temp_dir().join(format!(
-            "agm_clipboard_{}.png",
-            &uuid::Uuid::new_v4().to_string()[..8]
-        ));
-        std::fs::write(&temp_path, &bytes)
-            .map_err(|e| format!("failed to write temp clipboard image: {e}"))?;
-        temp_path
-    } else {
-        let clean_path = crate::modules::repo_db::failed_commands::decode_uri_to_path(raw);
-        let trimmed = clean_path.trim().replace(r"\\?\", "").replace(r"\?\", "");
-        let p = PathBuf::from(&trimmed);
-        if !p.exists() {
-            return Err(format!("Image file does not exist: {trimmed}"));
-        }
-        p
-    };
+pub fn copy_images_to_clipboard(paths: Vec<String>) -> Result<(), String> {
+    if paths.is_empty() {
+        return Err("No image paths provided to copy".to_string());
+    }
 
-    let abs_str = target_file_path.to_string_lossy().to_string();
+    let mut resolved_paths: Vec<PathBuf> = Vec::new();
+    for raw in paths {
+        let raw = raw.trim();
+        if raw.is_empty() {
+            continue;
+        }
+
+        let target_file_path: PathBuf = if raw.starts_with("data:image/") {
+            // Decode base64 and write to temp file
+            let comma_pos = raw
+                .find(',')
+                .ok_or_else(|| "invalid data URI: missing comma".to_string())?;
+            let b64_str = &raw[comma_pos + 1..];
+            use base64::Engine;
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(b64_str.trim())
+                .map_err(|e| format!("failed to decode base64 image: {e}"))?;
+            let temp_path = std::env::temp_dir().join(format!(
+                "agm_clipboard_{}.png",
+                &uuid::Uuid::new_v4().to_string()[..8]
+            ));
+            std::fs::write(&temp_path, &bytes)
+                .map_err(|e| format!("failed to write temp clipboard image: {e}"))?;
+            temp_path
+        } else {
+            let clean_path = crate::modules::repo_db::failed_commands::decode_uri_to_path(raw);
+            let trimmed = clean_path.trim().replace(r"\\?\", "").replace(r"\?\", "");
+            let p = PathBuf::from(&trimmed);
+            if !p.exists() {
+                return Err(format!("Image file does not exist: {trimmed}"));
+            }
+            p
+        };
+        resolved_paths.push(target_file_path);
+    }
+
+    if resolved_paths.is_empty() {
+        return Err("No valid image files found to copy".to_string());
+    }
 
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
+        let paths_formatted = resolved_paths
+            .iter()
+            .map(|p| format!("'{}'", p.to_string_lossy().replace('\'', "''")))
+            .collect::<Vec<_>>()
+            .join(", ");
+
         let script = format!(
             "Add-Type -AssemblyName System.Drawing; Add-Type -AssemblyName System.Windows.Forms; \
-            $img = [System.Drawing.Image]::FromFile('{abs_esc}'); \
-            $bmp = New-Object System.Drawing.Bitmap($img); \
+            $paths = @({paths_formatted}); \
+            $files = New-Object System.Collections.Specialized.StringCollection; \
+            $images = New-Object System.Collections.Generic.List[System.Drawing.Image]; \
+            foreach ($p in $paths) {{ \
+                if (Test-Path $p) {{ \
+                    [void]$files.Add($p); \
+                    $images.Add([System.Drawing.Image]::FromFile($p)); \
+                }} \
+            }} \
+            if ($images.Count -eq 0) {{ exit 1 }} \
+            if ($images.Count -eq 1) {{ \
+                $bmp = New-Object System.Drawing.Bitmap($images[0]); \
+            }} else {{ \
+                $maxW = 0; \
+                $totalH = 0; \
+                $gap = 16; \
+                for ($i = 0; $i -lt $images.Count; $i++) {{ \
+                    if ($images[$i].Width -gt $maxW) {{ $maxW = $images[$i].Width; }} \
+                    $totalH += $images[$i].Height; \
+                    if ($i -lt ($images.Count - 1)) {{ $totalH += $gap; }} \
+                }} \
+                $bmp = New-Object System.Drawing.Bitmap($maxW, $totalH); \
+                $g = [System.Drawing.Graphics]::FromImage($bmp); \
+                $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality; \
+                $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic; \
+                $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality; \
+                $g.Clear([System.Drawing.Color]::Transparent); \
+                $curY = 0; \
+                for ($i = 0; $i -lt $images.Count; $i++) {{ \
+                    $img = $images[$i]; \
+                    $x = [int][Math]::Max(0, ($maxW - $img.Width) / 2); \
+                    $g.DrawImage($img, $x, $curY, $img.Width, $img.Height); \
+                    $curY += $img.Height + $gap; \
+                }} \
+                $g.Dispose(); \
+            }} \
             $msPng = New-Object System.IO.MemoryStream; \
             $bmp.Save($msPng, [System.Drawing.Imaging.ImageFormat]::Png); \
             $msBmp = New-Object System.IO.MemoryStream; \
             $bmp.Save($msBmp, [System.Drawing.Imaging.ImageFormat]::Bmp); \
             $bytes = $msBmp.ToArray(); \
-            $dibStream = New-Object System.IO.MemoryStream(@(,$bytes[14..($bytes.Length - 1)])); \
+            $dibStream = New-Object System.IO.MemoryStream($bytes, 14, ($bytes.Length - 14)); \
             $data = New-Object System.Windows.Forms.DataObject; \
             $data.SetImage($bmp); \
             $data.SetData([System.Windows.Forms.DataFormats]::Dib, $dibStream); \
             $data.SetData('PNG', $msPng); \
+            if ($files.Count -gt 0) {{ \
+                $data.SetFileDropList($files); \
+            }} \
             [System.Windows.Forms.Clipboard]::SetDataObject($data, $true, 10, 100); \
-            $img.Dispose(); \
-            $bmp.Dispose()",
-            abs_esc = abs_str.replace('\'', "''")
+            $bmp.Dispose(); \
+            foreach ($img in $images) {{ $img.Dispose(); }}"
         );
+
         let mut cmd = std::process::Command::new("powershell");
         cmd.args(["-NoProfile", "-NonInteractive", "-Sta", "-Command", &script]);
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
@@ -158,45 +219,58 @@ pub fn copy_image_to_clipboard(path: String) -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
-        let script = format!(
-            "set the clipboard to (read (POSIX file \"{}\") as JPEG picture)",
-            abs_str.replace('"', "\\\"")
-        );
-        let mut cmd = std::process::Command::new("osascript");
-        cmd.args(["-e", &script]);
-        let status = cmd
-            .status()
-            .map_err(|e| format!("macOS osascript clipboard helper failed: {e}"))?;
-        if status.success() {
-            return Ok(());
-        } else {
-            return Err(format!("macOS clipboard helper exited with {status}"));
+        if let Some(first) = resolved_paths.first() {
+            let abs_str = first.to_string_lossy().to_string();
+            let script = format!(
+                "set the clipboard to (read (POSIX file \"{}\") as JPEG picture)",
+                abs_str.replace('"', "\\\"")
+            );
+            let mut cmd = std::process::Command::new("osascript");
+            cmd.args(["-e", &script]);
+            let status = cmd
+                .status()
+                .map_err(|e| format!("macOS osascript clipboard helper failed: {e}"))?;
+            if status.success() {
+                return Ok(());
+            } else {
+                return Err(format!("macOS clipboard helper exited with {status}"));
+            }
         }
     }
 
     #[cfg(target_os = "linux")]
     {
-        if let Ok(file) = std::fs::File::open(&target_file_path) {
-            let mut cmd = std::process::Command::new("wl-copy");
-            cmd.args(["-t", "image/png"]).stdin(file);
-            if let Ok(status) = cmd.status() {
+        if let Some(first) = resolved_paths.first() {
+            let abs_str = first.to_string_lossy().to_string();
+            if let Ok(file) = std::fs::File::open(first) {
+                let mut cmd = std::process::Command::new("wl-copy");
+                cmd.args(["-t", "image/png"]).stdin(file);
+                if let Ok(status) = cmd.status() {
+                    if status.success() {
+                        return Ok(());
+                    }
+                }
+            }
+            let mut cmd2 = std::process::Command::new("xclip");
+            cmd2.args(["-selection", "clipboard", "-t", "image/png", "-i", &abs_str]);
+            if let Ok(status) = cmd2.status() {
                 if status.success() {
                     return Ok(());
                 }
             }
+            return Err("Linux image clipboard helpers (wl-copy, xclip) failed".to_string());
         }
-        let mut cmd2 = std::process::Command::new("xclip");
-        cmd2.args(["-selection", "clipboard", "-t", "image/png", "-i", &abs_str]);
-        if let Ok(status) = cmd2.status() {
-            if status.success() {
-                return Ok(());
-            }
-        }
-        return Err("Linux image clipboard helpers (wl-copy, xclip) failed".to_string());
     }
 
     #[allow(unreachable_code)]
     Err("Image clipboard not supported on this operating system".to_string())
+}
+
+/// Copy an image file or base64 image data directly to system clipboard as native OS image format
+/// (CF_DIB / CF_BITMAP on Windows). This guarantees pasting into OneNote, Paint, Word, Antigravity, etc.
+#[tauri::command]
+pub fn copy_image_to_clipboard(path: String) -> Result<(), String> {
+    copy_images_to_clipboard(vec![path])
 }
 
 /// 保存文本文件 (绕过前端 Scope 限制)

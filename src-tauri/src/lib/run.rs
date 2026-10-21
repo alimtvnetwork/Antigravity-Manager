@@ -127,6 +127,7 @@ pub fn run() {
             commands::sync_account_from_db,
             commands::copy_text_to_clipboard,
             commands::copy_image_to_clipboard,
+            commands::copy_images_to_clipboard,
             commands::save_text_file,
             commands::write_prompt_backup_file,
             commands::read_prompt_backup_file,
