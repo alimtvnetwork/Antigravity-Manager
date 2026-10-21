@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [ui-and-functionality-corrections.md](./ui-and-functionality-corrections.md) | `COMPLETED` | Prompt Send preemption (cancel running task then execute immediately), FIFO Enqueue staging, resizable tree view panel (280px-760px), live IDE conversation title rename synchronization via protobuf raw_summary nullification and fsnotify trigger, One Dark Pro theme adaptability with zero-displacement hover transitions, portaled scoreboard formula tooltip, 100% green E2E tests, and minor version bump to v4.250.0. |
 | [prompt-sending-and-enqueue-testing.md](./prompt-sending-and-enqueue-testing.md) | `COMPLETED` | Immediate Send bypass vs FIFO Enqueue queueing, attached image markdown and payload forwarding, compact split dropdown dispatch [ Primary Action \| v ] in DetailHeader, iconification of Reset/Refresh/Images in ModalHeader, TreePanel Hide Auto overlap fix, relative time badge clumping resolution, and Win32 OLE CF_DIB / CF_HDROP clipboard repair for OneNote and Antigravity IDE. |
 | [04-booleans-and-complex-conditions.md](./04-booleans-and-complex-conditions.md) | `ACTIVE` | Elimination of compound negative chains (`!inst.is_running \|\| !proj.is_running`), 2-condition cap enforcement, extraction of affirmative `isConversationGenuinelyRunning` helper, discrete guard clauses in instance card liveness checking, and v4.244.0 minor bump release ceremony. |
 | [telegram-backup-and-fleet-management-enhancements.md](./telegram-backup-and-fleet-management-enhancements.md) | `COMPLETED` | Telegram inbound prompt backup (/backup) and restore (/restore), multimodal image counting & forwarding, fleet machine identity w1 lead resolution & 30s TTL caching, cross-machine prompt dispatch modal, 1-click Expand/Collapse All tree view with monospace connectors, compact auto-hide pill, and elimination of false QUEUED status badges via 600s TTL. |
@@ -54,6 +55,7 @@
 | `94` | [94-blind-ai-instance-test-and-release.md](./completed/94-blind-ai-instance-test-and-release.md) | `COMPLETED` | Blind AI instance test flow and release verification across the 8 Laws of Instance Sandboxing (L1 host PID safety, L2 folder owns PID, L3 clone vs new, L4 UI-CLI parity, L5 queued prompt preservation, L6 notify before return, L7 Supabase read-back & table integrity, L8 cleanup scope), dev hygiene hardening, and release ceremony alignment. |
 
 ## Completed this run
+| `164` | [ui-and-functionality-corrections.md](./ui-and-functionality-corrections.md) | `DONE` | Prompt Send preemption (cancel running task then execute immediately), FIFO Enqueue staging, resizable tree view panel (280px-760px), live IDE conversation title rename synchronization via protobuf raw_summary nullification and fsnotify trigger, One Dark Pro theme adaptability with zero-displacement hover transitions, portaled scoreboard formula tooltip, 100% green E2E tests, and minor version bump to v4.250.0. |
 | `155` | [boolean-and-complex-conditions-remediation.md](./pending/boolean-and-complex-conditions-remediation.md) | `DONE` | Decompose multi-clause conditionals, eliminate stacked negations, mixed polarity, and raw boolean equality (Rule 1) across repo_db, transcript, inbound send flow, lease manager, and frontend PromptTree. |
 | `154` | [154-antigravity-manager-package-repository-update-and-prompt-functionality-testing.md](./completed/154-antigravity-manager-package-repository-update-and-prompt-functionality-testing.md) | `DONE` | Package repo pulled to c7efb910; "Now Running + Up Next" tree panel (running-first + next-4 FIFO, 4-tier badges); prompts backup/restore with byte-identical images; rerun/re-send same prompt with image; E2E-154-01…07 evidence tree (machine verification pending). |
 | `100` | [100-resume-same-conversation-and-pid-cache.md](../../02-spec/21-app/100-resume-same-conversation-and-pid-cache.md) | `DONE` | Same-conversation resume file, audit info modal, 2-minute quota floor, saved-PID check with a 10-minute process cache. |
@@ -102,31 +104,30 @@
 
 ## Recent Completed Tasks Register (last 20, newest first)
 
-Updated 2026-10-06T01:45:00Z from `git log` (HEAD `ccf336b1`). Referenced by `.ai-memory/what-to-read.md`.
+Updated 2026-10-21T16:50:00Z from `git log` (HEAD `33ea5d83`). Referenced by `.ai-memory/what-to-read.md`.
 
 | # | Date | Commit | Task | Plan |
 |---|---|---|---|---|
-| 1 | 2026-10-18 | `77e6f780`, `0fe0b2bb` | Compile-time safe Diesel ORM, PascalCase Split-DB schemas, lossless single-file backup/re-import, zero account loss guard, and CLI migration suite | 163 |
-| 2 | 2026-10-05 | `b7e5744c`, `ccf336b1` | v4.158.0 two-phase 4 hour quota gate and hours-remaining weekly scoring, delimiter and rustfmt fixes | 138 |
-| 2 | 2026-10-05 | `7de81159` | v4.157.1 weekly scoring DESC sort and divide-by-100 integer score | 137 |
-| 3 | 2026-10-05 | `babb0b18` | v4.157.0 neon green progress bar, hours-elapsed weekly scoring, prompt tree modal header, empty tree fix | 136, 137 |
-| 4 | 2026-10-05 | `7952d8dd` | v4.156.0 prompt tree discovery from summaries DB | 136 |
-| 5 | 2026-10-05 | `2289730e`, `3581207d` | v4.155.0 running projects detection and restart split button | 132, 135 |
-| 6 | 2026-10-05 | `fbd5e819` | v4.154.0 accounts borders, VS Code cyan, email cooldown | 134 |
-| 7 | 2026-10-05 | `2274f100` | Seven specialized AGM skills | - |
-| 8 | 2026-10-05 | `2a5cd064` | v4.152.0 split restart button with distinct sync icons | 132 |
-| 9 | 2026-10-05 | `8ce647c7` | v4.151.0 AccountRow JSX fix and instance.rs rustfmt | - |
-| 10 | 2026-10-05 | `6d41d931` | Instance fleet deploy, default theme presets, plugins and skills parity, GitMap delegation | 131 |
-| 11 | 2026-10-05 | `b499eb5f` | v4.150.0 accounts table cyan palette and compact instances table | 130 |
-| 12 | 2026-10-05 | `24daa320` | v4.149.0 prompt tree line gaps, liveness scoping, N key dispatch | 128 |
-| 13 | 2026-10-04 | `319d2f36` to `d77ebe3b` | v4.145.0 to v4.148.0 rusqlite and compile fixes | - |
-| 14 | 2026-10-04 | `a03b68f3` | v4.143.0 per-instance prompt isolation, deep cloning, card mutex UI, macOS gatekeeper | 119, 120, 123 |
-| 15 | 2026-10-04 | `2b799681`, `7194a6e8` | v4.141.0 and v4.142.0 macOS installation and IDE switching | 116, 119 |
-| 16 | 2026-10-04 | `e1045a9d` | v4.140.0 multi-instance low-quota failover and async 5s prompt restore | 111 |
-| 17 | 2026-10-04 | `92bb0296`, `f357f5dd` | v4.133.0 and v4.134.0 release artifact packaging fix | - |
-| 18 | 2026-10-04 | `2bbcba13` | v4.130.0 startup white screen crash (tauri async runtime) | - |
-| 19 | 2026-10-03 | `2570ec30`, `1f0cf651` | v4.128.0 and v4.128.1 audit pagination, Supabase tab, instance view modes | 105 |
-| 20 | 2026-10-02 | `366d84e5` | Switch audit reads prompts by instance id; `is_instance_running` recovers wrapper PID (shipped v4.126.0). Memory: `memory/learned/23-switch-audit-default-key-and-wrapper-pid-recovery.md`, issue 62 | 100 |
+| 1 | 2026-10-21 | `33ea5d83` | Send preemption, resizable tree view, live title sync, theme adaptability and scoreboard tooltip fix (v4.250.0) | ui-and-functionality-corrections |
+| 2 | 2026-10-18 | `77e6f780`, `0fe0b2bb` | Compile-time safe Diesel ORM, PascalCase Split-DB schemas, lossless single-file backup/re-import, zero account loss guard, and CLI migration suite | 163 |
+| 3 | 2026-10-05 | `b7e5744c`, `ccf336b1` | v4.158.0 two-phase 4 hour quota gate and hours-remaining weekly scoring, delimiter and rustfmt fixes | 138 |
+| 4 | 2026-10-05 | `7de81159` | v4.157.1 weekly scoring DESC sort and divide-by-100 integer score | 137 |
+| 5 | 2026-10-05 | `babb0b18` | v4.157.0 neon green progress bar, hours-elapsed weekly scoring, prompt tree modal header, empty tree fix | 136, 137 |
+| 6 | 2026-10-05 | `7952d8dd` | v4.156.0 prompt tree discovery from summaries DB | 136 |
+| 7 | 2026-10-05 | `2289730e`, `3581207d` | v4.155.0 running projects detection and restart split button | 132, 135 |
+| 8 | 2026-10-05 | `fbd5e819` | v4.154.0 accounts borders, VS Code cyan, email cooldown | 134 |
+| 9 | 2026-10-05 | `2274f100` | Seven specialized AGM skills | - |
+| 10 | 2026-10-05 | `2a5cd064` | v4.152.0 split restart button with distinct sync icons | 132 |
+| 11 | 2026-10-05 | `8ce647c7` | v4.151.0 AccountRow JSX fix and instance.rs rustfmt | - |
+| 12 | 2026-10-05 | `6d41d931` | Instance fleet deploy, default theme presets, plugins and skills parity, GitMap delegation | 131 |
+| 13 | 2026-10-05 | `b499eb5f` | v4.150.0 accounts table cyan palette and compact instances table | 130 |
+| 14 | 2026-10-05 | `24daa320` | v4.149.0 prompt tree line gaps, liveness scoping, N key dispatch | 128 |
+| 15 | 2026-10-04 | `319d2f36` to `d77ebe3b` | v4.145.0 to v4.148.0 rusqlite and compile fixes | - |
+| 16 | 2026-10-04 | `a03b68f3` | v4.143.0 per-instance prompt isolation, deep cloning, card mutex UI, macOS gatekeeper | 119, 120, 123 |
+| 17 | 2026-10-04 | `2b799681`, `7194a6e8` | v4.141.0 and v4.142.0 macOS installation and IDE switching | 116, 119 |
+| 18 | 2026-10-04 | `e1045a9d` | v4.140.0 multi-instance low-quota failover and async 5s prompt restore | 111 |
+| 19 | 2026-10-04 | `92bb0296`, `f357f5dd` | v4.133.0 and v4.134.0 release artifact packaging fix | - |
+| 20 | 2026-10-04 | `2bbcba13` | v4.130.0 startup white screen crash (tauri async runtime) | - |
 
 ## Pending Plans (`pending/`)
 | # | Plan File | Status | Summary |
