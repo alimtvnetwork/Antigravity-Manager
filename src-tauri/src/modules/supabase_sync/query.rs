@@ -165,6 +165,11 @@ pub(crate) fn collect_all_peer_connections() -> Vec<crate::modules::ssh_manager:
 /// Build local machine info plus all registered SSH fleet and GitMap nodes
 pub fn build_local_and_ssh_fleet() -> Vec<FleetMachineInfo> {
     let mut machines = build_local_fallback_machine();
+    if let Some(m) = machines.first_mut() {
+        m.node_alias = "w1".to_string();
+        m.alias = "w1".to_string();
+        m.is_local = true;
+    }
     let local_ip = machines
         .first()
         .map(|m| m.ip_address.clone())
@@ -177,22 +182,63 @@ pub fn build_local_and_ssh_fleet() -> Vec<FleetMachineInfo> {
 
     let all_conns = collect_all_peer_connections();
     for conn in all_conns {
-        let is_self = conn.ip_address == local_ip
+        let is_self = conn.ip_address == "192.168.1.3"
+            || (!local_ip.is_empty() && conn.ip_address == local_ip)
+            || conn.alias.eq_ignore_ascii_case("w1")
             || (conn.alias.eq_ignore_ascii_case(&local_alias)
                 && (local_ip.is_empty() || conn.ip_address == local_ip));
         if is_self {
             if let Some(local_machine) = machines.first_mut() {
-                local_machine.node_alias = conn.alias.clone();
-                local_machine.alias = conn.alias;
+                local_machine.node_alias = "w1".to_string();
+                local_machine.alias = "w1".to_string();
+                local_machine.is_local = true;
             }
             continue;
         }
         machines.push(build_ssh_mesh_machine_info(&conn, now));
     }
 
+    // Ensure all canonical cluster nodes (w1, main, u1, w2, w3, w4) are preserved without dropping
+    for &(alias, ip, user, os) in crate::modules::ssh_manager::GITMAP_CLUSTER_NODES {
+        let exists = machines.iter().any(|m| {
+            m.node_alias.eq_ignore_ascii_case(alias) || (!ip.is_empty() && m.ip_address == ip)
+        });
+        if !exists {
+            let record = crate::modules::ssh_manager::SshConnectionRecord {
+                alias: alias.to_string(),
+                ip_address: ip.to_string(),
+                port: 22,
+                username: user.to_string(),
+                key_path: String::new(),
+                os: os.to_string(),
+                encrypted_password: String::new(),
+                encryption_algo: "RSA-2048".to_string(),
+                os_group: Some(if os.eq_ignore_ascii_case("windows") {
+                    "Windows".to_string()
+                } else {
+                    "Linux".to_string()
+                }),
+                os_version: None,
+                build_version: None,
+                first_run_at: None,
+                created_at: None,
+            };
+            machines.push(build_ssh_mesh_machine_info(&record, now));
+        }
+    }
+
     machines.sort_by(|a, b| {
-        if a.is_local != b.is_local {
-            return b.is_local.cmp(&a.is_local);
+        let a_is_w1 =
+            a.node_alias.eq_ignore_ascii_case("w1") || a.ip_address == "192.168.1.3" || a.is_local;
+        let b_is_w1 =
+            b.node_alias.eq_ignore_ascii_case("w1") || b.ip_address == "192.168.1.3" || b.is_local;
+        if a_is_w1 != b_is_w1 {
+            return b_is_w1.cmp(&a_is_w1);
+        }
+        let a_is_main = a.node_alias.eq_ignore_ascii_case("main") || a.ip_address == "192.168.1.20";
+        let b_is_main = b.node_alias.eq_ignore_ascii_case("main") || b.ip_address == "192.168.1.20";
+        if a_is_main != b_is_main {
+            return b_is_main.cmp(&a_is_main);
         }
         if a.is_online != b.is_online {
             return b.is_online.cmp(&a.is_online);
@@ -423,26 +469,31 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
             );
             continue;
         }
-        let is_local = node_id == local_node_id;
-        if is_local {
-            has_local = true;
-        }
         let ip_address = n
             .get("ip_address")
             .and_then(|v| v.as_str())
             .unwrap_or_default()
             .to_string();
+        let local_ip = get_local_ip();
+        let is_local = node_id == local_node_id
+            || ip_address == "192.168.1.3"
+            || (!local_ip.is_empty() && ip_address == local_ip);
+        if is_local {
+            has_local = true;
+        }
         let mut node_alias = n
             .get("alias")
             .and_then(|v| v.as_str())
             .unwrap_or_default()
             .to_string();
-        if (is_local || ip_address == get_local_ip())
+        if is_local {
+            node_alias = "w1".to_string();
+        } else if (ip_address == "192.168.1.3" || (!local_ip.is_empty() && ip_address == local_ip))
             && (node_alias.is_empty()
                 || node_alias == "agm-node-local"
                 || node_alias.starts_with("Node-"))
         {
-            node_alias = resolve_local_node_alias();
+            node_alias = "w1".to_string();
         }
         let uptime_seconds = if is_local {
             get_uptime_seconds()
@@ -565,7 +616,10 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
 
     if !has_local {
         let fallback = build_local_fallback_machine();
-        if let Some(local_machine) = fallback.into_iter().next() {
+        if let Some(mut local_machine) = fallback.into_iter().next() {
+            local_machine.node_alias = "w1".to_string();
+            local_machine.alias = "w1".to_string();
+            local_machine.is_local = true;
             machines.push(local_machine);
         }
     }
@@ -575,18 +629,55 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
     let all_conns = collect_all_peer_connections();
     for conn in all_conns {
         let is_dup = machines.iter().any(|m| {
-            m.ip_address == conn.ip_address
-                || (m.node_alias.eq_ignore_ascii_case(&conn.alias)
-                    && m.ip_address == conn.ip_address)
+            (!conn.ip_address.is_empty() && m.ip_address == conn.ip_address)
+                || m.node_alias.eq_ignore_ascii_case(&conn.alias)
         });
         if !is_dup {
             machines.push(build_ssh_mesh_machine_info(&conn, now));
         }
     }
 
+    // Ensure all canonical cluster nodes (w1, main, u1, w2, w3, w4) are preserved without dropping
+    for &(alias, ip, user, os) in crate::modules::ssh_manager::GITMAP_CLUSTER_NODES {
+        let exists = machines.iter().any(|m| {
+            m.node_alias.eq_ignore_ascii_case(alias) || (!ip.is_empty() && m.ip_address == ip)
+        });
+        if !exists {
+            let record = crate::modules::ssh_manager::SshConnectionRecord {
+                alias: alias.to_string(),
+                ip_address: ip.to_string(),
+                port: 22,
+                username: user.to_string(),
+                key_path: String::new(),
+                os: os.to_string(),
+                encrypted_password: String::new(),
+                encryption_algo: "RSA-2048".to_string(),
+                os_group: Some(if os.eq_ignore_ascii_case("windows") {
+                    "Windows".to_string()
+                } else {
+                    "Linux".to_string()
+                }),
+                os_version: None,
+                build_version: None,
+                first_run_at: None,
+                created_at: None,
+            };
+            machines.push(build_ssh_mesh_machine_info(&record, now));
+        }
+    }
+
     machines.sort_by(|a, b| {
-        if a.is_local != b.is_local {
-            return b.is_local.cmp(&a.is_local);
+        let a_is_w1 =
+            a.node_alias.eq_ignore_ascii_case("w1") || a.ip_address == "192.168.1.3" || a.is_local;
+        let b_is_w1 =
+            b.node_alias.eq_ignore_ascii_case("w1") || b.ip_address == "192.168.1.3" || b.is_local;
+        if a_is_w1 != b_is_w1 {
+            return b_is_w1.cmp(&a_is_w1);
+        }
+        let a_is_main = a.node_alias.eq_ignore_ascii_case("main") || a.ip_address == "192.168.1.20";
+        let b_is_main = b.node_alias.eq_ignore_ascii_case("main") || b.ip_address == "192.168.1.20";
+        if a_is_main != b_is_main {
+            return b_is_main.cmp(&a_is_main);
         }
         if a.is_online != b.is_online {
             return b.is_online.cmp(&a.is_online);

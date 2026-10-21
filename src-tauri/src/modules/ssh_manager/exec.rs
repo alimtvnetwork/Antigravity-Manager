@@ -1511,26 +1511,53 @@ pub fn get_cluster_instances_and_balances() -> Result<Vec<ClusterInstanceBalance
 pub async fn send_remote_ssh_prompt(
     payload: &RemotePromptDispatchPayload,
 ) -> Result<RemotePromptDispatchResult, String> {
-    let node_alias = if payload.node_alias.trim().is_empty() {
+    let raw_node = payload.node_alias.trim();
+    let clean_node = raw_node
+        .strip_prefix("ssh_")
+        .unwrap_or(raw_node)
+        .trim_matches(|c| c == '\'' || c == '"' || c == '`');
+    let node_alias = if clean_node.is_empty() {
         "local".to_string()
     } else {
-        payload.node_alias.trim().to_string()
+        clean_node.to_string()
     };
+
     let raw_inst = payload.instance_name.trim();
-    let clean_inst = if let Some((_, last)) = raw_inst.rsplit_once(':') {
+    let stripped_inst = if let Some((_, last)) = raw_inst.rsplit_once(':') {
         last.trim()
     } else {
         raw_inst
     };
-    let inst_name = if clean_inst.is_empty() {
+    let clean_inst = stripped_inst
+        .trim_matches(|c| c == '\'' || c == '"' || c == '`')
+        .replace([';', '&', '|', '`', '$', '\n', '\r'], "")
+        .trim()
+        .to_string();
+    let inst_name = if clean_inst.is_empty() || clean_inst.eq_ignore_ascii_case("(unbound)") {
         "default".to_string()
     } else {
-        clean_inst.to_string()
+        clean_inst
     };
+
     let text = payload.prompt_text.trim();
     if text.is_empty() {
         return Err("Prompt text cannot be empty".to_string());
     }
+
+    let raw_target = payload
+        .conversation_id
+        .as_deref()
+        .unwrap_or("")
+        .trim()
+        .trim_matches(|c| c == '\'' || c == '"' || c == '`')
+        .replace([';', '&', '|', '`', '$', '\n', '\r'], "")
+        .trim()
+        .to_string();
+    let target_proj = if raw_target.is_empty() {
+        "default".to_string()
+    } else {
+        raw_target
+    };
 
     let local_machine = crate::modules::email_watcher::detect_machine_name();
     let local_ip = crate::modules::email_watcher::detect_local_ip();
@@ -1541,6 +1568,9 @@ pub async fn send_remote_ssh_prompt(
         .map(|conn| conn.alias.clone());
     let is_local = node_alias.eq_ignore_ascii_case("local")
         || node_alias.eq_ignore_ascii_case("localhost")
+        || node_alias == "127.0.0.1"
+        || node_alias.eq_ignore_ascii_case("w1")
+        || node_alias == "192.168.1.3"
         || node_alias.eq_ignore_ascii_case(&local_machine)
         || (!local_ip.is_empty() && node_alias.eq_ignore_ascii_case(&local_ip))
         || matched_local_alias
@@ -1549,18 +1579,12 @@ pub async fn send_remote_ssh_prompt(
             .unwrap_or(false);
 
     let cmd_str = if is_local {
-        if let Some(conv) = payload.conversation_id.as_deref().filter(|s| !s.is_empty()) {
-            format!("{} --instance {} {}", conv, inst_name, text)
-        } else {
-            format!("{} {}", inst_name, text)
-        }
-    } else if let Some(conv) = payload.conversation_id.as_deref().filter(|s| !s.is_empty()) {
+        format!("{} --instance {} {}", target_proj, inst_name, text)
+    } else {
         format!(
             "{} --node {} --instance {} {}",
-            conv, node_alias, inst_name, text
+            target_proj, node_alias, inst_name, text
         )
-    } else {
-        format!("{}:{} {}", node_alias, inst_name, text)
     };
 
     let start = Instant::now();

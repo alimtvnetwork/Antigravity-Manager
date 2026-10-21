@@ -151,7 +151,7 @@ function ConversationListWithGrouping({
 
                     {/* Rendering Child Sub-Points (Indented with Branch Glyphs) */}
                     {root.subagents.length > 0 && (
-                        <div className="pl-5 space-y-1.5 border-l-2 border-purple-300/40 dark:border-purple-800/40 ml-3.5 my-1">
+                        <div className="ml-5 pl-3 space-y-1.5 border-l-2 border-purple-300/40 dark:border-purple-800/40 my-1">
                             {root.subagents.map((subNode, subIdx) => {
                                 const isSubSelected = selectedConversationId === subNode.primaryNode.conversation_id;
                                 const { isRunning: isSubRunning } = getConversationStatus(subNode.primaryNode);
@@ -194,9 +194,9 @@ function ConversationListWithGrouping({
                                         title={`AI Subagent Task · ${subNode.primaryNode.title || 'Subagent'} · ${subNode.primaryNode.step_count || 1} steps · Click to view`}
                                     >
                                         <div className="flex items-center gap-1.5 min-w-0">
-                                            {/* Tree Branch Connector Glyph: ├── or └── */}
-                                            <span className="text-purple-400 dark:text-purple-400 font-mono text-[11px] select-none shrink-0">
-                                                {isLast ? '└──' : '├──'}
+                                            {/* Tree Branch Connector Glyph: ├── ↳ or └── ↳ */}
+                                            <span className="text-purple-400 dark:text-purple-400 font-mono text-[11px] select-none shrink-0" aria-hidden="true">
+                                                {isLast ? '└── ↳' : '├── ↳'}
                                             </span>
                                             <span title={subNode.classification.roleBadge || 'Subagent'} className="shrink-0 flex items-center">
                                                 <Bot

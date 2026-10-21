@@ -303,6 +303,7 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
         • <b>Status:</b> {}\n\
         • <b>Reference:</b> <code>{}</code>\n\
         • <b>Attached Media:</b> {} image(s)\n\
+        • <b>Quick Actions:</b> <code>/active</code> · <code>/tree</code> · <code>/backup</code> · <code>/restore</code>\n\
         {}\
         <b>Your prompt:</b>\n<pre>{}</pre>",
         utc_str,
@@ -463,6 +464,7 @@ pub async fn execute_remote_prompt_injection(
         • <b>Status:</b> {}\n\
         • <b>Reference:</b> <code>{}</code>\n\
         • <b>Attached Media:</b> {} image(s)\n\
+        • <b>Quick Actions:</b> <code>/active</code> · <code>/tree</code> · <code>/backup</code> · <code>/restore</code>\n\
         {}\
         <b>Your prompt:</b>\n<pre>{}</pre>",
         utc_str,

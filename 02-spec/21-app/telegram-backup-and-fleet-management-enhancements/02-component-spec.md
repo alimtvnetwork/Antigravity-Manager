@@ -1,306 +1,556 @@
-# Specification: Prompt Tree View Liveness, Expandable Hierarchy & UI Modernization
+# Technical Specification: Fleet Machine Identity, Caching Architecture, Cross-Machine Prompt Dispatch & Prompt Tree View UI Enhancements
 
-> **Target:** `02-spec/21-app/telegram-backup-and-fleet-management-enhancements/02-component-spec.md`  
-> **Associated Plan:** `.ai-memory/plans/subtasks/telegram-backup-and-fleet-management-enhancements/02-prompt-tree-view-liveness-and-ui.md`  
-> **Status:** APPROVED & READY FOR IMPLEMENTATION  
-> **Lead Orchestrator:** Antigravity Lead Agent  
-> **Author:** Spec Author 02  
-> **Primary Attribution:** `@aukgit` (`(Thanks to @aukgit)`)  
-> **Target Release:** `v4.224.0`  
-> **Target Scope:**
-> - `src-tauri/src/modules/instance/observe.rs` (Default instance normalization, specifier resolution)
-> - `src-tauri/src/modules/repo_db/gemini_dirs.rs` (Canonical home & default sandbox directory matching)
-> - `src-tauri/src/modules/repo_db/liveness.rs` (FIFO query ordering, active status checking, heartbeat verification)
-> - `src-tauri/src/commands/cmd_running_up_next.rs` (IDE heartbeat fallback for live prompt detection)
-> - `src-tauri/src/modules/repo_db/sequences.rs` (`state.vscdb` workspace storage synchronization on rename)
-> - `src/components/instances/PromptTreeView/usePromptTreeData.ts` (Immutable state cloning, selection update, image filter)
-> - `src/components/instances/PromptTreeView/ConversationNode.tsx` (Auto-selection on double-click, terminal glyphs `├──`, `└──`)
-> - `src/components/instances/PromptTreeView/ProjectNode.tsx` (Terminal tree glyphs `├──`, `└──`, hierarchy rendering)
-> - `src/components/instances/PromptTreeView/TreePanel.tsx` (Responsive width `w-[460px] lg:w-[520px]`, `space-y-3.5`, segmented capsule)
-> - `src/components/instances/PromptTreeView/ModalHeader.tsx` (Image filter header pill button, segmented capsule)
-> - `src/components/instances/PromptTreeView/DetailTabs.tsx` (Details button relocation, Activity icon, `#1af18d` health pulse)
-> - `src/components/instances/PromptTreeView/PromptInstructionView.tsx` (`dark:bg-[#19191c]` markdown background)
-> - `src/components/instances/PromptTreeView/InspectorModal.tsx` (`dark:bg-[#19191c]` markdown background)
-> - `src/components/instances/PromptTreeView/ResultsView.tsx` (`dark:bg-[#19191c]` markdown background)
+- **Specification Slug:** `telegram-backup-and-fleet-management-enhancements`
+- **Specification Path:** `02-spec/21-app/telegram-backup-and-fleet-management-enhancements/02-component-spec.md`
+- **Subtask Plan Path:** `.ai-memory/plans/subtasks/telegram-backup-and-fleet-management-enhancements/02-tree-view-hierarchy-and-filters.md`
+- **Parent Plan Path:** `.ai-memory/plans/telegram-backup-and-fleet-management-enhancements.md`
+- **Author:** Frontend & Fleet Architecture Working Group
+- **Primary Attribution:** `@aukgit` (`(Thanks to @aukgit)`)
+- **Status:** APPROVED & MANDATED
+- **Target Release:** `v4.224.0`
+- **Component Scope:**
+  - `src/components/instances/fleet/useFleetMachines.ts` (Machine identity, 30s TTL cache envelope, SWR refresh, lead sorting)
+  - `src/components/instances/fleet/fleetTypes.ts` (Fleet data models, cache envelope interfaces)
+  - `src/components/instances/FleetMachinesTable.tsx` (Table toolbar, modal mounting, state dispatch)
+  - `src/components/instances/fleet/FleetMachineRow.tsx` (Lead/Local badges, action buttons, prompt dispatch trigger)
+  - `src/components/instances/fleet/SendFleetPromptModal.tsx` (Cross-machine prompt dispatcher modal)
+  - `src/components/instances/PromptTreeView/TreePanel.tsx` (1-click Expand/Collapse all, compact Auto-Hide capsule, image filter)
+  - `src/components/instances/PromptTreeView/ConversationNode.tsx` (Terminal connector glyphs `├──` / `└──`, subagent glyphs `└── ↳`, right-hand turn indentation)
+  - `src/components/instances/PromptTreeView/ProjectNode.tsx` (Project breathing room `my-2.5`, card framing, subagent tree hierarchy)
+  - `src/components/instances/PromptTreeView/ModalHeader.tsx` (Header `ImageIcon` filter toggle, dark-glass 30s sync popover with checkmarks)
+  - `src/components/instances/PromptTreeView/usePromptTreeData.ts` (`imageFilterEmitter` broadcast engine, turn filtering)
 
 ---
 
-## Technical Directive (Verbatim)
+## 1. Technical Directive (Verbatim)
 
 ```text
-Author the specification and subtask plan for Prompt Tree View Liveness, Expandable Hierarchy, Rename Synchronization, Image Filter, Auto-Hide, Details Button, and Markdown Background:
-1. Create 02-spec/21-app/telegram-backup-and-fleet-management-enhancements/02-component-spec.md. Document:
-   - Default Instance Running Prompt Detection: Specifier normalization in src-tauri/src/modules/instance/observe.rs, default instance directory matching in gemini_dirs.rs, FIFO ordering and active status checking in liveness.rs, and IDE heartbeat fallback in cmd_running_up_next.rs.
-   - Conversation Rename Synchronization: React state immutable cloning and selection update in src/components/instances/PromptTreeView/usePromptTreeData.ts, auto-selection on double-click in ConversationNode.tsx, and state.vscdb synchronization in src-tauri/src/modules/repo_db/sequences.rs.
-   - Expandable Tree View Layout: Responsive sidebar width (w-[460px] lg:w-[520px]), project separation (space-y-3.5), and terminal branch glyphs (├──, └──) in TreePanel.tsx and ProjectNode.tsx.
-   - Image Filter Toggle: Header pill toggle button in ModalHeader.tsx and image filter filtering in usePromptTreeData.ts / TreePanel.tsx.
-   - Auto-Hide Button Sizing: Replacing loose button with unified segmented capsule and borderless <select> in TreePanel.tsx.
-   - Details Button Restoration: Relocating Details button with activity icon and #1af18d pulsing green health status in DetailTabs.tsx.
-   - Markdown Background: Confirming dark:bg-[#19191c] across PromptInstructionView.tsx, InspectorModal.tsx, and ResultsView.tsx.
-2. Create .ai-memory/plans/subtasks/telegram-backup-and-fleet-management-enhancements/02-prompt-tree-view-liveness-and-ui.md documenting task breakdown, owned files, and verification steps.
-Strict rules: Only write to your owned files. Only use relative Git paths. Do not run any git commands. When done, send your completion report.
+Author the specification file 02-spec/21-app/telegram-backup-and-fleet-management-enhancements/02-component-spec.md.
+
+Cover:
+1. Fleet Machine Identity & Local IP Primacy:
+   - Reconciling local IP 192.168.1.3 as w1 (local Lead node) with is_local: true and is_lead: true.
+   - Matching remote node 192.168.1.20 as main.
+   - Enforcing w1 (lead) index 0 sorting in sortFleetMachines.
+2. Fleet UI Caching Architecture:
+   - Synchronous localStorage caching with 30s TTL envelope ({ timestamp: number, machines: FleetMachineInfo[] }) in useFleetMachines.ts.
+   - Immediate render on mount without full-screen loading freezes, with background SWR refresh.
+3. Shared Cluster Prompt Dispatching Component:
+   - SendFleetPromptModal.tsx modal interface, mounting in FleetMachinesTable.tsx / FleetMachineRow.tsx.
+4. Prompt Tree UI Components:
+   - Expandable tree view with 1-click Expand/Collapse All toggle (isAllExpanded, FolderPlus/FolderMinus) in TreePanel.tsx.
+   - Terminal monospace branch connector glyphs (├──, └──) and subagent branch glyphs (└── ↳) in ConversationNode.tsx and ProjectNode.tsx.
+   - Top-level project breathing room (my-2.5) and child turn right-hand indentation (ml-5 pl-3 border-l-2).
+   - Header image filter toggle (ImageIcon) in ModalHeader.tsx connected to imageFilterEmitter.
+   - Compact Auto-Hide pill button sizing matching adjacent filters.
+   - Modernized 30-second sync dropdown into a dark-glass popover capsule with active selection checkmarks.
+
+Write this file using write_file. Do NOT run any git commands. Report when completed with the relative file path.
 ```
 
 ---
 
-## 1. Problem Classification & Root Cause Analysis (RCA)
+## 2. Problem Classification & Root Cause Analysis (RCA)
 
-### 1.1 RCA 1: Default Instance Running Prompt Detection & Liveness Flapping
-- **Symptoms:** Prompts executed inside the default instance frequently fail to show as `RUNNING` in the Prompt Tree View, or revert prematurely to `IDLE` while the IDE is actively running a prompt. In `cmd_running_up_next.rs`, `now_running` returns `None`, causing the "Now Running" header card in the tree view to stay hidden even during active prompt execution.
+### 2.1 RCA 1: Inverted Fleet Machine Identity & Local IP Disorientation
+- **Symptoms:** In the Shared Cluster / Fleet Nodes table, the remote node `192.168.1.20` (`main`) was erroneously stamped with `is_lead: true`, causing it to claim the header row and lead badges. Meanwhile, the actual local developer workstation running Antigravity Manager (`192.168.1.3`, known as `w1` in `gitmap cluster nodes`) was labeled merely as an auxiliary worker or lost its local status entirely.
 - **Root Cause:**
-  1. *Specifier Normalization Divergence:* In `src-tauri/src/modules/instance/observe.rs`, `resolve_instance_id("default")` checks for `is_default` or `id == "default"`. However, if the registry associates the default profile with an explicit ID or if callers pass empty strings `""`, `__default__`, or `"default"`, downstream SQL queries in `cmd_running_up_next.rs` (`instance_predicate`) produced mismatched clauses.
-  2. *Gemini Directory Resolution:* In `src-tauri/src/modules/repo_db/gemini_dirs.rs`, `gemini_dirs_for_instance("default")` resolved canonical host directories (`dirs::home_dir()`) and the secondary sandboxes. If the default instance utilized local app data (`get_default_antigravity_data_dir()`), directory matching could fail to discover transcripts if the path matched `is_secondary_sandbox_path`.
-  3. *FIFO Queue Invariant & Stale Active Status:* In `src-tauri/src/modules/repo_db/liveness.rs`, queries against `active_prompts` evaluated `status = 'running'` with a 45s sliding TTL window (`updated_at >= now - 45`). When an IDE worker process ran long tool executions without intermediate database pings, SQLite marked the prompt as inactive.
-  4. *Lack of IDE Heartbeat Fallback in IPC:* In `src-tauri/src/commands/cmd_running_up_next.rs`, `query_now_running` checked solely the SQLite table `active_prompts`. When a user sent a prompt directly from the Antigravity IDE without an initial database insertion, `cmd_running_up_next` returned `now_running: None`, failing to fall back to the live `.antigravity_goal_heartbeat.json` or transcript scanner.
+  1. *Hardcoded Alias Association:* In legacy versions of `src/components/instances/fleet/useFleetMachines.ts` and `FleetMachineRow.tsx`, `aliasLower === 'main'` was directly mapped to `is_lead: true`.
+  2. *Cluster Topology Inversion:* In the developer's physical cluster topology, `gitmap ip` resolves to `192.168.1.3`. In the SSH mesh registry, `192.168.1.3` corresponds to `w1`. The workstation executing the AGM desktop app is `w1`. Therefore, `w1` is the local Lead execution node, while `main` (`192.168.1.20`) functions as a remote cluster controller and execution peer.
 - **Surgical Remedy:**
-  - Standardize specifier normalization in `observe.rs` to treat `""`, `"default"`, and `"__default__"` as canonical default instance queries.
-  - In `gemini_dirs.rs`, guarantee that default instance queries always include host home `.gemini`, default sandbox paths, and `get_default_antigravity_data_dir()`, while strictly isolating named secondary sandboxes.
-  - In `liveness.rs`, enforce strict FIFO `ORDER BY created_at ASC, id ASC`, evaluate `CascadeRunStatusType`, and check active heartbeat freshness before dropping to idle.
-  - In `cmd_running_up_next.rs`, add an IDE heartbeat fallback: if SQLite returns `None`, inspect `inspect_prompt_goal_status(&target, &workspaces)`; if an IDE goal worker is alive with fresh heartbeat, synthesize a live `PromptQueueRow` with status `'running'`.
-
-### 1.2 RCA 2: Conversation Rename Drift & Desynchronization
-- **Symptoms:** Renaming a conversation in the Tree View updates the sidebar label, but double-clicking the item opens the Inspector with the old title. Additionally, upon application restart or profile switch, renamed conversation titles revert to their old names in the IDE interface.
-- **Root Cause:**
-  1. *React SWR Mutation without Parent State Propagation:* In `src/components/instances/PromptTreeView/usePromptTreeData.ts`, `renameConversationOptimistic` directly modified the internal cache map `promptTreeSwrCache`, but did not return or dispatch an immutable copy to `selectedConversation` in `usePromptTreeState`.
-  2. *Double-Click Auto-Selection Omission:* In `src/components/instances/PromptTreeView/ConversationNode.tsx`, `onDoubleClick` executed `onOpenInspector(conv, project.repo_path)` without first calling `onSelect(conv, project)`. If the user double-clicked an unselected row, the inspector modal opened with the previously selected conversation data instead of the double-clicked item.
-  3. *Unsynchronized `state.vscdb` Workspace Storage:* In `src-tauri/src/modules/repo_db/sequences.rs`, `update_conversation_title` only updated `conversation_summaries.db` and `agm_conversation_sequences`. It did NOT update `state.vscdb` (the SQLite database located at `User/globalStorage/state.vscdb` or workspaceStorage where VSCode and Antigravity IDE store the active conversation title metadata). As a result, the IDE editor tabs continued to show the old title.
-- **Surgical Remedy:**
-  - In `usePromptTreeData.ts`, implement immutable state cloning and export helper functions to update both the SWR cache and parent `selectedConversation` state.
-  - In `ConversationNode.tsx`, wrap `onDoubleClick` to unconditionally trigger `onSelect` with turn resolution before calling `onOpenInspector`.
-  - In `sequences.rs`, locate the target instance's `state.vscdb` database path and perform parameterized SQL updates to sync conversation title strings in the IDE's persistent storage.
-
-### 1.3 RCA 3: Cramped Tree View Layout & Missing Terminal Hierarchy
-- **Symptoms:** The sidebar in `TreePanel.tsx` had a cramped width (`w-80 sm:w-96`, 320px–384px), forcing conversation titles, turn badges, and relative recency timestamps to wrap or truncate abruptly. Projects had minimal vertical separation (`space-y-1`), making it difficult to distinguish repository boundaries. Child subagent tasks were rendered with non-standard glyphs (`↳`) rather than standard terminal branch glyphs (`├──`, `└──`).
-- **Root Cause:** Restrictive Tailwind width constraints on the outer panel and absence of terminal tree styling guidelines in `TreePanel.tsx` and `ProjectNode.tsx`.
-- **Surgical Remedy:**
-  - Update `TreePanel.tsx` sidebar container to responsive `w-[460px] lg:w-[520px]`.
-  - Set project container list spacing to `space-y-3.5` for clear visual distinction between repositories.
-  - Update branch glyph rendering in `ProjectNode.tsx` and `ConversationNode.tsx` to standard terminal characters: `├──` for intermediate nodes and `└──` for the terminating child node.
-
-### 1.4 RCA 4: Missing Image Filter in Tree View Header
-- **Symptoms:** Multimodal prompt engineering workflows generate numerous text-only queries interspersed with image-heavy prompts. Users had no quick mechanism to filter out projects and conversations that lacked image attachments, forcing tedious manual scrolling.
-- **Root Cause:** `TreePanel.tsx` and `usePromptTreeData.ts` lacked an image filter state. The filter bar only toggled between `all`, `running`, `queued`, `pinned`, and `archived`.
-- **Surgical Remedy:**
-  - Introduce an `isImageFilterActive` toggle state.
-  - Add an interactive pill toggle button (`🖼️ Images` / `Image Filter`) to the segmented header capsule in `ModalHeader.tsx` with active styling.
-  - In `usePromptTreeData.ts` and `TreePanel.tsx`, filter out projects and conversations whose `has_images` flag is false and whose child prompt turns contain zero image payloads.
-
-### 1.5 RCA 5: Auto-Hide Button Visual Bloat & Segmented Capsule Violation
-- **Symptoms:** The "Hide Auto" / "Show Auto" button in `TreePanel.tsx` was rendered as a standalone bulky button (`border rounded-md px-2.5 py-0.5`) sitting loosely next to a native `<select>` dropdown. This violated the UI rule requiring adjacent controls to be packaged into a contiguous segmented pill capsule with borderless `<select>` styling.
-- **Root Cause:** Ad-hoc styling in `TreePanel.tsx` without wrapping into the shared dark-glass segmented container.
-- **Surgical Remedy:**
-  - Consolidate the Auto-Hide toggle button and the adjacent Scope `<select>` into a single contiguous segmented pill capsule (`inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#120d20]/90 border border-slate-200/80 dark:border-purple-900/50 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-900/40 shadow-2xs`).
-  - Style the inline `<select>` with transparent borderless styling (`bg-transparent border-0 focus:ring-0 focus:outline-none`).
-
-### 1.6 RCA 6: Details Button Displacement & Health Status Indicator
-- **Symptoms:** The "Details" button in `DetailTabs.tsx` was rendered as a plain tab button without prominent status feedback, making it easy to overlook and disconnected from the instance's active execution state.
-- **Root Cause:** Missing activity icon and lack of a prominent live health pulse.
-- **Surgical Remedy:**
-  - Relocate the Details button within `DetailTabs.tsx`.
-  - Equip the button with the `Activity` icon (from `lucide-react`) and an animated `#1af18d` pulsing green health status indicator when `selectedConversation?.is_running` is true.
-
-### 1.7 RCA 7: Inconsistent Markdown Container Backgrounds
-- **Symptoms:** In dark mode, markdown preview cards and inspector code blocks exhibited mismatched background tones, alternating between `#171025`, `#090611`, and `#19191c`.
-- **Root Cause:** Fragmented CSS utility classes applied across different prompt rendering components.
-- **Surgical Remedy:**
-  - Standardize and enforce `dark:bg-[#19191c]` across all markdown containers in `PromptInstructionView.tsx`, `InspectorModal.tsx`, and `ResultsView.tsx`.
+  - In `useFleetMachines.ts` and `FleetMachineRow.tsx`, establish Cluster-IP and Local Alias Primacy:
+    - Match `192.168.1.3`, alias `w1`, or `isLocalNode` as `is_local: true` and `is_lead: true`.
+    - Match `192.168.1.20` as alias `main`, setting `is_local: false` and `is_lead: false`.
+  - In `sortFleetMachines(list)`:
+    - Rank `is_lead || is_local` (`w1` / `192.168.1.3`) at Index 0.
+    - Rank remote controller peer `main` (`192.168.1.20`) at Index 1.
+    - Follow with remaining active nodes (`u1`, `w2`, `w3`, `w4`) sorted by online status and lexicographical alias.
 
 ---
 
-## 2. Architecture & Control Flow
+### 2.2 RCA 2: Full-Screen Stuck Skeleton on Mount & Uncached Latency
+- **Symptoms:** Navigating to the Instances page or Shared Cluster tab frequently subjected users to a 5-to-15 second blank state containing only three pulsing gray skeleton bars (`<FleetLoadingState />`). If an SSH node was rebooting or slow to respond to child process execution (`agm instances list --json`), the UI remained completely blocked.
+- **Root Cause:**
+  1. *Synchronous Blocking Waterfall:* `useFleetMachines.ts` defaulted `isLoading` to `true` and awaited `enrichFleetMachines()` (which executed sequential TCP socket probes and child SSH invocations) before committing data to React state.
+  2. *Unvalidated LocalStorage Persistence:* When raw cache records existed, they lacked expiration metadata, resulting in stale data leaking across sessions or being discarded indiscriminately.
+- **Surgical Remedy:**
+  - Implement a structured 30-second TTL cache envelope stored under `localStorage` key `agm_fleet_machines_cache_v2`:
+    ```typescript
+    interface FleetCacheEnvelope {
+        timestamp: number;
+        machines: FleetMachineInfo[];
+    }
+    ```
+  - On component mount, synchronously parse `agm_fleet_machines_cache_v2`. If the timestamp is fresh (`Date.now() - timestamp < 30_000`) and machines exist, populate `machines` state immediately and set `isLoading: false`. The user sees the fleet hierarchy in under 5 milliseconds with zero layout shift.
+  - Decouple `enrichFleetMachines()` into a non-blocking Stale-While-Revalidate (SWR) background task. The table renders baseline nodes instantly, progressively updating active instances, balances, and heartbeats once SSH background resolution completes.
 
-### 2.1 End-to-End Conversation Rename Synchronization Flow
+---
+
+### 2.3 RCA 3: Missing Shared Cluster Prompt Dispatching Component
+- **Symptoms:** While users could observe fleet nodes, IP addresses, and online statuses, they lacked an integrated, direct mechanism to dispatch prompt instructions to remote machines from the fleet table. Developers had to switch to command-line terminals and manually execute SSH commands.
+- **Root Cause:** Neither `FleetMachinesTable.tsx` nor `FleetMachineRow.tsx` mounted a modal or action handler for remote prompt dispatching.
+- **Surgical Remedy:**
+  - Architect `src/components/instances/fleet/SendFleetPromptModal.tsx` as a focused modal dialog equipped with target instance profile selection (`main:default`, `w1:default`, etc.), prompt text area, dispatch state management, and error tracking via `useErrorStore`.
+  - Mount `SendFleetPromptModal` in `FleetMachinesTable.tsx`.
+  - In `FleetMachineRow.tsx`, add an interactive `Send Prompt` action button (`p-1.5 px-2.5 rounded-lg text-purple-300 bg-purple-500/15 border border-purple-500/30`) that triggers `onOpenPromptModal(machine)`.
+
+---
+
+### 2.4 RCA 4: Prompt Tree View Usability, Density & Monospace Hierarchy Gaps
+- **Symptoms:**
+  1. *Navigation Fatigue:* Users with dozens of repositories had to expand or collapse each project folder one-by-one; no single-click expand/collapse all existed.
+  2. *Ambiguous Tree Hierarchy:* Turn sub-items and child subagent instructions lacked terminal-grade tree branch glyphs (`├──`, `└──`), making multi-turn workflows difficult to visually trace.
+  3. *Cramped Project Boundaries:* Projects were rendered tightly against each other (`space-y-0.5` / `space-y-1`), obscuring repository boundaries.
+  4. *Disconnected Image Filter Controls:* Image-heavy workflows had no header-level image filter toggle.
+  5. *Visual Inconsistency in Secondary Controls:* The "Hide Auto" toggle was rendered as an oversized button (`py-1`) adjacent to an unstyled dropdown, violating dark-glass segmented capsule standards.
+  6. *Unstyled Sync Dropdown:* Auto-sync interval selection utilized native browser `<select>`, popping up an unstyled gray Windows OS dropdown over dark-glass glassmorphism.
+- **Surgical Remedy:**
+  - Add `isAllExpanded` state and 1-click `FolderPlus` / `FolderMinus` toggle button in `TreePanel.tsx`.
+  - Replace ambiguous glyphs with crisp monospace terminal box-drawing glyphs: `├──` for intermediate nodes, `└──` for terminal nodes, and `└── ↳` for child subagent branches in `ConversationNode.tsx` and `ProjectNode.tsx`.
+  - Add generous top-level project breathing room (`my-2.5` with card framing `bg-slate-900/20 dark:bg-[#120a1f]/30 border border-slate-700/20 dark:border-purple-900/30`) and indent child turns (`ml-5 pl-3 border-l-2`).
+  - Introduce `imageFilterEmitter` singleton to synchronize the header pill button (`ImageIcon` in `ModalHeader.tsx`) and the tree panel filter pill.
+  - Wrap the Auto-Hide toggle into a unified segmented pill capsule with borderless `<select>` styling.
+  - Transform the 30-second sync dropdown into a dark-glass popover capsule with active interval checkmarks (`Check`).
+
+---
+
+## 3. System Architecture & Data Flow
+
+### 3.1 Fleet Machine Discovery, 30s TTL Caching & Async Enrichment Flow
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User
-    participant TreeUI as ConversationNode.tsx
-    participant StateHook as usePromptTreeData.ts
-    participant TauriIPC as commands/cmd_repo_db.rs
-    participant Backend as sequences.rs
-    participant StateDB as state.vscdb (IDE Storage)
-    participant SummariesDB as conversation_summaries.db
-    participant RepoDB as repo_prompts.db
+    participant Hook as useFleetMachines.ts
+    participant Storage as LocalStorage (agm_fleet_machines_cache_v2)
+    participant TableUI as FleetMachinesTable.tsx
+    participant IPC as Tauri IPC (invoke)
+    participant Supabase as Supabase Cloud Sync
+    participant SshSvc as sshService.ts (Cluster SSH)
 
-    User->>TreeUI: Double-click or F2 -> Enter new title
-    TreeUI->>TreeUI: onSelect(conv, project) [Auto-Select Node]
-    TreeUI->>StateHook: renameConversationOptimistic(id, newTitle)
-    StateHook->>StateHook: Immutable clone & SWR cache update
-    TreeUI->>TauriIPC: invoke('rename_conversation', { instanceId, conversationId, newTitle })
-    TauriIPC->>Backend: update_conversation_title(...)
-    Backend->>SummariesDB: UPDATE conversations SET title = ?1 WHERE id = ?2
-    Backend->>RepoDB: UPDATE agm_conversation_sequences SET title = ?1 WHERE conversation_id = ?2
-    Backend->>StateDB: UPDATE ItemTable SET value = json_set(value, '$.title', ?1) WHERE key LIKE '%conversation%'
-    Backend-->>TauriIPC: Ok(())
-    TauriIPC-->>TreeUI: Success Response
-    TreeUI-->>User: Title rendered in sidebar, header & IDE editor
+    User->>TableUI: Mount Instances Page / Fleet Tab
+    TableUI->>Hook: useFleetMachines() initializes
+    Hook->>Storage: getItem('agm_fleet_machines_cache_v2')
+    alt Fresh Envelope Found (<30s TTL)
+        Storage-->>Hook: { timestamp, machines: [...] }
+        Hook->>TableUI: setMachines(cached), isLoading: false
+        TableUI-->>User: Immediate Render (< 5ms, Zero Skeleton)
+    else Expired or No Cache
+        Storage-->>Hook: null / expired
+        Hook->>TableUI: isLoading: true (<FleetLoadingState />)
+    end
+
+    Note over Hook,IPC: Non-Blocking SWR Background Fetch
+    Hook->>IPC: invoke('get_fleet_machines')
+    alt Supabase / Local DB Returns Nodes
+        IPC-->>Hook: FleetMachineInfo[]
+    else DB Empty -> Fallback to SSH Nodes
+        Hook->>IPC: invoke('list_ssh_nodes')
+        IPC-->>Hook: SshNodeItem[] -> mapSshNodesToFleet()
+    end
+
+    Hook->>Hook: sortFleetMachines(w1 Lead Index 0, main Index 1)
+    Hook->>Storage: setItem(cacheKey, { timestamp: Date.now(), machines: sorted })
+    Hook->>TableUI: setMachines(sorted), isLoading: false
+
+    Note over Hook,SshSvc: Decoupled Async Balance Enrichment
+    Hook->>SshSvc: getClusterInstancesAndBalances()
+    SshSvc-->>Hook: ClusterInstanceBalanceItem[]
+    Hook->>Hook: enrichFleetMachines() (Emails, Active Profiles)
+    Hook->>Hook: sortFleetMachines(enriched)
+    Hook->>Storage: setItem(cacheKey, { timestamp: Date.now(), machines: sortedEnriched })
+    Hook->>TableUI: setMachines(sortedEnriched) [Progressive Update]
 ```
 
-### 2.2 Live Running Prompt Detection & Heartbeat Fallback Flow
+---
+
+### 3.2 Machine Primacy & Index Sorting Ladder
 
 ```mermaid
 flowchart TD
-    Start["get_running_and_up_next(instance_id)"] --> Norm["Normalize Specifier in observe.rs<br/>('default', '__default__', '')"]
-    Norm --> QueryDB["Query active_prompts in repo_prompts.db<br/>(status IN ('running', 'dispatched') ORDER BY created_at ASC)"]
+    Start["Input Fleet Machine List<br/>(FleetMachineInfo[])"] --> EvaluateLead{"Check Lead / Local Node<br/>alias == 'w1' || ip == '192.168.1.3' || is_local == true"}
     
-    QueryDB --> CheckDB{"Row Found &<br/>Fresh TTL?"}
-    CheckDB -- Yes --> RetDB["Return PromptQueueRow (from SQLite)"]
+    EvaluateLead -- Machine A is Lead --> PosA["Rank Machine A First (-1)<br/>(Local Lead Workstation)"]
+    EvaluateLead -- Machine B is Lead --> PosB["Rank Machine B First (1)<br/>(Local Lead Workstation)"]
     
-    CheckDB -- No --> FallbackHB["Fallback: inspect_prompt_goal_status(&inst, &workspaces)"]
-    FallbackHB --> CheckHB{"Heartbeat Fresh &<br/>PID Alive?"}
+    EvaluateLead -- Neither is Lead --> EvaluateMain{"Check Central Peer<br/>alias == 'main' || ip == '192.168.1.20'"}
+    EvaluateMain -- Machine A is Main --> RankMainA["Rank Machine A First (-1)<br/>(Remote Orchestrator Peer)"]
+    EvaluateMain -- Machine B is Main --> RankMainB["Rank Machine B First (1)<br/>(Remote Orchestrator Peer)"]
     
-    CheckHB -- Yes --> SynthRow["Synthesize PromptQueueRow<br/>(id: heartbeat.prompt_id, status: 'running')"]
-    CheckHB -- No --> CheckSummaries["Scan conversation_summaries.db<br/>(CascadeRunStatusType::is_running())"]
-    
-    CheckSummaries --> CheckSum{"Active Session<br/>Found?"}
-    CheckSum -- Yes --> RetSum["Return PromptQueueRow (from transcript summary)"]
-    CheckSum -- No --> RetNone["Return now_running: None"]
-    
-    SynthRow --> RetDB
-    RetSum --> RetDB
-    RetDB --> BuildPayload["Construct RunningAndUpNext Response Payload"]
-    RetNone --> BuildPayload
-    BuildPayload --> End["Deliver to Frontend via Tauri IPC"]
+    EvaluateMain -- Neither is Main --> CheckOnline{"Check Online Status<br/>is_online: true vs false"}
+    CheckOnline -- Different Status --> RankOnline["Online Nodes Before Offline Nodes"]
+    CheckOnline -- Same Status --> Lexico["Lexicographical Sort by node_alias ASC"]
+
+    PosA --> Result["Final Fleet Hierarchy Array<br/>[0: w1 (Lead), 1: main, 2: u1, 3: w2, 4: w3, 5: w4]"]
+    PosB --> Result
+    RankMainA --> Result
+    RankMainB --> Result
+    RankOnline --> Result
+    Lexico --> Result
 ```
 
 ---
 
-## 3. Subsystem Specifications
+### 3.3 Cross-Machine Prompt Dispatch Flow
 
-### 3.1 Backend: Default Instance Liveness & Heartbeat Fallback
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Developer
+    participant RowUI as FleetMachineRow.tsx
+    participant TableUI as FleetMachinesTable.tsx
+    participant Modal as SendFleetPromptModal.tsx
+    participant SshSvc as sshService.ts
+    participant Backend as cmd_ssh / injection.rs
+    participant RemoteNode as Target Machine (e.g. main / w2)
 
-#### 3.1.1 Specifier Normalization in `src-tauri/src/modules/instance/observe.rs`
-All instance specifiers must pass through unified normalization before registry querying or database filtering:
-```rust
-pub fn normalize_instance_specifier(specifier: &str) -> &str {
-    let clean = specifier.trim();
-    if clean.is_empty() || clean.eq_ignore_ascii_case("default") || clean.eq_ignore_ascii_case("__default__") {
-        "default"
-    } else {
-        clean
-    }
-}
+    Developer->>RowUI: Click [ 💬 Send Prompt ]
+    RowUI->>TableUI: onOpenPromptModal(machine)
+    TableUI->>Modal: Mount with machine (e.g. main, 192.168.1.20)
+    Modal-->>Developer: Render Modal with Target Instances [main:default, ...]
+    Developer->>Modal: Select instance & enter prompt instruction
+    Developer->>Modal: Click [ Send Instruction ] (or Cmd+Enter)
+    Modal->>Modal: setIsSending(true)
+    Modal->>SshSvc: sendRemoteSshPrompt({ node_alias, instance_target, prompt_text })
+    SshSvc->>Backend: invoke('send_remote_ssh_prompt', { ... })
+    Backend->>Backend: Base64 encode prompt payload
+    Backend->>RemoteNode: SSH exec: agm prompt --node <alias> --base64 <b64>
+    RemoteNode-->>Backend: Ok / Prompt Queued (PID alive)
+    Backend-->>SshSvc: { success: true, message: 'Dispatched' }
+    SshSvc-->>Modal: Success response
+    Modal->>Developer: Show Success Toast
+    Modal->>TableUI: onClose()
 ```
 
-#### 3.1.2 Directory Matching in `src-tauri/src/modules/repo_db/gemini_dirs.rs`
-When `instance_id` evaluates to `"default"`, the directory resolver must assemble:
-1. Canonical host home: `get_canonical_host_home().unwrap_or(dirs::home_dir())/.gemini`
-2. Default sandbox storage: `.antigravity_tools/instances/default/home/.gemini`
-3. APPDATA data directory: `get_default_antigravity_data_dir()/.gemini`
-All secondary sandboxes (`instances/<id>/home` where `id != "default"`) MUST be filtered out via `is_secondary_sandbox_path`.
+---
 
-#### 3.1.3 FIFO Query Invariant in `src-tauri/src/modules/repo_db/liveness.rs`
-All queries evaluating active prompt execution must adhere to:
-```sql
-SELECT status FROM active_prompts 
-WHERE (project_id = ?1 OR repo_path = ?1 OR project_id LIKE ?1 || '__%')
-  AND status = 'running'
-  AND updated_at >= ?2
-ORDER BY created_at ASC, id ASC LIMIT 1;
+### 3.4 Prompt Tree Filter & Expand State Synchronization
+
+```mermaid
+flowchart LR
+    subgraph Header ["ModalHeader.tsx"]
+        HeaderImgBtn["🖼️ Header Image Filter Pill"]
+        SyncDropdown["30s Sync Interval Popover"]
+    end
+
+    subgraph Emitter ["usePromptTreeData.ts"]
+        imageFilterEmitter["imageFilterEmitter<br/>(Singleton Pub/Sub)"]
+    end
+
+    subgraph Panel ["TreePanel.tsx"]
+        PanelImgBtn["🖼️ Row 2 Image Filter Pill"]
+        ExpandToggle["1-Click Expand/Collapse<br/>(FolderPlus / FolderMinus)"]
+        AutoHideCapsule["Segmented Auto-Hide Capsule"]
+    end
+
+    subgraph Nodes ["ConversationNode & ProjectNode"]
+        ProjBreathing["my-2.5 Card Breathing Room"]
+        MonospaceGlyphs["Monospace Terminal Glyphs<br/>├──, └──, └── ↳"]
+        TurnIndent["Child Turn Indent<br/>ml-5 pl-3 border-l-2"]
+    end
+
+    HeaderImgBtn <-->|toggle / subscribe| imageFilterEmitter
+    PanelImgBtn <-->|toggle / subscribe| imageFilterEmitter
+    imageFilterEmitter -->|Filter Predicate| Panel
+    ExpandToggle -->|isAllExpanded| Nodes
+    Panel --> ProjBreathing
+    Panel --> MonospaceGlyphs
+    Panel --> TurnIndent
 ```
-LIFO queries (`ORDER BY updated_at DESC`) are strictly forbidden in prompt dispatch and liveness logic.
 
-#### 3.1.4 IDE Heartbeat Fallback in `src-tauri/src/commands/cmd_running_up_next.rs`
-If `query_now_running` returns `Ok(None)`, `get_running_and_up_next` must invoke `inspect_prompt_goal_status`:
-```rust
-if now_running.is_none() {
-    let workspaces = crate::modules::instance::get_instance_workspace_folders(&target, &inst_data_dir);
-    let (is_running, _hb_file, last_line) = crate::modules::repo_db::inspect_prompt_goal_status(&target, &workspaces);
-    if is_running {
-        now_running = Some(PromptQueueRow {
-            id: extract_prompt_id_from_heartbeat(&last_line).unwrap_or_else(|| "live-ide-prompt".to_string()),
-            instance_id: target.to_string(),
-            status: "running".to_string(),
-            origin_tier: "USER_PROMPT".to_string(),
-            created_at: Utc::now().timestamp(),
-            has_images: false,
-        });
-    }
+---
+
+## 4. Subsystem Specifications
+
+### 4.1 Fleet Machine Identity & Local IP Primacy
+
+#### 4.1.1 Local Node Reality & Resolution Invariant
+In `src/components/instances/fleet/useFleetMachines.ts`:
+- **Local IP:** `192.168.1.3`
+- **Lead Node Alias:** `w1`
+- **Controller Peer IP:** `192.168.1.20`
+- **Controller Peer Alias:** `main`
+
+The node resolution logic must evaluate:
+```typescript
+const aliasLower = (n.alias || (n as any).node_alias || '').trim().toLowerCase();
+const ip = (n.ip_address || (n as any).ip || (n as any).host || '').trim();
+
+// 192.168.1.3 is the physical lead workstation executing AGM
+const isLocal = aliasLower === 'w1' || ip === '192.168.1.3' || aliasLower.startsWith('local');
+const isLead = isLocal || aliasLower === 'w1';
+
+return {
+    node_id: `ssh_${n.alias}`,
+    node_alias: n.alias,
+    ip_address: ip,
+    is_online: n.status === 'online' || n.status === 'ready' || isLocal || aliasLower === 'main',
+    is_local: isLocal,
+    is_lead: isLead,
+    source: isLocal ? 'local' : isLead ? 'lead' : 'ssh-mesh',
+    // ...
+};
+```
+
+#### 4.1.2 Strict Lead-First Sorting (`sortFleetMachines`)
+Sorting must guarantee determinism across all render cycles:
+```typescript
+function sortFleetMachines(list: FleetMachineInfo[]): FleetMachineInfo[] {
+    return [...list].sort((a, b) => {
+        const aAlias = (a.node_alias || (a as any).alias || '').trim().toLowerCase();
+        const bAlias = (b.node_alias || (b as any).alias || '').trim().toLowerCase();
+        const aIp = (a.ip_address || (a as any).ip || '').trim();
+        const bIp = (b.ip_address || (b as any).ip || '').trim();
+
+        // 1. Lead machine ('w1' / current local machine 192.168.1.3) has absolute top primacy (Index 0)
+        const aIsLead = Boolean((a as any).is_lead || aAlias === 'w1' || aIp === '192.168.1.3' || (a as any).is_local);
+        const bIsLead = Boolean((b as any).is_lead || bAlias === 'w1' || bIp === '192.168.1.3' || (b as any).is_local);
+        if (aIsLead !== bIsLead) return aIsLead ? -1 : 1;
+
+        // 2. Central orchestrator peer ('main' 192.168.1.20) follows immediately (Index 1)
+        const aIsMain = aAlias === 'main' || aIp === '192.168.1.20';
+        const bIsMain = bAlias === 'main' || bIp === '192.168.1.20';
+        if (aIsMain !== bIsMain) return aIsMain ? -1 : 1;
+
+        // 3. Online status preference
+        if (a.is_online !== b.is_online) return a.is_online ? -1 : 1;
+
+        // 4. Alphabetical tie-breaker
+        return (a.node_alias || '').localeCompare(b.node_alias || '');
+    });
 }
 ```
 
 ---
 
-### 3.2 Backend: Persistent `state.vscdb` Rename Synchronization
+### 4.2 Fleet UI Caching Architecture
 
-In `src-tauri/src/modules/repo_db/sequences.rs`, `update_conversation_title` must synchronize across three stores:
-1. `conversation_summaries.db`: `UPDATE conversations SET title = ?1, updated_at = ?2 WHERE id = ?3`
-2. `repo_prompts.db`: `UPDATE agm_conversation_sequences SET title = ?1, updated_at = ?2 WHERE conversation_id = ?3`
-3. `state.vscdb`: Locate `User/globalStorage/state.vscdb` in the instance's `data_dir` and execute:
-```sql
-UPDATE ItemTable 
-SET value = json_set(value, '$.customTitle', ?1)
-WHERE key LIKE '%antigravity.conversations%' 
-  AND key LIKE '%' || ?2 || '%';
-```
-If the key stores plain JSON or summary records, update the nested `title` attribute via `rusqlite` transaction with a safe fallback:
-```rust
-pub fn sync_title_to_state_vscdb(data_dir: &Path, conversation_id: &str, new_title: &str) -> Result<(), AppError> {
-    let vscdb_path = data_dir.join("User").join("globalStorage").join("state.vscdb");
-    if !vscdb_path.exists() {
-        return Ok(());
+#### 4.2.1 30-Second TTL Cache Envelope
+Cache storage must encapsulate timestamp metadata to prevent zombie cache retention:
+```typescript
+export interface FleetCacheEnvelope {
+    timestamp: number;
+    machines: FleetMachineInfo[];
+}
+
+const FLEET_CACHE_KEY = 'agm_fleet_machines_cache_v2';
+const FLEET_CACHE_TTL_MS = 30_000; // 30 seconds
+
+export function loadCachedFleetMachines(): FleetMachineInfo[] {
+    try {
+        const raw = localStorage.getItem(FLEET_CACHE_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            // Handle structured TTL envelope
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray(parsed.machines)) {
+                const age = Date.now() - (parsed.timestamp || 0);
+                if (age < FLEET_CACHE_TTL_MS && parsed.machines.length > 0) {
+                    return sortFleetMachines(parsed.machines);
+                }
+            }
+            // Backward-compatible fallback for bare arrays
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                return sortFleetMachines(parsed);
+            }
+        }
+    } catch {
+        // Safe fallback on quota or JSON parse error
     }
-    let conn = Connection::open(&vscdb_path).map_err(|e| AppError::Database(format!("open state.vscdb: {e}")))?;
-    crate::error::record_ignored(
-        conn.pragma_update(None, "busy_timeout", 3000),
-        "set busy_timeout on state.vscdb"
-    );
-    // Best-effort update of matching keys
-    let _ = conn.execute(
-        "UPDATE ItemTable SET value = ?1 WHERE key = ?2",
-        params![new_title, format!("antigravity.conversation.title.{}", conversation_id)],
-    );
-    Ok(())
+    return [];
+}
+
+export function saveCachedFleetMachines(machines: FleetMachineInfo[]): void {
+    try {
+        const envelope: FleetCacheEnvelope = {
+            timestamp: Date.now(),
+            machines,
+        };
+        localStorage.setItem(FLEET_CACHE_KEY, JSON.stringify(envelope));
+    } catch {
+        // Non-blocking best-effort cache write
+    }
 }
 ```
 
+#### 4.2.2 Non-Blocking Mount & SWR Refresh Execution
+In `useFleetMachines()`:
+1. `initialMachines` is populated synchronously via `loadCachedFleetMachines()`.
+2. `isLoading` initializes to `initialMachines.length === 0`.
+3. In `fetchMachines()`:
+   - Sets baseline machines immediately to React state.
+   - Saves baseline envelope to `localStorage`.
+   - Spawns decoupled `enrichFleetMachines()` via Promise chain without `await`.
+   - On completion of `enrichFleetMachines()`, merges discovered instances and emails, re-sorts via `sortFleetMachines`, updates `machines` state, and writes the refreshed envelope to `localStorage`.
+
 ---
 
-### 3.3 Frontend: UI Layout, Hierarchy & Controls
+### 4.3 Shared Cluster Prompt Dispatching Component
 
-#### 3.3.1 Responsive Sidebar Width & Project Spacing in `TreePanel.tsx`
-- Replace `w-80 sm:w-96` with `w-[460px] lg:w-[520px] shrink-0`.
-- Replace `space-y-1` on the project list container with `space-y-3.5` to provide generous visual separation between repositories.
-- Structure project items with distinct card-like boundaries and subtle background dividers.
+#### 4.3.1 Modal Component Architecture (`SendFleetPromptModal.tsx`)
+`SendFleetPromptModal` mounts as a floating glassmorphism dialog:
+- **Header:** Node alias badge, IP address, and close `X` button.
+- **Instance Selector:** `<select>` dropdown populated dynamically with `machine.active_instances`.
+- **Text Area:** Multi-line prompt input with keyboard shortcut listener (`Cmd/Ctrl + Enter` to dispatch).
+- **Footer:** Cancel button and high-contrast `[ Send Instruction ]` submit button with loading spinner (`Loader2`).
 
-#### 3.3.2 Terminal Tree Branch Glyphs in `ProjectNode.tsx` and `ConversationNode.tsx`
-Replace arrow markers (`↳`) with standard terminal box-drawing glyphs in monospace styling:
-- Intermediate child nodes: `<span className="font-mono text-[11px] text-purple-400 select-none">├──</span>`
-- Terminating child node: `<span className="font-mono text-[11px] text-purple-400 select-none">└──</span>`
+```tsx
+export interface SendFleetPromptModalProps {
+    machine: FleetMachineInfo | null;
+    onClose: () => void;
+}
+```
 
-#### 3.3.3 Image Filter Toggle in `ModalHeader.tsx` & `TreePanel.tsx`
-- In `ModalHeader.tsx`, add an image filter pill toggle within the header capsule:
+#### 4.3.2 IPC Execution & Toast Notification
+Dispatch invokes `sshService.sendRemoteSshPrompt`:
+```typescript
+const res = await sshService.sendRemoteSshPrompt({
+    node_alias: machine.node_alias,
+    instance_target: selectedInstance || 'default',
+    prompt_text: text,
+});
+if (res.success) {
+    showToast(`Dispatched prompt to ${machine.node_alias}:${selectedInstance}`, 'success');
+    onClose();
+} else {
+    showToast(`Warning from ${machine.node_alias}: ${res.message || res.stderr}`, 'warning');
+}
+```
+
+#### 4.3.3 Table & Row Mounting
+- `FleetMachinesTable.tsx` renders:
+  ```tsx
+  <SendFleetPromptModal machine={promptMachine} onClose={handleClosePromptModal} />
+  ```
+- `FleetMachineRow.tsx` renders in Column 6 (Action):
+  ```tsx
+  <button
+      type="button"
+      onClick={() => onOpenPromptModal(machine)}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 hover:text-purple-200 border border-purple-500/30 transition-colors shadow-2xs cursor-pointer"
+      title={`Send prompt instruction to ${cleanAlias}`}
+  >
+      <Send className="w-3 h-3 text-purple-400" />
+      <span>Send Prompt</span>
+  </button>
+  ```
+
+---
+
+### 4.4 Prompt Tree UI Components & Hierarchy Polish
+
+#### 4.4.1 Expandable Tree View & 1-Click Expand/Collapse All (`TreePanel.tsx`)
+- Add `isAllExpanded` boolean prop and `onToggleExpandAll` callback in `TreePanelProps`.
+- Render toggle button in the Scope header:
+  ```tsx
+  {onToggleExpandAll && (
+      <button
+          type="button"
+          onClick={onToggleExpandAll}
+          className="p-1 rounded-md text-slate-400 hover:text-purple-400 hover:bg-slate-100 dark:hover:bg-[#25173e] transition-colors cursor-pointer shrink-0"
+          title={isAllExpanded ? "Collapse all projects" : "Expand all projects"}
+      >
+          {isAllExpanded ? (
+              <FolderMinus className="w-3.5 h-3.5 text-purple-400" />
+          ) : (
+              <FolderPlus className="w-3.5 h-3.5 text-slate-400" />
+          )}
+      </button>
+  )}
+  ```
+
+#### 4.4.2 Monospace Terminal Branch Connector Glyphs
+In both `ConversationNode.tsx` and `ProjectNode.tsx`:
+- Intermediate conversation turns and subagent tasks MUST render:
+  ```tsx
+  <span className="text-slate-300 dark:text-purple-400 font-mono text-[10px] select-none shrink-0">
+      ├──
+  </span>
+  ```
+- Terminating conversation turns and subagent tasks MUST render:
+  ```tsx
+  <span className="text-slate-300 dark:text-purple-400 font-mono text-[10px] select-none shrink-0">
+      └──
+  </span>
+  ```
+- Subagent hierarchical connector under parent prompt turns MUST render:
+  ```tsx
+  <span className="text-purple-400 dark:text-purple-400 font-mono text-[10px] select-none shrink-0" title="AI Subagent Instruction">
+      └── ↳
+  </span>
+  ```
+
+#### 4.4.3 Top-Level Project Breathing Room & Right-Hand Turn Indentation
+- Top-level project container in `ProjectNode.tsx`:
+  ```tsx
+  <div 
+      key={project.project_id} 
+      className={cn(
+          "space-y-1 transition-all", 
+          !isScopedSingleProject && "my-2.5 rounded-xl bg-slate-900/20 dark:bg-[#120a1f]/30 border border-slate-700/20 dark:border-purple-900/30 p-1.5 shadow-2xs"
+      )}
+  >
+  ```
+- Child conversations and turns indentation container:
+  ```tsx
+  <div className={cn(
+      "space-y-2 py-1",
+      !isScopedSingleProject && "ml-5 pl-3 border-l-2 border-slate-300/60 dark:border-purple-900/50"
+  )}>
+  ```
+
+#### 4.4.4 Header Image Filter Toggle & `imageFilterEmitter`
+In `src/components/instances/PromptTreeView/usePromptTreeData.ts`:
+```typescript
+export const imageFilterEmitter = {
+    isActive: false,
+    listeners: new Set<(active: boolean) => void>(),
+    get(): boolean {
+        return this.isActive;
+    },
+    set(active: boolean) {
+        this.isActive = active;
+        this.listeners.forEach((fn) => fn(active));
+    },
+    toggle() {
+        this.set(!this.isActive);
+    },
+    subscribe(fn: (active: boolean) => void) {
+        this.listeners.add(fn);
+        return () => {
+            this.listeners.delete(fn);
+        };
+    },
+};
+```
+
+In `ModalHeader.tsx`:
 ```tsx
 <button
     type="button"
-    onClick={() => setIsImageFilterActive(!isImageFilterActive)}
+    onClick={() => imageFilterEmitter.toggle()}
     className={cn(
-        "flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+        "flex items-center justify-center w-7 h-7 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
         isImageFilterActive
-            ? "bg-sky-600 text-white shadow-2xs"
-            : "text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90"
+            ? "bg-sky-500/25 text-sky-400 border-x border-sky-500/40 shadow-inner"
+            : "text-slate-500 dark:text-slate-400 hover:text-sky-400 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90"
     )}
-    title={isImageFilterActive ? "Showing only conversations with images" : "Filter conversations with images"}
+    title={isImageFilterActive ? "Image Filter Active: Showing only conversations with images" : "Filter by Images"}
+    aria-label={isImageFilterActive ? "Image Filter Active" : "Filter by Images"}
 >
-    <span>🖼️</span>
-    <span>Images</span>
+    <ImageIcon className="w-3.5 h-3.5" />
 </button>
 ```
-- In `usePromptTreeData.ts`, filter conversations:
-```typescript
-const matchesImageFilter = !isImageFilterActive || Boolean(conv.has_images || conv.prompts?.some(p => p.has_images));
-```
 
-#### 3.3.4 Auto-Hide Button Sizing & Segmented Capsule in `TreePanel.tsx`
-Replace the loose auto-hide button and adjacent scope select with a unified contiguous segmented pill capsule:
+#### 4.4.5 Compact Auto-Hide Pill Button Sizing
+In `TreePanel.tsx` Row 2:
 ```tsx
-<div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#120d20]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-900/50 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-900/40 shadow-2xs">
+<div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#120d20]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-900/50 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-900/40 shadow-2xs shrink-0">
     <button
         type="button"
         onClick={handleToggleAutomated}
         className={cn(
-            "flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-semibold rounded-l-full transition-colors cursor-pointer",
+            "flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-l-full transition-colors cursor-pointer",
             effectiveAutomatedHidden
                 ? "bg-purple-500/15 text-purple-700 dark:text-purple-300"
                 : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
@@ -329,94 +579,162 @@ Replace the loose auto-hide button and adjacent scope select with a unified cont
 </div>
 ```
 
-#### 3.3.5 Details Button Relocation with Activity Icon & Health Pulse in `DetailTabs.tsx`
-- Replace the plain `FileText` icon with `Activity` (from `lucide-react`).
-- Render a live glowing pulse dot using `#1af18d`:
+#### 4.4.6 Modernized Dark-Glass Auto-Sync Popover
+In `ModalHeader.tsx` Segment 4:
 ```tsx
-<button
-    type="button"
-    onClick={() => setIsDetailsModalOpen(true)}
-    className="p-1.5 px-2.5 rounded-md flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60 text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-    title="Open Conversation & Instance Details"
->
-    <Activity className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-    <span>Details</span>
-    {selectedConversation?.is_running && (
-        <span className="w-2 h-2 rounded-full bg-[#1af18d] shadow-[0_0_6px_#1af18d] animate-pulse shrink-0" />
+<div className="relative flex items-center h-7 px-2.5">
+    <button
+        type="button"
+        onClick={() => setIsSyncDropdownOpen((prev) => !prev)}
+        className="flex items-center gap-1 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:text-purple-400 transition-colors cursor-pointer"
+        title="Auto-sync interval (Click to change)"
+    >
+        <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 select-none">Sync:</span>
+        <span className="text-purple-600 dark:text-purple-300 font-mono font-bold">{syncInterval}</span>
+        <ChevronDown className={cn("w-3 h-3 text-slate-400 transition-transform duration-150", isSyncDropdownOpen && "rotate-180")} />
+    </button>
+
+    {isSyncDropdownOpen && (
+        <>
+            <div className="fixed inset-0 z-50" onClick={() => setIsSyncDropdownOpen(false)} />
+            <div className="absolute right-0 top-full mt-1.5 w-28 py-1 rounded-xl bg-slate-900/95 dark:bg-[#171025]/95 backdrop-blur-xl border border-slate-700/60 dark:border-purple-900/60 shadow-2xl z-50">
+                <div className="px-2.5 py-1 text-[9px] uppercase tracking-wider font-semibold text-slate-400 border-b border-slate-800/60 dark:border-purple-900/40">
+                    Sync Interval
+                </div>
+                {SYNC_INTERVALS.map((opt) => (
+                    <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                            setSyncInterval(opt.value);
+                            setPromptTreeSyncInterval(opt.value);
+                            setIsSyncDropdownOpen(false);
+                        }}
+                        className={cn(
+                            "w-full text-left px-2.5 py-1.5 text-xs flex items-center justify-between transition-colors cursor-pointer",
+                            syncInterval === opt.value
+                                ? "bg-purple-600/20 text-purple-300 font-semibold"
+                                : "text-slate-300 hover:bg-slate-800/60 dark:hover:bg-[#281b3d]"
+                        )}
+                    >
+                        <span className="font-mono text-[11px]">{opt.label}</span>
+                        {syncInterval === opt.value && (
+                            <Check className="w-3.5 h-3.5 text-purple-400" />
+                        )}
+                    </button>
+                ))}
+            </div>
+        </>
     )}
-</button>
+</div>
 ```
 
-#### 3.3.6 Markdown Background Uniformity
-Verify and ensure `dark:bg-[#19191c]` across:
-- `src/components/instances/PromptTreeView/PromptInstructionView.tsx`: Markdown preview card (`leading-relaxed max-h-[460px] overflow-y-auto cursor-pointer`).
-- `src/components/instances/PromptTreeView/InspectorModal.tsx`: Inspector modal code/markdown container.
-- `src/components/instances/PromptTreeView/ResultsView.tsx`: Prompt results and output container.
+---
+
+## 5. Component Interface Contracts & Props
+
+### 5.1 `SendFleetPromptModalProps`
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| `machine` | `FleetMachineInfo \| null` | The target machine metadata. Modal unmounts/returns null if null. |
+| `onClose` | `() => void` | Dismissal handler closing the modal and resetting draft prompt text. |
+
+### 5.2 `FleetMachineRowProps`
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| `machine` | `FleetMachineInfo` | Validated fleet machine record. |
+| `isRowUnmasked` | `boolean` | Flag indicating whether account email masking is bypassed for this row. |
+| `copiedIp` | `string \| null` | Currently copied IP string for rendering temporary checkmark feedback. |
+| `onCopyIp` | `(ip: string) => void` | Invoked to copy host IP address to clipboard. |
+| `onToggleMask` | `(nodeId: string) => void` | Toggles email masking per individual node row. |
+| `onOpenPromptModal` | `(machine: FleetMachineInfo) => void` | Opens the `SendFleetPromptModal` targeting this machine. |
+
+### 5.3 `TreePanelProps` (Selective Enhancements)
+| Prop | Type | Description |
+| :--- | :--- | :--- |
+| `isAllExpanded` | `boolean \| undefined` | Whether all project nodes are expanded. |
+| `onToggleExpandAll` | `(() => void) \| undefined` | Handler toggling full hierarchy expansion. |
+| `isImageFilterActive` | `boolean \| undefined` | External image filter active state. |
+| `isAutomatedHidden` | `boolean \| undefined` | Whether automated subagent conversations are hidden. |
+| `setIsAutomatedHidden` | `React.Dispatch<...> \| undefined` | Toggle setter for automated subagent conversation visibility. |
 
 ---
 
-## 4. Acceptance Criteria & Quality Gates
+## 6. Acceptance Criteria & Quality Gates
 
-### AC-01: Default Instance Running Prompt Detection
-- **Given** The default instance is executing an active task in the IDE.
-- **When** `get_running_and_up_next(Some("default"))` is called via Tauri IPC.
-- **Then** The response MUST return `now_running: Some(PromptQueueRow)` with `status: "running"`, either from SQLite `active_prompts` or synthesized via the IDE heartbeat fallback ladder.
+### AC-01: Local Lead Identity Primacy
+- **Given** The local workstation running AGM has IP `192.168.1.3` and alias `w1`.
+- **When** `useFleetMachines()` loads or receives node updates.
+- **Then** Node `w1` (`192.168.1.3`) MUST have `is_local: true` and `is_lead: true`.
+- **And** `sortFleetMachines` MUST sort `w1` to Index 0 of the `machines` array.
 
-### AC-02: Conversation Rename Synchronization
-- **Given** A conversation is renamed in the Prompt Tree View via F2 or context menu.
-- **When** The user inputs a new title and confirms.
-- **Then** The new title MUST immediately reflect in the sidebar node, header title, `promptTreeSwrCache`, `conversation_summaries.db`, and `state.vscdb`.
-- **And** Double-clicking the renamed conversation node MUST automatically select that node and open the Inspector Modal displaying the updated title.
+### AC-02: Remote Peer Node Matching
+- **Given** Node `main` (`192.168.1.20`) is present in the cluster.
+- **When** Inspecting the fleet hierarchy.
+- **Then** `main` MUST have `is_local: false` and `is_lead: false`.
+- **And** `main` MUST sort to Index 1 (directly below `w1`).
 
-### AC-03: Responsive Sidebar Width & Project Spacing
-- **Given** The Prompt Tree View modal is rendered on desktop viewports (`>= 1024px`).
-- **When** Inspecting the DOM elements of `TreePanel.tsx`.
-- **Then** The sidebar container MUST have class `w-[460px] lg:w-[520px]`.
-- **And** The active project container MUST enforce `space-y-3.5` between adjacent repositories.
+### AC-03: Zero-Freeze Initial Mount with 30s TTL Cache Envelope
+- **Given** Stored fleet cache exists in `localStorage` under key `agm_fleet_machines_cache_v2` with `timestamp` within 30 seconds.
+- **When** `FleetMachinesTable` mounts in the DOM.
+- **Then** The table MUST render cached machines in under 5 milliseconds with `isLoading: false`.
+- **And** Full-screen `<FleetLoadingState />` skeleton bars MUST NOT be displayed.
 
-### AC-04: Terminal Tree Branch Glyphs
-- **Given** Subagent conversations or prompt turns are rendered under a parent node.
-- **When** Inspecting the branch prefix elements in `ProjectNode.tsx` and `ConversationNode.tsx`.
-- **Then** Intermediate nodes MUST render `├──` and the final node MUST render `└──`. The legacy glyph `↳` MUST NOT appear.
+### AC-04: Non-Blocking SWR Background Enrichment
+- **Given** Cached baseline machines are rendered on mount.
+- **When** `enrichFleetMachines()` queries cluster instances and balances via SSH.
+- **Then** The table UI MUST remain fully interactive without freezing.
+- **And** Upon resolution, active instances and bound emails MUST progressively update into the rows and refresh the `localStorage` envelope.
 
-### AC-05: Image Filter Header Toggle
-- **Given** The Prompt Tree View contains both text-only conversations and conversations with attached screenshots/images.
-- **When** The user clicks the `🖼️ Images` pill toggle button in `ModalHeader.tsx`.
-- **Then** All projects and conversations lacking image payloads MUST be hidden from the tree list.
-- **And** Deactivating the filter MUST restore the full conversation hierarchy.
+### AC-05: Cross-Machine Remote Prompt Modal Dispatch
+- **Given** Any online fleet machine row in `FleetMachinesTable`.
+- **When** The user clicks `[ Send Prompt ]`.
+- **Then** `SendFleetPromptModal` MUST open displaying the target node alias and IP.
+- **And** Submitting a prompt MUST route via `sshService.sendRemoteSshPrompt`, produce a success toast, and close the modal.
 
-### AC-06: Unified Auto-Hide Segmented Capsule
-- **Given** The secondary filter row in `TreePanel.tsx`.
-- **When** Inspecting the "Hide Auto" / "Show Auto" toggle and the scope dropdown.
-- **Then** They MUST be wrapped in a shared contiguous pill capsule (`rounded-full`, shared border, subtle divider lines).
-- **And** The `<select>` dropdown MUST feature borderless transparent styling (`bg-transparent border-0 focus:ring-0 focus:outline-none`).
+### AC-06: 1-Click Expand/Collapse All
+- **Given** Multiple project nodes in `TreePanel.tsx`.
+- **When** The user clicks the `FolderPlus` icon button in the scope bar.
+- **Then** All projects in the tree MUST expand simultaneously.
+- **And** Clicking `FolderMinus` MUST collapse all projects simultaneously.
 
-### AC-07: Relocated Details Button with Health Status Indicator
-- **Given** `DetailTabs.tsx` rendered for an active conversation.
-- **When** The conversation is in `running` state.
-- **Then** The Details button MUST feature the `Activity` icon.
-- **And** An animated `#1af18d` pulsing green health dot MUST be visible adjacent to the "Details" text.
+### AC-07: Terminal Monospace Connector Glyphs
+- **Given** Subagent conversation nodes and execution turns in `ConversationNode.tsx` and `ProjectNode.tsx`.
+- **When** Inspecting the connector glyphs in the DOM.
+- **Then** Intermediate turns MUST render `├──` in `font-mono`.
+- **And** Terminal turns MUST render `└──` in `font-mono`.
+- **And** Subagent tasks beneath a prompt MUST render `└── ↳`.
 
-### AC-08: Markdown Background Consistency
-- **Given** The dark mode presentation in `PromptInstructionView.tsx`, `InspectorModal.tsx`, and `ResultsView.tsx`.
-- **When** Inspecting background utility classes on markdown containers.
-- **Then** All containers MUST specify `dark:bg-[#19191c]`.
+### AC-08: Project Breathing Room & Right-Hand Turn Indentation
+- **Given** Multiple project cards rendered in `ProjectNode.tsx`.
+- **When** Checking CSS classes.
+- **Then** Top-level project cards MUST include `my-2.5`.
+- **And** Child conversation turn containers MUST include `ml-5 pl-3 border-l-2`.
+
+### AC-09: Synchronized Header Image Filter Toggle
+- **Given** The Prompt Tree View modal header.
+- **When** Clicking the `ImageIcon` button in `ModalHeader.tsx`.
+- **Then** `imageFilterEmitter` MUST broadcast the updated state.
+- **And** Both `ModalHeader` and `TreePanel` image filter buttons MUST reflect the active state, filtering out text-only conversations.
+
+### AC-10: Modernized Dark-Glass Auto-Sync Dropdown
+- **Given** The sync interval selector in `ModalHeader.tsx`.
+- **When** Clicking the `Sync:` indicator.
+- **Then** A glassmorphic popover (`bg-slate-900/95 dark:bg-[#171025]/95`) MUST open containing `Off`, `15s`, `30s`, `1m`, and `2m`.
+- **And** The currently selected interval MUST display a purple `Check` mark.
 
 ---
 
-## 5. Verification Commands
+## 7. Verification Commands
 
 ```bash
-# 1. Rust Formatting Check
+# 1. Rust pre-flight checks (Formatting & Clippy Gate)
 cd src-tauri && cargo fmt -- --check
-
-# 2. Rust Clippy Gate
 cd src-tauri && cargo clippy --all-targets --all-features
 
-# 3. Targeted Rust Unit Tests for Liveness & Sequences
-cd src-tauri && cargo test --bin antigravity-manager modules::repo_db::liveness
-cd src-tauri && cargo test --bin antigravity-manager modules::repo_db::sequences
-
-# 4. Frontend Typecheck and Production Build
+# 2. Frontend Typecheck and Production Build
 npm run build
+
+# 3. Fleet Table Unit Tests
+npm test -- src/components/instances/__tests__/fleetMachinesTable.test.ts
 ```

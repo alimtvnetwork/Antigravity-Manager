@@ -1,40 +1,65 @@
-# Master Plan: Telegram Backup and Fleet Management Enhancements
+# Execution Plan: Telegram Backup & Fleet Management Enhancements
 
-**Task Slug**: `telegram-backup-and-fleet-management-enhancements`  
-**Status**: IN_PROGRESS  
-**Spec References**:  
-- `02-spec/21-app/telegram-backup-and-fleet-management-enhancements/01-architecture-and-fleet-spec.md`  
-- `02-spec/21-app/telegram-backup-and-fleet-management-enhancements/02-tree-view-and-clipboard-spec.md`  
-- `02-spec/21-app/telegram-backup-and-fleet-management-enhancements/03-telegram-backup-and-media-spec.md`  
+**Slug:** `telegram-backup-and-fleet-management-enhancements`  
+**Parent Task:** `Telegram Backup and Fleet Management Enhancements`  
+**Status:** Completed (v4.247.0 Released)  
+**Lead Orchestrator:** Antigravity AI  
 
 ---
 
-## 1. Workstream Breakdown
+## 1. User Request (Verbatim)
 
-| Subtask ID | Title | Primary Files | Target Outcome |
-|---|---|---|---|
-| **Subtask-01** | Fleet Caching, Lead Alignment & Cross-Machine Dispatch | `src/components/instances/fleet/useFleetMachines.ts`<br/>`src/components/instances/fleet/FleetMachineRow.tsx`<br/>`src/components/instances/FleetMachinesTable.tsx`<br/>`src-tauri/src/modules/ssh_manager/exec.rs` | 2-tier cache prevents stuck skeleton; `w1` assigned Lead/Local with top primacy; remote prompt dispatch enabled in fleet table. |
-| **Subtask-02** | Tree View Spacing, Terminal Indentation, Image Filter & Modernized Dropdown | `src/components/instances/PromptTreeView/ProjectNode.tsx`<br/>`src/components/instances/PromptTreeView/ConversationNode.tsx`<br/>`src/components/instances/PromptTreeView/TreePanel.tsx`<br/>`src/components/instances/PromptTreeView/ModalHeader.tsx` | Expanded top-level project breathing room; terminal branch glyphs (`├──`, `└──`); image filter button; normalized Hide Auto button; dark-glass Sync dropdown. |
-| **Subtask-03** | Composite PNG Clipboard Repair & Send Status Correction | `src/components/instances/PromptTreeView/clipboard.ts`<br/>`src/components/instances/PromptTreeView/DetailHeader.tsx`<br/>`src/components/instances/PromptTreeView/usePromptTreePromptActions.ts` | Eliminate canvas tainting in composite image copy; dual-write to OS and browser clipboard; correct prompt queue status on Send button. |
-| **Subtask-04** | Telegram Backup, Restore & Media Enhancements | `src-tauri/src/modules/telegram_inbound/config.rs`<br/>`src-tauri/src/modules/telegram_inbound/commands.rs`<br/>`src-tauri/src/modules/telegram_inbound/processing.rs`<br/>`src-tauri/src/modules/telegram_inbound/reports_b.rs` | Register `/backup` & `/restore` slash commands; add interactive Telegram inline buttons; support media sending. |
-| **Subtask-05** | E2E Testing, Pre-flight Quality Gates & Release Ceremony | `scripts/test-instance-e2e.ps1`<br/>`package.json`<br/>`changelog.md`<br/>`readme.md` | All test suites green, transient sandbox pass, fmt + clippy + build pass, minor release bump and CI/CD verified via `gitmap pe -t`. |
+```text
+Why don't you add a backup prompt option to the Telegram? And when you have the tree view, make it expandable. A tree view needs to have more space on the top level, and indented items need to be on the right-hand side, like a tree view in the terminal. Check for the Gitmap. Check if the installation works. The fleet section gets stuck. Fix it immediately. The fleet section works but is slow; cache it. The names do not match. In the start machine, it shows as main, but it is actually W1. W1 should be the lead because this is the current machine. Check with the Gitmap ``Id`` to find out the IP of the current machine and correct your logic. Correct the code base to match with Gitmap. In the prompt section, try to do the copy to one node for the first time. The copy all image composite PNG does not work; fix it. The send button shows that super base prompt is in QE, which is wrong. Sending works well. Check with send with images. In the filter section on top for the prompt tree view, there should be an option to filter out projects and prompts with images. Auto-hide has a bigger button; fix it. Sending images, sending prompt with images needs testing. Currently, it sends as a file path. In the future, have an endpoint to upload files for a short period. The sync option has a 30-second dropdown; modernize the UI. Test everything and finalize the code. From the Telegram, have the backup, restore, send images from the backup prompt. Fleet naming needs to match. Cannot send prompt from one machine to another in the instance section, in the shared cluster section. Correct this.
+```
 
 ---
 
-## 2. Execution Phases
+## 2. Architecture & Root Cause Synthesis
 
-### Phase 1: Planning & Spec Authoring (Steps 1..100)
-- Ingest GitMap IP and cluster node mappings.
-- Author specifications in `02-spec/21-app/telegram-backup-and-fleet-management-enhancements/`.
-- Initialize master plan and subtasks in `.ai-memory/plans/`.
+### 2.1 Telegram Backup, Restore & Photo Forwarding
+- **Inbound Commands**: `/backup` (and aliases `/backpack`, `/brp`) snapshot running prompts and attached media into `backup_prompts.db`. `/restore` (and aliases `/rrp`, `/resend`) restores and re-injects prompts into target or default instances.
+- **Inline Keyboards**: Add interactive 1-tap buttons: `[ 📦 Backup Prompts ]`, `[ ♻️ Restore Prompts ]`, `[ 🖼️ Send with Images ]`, `[ 🌲 Expand Tree ]`, `[ ⚡ Active Prompts ]`.
+- **Photo Forwarding**: Download attached Telegram photos to `~/.antigravity_tools/saved_images/`, index in `media_vault`, and forward as `![attached-image](<path_or_url>)` in injected prompt text.
 
-### Phase 2: Implementation Waves (Steps 101..250)
-- **Wave 1 (Fleet & Lead Alignment)**: Implement fleet caching, lead node assignment to `w1`, and cross-machine prompt sending.
-- **Wave 2 (Tree View UX & Clipboard)**: Implement project spacing, branch indentation glyphs, image filter, modernized sync dropdown, and composite PNG clipboard fix.
-- **Wave 3 (Telegram Backup & Media)**: Register `/backup` & `/restore` commands and inline keyboards in Telegram.
+### 2.2 Fleet Performance, Identity & Cross-Machine Prompt Dispatch
+- **Performance & Caching**: Implement synchronous `localStorage` caching with 30s TTL envelope (`{ timestamp: number, machines: FleetMachineInfo[] }`) in `useFleetMachines.ts`. Render immediately on mount without full-screen loading freezes, and enrich via SWR.
+- **Machine Identity Primacy**: Resolve local IP `192.168.1.3` as `w1` (local Lead node) with `is_local: true` and `is_lead: true`. Match remote node `192.168.1.20` as `main`. Ensure `sortFleetMachines` unconditionally places `w1` (lead) at index 0.
+- **Cross-Machine Prompt Dispatching**: Connect `SendFleetPromptModal.tsx` in `FleetMachinesTable.tsx` / `FleetMachineRow.tsx` to `send_remote_ssh_prompt`. Sanitize remote CLI arguments (`agm prompt ...` or `gitmap agy ...`) over SSH so cross-machine prompt delivery works seamlessly across cluster nodes.
 
-### Phase 3: Verification & Release (Steps 251..400)
-- Run unit test suites (`telegram_inbound`, `repo_db`).
-- Test transient sandbox lifecycle (`agm instances test-create` / `test-clean`).
-- Execute pre-flight gates (`cargo fmt`, `cargo clippy`, `npm run build`).
-- Perform minor version bump to `v4.243.0`, commit atomically via `gitmap cpf`, and verify CI/CD via `gitmap pe -t`.
+### 2.3 Prompt Tree Terminal Hierarchy, Image Filter & False Queue Removal
+- **Expandable Terminal Tree**: Provide top-level project breathing room (`my-2.5`), right-hand child turn indentation (`ml-5 pl-3 border-l-2`), terminal monospace branch connector glyphs (`├──`, `└──`), and 1-click Expand/Collapse All toggle (`isAllExpanded`).
+- **Header Controls & Sizing**: Add `ImageIcon` image filter toggle in `ModalHeader.tsx` connected to `imageFilterEmitter`. Modernize 30s auto-sync interval into a dark-glass popover capsule with checkmarks. Resize Auto-Hide button in `TreePanel.tsx` to a sleek compact pill matching surrounding controls.
+- **False `QUEUED` Status Elimination**: In `tree_node_conv.rs`, `transcript.rs`, and `tree_collect.rs`, only declare a turn queued if genuine instance liveness and 600s TTL checks pass, preventing idle or completed prompts from displaying false amber `QUEUED` notices.
+- **Multi-Image Composite Clipboard**: Verified Win32 OLE `CF_DIB`, `CF_BITMAP`, `PNG`, and `CF_HDROP` clipboard engine for Microsoft OneNote and Antigravity IDE compatibility.
+- **Future Upload Endpoint Architecture**: Detailed architecture design for ephemeral file uploads with sliding TTL.
+
+---
+
+## 3. Disjoint Subtask Breakdown
+
+- **Subtask-01 (Telegram Inbound - Backup, Restore & Media)**:
+  - `src-tauri/src/modules/telegram_inbound/commands.rs`
+  - `src-tauri/src/modules/telegram_inbound/daemon.rs`
+  - `src-tauri/src/modules/telegram_inbound/processing.rs`
+  - `src-tauri/src/modules/telegram_inbound/injection.rs`
+- **Subtask-02 (Fleet & SSH - Machine Identity, Caching & Cross-Machine Dispatch)**:
+  - `src/components/instances/fleet/useFleetMachines.ts`
+  - `src/components/instances/fleet/FleetMachinesTable.tsx`
+  - `src/components/instances/fleet/FleetMachineRow.tsx`
+  - `src/components/instances/fleet/SendFleetPromptModal.tsx`
+  - `src-tauri/src/modules/ssh_manager/exec.rs`
+  - `src-tauri/src/modules/supabase_sync/query.rs`
+- **Subtask-03 (Prompt Tree UI & Status - Terminal Glyphs, Filters & Queue Fix)**:
+  - `src/components/instances/PromptTreeView/ModalHeader.tsx`
+  - `src/components/instances/PromptTreeView/TreePanel.tsx`
+  - `src/components/instances/PromptTreeView/ConversationNode.tsx`
+  - `src/components/instances/PromptTreeView/ProjectNode.tsx`
+  - `src-tauri/src/modules/repo_db/tree_node_conv.rs`
+  - `src-tauri/src/modules/repo_db/transcript.rs`
+  - `src-tauri/src/modules/repo_db/tree_collect.rs`
+  - `src-tauri/src/modules/repo_db/tree_phases.rs`
+- **Subtask-04 (Verification, Pre-flight Linting & Release Ceremony)**:
+  - Transient sandbox testing (`agm instances test-create/clean`).
+  - Pre-flight quality gates (`cargo fmt`, `cargo clippy`, `npm run build`).
+  - Atomic version bump, changelog sync with `@aukgit` attribution, tag, push, and CI/CD monitoring.

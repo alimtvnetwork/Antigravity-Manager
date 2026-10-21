@@ -931,6 +931,12 @@ pub fn extract_conversation_prompt_turns(
         None
     };
 
+    let now = Utc::now().timestamp();
+    let is_inst_alive =
+        !crate::modules::instance::find_pids_for_data_dir(&base_dir.to_string_lossy(), true)
+            .is_empty()
+            || crate::modules::process::is_antigravity_running(None);
+
     let mut result = Vec::with_capacity(n);
     for (idx, turn) in raw_turns.into_iter().enumerate() {
         let (status, is_running, is_queued) = match active_turn_idx {
@@ -944,11 +950,17 @@ pub fn extract_conversation_prompt_turns(
                 }
             }
             None => {
+                let turn_sec = if turn.created_at > 100_000_000_000 {
+                    turn.created_at / 1000
+                } else {
+                    turn.created_at
+                };
+                let is_recent = turn_sec > 0 && (now - turn_sec <= 600);
                 let is_beyond_last_completed = match last_completed_model_step_idx {
                     Some(last_comp) => turn.step_index > last_comp,
                     None => true,
                 };
-                if is_beyond_last_completed {
+                if is_beyond_last_completed && (is_conv_running || (is_inst_alive && is_recent)) {
                     ("QUEUED".to_string(), false, true)
                 } else {
                     ("COMPLETED".to_string(), false, false)

@@ -1,5 +1,22 @@
 # Changelog
 
+## [v4.247.0] - 2026-10-21
+
+### Added
+- **Telegram Inbound Backup & Restore Enhancements (`telegram_inbound`)**: Added rich instance status indicators (`🟢 Active & Running` / `⚪ Standby / Ready`) and comprehensive counts of backed up/restored prompts and attached multimodal images to `/backup` and `/restore` commands. Expanded `/restore` with intelligent `all` scope handling to restore running prompts across all workspace profiles. Enriched inline keyboard markups across Telegram daemon status and prompt dispatch acknowledgments with quick action buttons (`[ 📦 Backup Prompts ]`, `[ ♻️ Restore Prompts ]`, `[ 🖼️ Send with Images ]`, `[ 🌲 Expand Tree ]`, `[ ⚡ Active Prompts ]`). Automatically enclosed attached Telegram photo markdown paths in angle brackets (`![attached-image](<path>)`) to prevent CommonMark whitespace parsing errors. (Thanks to @aukgit)
+- **Expandable Terminal-Style Prompt Tree View (`TreePanel.tsx`, `ProjectNode.tsx`, `ConversationNode.tsx`)**: Added global 1-click Expand/Collapse All toggle (`isAllExpanded`, `FolderPlus`/`FolderMinus`) to cleanly toggle all project nodes across the tree. Refined terminal monospace branch connector glyphs (`├──`, `└──`) and subagent branch glyphs (`└── ↳`), top-level project breathing room (`my-2.5` with container framing), and child turn right-hand indentation (`ml-5 pl-3 border-l-2`). Resized the Auto-Hide button in row 2 to a sleek, compact pill matching adjacent filter capsules (`rounded-lg`, `px-2 py-0.5 text-[10px]`, matching `divide-x`). (Thanks to @aukgit)
+- **Fleet Synchronous Cache Acceleration (`useFleetMachines.ts`)**: Implemented synchronous `localStorage` caching with 30s TTL envelope under key `agm_fleet_machines_cache_v2`, enabling instant rendering on mount without full-screen loading freezes while SWR refreshes in the background. (Thanks to @aukgit)
+- **Cross-Machine Prompt Dispatch in Fleet Management (`SendFleetPromptModal.tsx`, `exec.rs`)**: Integrated `SendFleetPromptModal` to send prompts across cluster nodes with sanitized shell escaping and remote SSH execution. (Thanks to @aukgit)
+
+### Changed
+- **Fleet Machine Identity & Lead Node Alignment (`query.rs`, `useFleetMachines.ts`)**: Resolved local machine identity (`192.168.1.3`) as `w1` (local Lead node) with `is_local: true` and `is_lead: true` using GitMap IP resolution, placing `w1` at index 0 and `main` (`192.168.1.20`) as remote node, while preserving all 6 cluster nodes. (Thanks to @aukgit)
+- **Multi-Image Composite PNG Clipboard Engine (`cmd_files.rs`, `clipboard.ts`)**: Ensured composite PNG copying populates Win32 OLE `CF_DIB`, `CF_BITMAP`, `PNG`, and `CF_HDROP` for seamless pasting into OneNote, Antigravity IDE, Word, and Paint. (Thanks to @aukgit)
+
+### Fixed
+- **Eliminated False `QUEUED` Badges (`transcript.rs`, `tree_collect.rs`, `tree_phases.rs`)**: Fixed false amber `QUEUED` badges displaying on completed or idle turns by enforcing active instance liveness and 600s TTL verification before declaring queued status. Updated `transition_stale_inflight_prompts` in `tree_phases.rs` to include stale queued and pending prompts after 600s. (Thanks to @aukgit)
+
+---
+
 ## [v4.246.0] - 2026-10-21
 
 ### Added
@@ -1038,6 +1055,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.247.0 (2026-10-21)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.246.0 (2026-10-21)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

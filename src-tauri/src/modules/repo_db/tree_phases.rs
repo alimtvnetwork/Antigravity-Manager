@@ -20,7 +20,7 @@ pub(crate) fn transition_stale_inflight_prompts(now: i64) {
             conn.execute(
                 "UPDATE active_prompts
              SET status = 'completed', updated_at = ?1
-             WHERE (status IN ('running', 'in_flight') AND updated_at < ?2)
+             WHERE (status IN ('running', 'in_flight', 'queued', 'pending') AND updated_at < ?2)
                 OR (status = 'dispatched' AND updated_at < ?3)",
                 rusqlite::params![now, now - 600, now - 120],
             ),

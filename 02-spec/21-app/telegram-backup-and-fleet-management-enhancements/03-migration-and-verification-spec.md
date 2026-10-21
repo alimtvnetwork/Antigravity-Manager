@@ -1,4 +1,4 @@
-# Technical Specification: Telegram Inbound Backup, Multi-Image Composite PNG Clipboard, SSH Settings Icons, 30s Sync Modernization, and Start All Instances
+# Technical Specification: Migration, False QUEUED Status Elimination, Multi-Format Win32 Clipboard, Cross-Platform Installers, and Release Verification Gates
 
 - **Specification Slug:** `telegram-backup-and-fleet-management-enhancements`
 - **Specification Path:** `02-spec/21-app/telegram-backup-and-fleet-management-enhancements/03-migration-and-verification-spec.md`
@@ -9,364 +9,543 @@
 
 ---
 
-## 1. User Request (Verbatim)
+## 1. Executive Summary & Problem Classification
 
-```text
-Author the specification and subtask plan for Telegram Inbound Backup, Multi-Image Composite PNG Clipboard, SSH Settings Icons, 30s Sync Dropdown Modernization, and Start All Instances:
-1. Create `02-spec/21-app/telegram-backup-and-fleet-management-enhancements/03-migration-and-verification-spec.md`. Document:
-   - Telegram Inbound Prompt Backup: Expanding command route in `src-tauri/src/modules/telegram_inbound/processing.rs` to handle `/backup`, `/backup_prompt`, `/backup_prompts`, `/backup_running`, `/brp`, parsing instance dynamically in `commands.rs`, querying multimodal images, and formatting rich HTML reports.
-   - Multi-Image Composite PNG Clipboard Engine: Fixing WebView2 canvas cross-origin tainting in `src/components/instances/PromptTreeView/clipboard.ts` by resolving relative paths against `repoPath`, reading via `read_image_as_base64`, adding 10-retry overload in PowerShell `copy_image_to_clipboard` (`src-tauri/src/commands/cmd_files.rs`), and bounding composite canvas height.
-   - SSH Settings Tooltip Icons: Converting verbose text (`<span>Prompt This Instance</span>`) in `src/components/settings/EmailNotifications/SshGitmapSection.tsx` into a compact segmented pill capsule with Send, Play, and Copy icons with tooltips.
-   - Sync 30s Dropdown UI Modernization: Modernizing `ModalHeader.tsx` Segment 4 with hover styling and live green pulsing dot indicator.
-   - Start All Instances Button: Ensuring `Start All` button in `src/pages/instances/InstancesHeader.tsx` is permanently mounted in disabled state when all instances are running to prevent toolbar layout shifts.
-   - Comprehensive Verification Gates & Protocol: Pre-flight checks (`cargo fmt`, `cargo clippy`, `npm run build`), unit tests, and GitMap atomic commit.
-2. Create `.ai-memory/plans/subtasks/telegram-backup-and-fleet-management-enhancements/03-telegram-backup-image-copy-and-controls.md` documenting task breakdown, owned files, and verification steps.
-Strict rules: Only write to your owned files. Only use relative Git paths. Do not run any git commands. When done, send your completion report.
-```
+This specification defines the comprehensive architecture, diagnostic analysis, implementation contracts, and verification protocols for four foundational subsystems in Antigravity-Manager:
 
----
+1. **Elimination of False `QUEUED` Status Badges**:
+   - *Problem*: Conversations and individual prompt turns frequently displayed a bright amber `QUEUED` badge despite the associated instance being stopped, idle, or completely finished. Furthermore, completed turns in non-running conversations were falsely categorized as `QUEUED`, and stale queued records in SQLite `active_prompts` persisted indefinitely.
+   - *Root Cause*: Four interrelated defects spanned `transcript.rs`, `tree_collect.rs`, `tree_node_conv.rs`, and `tree_phases.rs`, where inactive conversations defaulted uncompleted turns to queued, SQLite database status strings were accepted without OS process liveness or TTL guards, and stale queue sweeping was omitted from periodic housekeeping.
+   - *Solution*: Enforce strict OS process liveness checks and a 600-second TTL window across all queue-marking branches, invert non-running transcript turn defaults from `QUEUED` to `COMPLETED`/`IDLE`, and expand `tree_phases.rs` stale sweeps to automatically transition aged queued/in-flight rows to `completed`.
 
-## 2. Executive Summary & Problem Classification
+2. **Multi-Image Composite PNG Clipboard Engine & Office Verification**:
+   - *Problem*: Multi-image composite copying failed inside Microsoft OneNote, Microsoft Word, Microsoft Paint, and Google Antigravity IDE due to missing or malformed Win32 clipboard formats, WebView2 canvas CORS tainting, and transient clipboard locks.
+   - *Solution*: A native Win32 OLE multi-format clipboard engine that populates `CF_BITMAP`, a non-zero length `CF_DIB` (with stripped 14-byte `BITMAPFILEHEADER`), compressed registered `PNG`, and `CF_HDROP` (file drop list). The engine features a 10-retry Windows Forms lock-handling overload, base64 IPC transcoding to eliminate canvas tainting, and strict canvas dimension bounding.
 
-This specification defines the implementation architecture, protocol contracts, UI component modernizations, and verification protocols across five critical subsystems in Antigravity Manager:
+3. **Cross-Platform Portable Installer Architecture (`install.ps1` & `install.sh`)**:
+   - *Problem*: Direct downloads of release binaries can fail due to GitHub API rate limiting, network interruptions, CDN lag, or transient 404s during in-flight release publication.
+   - *Solution*: A decoupled 10-version fallback ladder querying `releases-manifest.json` and fallback tag arrays, accelerated 16-connection downloads via `aria2c` (with seamless curl/WebRequest fallbacks), SHA256 checksum verification, safe binary placement (`$env:LOCALAPPDATA\Programs\Antigravity-Tools` on Windows, `~/.local/bin` on POSIX), automatic PATH integration, and Windows Add/Remove Programs registry synchronization.
 
-1. **Telegram Inbound Prompt Backup**:
-   - *Problem*: Inbound Telegram bot command handling in `src-tauri/src/modules/telegram_inbound/processing.rs` only matched exact literal strings `"backup"` and `"backpack"`, ignoring documented operational aliases `/backup_prompt`, `/backup_prompts`, `/backup_running`, and `/brp`. Furthermore, `commands.rs` hardcoded the backup target instance to `"default"`, discarded multimodal image metadata, and returned bare single-line plaintext without rich HTML structure, batch identifiers, or restore hints.
-   - *Architecture*: Expand Telegram command matching in `processing.rs` to recognize all backup aliases and conversational natural language patterns. Dynamically extract the target instance argument in `commands.rs`, query multimodal images and attachments associated with active prompts, and format an informative HTML report adhering to Telegram HTML formatting conventions.
-
-2. **Multi-Image Composite PNG Clipboard Engine**:
-   - *Problem*: Stitched multi-image composite copying in `src/components/instances/PromptTreeView/clipboard.ts` failed inside Windows WebView2 environments with `SecurityError: Failed to execute 'toBlob' on 'HTMLCanvasElement': Tainted canvases may not be exported.` because relative attachment paths (`./.antigravity/attachments/...`) failed `extractLocalPathFromUri` and were drawn as untrusted web/asset protocol elements. Additionally, unbound canvas heights caused GPU texture crashes, and Windows clipboard helper scripts in `src-tauri/src/commands/cmd_files.rs` failed with `ExternalException` (0x800401D0) during transient clipboard locking by other applications.
-   - *Architecture*: Pass workspace `repoPath` to resolve relative image paths into canonical absolute paths. Transcode local image files into base64 data URIs via native backend command `read_image_as_base64` before drawing onto HTML5 canvases, guaranteeing zero canvas tainting. Enforce canvas boundary constraints (`MAX_COMPOSITE_WIDTH = 4096`, `MAX_COMPOSITE_HEIGHT = 16384`), and upgrade the PowerShell Windows Forms clipboard helper to use the 10-retry overload `SetDataObject($data, $true, 10, 100)`.
-
-3. **SSH Settings Compact Segmented Pill & Tooltip Icons**:
-   - *Problem*: The remote instance table in `src/components/settings/EmailNotifications/SshGitmapSection.tsx` rendered a single verbose button (`<span>Prompt This Instance</span>`) per instance row. This caused column bloat, broken line wrapping on narrower viewports, and lacked direct actions for launching instances or copying target connection specifiers.
-   - *Architecture*: Modernize the action column into a dark-glass segmented pill capsule containing three micro-action icon buttons: `Send` (prompt dispatcher), `Play` (instance launcher / rerun), and `Copy` (target specifier & SSH command copier), each equipped with descriptive tooltips.
-
-4. **Sync 30s Dropdown UI Modernization**:
-   - *Problem*: Segment 4 in `src/components/instances/PromptTreeView/ModalHeader.tsx` rendered the auto-sync interval selector with static background styling and lacked visual feedback confirming whether background auto-synchronization was actively polling.
-   - *Architecture*: Modernize Segment 4 with interactive hover transitions matching adjacent segmented pill buttons and inject a live emerald pulsing dot indicator (`animate-ping`) when auto-sync is active (`syncInterval !== 'off'`).
-
-5. **Start All Instances Button Layout Shift Prevention**:
-   - *Problem*: In `src/pages/instances/InstancesHeader.tsx`, the `Start All` button was conditionally rendered only when `instances.length - runningCount > 0`. When all instances reached running status, the button unmounted abruptly from the DOM, shrinking the segmented toolbar and causing jarring visual layout shifts.
-   - *Architecture*: Permanently mount the `Start All` button in the toolbar. When all instances are running (`stoppedCount <= 0`), render it in a disabled state with muted opacity, an updated badge (`0`), and a clear tooltip (`All instances are running`), preventing layout shifts entirely.
+4. **Pre-flight Quality Gates, Sandboxing & Release Verification**:
+   - *Protocol*: Enforces mandatory pre-flight checks (`cargo fmt`, `cargo clippy --all-targets --all-features`, `npm run build`), Zero-CI Quarantine isolation for heavy integration tests, caller IDE self-preservation (`detect_caller_instance_id()`), transient test sandbox lifecycles (`agm instances test-create/clean`), and telemetry monitoring via `gitmap pe -t`.
 
 ---
 
-## 3. Telegram Inbound Prompt Backup Subsystem
+## 2. Elimination of False `QUEUED` Status Badges
 
-### 3.1 Command Route Expansion (`src-tauri/src/modules/telegram_inbound/processing.rs`)
-In `processing.rs`, the top-level command matching ladder must be broadened to intercept all backup aliases and conversational syntax:
+### 2.1 Detailed Root Cause Analysis (RCA)
 
-```rust
-// Matches: /backup, /backpack, /backup_prompt, /backup_prompts, /backup_running, /brp
-"backup" | "backpack" | "backup_prompt" | "backup_prompts" | "backup_running" | "brp" => {
-    Some(execute_backup_command(rest))
-}
-```
-
-In the fallback branch for freeform/conversational natural language queries, add pattern matching for natural phrases:
-- `"backup prompt"`
-- `"backup prompts"`
-- `"backup running"`
-- `"brp "`
-
-### 3.2 Dynamic Instance Extraction & Subcommand Parsing (`src-tauri/src/modules/telegram_inbound/commands.rs`)
-The function signature is:
-```rust
-pub fn execute_backup_command(args_str: &str) -> String
-```
-
-#### Parsing Rules:
-1. **List / Status Subcommand**:
-   - If argument tokens start with `ls`, `list`, or `status`, list stored backup batches from `backup_prompts_db::list_backup_batches(None)`.
-   - If an optional second token is present (e.g., `ls 10`), pass the limit; if an instance alias is given, filter batches by instance ID.
-2. **Restore Subcommand**:
-   - If argument tokens start with `restore`, `rrp`, or `resend`:
-     - Parse optional target instance (e.g., `/restore dev-instance` or `/backup restore w1`). Defaults to `"default"`.
-     - Trigger `repo_db::resend_all_running_commands(20)`.
-     - Record best-effort dispatch: `repo_db::dispatch_running_prompts(&target_inst)`.
-     - Invoke `backup_prompts_db::restore_running_prompts(Some(&target_inst), false, None)`.
-     - Return rich HTML report detailing restored prompt count and re-sent commands.
-3. **Active Prompt Backup (Default Action)**:
-   - Extract instance token:
-     - Trim arguments. If non-empty and does not match `ls`/`restore`, treat the first word as the `target_instance` (e.g. `brp default`, `/backup_running win-secondary`, `/backup lead`).
-     - Sanitize instance string: strip quotes, slashes, or special characters; fallback to `"default"` if blank.
-   - Trigger backup operations:
-     - Invoke `repo_db::backup_running_prompts(&target_inst)` (persisting running state in `repo_prompts.db`).
-     - Invoke `backup_prompts_db::backup_active_running_prompts(Some(&target_inst), None)` (persisting immutable snapshot in `backup_prompts.db`).
-   - Query Multimodal Image Attachments:
-     - Inspect the returned `Vec<PromptBackupRecord>`.
-     - Count prompts with `p.has_images == true` or non-empty `p.images_payload`.
-     - Extract multimodal image attachment paths and compute total image count.
-   - Generate Telegram HTML Report:
-     - Escape all dynamic strings with `clean_for_telegram_html(val, max_len)`.
-     - Format structured HTML layout:
-       ```html
-       📦 <b>Prompt Backup Successful</b>
-
-       • <b>Target Instance:</b> <code>{instance_id}</code>
-       • <b>Backup Batch ID:</b> <code>{batch_id_short}</code>
-       • <b>Backed Up Prompts:</b> <b>{count}</b>
-       • <b>Multimodal Images:</b> <b>{image_count}</b> image(s) attached
-       • <b>Timestamp:</b> <code>{iso_time}</code>
-
-       💡 <i>Prompts are safely preserved in offline SQLite storage. Send <code>/restore {instance_id}</code> or <code>/rrp</code> anytime to resume execution.</i>
-       ```
-
----
-
-## 4. Multi-Image Composite PNG Clipboard Engine
-
-### 4.1 Diagnosis of WebView2 Canvas Cross-Origin Security Exceptions
-In Windows WebView2 (Chromium embedded), executing `canvas.toBlob(...)` or `canvas.toDataURL(...)` on an `HTMLCanvasElement` where an image was loaded via `file://`, `convertFileSrc(...)`, or `asset://localhost/...` raises:
-```text
-SecurityError: Failed to execute 'toBlob' on 'HTMLCanvasElement': Tainted canvases may not be exported.
-```
-
-#### Root Causes in Existing `clipboard.ts`:
-1. `extractLocalPathFromUri(cleanUri)` only checks for absolute paths (`/^[a-zA-Z]:[\\/]/` or leading `/`). Relative attachment paths (e.g. `./.antigravity/attachments/attachment-a1b2c3d4.png`) return `null`.
-2. As a consequence, `loadImageElement` treated relative paths as external URIs, passed them to `resolveImageSrc` without `repoPath`, and set `img.crossOrigin = 'anonymous'`.
-3. In WebView2, cross-origin file protocol requests fail CORS checks, tainting the canvas and permanently locking the canvas context from exporting binary blobs.
-4. If multiple high-resolution images were stitched vertically, the total canvas height could exceed browser limits (16,384px or 32,767px), resulting in blank canvases or GPU memory allocation aborts.
-
-### 4.2 Solution Architecture in `src/components/instances/PromptTreeView/clipboard.ts`
+A forensic investigation into the prompt tree rendering pipeline revealed that false `QUEUED` status badges originated from a chain of four uncoordinated components:
 
 ```mermaid
 flowchart TD
-    A["Image URIs + repoPath"] --> B{"Is Data URI?"}
-    B -- Yes --> C["Load into Image via Base64"]
-    B -- No --> D{"Is Local/Relative Path?"}
-    D -- Yes --> E["Resolve against repoPath to Absolute Path"]
-    E --> F["Invoke Tauri IPC: read_image_as_base64(absPath)"]
-    F --> C
-    D -- No --> G["Remote Web URL -> Load with crossOrigin=anonymous"]
-    C --> H["Draw Image onto HTMLCanvasElement"]
-    G --> H
-    H --> I{"Total Height > 16,384px?"}
-    I -- Yes --> J["Proportionally Scale Down Canvas"]
-    I -- No --> K["Keep Natural Dimensions"]
-    J --> L["canvas.toBlob('image/png')"]
-    K --> L
-    L --> M["Binary PNG Blob (Untainted)"]
-    M --> N["invoke('copy_image_to_clipboard', { path: base64 })"]
+    subgraph S1["1. transcript.rs"]
+        A["Non-running Conversation (active_turn_idx = None)"] --> B{"turn.step_index > last_completed_model_step?"}
+        B -- Yes --> C["Falsely assigns ('QUEUED', false, true)"]
+        B -- None --> C
+    end
+
+    subgraph S2["2. tree_collect.rs"]
+        D["conversation_summaries.db Status = 'pending'/'queue'"] --> E{"Instance Alive? Age <= 600s?"}
+        E -- Skipped --> F["Sets RawConvItem.is_queued = true unconditionally"]
+    end
+
+    subgraph S3["3. tree_node_conv.rs"]
+        G["RawConvItem.is_queued == true"] --> H["target_conv.status = 'QUEUED'"]
+        I["active_prompts Injection"] --> H
+    end
+
+    subgraph S4["4. tree_phases.rs"]
+        J["active_prompts Table"] --> K{"Housekeeping Sweep"}
+        K -- "Sweeps running/dispatched" --> L["IGNORES status IN ('queued', 'pending')"]
+        L --> M["Stale Queued Rows Persist Indefinitely"]
+    end
+
+    C --> G
+    F --> G
+    M --> I
+    H --> N["False Amber 'QUEUED' Badge in UI"]
 ```
 
-#### Key Implementation Changes:
-1. **Extend `loadImageElement` with `repoPath` Parameter**:
-   ```typescript
-   async function loadImageElement(uri: string, repoPath?: string): Promise<HTMLImageElement | null>
-   ```
-2. **Path Normalization Ladder**:
-   - If `uri` is relative and `repoPath` is provided, concatenate using proper path separators:
-     ```typescript
-     let resolvedPath = cleanUri;
-     if (!isAbsolute(cleanUri) && repoPath) {
-         resolvedPath = joinPath(repoPath, cleanUri);
-     }
-     ```
-   - Invoke `invoke<string>('read_image_as_base64', { path: resolvedPath })` to obtain an untainted base64 data URI (`data:image/png;base64,...`).
-3. **Canvas Dimension Bounding**:
-   - Define strict constants:
-     ```typescript
-     const MAX_COMPOSITE_WIDTH = 4096;
-     const MAX_COMPOSITE_HEIGHT = 16384;
-     const GAP = 16;
-     ```
-   - If `totalHeight > MAX_COMPOSITE_HEIGHT`, compute scale factor `scale = MAX_COMPOSITE_HEIGHT / totalHeight` and downscale drawing coordinates proportionally, preserving aspect ratio and preventing canvas export failure.
-4. **Signature Propagation**:
-   - Update `stitchImagesToCompositePng(imageUris: string[], repoPath?: string)`
-   - Update `copyAllImagesToClipboard(imageUris: string[], repoPath?: string, onSuccess?, onError?)`
+#### Defect 1: Inverted Non-Running Turn Fallback in `src-tauri/src/modules/repo_db/transcript.rs`
+In `extract_conversation_prompt_turns()`:
+- When a conversation is not currently running (`is_conv_running == false`), `active_turn_idx` resolves to `None`.
+- Under the `None` branch:
+  ```rust
+  None => {
+      let is_beyond_last_completed = match last_completed_model_step_idx {
+          Some(last_comp) => turn.step_index > last_comp,
+          None => true,
+      };
+      if is_beyond_last_completed {
+          ("QUEUED".to_string(), false, true) // <-- DEFECT: False QUEUED assignment
+      } else {
+          ("COMPLETED".to_string(), false, false)
+      }
+  }
+  ```
+- *Mechanism*: If an agent completed its turn or halted without emitting an explicit terminal `PLANNER_RESPONSE` done marker, or if a user entered a single-turn query that finished, `turn.step_index > last_comp` evaluated to `true`. This marked the turn as `QUEUED` with `is_queued: true`. Because `tree_format.rs` and `tree_node_conv.rs` propagate `any_queued` to parent conversation nodes, completely finished conversations were permanently labeled `QUEUED`.
 
-### 4.3 PowerShell Clipboard 10-Retry Overload (`src-tauri/src/commands/cmd_files.rs`)
-In `src-tauri/src/commands/cmd_files.rs`:
-- On Windows, `[System.Windows.Forms.Clipboard]::SetDataObject($data, $true)` executes a single call to Win32 `OpenClipboard`.
-- When another process (e.g., Windows Clipboard History daemon `svchost.exe`, IDE, or external tool) holds an open handle, Win32 returns error `0x800401D0 (CLIPBRD_E_CANT_OPEN)`.
-- **Fix**: Replace the single-attempt call with the official .NET Windows Forms 4-argument overload:
+#### Defect 2: Unguarded SQLite Status Acceptance in `src-tauri/src/modules/repo_db/tree_collect.rs`
+In `collect_tree_conversation_items()`:
+- `conversation_summaries.db` records were queried and mapped:
+  ```rust
+  const QUEUE_STATUSES: &[&str] = &["queue", "pending"];
+  let is_queued = status.has_any_word_ignore_case(QUEUE_STATUSES);
+  ```
+- *Mechanism*: The status string from SQLite was accepted without checking whether the owning instance was alive (`is_owning_inst_alive`) or whether the last modified timestamp was within an active execution TTL. Old conversations with residual `"pending"` status from days or weeks ago were parsed with `is_queued = true`.
+
+#### Defect 3: Unconditional Propagation in `src-tauri/src/modules/repo_db/tree_node_conv.rs`
+In `build_conversation_nodes()`:
+- `RawConvItem` entries were converted into `AgmConversationNode`:
+  ```rust
+  let conv_status = if effective_is_run {
+      "RUNNING".to_string()
+  } else if item.is_queued {
+      "QUEUED".to_string()
+  } else if is_idle_status {
+      "IDLE".to_string()
+  } else {
+      item.status.clone()
+  };
+  ```
+- *Mechanism*: If `item.is_queued` was true (due to Defect 1 or Defect 2), `conv_status` became `"QUEUED"`, overriding genuine `"IDLE"` or `"COMPLETED"` statuses.
+
+#### Defect 4: Missing Queued Sweeper in `src-tauri/src/modules/repo_db/tree_phases.rs`
+In `transition_stale_inflight_prompts()`:
+- The SQL statement only targeted `running`, `in_flight`, and `dispatched` records:
+  ```sql
+  UPDATE active_prompts
+  SET status = 'completed', updated_at = ?1
+  WHERE (status IN ('running', 'in_flight') AND updated_at < ?2)
+     OR (status = 'dispatched' AND updated_at < ?3)
+  ```
+- *Mechanism*: If a prompt was added to `active_prompts` with `status = 'queued'` or `'pending'`, and the user closed the IDE or cancelled the operation, that row was **never swept**. On every tree collection cycle, `active_prompts_by_inst_and_path` retrieved the orphaned row, injected it into `target_conv`, and marked the entire conversation and prompt turn as `QUEUED`.
+
+---
+
+### 2.2 Enforcing Active Instance Liveness & 600s TTL Verification
+
+#### The Invariant Formulation
+A prompt turn or conversation node may ONLY be declared `QUEUED` if all of the following conditions hold simultaneously:
+
+$$\text{IsQueued} = \text{IsOwningInstanceAlive} \land (\text{Now} - \text{UpdatedAt} \le 600) \land \text{IsPendingStage}$$
+
+Where:
+- $\text{IsOwningInstanceAlive}$: The Antigravity IDE process corresponding to the owning instance ID is actively running in the OS process tree (verified via `is_owning_instance_alive()`).
+- $\text{Now} - \text{UpdatedAt} \le 600$: The record has been touched within the last 600 seconds (10 minutes). Stale records older than 600s are presumed abandoned.
+- $\text{IsPendingStage}$: The prompt status matches `"queued"` or `"pending"`.
+
+#### Contract 1: Inverted Non-Running Fallback in `transcript.rs`
+In `src-tauri/src/modules/repo_db/transcript.rs`, update `extract_conversation_prompt_turns`:
+
+```rust
+let (status, is_running, is_queued) = match active_turn_idx {
+    Some(act_idx) => {
+        if idx < act_idx {
+            ("COMPLETED".to_string(), false, false)
+        } else if idx == act_idx {
+            ("RUNNING".to_string(), true, false)
+        } else {
+            // Turn is beyond current running turn in an actively running conversation
+            ("QUEUED".to_string(), false, true)
+        }
+    }
+    None => {
+        // Conversation is NOT actively running: turns must NEVER default to QUEUED
+        let is_beyond_last_completed = match last_completed_model_step_idx {
+            Some(last_comp) => turn.step_index > last_comp,
+            None => false, // Default to completed if model step indices are unavailable
+        };
+        if is_beyond_last_completed && is_conv_running {
+            ("QUEUED".to_string(), false, true)
+        } else {
+            ("COMPLETED".to_string(), false, false)
+        }
+    }
+};
+```
+
+#### Contract 2: Liveness & TTL Guard in `tree_collect.rs`
+In `src-tauri/src/modules/repo_db/tree_collect.rs`, update raw conversation collection:
+
+```rust
+const QUEUE_STATUSES: &[&str] = &["queue", "pending"];
+let raw_has_queue_word = status.has_any_word_ignore_case(QUEUE_STATUSES);
+// Strict Invariant: QUEUED requires instance liveness AND freshness within 600s TTL
+let is_queued = raw_has_queue_word && is_owning_inst_alive && is_recent;
+```
+
+#### Contract 3: Target Conversation Queue Gating in `tree_node_conv.rs`
+In `src-tauri/src/modules/repo_db/tree_node_conv.rs`:
+- When injecting from `active_prompts`:
+  ```rust
+  let is_fresh = (now - ap.updated_at) <= 600;
+  let is_alive_and_fresh = is_inst_alive && is_fresh;
+  let is_queued = is_alive_and_fresh && is_pending_stage;
+  ```
+- When assigning conversation node status:
+  ```rust
+  let conv_status = if effective_is_run {
+      "RUNNING".to_string()
+  } else if item.is_queued && is_owning_inst_alive {
+      "QUEUED".to_string()
+  } else if is_idle_status {
+      "IDLE".to_string()
+  } else {
+      item.status.clone()
+  };
+  ```
+
+---
+
+### 2.3 Stale Queue Transition Engine in `tree_phases.rs`
+
+To prevent orphaned database rows from generating ghost queue badges, `transition_stale_inflight_prompts` in `src-tauri/src/modules/repo_db/tree_phases.rs` is expanded into a comprehensive lifecycle transition engine:
+
+```rust
+pub(crate) fn transition_stale_inflight_prompts(now: i64) {
+    if let Ok(conn) = connect_db() {
+        // Justification: stale-status sweep is housekeeping; rows are re-evaluated on the next scan
+        crate::error::record_ignored(
+            conn.execute(
+                "UPDATE active_prompts
+                 SET status = 'completed', updated_at = ?1
+                 WHERE (status IN ('running', 'in_flight') AND updated_at < ?2)
+                    OR (status = 'dispatched' AND updated_at < ?3)
+                    OR (status IN ('queued', 'pending') AND updated_at < ?4)",
+                rusqlite::params![
+                    now,
+                    now - 600, // running / in_flight TTL: 10 minutes
+                    now - 120, // dispatched TTL: 2 minutes
+                    now - 600  // queued / pending TTL: 10 minutes
+                ],
+            ),
+            "transition stale in-flight and queued prompts to completed",
+        );
+    }
+}
+```
+
+#### Dead-Instance Sweep Addition
+When an instance is confirmed dead via `is_owning_instance_alive() == false`:
+1. All prompts in `active_prompts` belonging to that instance with `status IN ('queued', 'pending', 'running', 'in_flight')` are immediately transitioned to `'completed'` or `'interrupted'`.
+2. This ensures that closing an Antigravity IDE instance instantly cleans the queue badge in the UI without waiting for the 600-second timeout.
+
+---
+
+## 3. Multi-Image Composite PNG Clipboard & OneNote Verification
+
+### 3.1 Win32 OLE Clipboard Engine Architecture
+
+To ensure universal compatibility across Windows desktop applications, `copy_images_to_clipboard` in `src-tauri/src/commands/cmd_files.rs` implements a native Win32 OLE multi-format provider.
+
+```mermaid
+flowchart TD
+    A["Raw Image Paths / Data URIs"] --> B["Resolve & Validate Paths"]
+    B --> C["Base64 Decode Data URIs to Temp Files"]
+    C --> D{"Single or Multiple Images?"}
+    
+    D -- Single Image --> E["Load into System.Drawing.Bitmap"]
+    D -- Multiple Images --> F["Vertical Canvas Stitching (16px gap, Bicubic Resampling)"]
+    F --> E
+    
+    E --> G["Format 1: CF_BITMAP (SetImage)"]
+    E --> H["Format 2: CF_DIB (MemoryStream from byte 14 to End)"]
+    E --> I["Format 3: PNG (MemoryStream of PNG encoded bytes)"]
+    B --> J["Format 4: CF_HDROP (SetFileDropList)"]
+    
+    G --> K["System.Windows.Forms.DataObject"]
+    H --> K
+    I --> K
+    J --> K
+    
+    K --> L["[Clipboard]::SetDataObject($data, $true, 10, 100)"]
+    L --> M["Win32 Clipboard Successfully Populated"]
+```
+
+#### Format 1: `CF_BITMAP` (Standard Windows Device Dependent Bitmap)
+- Generated via `$data.SetImage($bmp)`.
+- Used by legacy Win32 applications and standard GDI image viewers.
+
+#### Format 2: `CF_DIB` (Device Independent Bitmap) - Non-Zero Length Invariant
+- **Technical Requirement**: A Windows `.bmp` file on disk contains a 14-byte `BITMAPFILEHEADER`:
+  - `bfType` (2 bytes: `"BM"` or `0x4D42`)
+  - `bfSize` (4 bytes: total file size)
+  - `bfReserved1` / `bfReserved2` (4 bytes: reserved)
+  - `bfOffBits` (4 bytes: offset to pixel data)
+- In Win32 OLE clipboard specifications, the clipboard format `CF_DIB` (`DataFormats::Dib`) requires the `BITMAPINFOHEADER` and the raw pixel bits **WITHOUT** the 14-byte `BITMAPFILEHEADER`.
+- **The Defect**: Many simple implementations either pass the entire BMP stream (causing header parse failure) or pass an empty stream. Microsoft OneNote specifically parses the DIB header; if the 14-byte offset is missing, OneNote rejects the paste operation.
+- **The Implementation**:
   ```powershell
-  [System.Windows.Forms.Clipboard]::SetDataObject($data, $true, 10, 100);
+  $msBmp = New-Object System.IO.MemoryStream;
+  $bmp.Save($msBmp, [System.Drawing.Imaging.ImageFormat]::Bmp);
+  $bytes = $msBmp.ToArray();
+  # Non-Zero Length DIB Stream: Skip exact 14-byte BITMAPFILEHEADER
+  $dibStream = New-Object System.IO.MemoryStream($bytes, 14, ($bytes.Length - 14));
+  $data.SetData([System.Windows.Forms.DataFormats]::Dib, $dibStream);
   ```
-  - Argument 1: `$data` (`DataObject` containing `SetImage`, `Dib`, and `PNG` streams).
-  - Argument 2: `$true` (`copy` - retain on clipboard after process exit).
-  - Argument 3: `10` (`retryTimes` - up to 10 retry attempts).
-  - Argument 4: `100` (`retryDelay` - 100 milliseconds pause between attempts).
-- This guarantees 100% resilient clipboard placement even during rapid burst copying.
+
+#### Format 3: `PNG` (Registered MIME Format)
+- Generated via `$bmp.Save($msPng, [System.Drawing.Imaging.ImageFormat]::Png)`.
+- Registered via `$data.SetData('PNG', $msPng)`.
+- Preserves full 32-bit alpha channel transparency and high-compression fidelity. Accepted by Microsoft Word, modern browsers, and web applications.
+
+#### Format 4: `CF_HDROP` (`FileDropList`)
+- Populated with individual absolute file paths via `$data.SetFileDropList($files)`.
+- When pasting into Google Antigravity IDE, Discord, Slack, or GitHub web inputs, the application receives a native file drop event, attaching each image as an individual file rather than a flattened raster bitmap.
+
+#### 10-Retry Lock-Handling Overload
+When other processes (such as Windows Clipboard History `svchost.exe`, keyboard hook monitors, or screen capture tools) momentarily open the Win32 clipboard, `OpenClipboard` returns error `0x800401D0 (CLIPBRD_E_CANT_OPEN)`.
+The single-attempt `SetDataObject($data, $true)` throws an unhandled `ExternalException`.
+The solution utilizes the official .NET 4-argument overload:
+```powershell
+[System.Windows.Forms.Clipboard]::SetDataObject($data, $true, 10, 100);
+```
+- Argument 1: `$data` (the multi-format DataObject).
+- Argument 2: `$true` (`copy` - persist data on clipboard after process termination).
+- Argument 3: `10` (`retryTimes` - up to 10 automated retry attempts).
+- Argument 4: `100` (`retryDelay` - 100 milliseconds wait between attempts).
 
 ---
 
-## 5. SSH Settings Compact Segmented Pill & Tooltip Icons
+### 3.2 Verification Checklist across Target Applications
 
-### 5.1 Component: `src/components/settings/EmailNotifications/SshGitmapSection.tsx`
-
-#### Visual Design Invariant:
-In accordance with `AGENTS.md` guidelines:
-> Adjacent toolbar actions or desktop window controls must always wrap into contiguous segmented pill capsules (`rounded-full`, shared border, subtle divider lines, and dark-glass styling) rather than loose, disjointed circular buttons or verbose wrapped text buttons.
-
-#### UI Transformation:
-- **Before**: A verbose, wide button occupying excessive horizontal width:
-  ```tsx
-  <button className="px-2.5 py-1 rounded-full text-[11px] font-medium ...">
-      <Send className="w-3 h-3" />
-      <span>Prompt This Instance</span>
-  </button>
-  ```
-- **After**: A compact 3-button segmented pill capsule:
-  ```tsx
-  <div className="inline-flex items-center rounded-full border border-slate-200/80 dark:border-white/10 bg-slate-100/80 dark:bg-black/40 backdrop-blur-md p-0.5 shadow-sm divide-x divide-slate-200/60 dark:divide-white/10">
-      {/* 1. Prompt / Send Button */}
-      <button
-          type="button"
-          onClick={() => handleSendToInstance(item)}
-          className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-200/60 dark:hover:bg-white/10 rounded-l-full transition-colors cursor-pointer"
-          title={`Prompt ${item.machine_alias}:${item.instance_id}`}
-      >
-          <Send className="w-3.5 h-3.5" />
-      </button>
-
-      {/* 2. Run / Launch Instance Button */}
-      <button
-          type="button"
-          onClick={() => handleLaunchInstance(item)}
-          className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-slate-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
-          title={`Launch / Run ${item.machine_alias}:${item.instance_id}`}
-      >
-          <Play className="w-3.5 h-3.5" />
-      </button>
-
-      {/* 3. Copy Target & SSH CLI Command Button */}
-      <button
-          type="button"
-          onClick={() => handleCopyTargetCommand(item)}
-          className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-slate-200/60 dark:hover:bg-white/10 rounded-r-full transition-colors cursor-pointer"
-          title="Copy target identifier and SSH dispatch command"
-      >
-          <Copy className="w-3.5 h-3.5" />
-      </button>
-  </div>
-  ```
-
-#### Action Handlers:
-1. `handleSendToInstance(item)`:
-   - Sets `targetMachine` and `targetInstance`.
-   - If prompt text is present in the input box, dispatches immediately via `handleDispatchRemotePrompt`.
-   - If prompt text is empty, shows toast `"Target locked to <alias>:<id>"`, smooth-scrolls to `#remote-prompt-input`, and focuses the textarea.
-2. `handleLaunchInstance(item)`:
-   - Dispatches remote launch command via SSH: `agm instances start <id>` or local instance start if on local machine.
-   - Shows feedback toast with execution status.
-3. `handleCopyTargetCommand(item)`:
-   - Copies command string `agm ssh run ${item.machine_alias} "agm prompt ${item.instance_id} 'Hello'"` and target specifier `${item.machine_alias}:${item.instance_id}` to clipboard.
-   - Shows feedback toast `"Target command copied to clipboard"`.
+| Application | Required Format | Test Procedure | Expected Outcome | Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **Microsoft OneNote** (Win32 / Desktop) | `CF_DIB` (non-zero length without 14-byte header) | Copy 3 images via "Copy All Images". Open OneNote page, press `Ctrl+V`. | Stitched composite image pastes instantly with clean 16px vertical gaps; no error dialogs. | PASS |
+| **Google Antigravity IDE** (Chat Input) | `CF_HDROP` (FileDropList) | Copy 3 images. Focus Antigravity prompt input box, press `Ctrl+V`. | All 3 individual image files attach as discrete attachments with pill previews. | PASS |
+| **Microsoft Word** (Win32 / 365) | `CF_DIB` or `PNG` | Copy single or multiple images. Press `Ctrl+V` in document body. | High-resolution bitmap inserts inline; aspect ratio is preserved. | PASS |
+| **Microsoft Paint** (`mspaint.exe`) | `CF_BITMAP` or `CF_DIB` | Launch Paint, press `Ctrl+V`. | Canvas auto-expands to match composite dimensions; renders crisp text and graphics. | PASS |
+| **Browser Webview2** (In-App Paste) | `navigator.clipboard` Blob | Paste inside webview textarea or HTML rich editor. | PNG blob pastes cleanly without canvas tainting `SecurityError`. | PASS |
 
 ---
 
-## 6. Sync 30s Dropdown UI Modernization
+## 4. Cross-Platform Installer Verification
 
-### 6.1 Component: `src/components/instances/PromptTreeView/ModalHeader.tsx` (Segment 4)
+### 4.1 Architecture & Multi-Tier Download Ladder
 
-#### UI Transformation:
-Segment 4 in `ModalHeader.tsx` houses the auto-sync interval selector.
+The standalone installers (`install.ps1` for Windows, `install.sh` for Linux/macOS) are engineered for zero-friction portable deployment without administrative privileges or installer wizard dialogs.
 
-1. **Hover & Active States**:
-   - Apply container hover styling:
-     ```tsx
-     <div className="relative flex items-center h-7 px-2.5 gap-1.5 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer rounded-none">
-     ```
-2. **Live Green Pulsing Dot Indicator**:
-   - When auto-sync is active (`syncInterval !== 'off'`), render a pulsing emerald status dot next to the label:
-     ```tsx
-     {syncInterval !== 'off' && (
-         <span className="relative flex h-2 w-2 mr-0.5">
-             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-         </span>
-     )}
-     ```
-3. **Transparent Inline Dropdown**:
-   - Strict AGENTS.md invariant: Any inline `<select>` mounted within segmented capsules MUST use transparent borderless styling:
-     ```tsx
-     className="appearance-none bg-transparent border-0 focus:ring-0 focus:outline-none text-[11px] font-semibold text-slate-700 dark:text-slate-200 cursor-pointer pr-3.5 py-0"
-     ```
-
----
-
-## 7. Start All Instances Button Layout Shift Prevention
-
-### 7.1 Component: `src/pages/instances/InstancesHeader.tsx`
-
-#### UI Invariant:
-Toolbar buttons in segmented capsules must never unmount dynamically based on runtime status fluctuations, as unmounting causes layout shifts and misaligned click targets.
-
-#### Transformation:
-- **Before**:
-  ```tsx
-  {instances.length - runningCount > 0 && (
-      <button ... onClick={handleLaunchAll}>
-          <Play className="..." />
-          <span>Start All</span>
-          <span className="...">
-              {instances.length - runningCount}
-          </span>
-      </button>
-  )}
-  ```
-- **After**:
-  ```tsx
-  {(() => {
-      const stoppedCount = Math.max(0, instances.length - runningCount);
-      const isAllRunning = stoppedCount === 0;
-      return (
-          <button
-              type="button"
-              onClick={handleLaunchAll}
-              disabled={isLoading || isLaunchingAll || isAllRunning}
-              className={cn(
-                  "flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-none transition-all duration-150 ease-out active:scale-[0.98]",
-                  isAllRunning
-                      ? "text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-50"
-                      : "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100/50 dark:hover:bg-emerald-950/40 cursor-pointer"
-              )}
-              title={
-                  isAllRunning
-                      ? "All instances are currently running"
-                      : `Start all ${stoppedCount} stopped instance(s)`
-              }
-          >
-              <Play className={cn("w-3.5 h-3.5 text-emerald-500", isLaunchingAll && "animate-spin")} />
-              <span>Start All</span>
-              <span className={cn(
-                  "px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold",
-                  isAllRunning
-                      ? "bg-slate-200/50 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
-                      : "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
-              )}>
-                  {stoppedCount}
-              </span>
-          </button>
-      );
-  })()}
-  ```
-
----
-
-## 8. Comprehensive Verification Gates & Protocol
-
-### 8.1 Quality Gates Checklist
-
-```markdown
-- [ ] Rust Code Formatting: `cd src-tauri && cargo fmt -- --check`
-- [ ] Rust Clippy Gate: `cd src-tauri && cargo clippy --all-targets --all-features`
-- [ ] Frontend Build Gate: `npm run build`
-- [ ] No Silent Errors Invariant: All fallible calls route to `AppError` or `record_ignored` with justification comments.
-- [ ] Strictly Relative Git Paths Invariant: Zero absolute paths recorded in code, logs, or commit messages.
-- [ ] GitMap Atomic Commit: Executed via `gitmap cpb "<module> - <summary>"`.
+```mermaid
+flowchart TD
+    A["User Runs install.ps1 / install.sh"] --> B["Detect Target Version"]
+    B --> C{"Version Source"}
+    C -- "-Version flag" --> D["Explicit Target Version"]
+    C -- "Download URL Pattern" --> E["Detected Pinned Version"]
+    C -- "Default / None" --> F["Fetch releases-manifest.json"]
+    
+    D --> G["10-Version Candidate Fallback Ladder"]
+    E --> G
+    F --> G
+    
+    G --> H["Probe Candidate Tag URLs"]
+    H --> I{"Download Tool Available?"}
+    I -- aria2c found --> J["Accelerated 16-Connection Download"]
+    I -- curl / WebRequest --> K["Standard Streamed Download"]
+    
+    J --> L["Verify SHA256 Checksum"]
+    K --> L
+    L -- Valid --> M["Extract / Place Binaries"]
+    L -- Hash Mismatch / 404 --> N["Step Down to Next Ladder Version"]
+    N --> H
+    
+    M --> O["Configure User PATH & Shortcuts"]
+    O --> P["Synchronize OS Uninstall Registry"]
 ```
 
-### 8.2 Targeted Verification Scenarios
+#### The 10-Version Fallback Ladder Mechanics
+If a specific version tag 404s (e.g., during active GitHub Actions builds or tag propagation delays), the installer sequentially tests the fallback release ladder:
+```powershell
+$fallbackVersions = @("4.69.0", "4.68.0", "4.67.0", "4.66.0", "4.65.0", "4.64.0", "4.63.0", "4.62.0", "4.61.0", "4.60.0")
+```
+For each version, download attempts rotate across mirrors:
+1. Primary: `https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v<ver>/<asset>`
+2. Secondary CDN: `https://gh-proxy.com/https://github.com/...`
+3. Fallback: Rate-limit-free `releases-manifest.json` CDN link.
 
-| Test Case | Target Subsystem | Procedure | Expected Outcome |
+#### Accelerated Multi-Connection Downloading (`aria2c`)
+When `aria2c` is present in the environment:
+```powershell
+aria2c -x 16 -s 16 -k 1M -j 16 --quiet=true --dir="$tempDir" --out="$assetName" "$downloadUrl"
+```
+If `aria2c` is not installed, `install.ps1` falls back to `Invoke-WebRequest -UseBasicParsing`, and `install.sh` falls back to `curl -fSL` or `wget -q`.
+
+---
+
+### 4.2 Binary Placement & System Integration
+
+#### Windows (`install.ps1`)
+- **Installation Directory**: `$env:LOCALAPPDATA\Programs\Antigravity-Tools` (or `$InstallDir` parameter).
+- **Installed Binaries**:
+  - `agm-alim.exe`: The Tauri GUI application and system tray service.
+  - `agm.exe`: The native command-line interface binary.
+- **Environment PATH**:
+  - Automatically appends install directory to the user environment variable:
+    ```powershell
+    [Environment]::SetEnvironmentVariable("PATH", "$currentPath;$installDir", "User")
+    ```
+- **Desktop & Start Menu Shortcuts**:
+  - Created via `WScript.Shell` COM object.
+  - Desktop: `[Environment]::GetFolderPath("Desktop")\Antigravity Manager Tools.lnk`
+  - Start Menu: `[Environment]::GetFolderPath("StartMenu")\Programs\Antigravity Manager Tools.lnk`
+- **Windows Registry Uninstall Registration**:
+  - Key: `HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Antigravity Manager`
+  - Values:
+    - `DisplayName`: `"Antigravity Manager Tools v<version>"`
+    - `DisplayVersion`: `"<version>"`
+    - `Publisher`: `"Maintained by Alim, Sponsored by RISEUP ASIA LLC"`
+    - `UninstallString`: `"powershell.exe -ExecutionPolicy Bypass -File \"<installDir>\install.ps1\" -Uninstall"`
+
+#### Linux & macOS (`install.sh`)
+- **Installation Directory**: `~/.local/bin` and `~/.local/share/antigravity-manager`.
+- **Architecture Auto-Detection**:
+  - `x86_64` / `amd64` $\rightarrow$ downloads `x86_64` tarball or appimage.
+  - `aarch64` / `arm64` $\rightarrow$ downloads `aarch64` tarball or DMG.
+- **Desktop Entry**:
+  - Creates `~/.local/share/applications/antigravity-manager.desktop` with application icon and categories.
+- **Shell Profile Integration**:
+  - Automatically checks `~/.bashrc`, `~/.zshrc`, or `~/.profile` and appends `export PATH="$HOME/.local/bin:$PATH"` if absent.
+
+---
+
+### 4.3 Installer Verification Matrix
+
+| Scenario | Command | Expected Result | Pass Criteria |
 | :--- | :--- | :--- | :--- |
-| **TC-01** | Telegram Inbound Backup | Send `/brp` or `/backup_running` to Telegram bot | Bot executes backup for default instance, queries running prompts, counts multimodal attachments, and replies with formatted HTML report containing batch ID and restore advice. |
-| **TC-02** | Telegram Instance Backup | Send `/backup custom-instance` to Telegram bot | Bot extracts `custom-instance`, executes scoped backup, and confirms scoped batch details. |
-| **TC-03** | Composite PNG Clipboard | In Prompt Tree View, click "Copy All Images" on a prompt with 3+ images (including relative attachments) | Canvas does not taint in WebView2; all images are stitched vertically without distortion; pure binary PNG is written to clipboard via 10-retry PowerShell helper; pasting into OneNote or Paint succeeds. |
-| **TC-04** | SSH Settings Tooltip Icons | Navigate to Settings -> Email & Telegram -> SSH GitMap Section | Table renders compact segmented pill capsule with Send, Play, and Copy icons. Hovering displays tooltips. Clicking Send locks instance; clicking Play triggers launch; clicking Copy copies command. |
-| **TC-05** | 30s Sync Dropdown Modernization | Open Prompt Tree View modal | Segment 4 displays hover background effect. Selecting 30s sync displays emerald pulsing dot indicator. Selecting "off" hides pulsing dot. |
-| **TC-06** | Start All Permanently Mounted | Start all instances until 0 stopped instances remain | "Start All" button remains mounted in toolbar, disabled with opacity 50%, badge showing "0", and tooltip "All instances are currently running". No layout shift occurs. |
+| **Fresh Install (Latest)** | `powershell -ExecutionPolicy Bypass -File install.ps1` | Fetches latest manifest, downloads binary, configures PATH, creates shortcuts. | `agm --version` executes cleanly in a new terminal session; shortcut exists on Desktop. |
+| **Pinned Version Install** | `.\install.ps1 -Version "4.68.0"` | Ignores latest release; downloads v4.68.0 asset ladder; sets registry to v4.68.0. | `Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Antigravity Manager" \| Select DisplayVersion` returns `4.68.0`. |
+| **Dry Run Mode** | `.\install.ps1 -DryRun` | Executes version resolution and ladder probing; outputs planned operations without writing files. | Zero filesystem or registry changes; exits with code 0. |
+| **Uninstallation** | `.\install.ps1 -Uninstall` | Removes install directory, deletes Desktop and Start Menu shortcuts, strips PATH entry. | Directory removed; PATH cleaned; registry key deleted. |
+| **POSIX Architecture Probe** | `bash install.sh --dry-run` | Accurately detects OS (`Linux`/`Darwin`) and architecture (`x86_64`/`arm64`). | Logs correct target asset name for local architecture. |
+
+---
+
+## 5. Pre-flight Quality Gates & Release Verification
+
+### 5.1 Pre-Flight Quality Gates
+
+All modifications must pass the four mandatory pre-flight quality gates locally before PR submission or release tagging:
+
+```mermaid
+flowchart LR
+    A["Code Edits"] --> B["Gate 1: cargo fmt -- --check"]
+    B --> C["Gate 2: cargo clippy --all-targets --all-features"]
+    C --> D["Gate 3: npm run build"]
+    D --> E["Gate 4: Fast Unit Tests (cargo test --lib)"]
+    E --> F["Green Gate: Ready for Commit & Release"]
+```
+
+#### Gate 1: Rust Code Formatting
+```bash
+cd src-tauri && cargo fmt -- --check
+```
+- Strict zero-diff check. Auto-format via `cd src-tauri && cargo fmt` if formatting errors are detected.
+
+#### Gate 2: Rust Clippy & Compilation Gate
+```bash
+cd src-tauri && cargo clippy --all-targets --all-features
+```
+- Compiles library, binaries (`agm-alim`, `agm`), tests, and benchmarks.
+- Enforces zero clippy warnings. `cargo check` alone is **strictly prohibited**.
+
+#### Gate 3: Frontend TypeScript & Vite Production Bundle
+```bash
+npm run build
+```
+- Executes `tsc` followed by `vite build` (`--max-old-space-size=4096`).
+- Ensures zero TypeScript type mismatches and bundles production assets into `dist/`.
+
+#### Gate 4: Zero-CI Quarantine Standard (Invariant 6)
+- Heavy integration tests that spawn processes, modify `state.vscdb`, or switch profiles must be quarantined:
+  ```rust
+  #[test]
+  #[ignore = "local_only_e2e"]
+  fn test_local_e2e_flow() {
+      if std::env::var("RUN_TEMP_E2E").as_deref() != Ok("1") {
+          return;
+      }
+      // ...
+  }
+  ```
+- CI runners compile test targets with 100% green status but **never** execute heavy tests without explicit authorization.
+
+#### Gate 5: No Silent Errors Invariant
+- Every fallible operation must route into `AppError` or use `crate::error::record_ignored` accompanied by an explicit `// Justification:` comment explaining why it is safe to proceed.
+
+#### Gate 6: Strictly Relative Git Paths Invariant
+- Absolute paths (e.g. `C:\...`, `D:\...`, `/home/...`) are **strictly prohibited** in specifications, documentation, code, commit messages, and release notes. All paths must be repository-relative (e.g., `src/...`, `src-tauri/...`, `02-spec/...`).
+
+---
+
+### 5.2 Transient Test Sandbox Lifecycle (`agm instances test-create/clean`)
+
+#### Caller IDE Self-Preservation Invariant
+Automated tests and CLI operations must detect the caller's active IDE process (`detect_caller_instance_id()`) to prevent accidentally terminating the developer's live working session. Any command targeting the caller instance fails-fast with exit code 2 unless `--force` is explicitly provided.
+
+#### Sandbox Lifecycle Management
+To ensure tests leave zero residual artifacts or orphan processes:
+
+1. **Sandbox Provisioning**:
+   ```bash
+   agm instances test-create --name "agm-sandbox-test"
+   ```
+   - Allocates an isolated temporary directory in the OS temp space.
+   - Generates an isolated `state.vscdb` and `storage.json` with synthetic telemetry keys.
+   - Sets an OS keyring bypass marker so authentication prompts are suppressed.
+   - Binds to an ephemeral high-range port.
+
+2. **Test Execution**:
+   - The test runner executes all assertions exclusively against `agm-sandbox-test`.
+
+3. **Sandbox Teardown**:
+   ```bash
+   agm instances test-clean --name "agm-sandbox-test"
+   ```
+   - Issues graceful shutdown signal to the sandbox PID.
+   - Force-kills orphan child processes after a 3-second grace window.
+   - Deletes temporary workspace directories completely.
+   - Verifies 0 processes and 0 lingering database lock files remain.
+
+---
+
+### 5.3 GitHub Actions CI/CD Telemetry Monitoring (`gitmap pe -t`)
+
+To monitor remote pipeline execution after tagging without burning CI credits or flooding logs:
+
+1. **Telemetry Inspection Command**:
+   ```bash
+   gitmap pe -t
+   ```
+   - Connects to GitHub Actions API via GitMap.
+   - Extracts live pipeline health, step runtimes, and bounded failure summaries.
+
+2. **Dynamic ETA Sleep Protocol**:
+   - Rapid polling loops (`while true; sleep 5; gh run view`) are strictly forbidden.
+   - Agents must query pipeline state via `gitmap pipeline-ai status -t <sec>` and sleep according to the workflow's calculated `etaSeconds`.
+
+3. **4-Part Root Cause Analysis (RCA) on Failure**:
+   If a remote CI job fails, telemetry must be parsed into the standard 4-part RCA block:
+   - **Trigger**: The specific test, build target, or linter that failed.
+   - **Root Cause**: The underlying syntax error, missing dependency, or race condition.
+   - **Blast Radius**: Affected modules and operating systems.
+   - **Verified Fix**: The exact code change applied and local gate output confirming resolution.
+
+---
+
+## 6. Comprehensive Verification Matrix & Scenarios
+
+| Test ID | Subsystem | Pre-conditions | Execution Steps | Expected Outcome | Verification Command |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **TC-01** | False QUEUED Badge Elimination | Completed conversation with `active_turn_idx = None` in `conversation_summaries.db`. | Query prompt tree via IPC `get_prompt_tree` or UI Tree View. | Conversation status displays `COMPLETED` or `IDLE`. No amber `QUEUED` badge is visible. | `cargo test --lib repo_db::tests::test_no_false_queued_badge` |
+| **TC-02** | Stale Queue Sweeper | SQLite `active_prompts` contains rows with `status = 'queued'` and `updated_at < now - 600`. | Run `transition_stale_inflight_prompts(now)`. | Aged queued rows transition to `completed`. Stale badges disappear from tree. | SQLite query: `SELECT count(*) FROM active_prompts WHERE status = 'queued' AND updated_at < ?` returns 0. |
+| **TC-03** | Instance Liveness Queue Guard | Instance process is stopped (`is_antigravity_running == false`). | Inbound prompt is queued for stopped instance. Query tree view. | Turn is flagged as unrunnable / idle; does not show active live queue status. | Inspect `AgmConversationNode.is_queued` equals `false`. |
+| **TC-04** | OneNote `CF_DIB` Non-Zero Length | 3 multimodal images attached to a prompt turn. | Execute `copy_images_to_clipboard(paths)`. Open OneNote, press `Ctrl+V`. | Stitched composite image pastes cleanly. No OLE format errors. Non-zero length DIB confirmed. | Manual paste verification in OneNote desktop app. |
+| **TC-05** | Antigravity `CF_HDROP` File Drop | Multiple images copied to clipboard. | Focus Antigravity prompt input textarea, press `Ctrl+V`. | Individual image files attach as discrete file pills in chat box. | UI inspection of input attachments in Antigravity IDE. |
+| **TC-06** | Clipboard 10-Retry Lock Resiliency | Background script locks clipboard for 300ms during copy. | Trigger `copy_images_to_clipboard` concurrently. | PowerShell 10-retry overload catches `0x800401D0` and retries every 100ms; copy succeeds. | Command returns `Ok(())` without throwing `ExternalException`. |
+| **TC-07** | Windows Installer Fresh Run | Windows 10/11 x64 without Antigravity Tools installed. | Run `powershell -ExecutionPolicy Bypass -File install.ps1`. | Downloads binary, unpacks to `$env:LOCALAPPDATA\Programs\Antigravity-Tools`, sets PATH, creates shortcuts. | `agm --version` executes cleanly in new PowerShell window. |
+| **TC-08** | Windows Installer 10-Version Ladder | Primary release tag intentionally returns HTTP 404. | Run `install.ps1` targeting latest tag. | Installer catches 404, steps down ladder to previous release, completes installation. | Successful install log showing fallback ladder step-down. |
+| **TC-09** | POSIX Installer Auto-Arch | Ubuntu 22.04 LTS x86_64 and macOS aarch64. | Run `bash install.sh`. | Detects correct architecture, extracts binaries to `~/.local/bin`, installs desktop entry. | `~/.local/bin/agm --version` executes with exit code 0. |
+| **TC-10** | Pre-Flight Rust Clippy Gate | Workspace in clean Git state. | Execute `cd src-tauri && cargo clippy --all-targets --all-features`. | Zero compiler warnings, zero errors across all targets. | Process exit code 0. |
+| **TC-11** | Frontend Production Build Gate | Frontend source files modified. | Execute `npm run build`. | TypeScript compiler passes; Vite bundles production assets into `dist/`. | Process exit code 0; `dist/index.html` exists. |
+| **TC-12** | Transient Test Sandbox Lifecycle | Developer active IDE running. | Run `agm instances test-create`, execute test, run `agm instances test-clean`. | Test runs in total isolation. Active developer IDE process is unaffected. Zero orphan files. | Verify active IDE PID remains alive; temp dir is unlinked. |

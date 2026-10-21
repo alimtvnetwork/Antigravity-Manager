@@ -344,7 +344,7 @@ export function ConversationNode({
 
             {/* Tier 3: Indented Prompt Subtree */}
             {hasPrompts && isExpanded && conv.prompts && (
-                <div className="border-l-2 border-slate-300/60 dark:border-purple-900/50 ml-6 pl-3 space-y-1 mt-1">
+                <div className="border-l-2 border-slate-300/60 dark:border-purple-900/50 ml-5 pl-3 space-y-1 mt-1">
                     {conv.prompts.map((turn, tIdx) => {
                         const isLastTurn = tIdx === conv.prompts!.length - 1;
                         const hasImages = turn.media_paths && turn.media_paths.length > 0;

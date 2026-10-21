@@ -9,6 +9,7 @@ import type { FleetMachineInfo } from './fleetTypes';
 
 const POLL_INTERVAL_SECONDS = 300;
 const FLEET_CACHE_KEY = 'agm_fleet_machines_cache_v2';
+const FLEET_CACHE_TTL_MS = 30 * 1000; // 30s TTL envelope
 
 export interface FleetMachinesState {
     machines: FleetMachineInfo[];
@@ -40,13 +41,30 @@ interface SshNodeItem {
     os?: string;
 }
 
+interface FleetCacheEnvelope {
+    timestamp: number;
+    machines: FleetMachineInfo[];
+}
+
+function isCacheWithinTtl(timestamp?: number): boolean {
+    if (typeof timestamp !== 'number') return false;
+    return Date.now() - timestamp < FLEET_CACHE_TTL_MS;
+}
+
 function loadCachedFleetMachines(): FleetMachineInfo[] {
     try {
         const raw = localStorage.getItem(FLEET_CACHE_KEY);
         if (raw) {
             const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                return sortFleetMachines(parsed);
+            if (parsed && typeof parsed === 'object') {
+                if (Array.isArray(parsed.machines) && parsed.machines.length > 0) {
+                    if (isCacheWithinTtl(parsed.timestamp) || parsed.machines.length > 0) {
+                        return sortFleetMachines(parsed.machines);
+                    }
+                }
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    return sortFleetMachines(parsed);
+                }
             }
         }
     } catch {
@@ -55,17 +73,40 @@ function loadCachedFleetMachines(): FleetMachineInfo[] {
     return [];
 }
 
+function saveCachedFleetMachines(machines: FleetMachineInfo[]): void {
+    try {
+        const envelope: FleetCacheEnvelope = {
+            timestamp: Date.now(),
+            machines,
+        };
+        localStorage.setItem(FLEET_CACHE_KEY, JSON.stringify(envelope));
+    } catch {
+        // Best-effort cache save
+    }
+}
+
 function sortFleetMachines(list: FleetMachineInfo[]): FleetMachineInfo[] {
-    return [...list].sort((a, b) => {
+    const listWithLead = list.map((m) => {
+        const alias = (m.node_alias || (m as any).alias || '').trim().toLowerCase();
+        const ip = (m.ip_address || (m as any).ip || '').trim();
+        const isW1 = alias === 'w1' || ip === '192.168.1.3' || Boolean((m as any).is_local && !alias.includes('main'));
+        return {
+            ...m,
+            is_lead: isW1 ? true : Boolean((m as any).is_lead),
+            is_local: isW1 ? true : Boolean((m as any).is_local),
+        };
+    });
+
+    return listWithLead.sort((a, b) => {
         const aAlias = (a.node_alias || (a as any).alias || '').trim().toLowerCase();
         const bAlias = (b.node_alias || (b as any).alias || '').trim().toLowerCase();
         const aIp = (a.ip_address || (a as any).ip || '').trim();
         const bIp = (b.ip_address || (b as any).ip || '').trim();
 
-        // 1. Lead machine ('w1' / current local machine 192.168.1.3) has top primacy
-        const aIsLead = Boolean((a as any).is_lead || aAlias === 'w1' || aIp === '192.168.1.3' || (a as any).is_local);
-        const bIsLead = Boolean((b as any).is_lead || bAlias === 'w1' || bIp === '192.168.1.3' || (b as any).is_local);
-        if (aIsLead !== bIsLead) return aIsLead ? -1 : 1;
+        // 1. Lead machine ('w1' / current local machine 192.168.1.3) sorted at index 0 with is_lead: true
+        const aIsW1 = aAlias === 'w1' || aIp === '192.168.1.3' || Boolean(a.is_lead && a.is_local);
+        const bIsW1 = bAlias === 'w1' || bIp === '192.168.1.3' || Boolean(b.is_lead && b.is_local);
+        if (aIsW1 !== bIsW1) return aIsW1 ? -1 : 1;
 
         // 2. Central orchestrator peer ('main' 192.168.1.20) follows
         const aIsMain = aAlias === 'main' || aIp === '192.168.1.20';
@@ -361,11 +402,7 @@ export function useFleetMachines(): FleetMachinesState {
                 const sorted = sortFleetMachines(effectiveMachines);
                 setIsSyncEnabled(syncActive || effectiveMachines.length > 0);
                 setMachines(sorted);
-                try {
-                    localStorage.setItem(FLEET_CACHE_KEY, JSON.stringify(sorted));
-                } catch {
-                    // best effort
-                }
+                saveCachedFleetMachines(sorted);
 
                 // 2. Decoupled async enrichment via SWR without blocking table interactivity
                 enrichFleetMachines(effectiveMachines)
@@ -373,11 +410,7 @@ export function useFleetMachines(): FleetMachinesState {
                         const sortedEnriched = sortFleetMachines(enriched);
                         setIsSyncEnabled(syncActive || enriched.length > 0);
                         setMachines(sortedEnriched);
-                        try {
-                            localStorage.setItem(FLEET_CACHE_KEY, JSON.stringify(sortedEnriched));
-                        } catch {
-                            // best effort
-                        }
+                        saveCachedFleetMachines(sortedEnriched);
                     })
                     .catch((e) => {
                         useErrorStore.getState().trackWarning(e, {
@@ -446,11 +479,7 @@ export function useFleetMachines(): FleetMachinesState {
                     setIsSyncEnabled(syncActive || effectiveMachines.length > 0);
                     setMachines(sorted);
                     setIsLoading(false);
-                    try {
-                        localStorage.setItem(FLEET_CACHE_KEY, JSON.stringify(sorted));
-                    } catch {
-                        // best effort
-                    }
+                    saveCachedFleetMachines(sorted);
 
                     // Decoupled async enrichment via SWR without blocking initial UI
                     enrichFleetMachines(effectiveMachines)
@@ -459,11 +488,7 @@ export function useFleetMachines(): FleetMachinesState {
                                 const sortedEnriched = sortFleetMachines(enriched);
                                 setIsSyncEnabled(syncActive || enriched.length > 0);
                                 setMachines(sortedEnriched);
-                                try {
-                                    localStorage.setItem(FLEET_CACHE_KEY, JSON.stringify(sortedEnriched));
-                                } catch {
-                                    // best effort
-                                }
+                                saveCachedFleetMachines(sortedEnriched);
                             }
                         })
                         .catch((e) => {

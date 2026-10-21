@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Send, Server, Loader2 } from 'lucide-react';
 import { sshService } from '../../../services/sshService';
 import { showToast } from '../../common/ToastContainer';
@@ -18,6 +18,24 @@ export function SendFleetPromptModal({ machine, onClose }: SendFleetPromptModalP
     const [promptText, setPromptText] = useState<string>('');
     const [isSending, setIsSending] = useState<boolean>(false);
 
+    useEffect(() => {
+        if (machine) {
+            const firstInst = machine.active_instances?.[0]?.profile_name || 'default';
+            const clean = firstInst.replace(/^.*?:/, '').trim() || 'default';
+            setSelectedInstance(clean);
+        }
+    }, [machine]);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && !isSending) {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose, isSending]);
+
     if (!machine) return null;
 
     const handleSend = async () => {
@@ -30,17 +48,19 @@ export function SendFleetPromptModal({ machine, onClose }: SendFleetPromptModalP
         setIsSending(true);
         try {
             const alias = machine.node_alias || (machine as any).alias || 'local';
+            const cleanAlias = alias.replace(/^ssh_/i, '').trim() || 'local';
+            const cleanInst = (selectedInstance || 'default').replace(/^.*?:/, '').trim() || 'default';
             const res = await sshService.sendRemoteSshPrompt({
-                node_alias: alias,
-                instance_target: selectedInstance || 'default',
+                node_alias: cleanAlias,
+                instance_target: cleanInst,
                 prompt_text: text,
             });
 
             if (res.success) {
-                showToast(`Dispatched prompt to ${alias}:${selectedInstance}`, 'success');
+                showToast(`Dispatched prompt to ${cleanAlias}:${cleanInst}`, 'success');
                 onClose();
             } else {
-                showToast(`Prompt dispatch to ${alias} reported warning: ${res.message || res.stderr || 'Check remote logs'}`, 'warning');
+                showToast(`Prompt dispatch to ${cleanAlias} reported warning: ${res.message || res.stderr || 'Check remote logs'}`, 'warning');
             }
         } catch (err: any) {
             useErrorStore.getState().captureError(err, {
@@ -54,7 +74,12 @@ export function SendFleetPromptModal({ machine, onClose }: SendFleetPromptModalP
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs">
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs"
+            onClick={(e) => {
+                if (e.target === e.currentTarget && !isSending) onClose();
+            }}
+        >
             <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-700/60 dark:border-purple-900/50 shadow-2xl overflow-hidden flex flex-col">
                 {/* Header */}
                 <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/50">

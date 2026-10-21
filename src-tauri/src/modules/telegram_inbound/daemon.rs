@@ -299,7 +299,7 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
                 || trimmed.starts_with("C0")
                 || trimmed.starts_with("P0"))
         {
-            format!("{}\n\n![attached-image]({})", trimmed, media_ref)
+            format!("{}\n\n![attached-image](<{}>)", trimmed, media_ref)
         } else {
             trimmed.to_string()
         }
@@ -402,8 +402,16 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
         "status" | "observe" => Some(json!({
             "inline_keyboard": [
                 [
+                    { "text": "📦 Backup Prompts", "callback_data": "cmd:/backup" },
+                    { "text": "♻️ Restore Prompts", "callback_data": "cmd:/restore" }
+                ],
+                [
                     { "text": "💰 Account Balances", "callback_data": "cmd:/balance" },
                     { "text": "🚀 Prompt Wizard (/send)", "callback_data": "cmd:/send" }
+                ],
+                [
+                    { "text": "🌲 Expand Tree", "callback_data": "cmd:/tree" },
+                    { "text": "⚡ Active Prompts", "callback_data": "cmd:/active" }
                 ],
                 [
                     { "text": "📥 Accounts CSV", "callback_data": "cmd:/export accounts csv" },
@@ -427,6 +435,18 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
                 ]
             ]
         })),
+        "prompt" | "pt" => Some(json!({
+            "inline_keyboard": [
+                [
+                    { "text": "⚡ Active Prompts", "callback_data": "cmd:/active" },
+                    { "text": "🌲 Expand Tree", "callback_data": "cmd:/tree" }
+                ],
+                [
+                    { "text": "📦 Backup Prompts", "callback_data": "cmd:/backup" },
+                    { "text": "♻️ Restore Prompts", "callback_data": "cmd:/restore" }
+                ]
+            ]
+        })),
         "help" | "start" => Some(super::ui_remote::help_copy_markup()),
         "send" => {
             if rest.trim().eq_ignore_ascii_case("cancel") {
@@ -440,9 +460,33 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
                 [
                     { "text": "🌐 Fleet Identity", "callback_data": "cmd:fleet" },
                     { "text": "📊 Live Observe", "callback_data": "cmd:observe" }
+                ],
+                [
+                    { "text": "📦 Backup Prompts", "callback_data": "cmd:/backup" },
+                    { "text": "♻️ Restore Prompts", "callback_data": "cmd:/restore" }
                 ]
             ]
         })),
+        s if (s.starts_with('c')
+            || s.starts_with('p')
+            || s.starts_with("agm:c")
+            || s.starts_with("agm:p")
+            || s.starts_with("gm:#")
+            || s.starts_with("gm:")) =>
+        {
+            Some(json!({
+                "inline_keyboard": [
+                    [
+                        { "text": "⚡ Active Prompts", "callback_data": "cmd:/active" },
+                        { "text": "🌲 Expand Tree", "callback_data": "cmd:/tree" }
+                    ],
+                    [
+                        { "text": "📦 Backup Prompts", "callback_data": "cmd:/backup" },
+                        { "text": "♻️ Restore Prompts", "callback_data": "cmd:/restore" }
+                    ]
+                ]
+            }))
+        }
         _ => None,
     };
 

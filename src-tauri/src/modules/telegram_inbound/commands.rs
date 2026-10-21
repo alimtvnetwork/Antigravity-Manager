@@ -187,6 +187,29 @@ pub async fn execute_api_status_command() -> String {
     msg
 }
 
+fn check_instance_active_status(instance_id: &str) -> &'static str {
+    if let Ok(reg) = crate::modules::instance::load_registry() {
+        if let Some(inst) = reg
+            .instances
+            .iter()
+            .find(|i| i.id.eq_ignore_ascii_case(instance_id))
+        {
+            let pids =
+                crate::modules::instance::find_pids_for_data_dir(&inst.data_dir, inst.is_default);
+            let is_run = !pids.is_empty()
+                || crate::modules::instance::is_instance_running(
+                    &inst.id,
+                    &inst.data_dir,
+                    inst.pid,
+                );
+            if is_run {
+                return "🟢 Active & Running";
+            }
+        }
+    }
+    "⚪ Standby / Ready"
+}
+
 /// Execute Prompt Backup ("Backpack") or Restore command
 pub fn execute_backup_command(args_str: &str) -> String {
     let trimmed = args_str.trim();
@@ -252,31 +275,76 @@ pub fn execute_backup_command(args_str: &str) -> String {
             ),
         }
     } else if first == "restore" || first == "rrp" || first == "resend" {
-        let target_inst = tokens
+        let raw_target = tokens
             .get(1)
             .map(|s| s.trim_matches(|c: char| c == '\'' || c == '"' || c == '/' || c == '\\'))
-            .filter(|s| !s.is_empty())
-            .unwrap_or("default");
+            .filter(|s| !s.is_empty());
+        let is_all = raw_target
+            .map(|s| s.eq_ignore_ascii_case("all"))
+            .unwrap_or(false);
+        let target_inst = if is_all {
+            "all"
+        } else {
+            raw_target.unwrap_or("default")
+        };
+        let scope_filter = if is_all { None } else { Some(target_inst) };
 
         let repo_resent = repo_db::resend_all_running_commands(20).unwrap_or_default();
-        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-        crate::error::record_ignored(
-            repo_db::dispatch_running_prompts(target_inst),
-            "dispatch_running_prompts",
-        );
-        match backup_prompts_db::restore_running_prompts(Some(target_inst), false, None) {
-            Ok(records) => format!(
-                "♻️ <b>Prompt Restore Completed</b>\n\n\
-                • <b>Target Instance:</b> <code>{}</code>\n\
-                • <b>Restored Prompts:</b> <b>{}</b>\n\
-                • <b>Re-sent Commands:</b> <b>{}</b> command(s) queued\n\
-                • <b>Timestamp:</b> <code>{}</code>\n\n\
-                💡 <i>Execution resumed in target workspace.</i>",
-                clean_for_telegram_html(target_inst, 64),
-                records.len(),
-                repo_resent.len(),
-                Utc::now().to_rfc3339()
-            ),
+        if !is_all {
+            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+            crate::error::record_ignored(
+                repo_db::dispatch_running_prompts(target_inst),
+                "dispatch_running_prompts",
+            );
+        } else {
+            crate::error::record_ignored(
+                repo_db::dispatch_running_prompts("default"),
+                "dispatch_running_prompts_default",
+            );
+        }
+        match backup_prompts_db::restore_running_prompts(scope_filter, false, None) {
+            Ok(records) => {
+                let mut restored_image_count = 0;
+                for p in &records {
+                    if let Some(payload) = &p.images_payload {
+                        let uris = crate::modules::repo_db::detection::parse_image_uris(payload);
+                        if !uris.is_empty() {
+                            restored_image_count += uris.len();
+                        } else if p.has_images {
+                            restored_image_count += 1;
+                        }
+                    } else if p.has_images {
+                        let (uris, paths) =
+                            crate::modules::repo_db::detection::extract_image_uris_or_paths(
+                                &p.prompt_text,
+                            );
+                        let c = uris.len() + paths.len();
+                        restored_image_count += if c > 0 { c } else { 1 };
+                    }
+                }
+                let status_badge = if is_all {
+                    check_instance_active_status("default")
+                } else {
+                    check_instance_active_status(target_inst)
+                };
+
+                format!(
+                    "♻️ <b>Prompt Restore Completed</b>\n\n\
+                    • <b>Target Instance:</b> <code>{}</code>\n\
+                    • <b>Instance Status:</b> {}\n\
+                    • <b>Restored Prompts:</b> <b>{}</b>\n\
+                    • <b>Attached Media:</b> <b>{}</b> image(s)\n\
+                    • <b>Re-sent Commands:</b> <b>{}</b> command(s) queued\n\
+                    • <b>Timestamp:</b> <code>{}</code>\n\n\
+                    💡 <i>Execution resumed in target workspace.</i>",
+                    clean_for_telegram_html(target_inst, 64),
+                    status_badge,
+                    records.len(),
+                    restored_image_count,
+                    repo_resent.len(),
+                    Utc::now().to_rfc3339()
+                )
+            }
             Err(e) => format!(
                 "❌ <b>Restore Failed:</b> <code>{}</code>",
                 clean_for_telegram_html(&e, 200)
@@ -320,16 +388,19 @@ pub fn execute_backup_command(args_str: &str) -> String {
                 }
                 let batch_id_short = batch.id.get(..8).unwrap_or(&batch.id);
                 let iso_time = Utc::now().to_rfc3339();
+                let status_badge = check_instance_active_status(target_inst);
 
                 format!(
                     "📦 <b>Prompt Backup Successful</b>\n\n\
                     • <b>Target Instance:</b> <code>{}</code>\n\
+                    • <b>Instance Status:</b> {}\n\
                     • <b>Backup Batch ID:</b> <code>{}</code>\n\
                     • <b>Backed Up Prompts:</b> <b>{}</b>\n\
                     • <b>Multimodal Images:</b> <b>{}</b> image(s) attached\n\
                     • <b>Timestamp:</b> <code>{}</code>\n\n\
                     💡 <i>Prompts are safely preserved in offline SQLite storage. Send <code>/restore {}</code> or <code>/rrp</code> anytime to resume execution.</i>",
                     clean_for_telegram_html(target_inst, 64),
+                    status_badge,
                     clean_for_telegram_html(batch_id_short, 32),
                     count,
                     image_count,
