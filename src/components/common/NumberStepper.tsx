@@ -61,9 +61,11 @@ export function NumberStepper({
                 type="button"
                 onClick={handleDecrement}
                 disabled={!canDecrement}
+                aria-label="Decrease value"
                 className={cn(
                     'flex items-center justify-center w-6 h-6 rounded-md transition-colors',
                     'hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300',
+                    'focus:outline-none focus-visible:ring-1 focus-visible:ring-sky-500',
                     'disabled:opacity-30 disabled:pointer-events-none'
                 )}
             >
@@ -79,7 +81,8 @@ export function NumberStepper({
                     max={max}
                     step={step}
                     disabled={disabled}
-                    className="w-10 text-center font-mono text-xs bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-800 dark:text-slate-100 p-0"
+                    aria-label={unit ? `Value (${unit})` : 'Value'}
+                    className="w-10 text-center font-mono text-xs bg-transparent border-0 focus:ring-1 focus:ring-sky-500/50 rounded focus:outline-none text-slate-800 dark:text-slate-100 p-0"
                 />
                 {unit && <span className="text-[10px] text-slate-400 ml-0.5">{unit}</span>}
             </div>
@@ -88,9 +91,11 @@ export function NumberStepper({
                 type="button"
                 onClick={handleIncrement}
                 disabled={!canIncrement}
+                aria-label="Increase value"
                 className={cn(
                     'flex items-center justify-center w-6 h-6 rounded-md transition-colors',
                     'hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300',
+                    'focus:outline-none focus-visible:ring-1 focus-visible:ring-sky-500',
                     'disabled:opacity-30 disabled:pointer-events-none'
                 )}
             >

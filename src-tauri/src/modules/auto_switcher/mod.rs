@@ -123,6 +123,8 @@ pub mod tests_cooldown_decay_stepper;
 #[cfg(test)]
 pub mod tests_account_tier_filter;
 #[cfg(test)]
+pub mod tests_binding_affinity;
+#[cfg(test)]
 pub(crate) use crate::models::account::Account;
 #[cfg(test)]
 pub(crate) use tests_a::make_test_account;

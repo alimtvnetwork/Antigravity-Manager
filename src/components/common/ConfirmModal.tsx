@@ -54,6 +54,7 @@ export function ConfirmModal({
             <div
                 role="dialog"
                 aria-modal="true"
+                aria-labelledby="confirm-modal-title"
                 className={cn(
                     'relative w-full max-w-md rounded-2xl border shadow-2xl p-5',
                     'bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl',
@@ -73,14 +74,15 @@ export function ConfirmModal({
                         >
                             {isDestructive ? <AlertTriangle className="w-4 h-4" /> : <Info className="w-4 h-4" />}
                         </div>
-                        <h3 className="text-sm font-semibold truncate">{title}</h3>
+                        <h3 id="confirm-modal-title" className="text-sm font-semibold truncate">{title}</h3>
                     </div>
 
                     <button
                         type="button"
                         onClick={onCancel}
                         disabled={isLoading}
-                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-1 rounded-lg"
+                        aria-label="Close dialog"
+                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 transition-colors p-1 rounded-lg"
                     >
                         <X className="w-4 h-4" />
                     </button>
@@ -95,7 +97,7 @@ export function ConfirmModal({
                         type="button"
                         onClick={onCancel}
                         disabled={isLoading}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 transition-colors disabled:opacity-50"
                     >
                         {cancelLabel}
                     </button>
@@ -106,6 +108,7 @@ export function ConfirmModal({
                         disabled={isLoading}
                         className={cn(
                             'px-4 py-1.5 rounded-lg text-xs font-semibold text-white shadow-xs transition-all disabled:opacity-50',
+                            'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900',
                             isDestructive
                                 ? 'bg-rose-600 hover:bg-rose-500 active:bg-rose-700'
                                 : 'bg-purple-600 hover:bg-purple-500 active:bg-purple-700'

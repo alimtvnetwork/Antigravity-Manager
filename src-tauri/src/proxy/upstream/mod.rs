@@ -69,6 +69,10 @@ pub mod tests_h2_window_recovery;
 pub mod tests_response_chunk_assembler;
 #[cfg(test)]
 pub mod tests_connection_age_sentinel;
+#[cfg(test)]
+pub mod tests_dynamic_dns_resolver;
+#[cfg(test)]
+pub mod tests_retry_decelerator;
 
 pub use brotli_decompressor::*;
 pub use circuit_breaker_counter::*;

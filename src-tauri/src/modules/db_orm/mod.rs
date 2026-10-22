@@ -126,6 +126,10 @@ pub mod tests_free_page_stepper;
 pub mod tests_column_nullability_validator;
 #[cfg(test)]
 pub mod tests_column_type_affinity_validator;
+#[cfg(test)]
+pub mod tests_column_default_validator;
+#[cfg(test)]
+pub mod tests_index_coverage_verifier;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;

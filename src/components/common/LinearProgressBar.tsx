@@ -38,10 +38,13 @@ export const LinearProgressBar: React.FC<LinearProgressBarProps> = ({
     <div className={`w-full flex items-center gap-2.5 ${className}`}>
       <div
         role="progressbar"
+        tabIndex={0}
+        aria-label="Progress"
         aria-valuenow={clampedValue}
         aria-valuemin={0}
         aria-valuemax={100}
-        className={`flex-1 relative overflow-hidden rounded-full bg-slate-800/90 border border-slate-700/50 shadow-inner ${heightClass}`}
+        aria-valuetext={`${Math.round(clampedValue)}%`}
+        className={`flex-1 relative overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700/50 shadow-inner focus:outline-none focus:ring-1 focus:ring-sky-500/50 ${heightClass}`}
       >
         <div
           className={`h-full rounded-full transition-all duration-300 ease-out ${gradient} ${
@@ -51,7 +54,7 @@ export const LinearProgressBar: React.FC<LinearProgressBarProps> = ({
         />
       </div>
       {showLabel && (
-        <span className="text-xs font-semibold text-slate-300 min-w-[36px] text-right font-mono">
+        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 min-w-[36px] text-right font-mono">
           {Math.round(clampedValue)}%
         </span>
       )}
