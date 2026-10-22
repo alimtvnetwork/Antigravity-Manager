@@ -694,6 +694,38 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
                 except Exception:
                     pass
 
+        # Purge deprecated 100-improvements prompts superseded by next-100 suite
+        for dep_prompt in (
+            "01-prompts/30-improvements/01-find-100-improvements-in-ui-level.md",
+            "01-prompts/30-improvements/02-find-100-improvements-in-code-base.md",
+            "01-prompts/30-improvements/03-find-100-improvements-in-whole-system.md",
+            "01-prompts/30-improvements/04-detail-plans-and-improvements-for-review.md",
+        ):
+            dep_path = target / dep_prompt
+            if dep_path.exists():
+                try:
+                    dep_path.unlink()
+                except Exception:
+                    pass
+
+        # Purge deprecated 100-improvements skill directories superseded by next-100 suite
+        for dep_skill_dir in (
+            ".agents/skills/find-100-improvements-in-ui-level",
+            ".agents/skills/find-100-improvements-in-code-base",
+            ".agents/skills/find-100-improvements-in-whole-system",
+            ".agents/skills/detail-plans-and-improvements-for-review",
+            ".cursor/skills/find-100-improvements-in-ui-level",
+            ".cursor/skills/find-100-improvements-in-code-base",
+            ".cursor/skills/find-100-improvements-in-whole-system",
+            ".cursor/skills/detail-plans-and-improvements-for-review",
+        ):
+            dep_dir_path = target / dep_skill_dir
+            if dep_dir_path.exists():
+                try:
+                    shutil.rmtree(dep_dir_path, ignore_errors=True)
+                except Exception:
+                    pass
+
     # 4. Mirror directories and conditional coding guidelines cleanly
     total_copied = 0
     total_removed = 0

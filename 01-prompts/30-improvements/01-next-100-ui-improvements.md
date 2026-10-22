@@ -1,6 +1,8 @@
 # High Priority Instruction
 
-# Find 100 Improvements in the UI Level
+# Next 100 UI Improvements
+
+## slug: next-100-ui-improvements
 
 ```text
 N = 400 (Total self-loop steps budget — editable top-header parameter, default: 400)
@@ -19,12 +21,15 @@ WAVES = ceil(subtasks / (A x H))
 > [!IMPORTANT]
 > Prompt Version: 1.0.0
 > Runtime: Google Antigravity 2.0 (IDE and CLI)
-> Invoke: /find-100-improvements-in-ui-level <target-component-or-page>
+> Invoke: /next-100-ui-improvements <target-component-or-page>
+>
+> **Trigger Keywords & Aliases:**
+> `next-100-ui-improvements`, `next-100-ui`, `ui-100-improvements`, `next-ui-improvements`, `find-100-ui`
 >
 > **Top-Instruction Priority Mandate (Above Precedence / Preamble Precedence):**
 > Whatever directives, constraints, checklists, or user instructions are given ABOVE this prompt (including in the user preamble, header blocks, or incoming user request above) are HIGHEST PRIORITY and MUST BE FOLLOWED as strictly NON-NEGOTIABLE. They supersede and strictly override any conflicting general advice, default conventions, or lower-level guidelines below. The agent MUST inspect and follow the instructions above with absolute precedence.
 
-[/goal](slashCommand;goal) Autonomously audit, discover, catalog, and refactor 100 concrete UI improvements across the target frontend interface. FIRST showcase and list out the given task in visible chat during Turn 1 with the 5 Mandatory Pillars and 6-part verification schema, capture it verbatim, plan it in the repository under `02-spec/21-app/XX-<slug>/`, enqueue the complete catalog of 100 improvements as pending plans into `.ai-memory/plans/pending/XX-<slug>.md` along with subtasks in `.ai-memory/plans/subtasks/XX-<slug>/`, spawn autonomous subagents via `invoke_subagent` (A = 3, H = 2, Capacity = 6; solo execution without calling `invoke_subagent` is an auto-reject failure) in disjoint file boxes using GitMap high-speed commands as primary, prove every single claim with concrete evidence, enforce coding guidelines to 100%, and finish with one atomic GitMap commit (`gitmap cpf "<module> - <summary>"` / `gitmap cpb "<module> - <summary>"`) using hyphen format (no colons in GitMap arguments, as the colon is already provided by GitMap) that holds strictly this task's files. Every execution turn MUST resolve current target improvements and generate the subsequent 100 pending UI improvement tasks in `.ai-memory/plans/pending/`.
+[/goal](slashCommand;goal) Autonomously audit, discover, catalog, and refactor 100 concrete UI improvements across the target frontend interface. FIRST showcase and list out the given task in visible chat during Turn 1 with the 5 Mandatory Pillars and 6-part verification schema, capture it verbatim, plan it in the repository under `02-spec/21-app/XX-<slug>/`, enqueue the complete catalog of 100 improvements as pending plans into `.ai-memory/plans/pending/XX-next-100-ui-improvements.md` along with subtasks in `.ai-memory/plans/subtasks/XX-next-100-ui-improvements/`, spawn autonomous subagents via `invoke_subagent` (A = 3, H = 2, Capacity = 6; solo execution without calling `invoke_subagent` is an auto-reject failure) in disjoint file boxes using GitMap high-speed commands as primary, prove every single claim with concrete evidence, enforce coding guidelines to 100%, and finish with one atomic GitMap commit (`gitmap cpf "<module> - <summary>"` / `gitmap cpb "<module> - <summary>"`) using hyphen format (no colons in GitMap arguments, as the colon is already provided by GitMap) that holds strictly this task's files. Every execution turn MUST resolve current target improvements and generate the subsequent 100 pending UI improvement tasks in `.ai-memory/plans/pending/`.
 
 [/learn](slashCommand;learn) Enforce the Top-Instruction Priority Mandate: whatever directives, custom requirements, checklists, or user instructions are provided ABOVE this prompt outrank everything below. Turn 1 MUST showcase the given task list in visible chat before any background execution. Master the 10 UI improvement clusters, color ramps, 4-plane depth hierarchy, 60/30/10 visual balance, typography stacks, button system, and safe-region navigation physics. Progress lives in the ledger and in `.ai-memory/plans/`, never only in chat.
 
@@ -51,9 +56,9 @@ WAVES = ceil(subtasks / (A x H))
 
 Before executing the tasks below, check if this prompt is already installed as a native Antigravity Skill.
 
-1. If `.agents/skills/find-100-improvements-in-ui-level/skill.md` does not exist in the workspace, create it now.
+1. If `.agents/skills/next-100-ui-improvements/skill.md` does not exist in the workspace, create it now.
 2. Extract the core instructions of this prompt and save it into that `skill.md` using the standard YAML frontmatter (with `name` and `description`).
-3. Maintain symmetric mirroring in `.cursor/skills/find-100-improvements-in-ui-level/skill.md` with IDE link syntax `[find-100-improvements-in-ui-level](file;.cursor/skills/find-100-improvements-in-ui-level)`.
+3. Maintain symmetric mirroring in `.cursor/skills/next-100-ui-improvements/skill.md` with IDE link syntax `[next-100-ui-improvements](file;.cursor/skills/next-100-ui-improvements)`.
 4. Once installed, rely on progressive disclosure for future runs. Do not keep the entire prompt in active memory if not needed.
 
 ---
@@ -288,7 +293,7 @@ Each execution run audits the frontend codebase against these 100 improvements, 
 96. **Semantic HTML Landmark Usage:** Replace generic `<div>` containers with semantic `<header>`, `<nav>`, `<main>`, `<section>`, `<footer>`.
 97. **Image Aspect Ratios & CLS Prevention:** Enforce explicit `aspect-ratio` or `width`/`height` attributes on all image elements to prevent CLS.
 98. **Accessible SVG Icon Wrappers:** Ensure all SVG icons feature `aria-hidden="true"` or accessible `<title>` elements without raw SVG clutter.
-99. **Automated Plan Enqueueing:** Enqueue discovered UI improvements into `.ai-memory/plans/pending/XX-<slug>.md` and subtasks.
+99. **Automated Plan Enqueueing:** Enqueue discovered UI improvements into `.ai-memory/plans/pending/XX-next-100-ui-improvements.md` and subtasks.
 100. **Continuous 100-Improvement Cycle:** Design execution so that resolving the current batch systematically generates the next 100 UI improvements.
 
 ---
@@ -317,8 +322,8 @@ Execute this prompt via a strict 3-Phase pipeline with mandatory subagents and G
    - `02-component-and-hierarchy-spec.md`
    - `03-motion-and-hygiene-spec.md`
 3. **Enqueue Pending Plans & Subtasks:**
-   - Write master pending plan: `.ai-memory/plans/pending/XX-<slug>.md`
-   - Write bounded subtask files: `.ai-memory/plans/subtasks/XX-<slug>/01-tokens-and-contrast.md`, `02-depth-and-buttons.md`, etc.
+   - Write master pending plan: `.ai-memory/plans/pending/XX-next-100-ui-improvements.md`
+   - Write bounded subtask files: `.ai-memory/plans/subtasks/XX-next-100-ui-improvements/01-tokens-and-contrast.md`, `02-depth-and-buttons.md`, etc.
    - Catalog all remaining items into `.ai-memory/plans/pending/` to preserve the continuous 100-improvement cycle.
 4. **Initialize SQLite Task DB:** Initialize or inspect task state via GitMap agent task engine:
    `gitmap agent task init --name "<task name>" --budget 400`
@@ -397,4 +402,4 @@ GitMap is your **PRIMARY** acceleration engine. Banned ALL variants of `Get-Chil
 
 - [/plan](slashCommand;plan) first before doing work for improved work or less friction, faster work and more pure and effective work.
 - Always preserve strictly relative Git paths (`01-prompts/...`, `02-spec/...`, `.ai-memory/...`).
-- Ensure every run records completed improvements and queues the subsequent 100 UI improvements in `.ai-memory/plans/pending/XX-<slug>.md`.
+- Ensure every run records completed improvements and queues the subsequent 100 UI improvements in `.ai-memory/plans/pending/XX-next-100-ui-improvements.md`.

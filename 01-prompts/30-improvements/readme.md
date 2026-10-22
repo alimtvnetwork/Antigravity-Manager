@@ -25,10 +25,10 @@ All improvements adhere to the structured **8-Part Specification Schema**, enfor
 
 | Prompt File | Version | Scope | Key Capabilities |
 | :--- | :--- | :--- | :--- |
-| [`01-find-100-improvements-in-ui-level.md`](01-find-100-improvements-in-ui-level.md) | V6 / 1.0.0 | UI/UX & Design Tokens | 100 UI-level UX improvements covering design token registries, typography clamp formulas, WCAG AAA contrast, glassmorphic depth, virtualized trees, and presenter HUDs. |
-| [`02-find-100-improvements-in-code-base.md`](02-find-100-improvements-in-code-base.md) | V6 / 1.0.0 | Codebase Quality & Hygiene | 100 codebase-level improvements enforcing monadic Result envelopes, domain `*appfault.AppError`, positive booleans, parameter structs, map dispatch tables, and value semantics. |
-| [`03-find-100-improvements-in-whole-system.md`](03-find-100-improvements-in-whole-system.md) | V6 / 1.0.0 | Whole-System Architecture | 100 whole-system improvements across 10 UX clusters: DX/CLI ergonomics, UI tokens, agent swarms, prompt architecture, fleet sync, code quality, performance, diagnostics, test isolation, and spec governance. |
-| [`04-detail-plans-and-improvements-for-review.md`](04-detail-plans-and-improvements-for-review.md) | V6 / 1.0.0 | Multi-Step Detailing & Review Dockets | Autonomously details out active, pending, and completed plans and discovered improvements into exhaustive multi-step execution roadmaps, structural contracts, dependency graphs, and review dockets with strict review-first gating (no immediate execution without user review). |
+| [`01-next-100-ui-improvements.md`](01-next-100-ui-improvements.md) | V6 / 1.0.0 | UI/UX & Design Tokens | 100 UI-level UX improvements covering design token registries, typography clamp formulas, WCAG AAA contrast, glassmorphic depth, virtualized trees, and presenter HUDs. |
+| [`02-next-100-code-improvements.md`](02-next-100-code-improvements.md) | V6 / 1.0.0 | Codebase Quality & Hygiene | 100 codebase-level improvements enforcing monadic Result envelopes, domain `*appfault.AppError`, positive booleans, parameter structs, map dispatch tables, and value semantics. |
+| [`03-next-100-whole-system-improvements.md`](03-next-100-whole-system-improvements.md) | V6 / 1.0.0 | Whole-System Architecture | 100 whole-system improvements across 10 UX clusters: DX/CLI ergonomics, UI tokens, agent swarms, prompt architecture, fleet sync, code quality, performance, diagnostics, test isolation, and spec governance. |
+| [`04-next-detail-out-100-improvements.md`](04-next-detail-out-100-improvements.md) | V6 / 1.0.0 | Multi-Step Detailing & Review Dockets | Autonomously details out active, pending, and completed plans and discovered improvements into exhaustive multi-step execution roadmaps, structural contracts, dependency graphs, and review dockets with strict review-first gating (no immediate execution without user review). |
 
 ---
 
@@ -77,7 +77,7 @@ flowchart TD
 
 ## The 10 System UX Clusters (Whole System)
 
-The whole-system improvements catalog (`03-find-100-improvements-in-whole-system.md`) organizes 100 concrete enhancements across 10 distinct operational clusters (10 items each):
+The whole-system improvements catalog (`03-next-100-whole-system-improvements.md`) organizes 100 concrete enhancements across 10 distinct operational clusters (10 items each):
 
 1. **Cluster 01: Developer Experience (DX) & CLI Ergonomics (`SYS-IMP-001` – `SYS-IMP-010`):** Typo-tolerant command suggestions, terminal auto-scaling, shell completion installers, live spinners, color formatting, environment health preflights, and workspace root auto-discovery.
 2. **Cluster 02: UI/UX, Design Tokens & Materiality (`SYS-IMP-011` – `SYS-IMP-020`):** Unified design tokens, WCAG AAA contrast ramps, fluid typography clamp scales, virtualized tree lists, glassmorphic surfaces, scroll-spy docs preview, and zero-FOUC theme hydration.
@@ -112,15 +112,15 @@ Every improvement generated or detailed under Category 30 adheres to the strict 
 Each prompt in this category is accompanied by symmetric, production-grade skills installed in both Antigravity Agents and Cursor IDE:
 
 - **Antigravity Agents:**
-  - [`find-100-improvements-in-ui-level`](file;.agents/skills/find-100-improvements-in-ui-level)
-  - [`find-100-improvements-in-code-base`](file;.agents/skills/find-100-improvements-in-code-base)
-  - [`find-100-improvements-in-whole-system`](file;.agents/skills/find-100-improvements-in-whole-system)
-  - [`detail-plans-and-improvements-for-review`](file;.agents/skills/detail-plans-and-improvements-for-review)
+  - [`next-100-ui-improvements`](file;.agents/skills/next-100-ui-improvements)
+  - [`next-100-code-improvements`](file;.agents/skills/next-100-code-improvements)
+  - [`next-100-whole-system-improvements`](file;.agents/skills/next-100-whole-system-improvements)
+  - [`next-detail-out-100-improvements`](file;.agents/skills/next-detail-out-100-improvements)
 - **Cursor IDE:**
-  - [`find-100-improvements-in-ui-level`](file;.cursor/skills/find-100-improvements-in-ui-level)
-  - [`find-100-improvements-in-code-base`](file;.cursor/skills/find-100-improvements-in-code-base)
-  - [`find-100-improvements-in-whole-system`](file;.cursor/skills/find-100-improvements-in-whole-system)
-  - [`detail-plans-and-improvements-for-review`](file;.cursor/skills/detail-plans-and-improvements-for-review)
+  - [`next-100-ui-improvements`](file;.cursor/skills/next-100-ui-improvements)
+  - [`next-100-code-improvements`](file;.cursor/skills/next-100-code-improvements)
+  - [`next-100-whole-system-improvements`](file;.cursor/skills/next-100-whole-system-improvements)
+  - [`next-detail-out-100-improvements`](file;.cursor/skills/next-detail-out-100-improvements)
 
 ---
 
@@ -128,9 +128,9 @@ Each prompt in this category is accompanied by symmetric, production-grade skill
 
 ```text
 01-prompts/30-improvements/
-├── 01-find-100-improvements-in-ui-level.md
-├── 02-find-100-improvements-in-code-base.md
-├── 03-find-100-improvements-in-whole-system.md
-├── 04-detail-plans-and-improvements-for-review.md
+├── 01-next-100-ui-improvements.md
+├── 02-next-100-code-improvements.md
+├── 03-next-100-whole-system-improvements.md
+├── 04-next-detail-out-100-improvements.md
 └── readme.md
 ```
