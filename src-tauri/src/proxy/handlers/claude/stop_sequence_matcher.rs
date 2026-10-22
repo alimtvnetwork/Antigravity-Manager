@@ -20,6 +20,21 @@ pub enum StopSequenceMatch {
     PartialPrefixMatch { candidate: String },
 }
 
+/// Affirmative predicate checking if match result represents a terminal stop.
+pub fn is_stop_sequence_matched(match_result: &StopSequenceMatch) -> bool {
+    matches!(match_result, StopSequenceMatch::Matched { .. })
+}
+
+/// Affirmative predicate checking if match result requires buffering for potential stop sequence.
+pub fn is_partial_match(match_result: &StopSequenceMatch) -> bool {
+    matches!(match_result, StopSequenceMatch::PartialPrefixMatch { .. })
+}
+
+/// Checks if text contains an exact stop sequence.
+pub fn contains_exact_stop(text: &str, stop_seq: &str) -> bool {
+    !stop_seq.is_empty() && text.contains(stop_seq)
+}
+
 /// Matches streaming text accumulator against a list of custom stop sequences.
 pub fn check_stop_sequences(
     accumulated_text: &str,
@@ -61,4 +76,67 @@ pub fn check_stop_sequences(
     }
 
     StopSequenceMatch::NoMatch
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_stop_sequence_matched_predicates() {
+        let no_match = StopSequenceMatch::NoMatch;
+        let matched = StopSequenceMatch::Matched {
+            matched_sequence: "</stop>".to_string(),
+            truncated_text: "output".to_string(),
+        };
+        let partial = StopSequenceMatch::PartialPrefixMatch {
+            candidate: "</stop>".to_string(),
+        };
+
+        assert!(!is_stop_sequence_matched(&no_match));
+        assert!(is_stop_sequence_matched(&matched));
+        assert!(!is_stop_sequence_matched(&partial));
+
+        assert!(!is_partial_match(&no_match));
+        assert!(!is_partial_match(&matched));
+        assert!(is_partial_match(&partial));
+    }
+
+    #[test]
+    fn test_check_stop_sequences_exact_match() {
+        let text = "Hello world! <stop> More tokens";
+        let stops = vec!["<stop>".to_string()];
+
+        let res = check_stop_sequences(text, &stops);
+        assert_eq!(
+            res,
+            StopSequenceMatch::Matched {
+                matched_sequence: "<stop>".to_string(),
+                truncated_text: "Hello world! ".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn test_check_stop_sequences_partial_prefix() {
+        let text = "Hello world! <st";
+        let stops = vec!["<stop>".to_string()];
+
+        let res = check_stop_sequences(text, &stops);
+        assert_eq!(
+            res,
+            StopSequenceMatch::PartialPrefixMatch {
+                candidate: "<stop>".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn test_check_stop_sequences_no_match() {
+        let text = "Hello world!";
+        let stops = vec!["<stop>".to_string()];
+
+        let res = check_stop_sequences(text, &stops);
+        assert_eq!(res, StopSequenceMatch::NoMatch);
+    }
 }

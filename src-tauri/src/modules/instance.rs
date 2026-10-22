@@ -270,6 +270,15 @@ pub mod tests_process_vitality_probe;
 #[cfg(test)]
 #[path = "instance/tests_ipc_socket_cleaner.rs"]
 pub mod tests_ipc_socket_cleaner;
+#[cfg(test)]
+#[path = "instance/tests_profile_dir_validator.rs"]
+pub mod tests_profile_dir_validator;
+#[cfg(test)]
+#[path = "instance/tests_workspace_dir_validator.rs"]
+pub mod tests_workspace_dir_validator;
+#[cfg(test)]
+#[path = "instance/tests_sandboxed_storage_cleaner.rs"]
+pub mod tests_sandboxed_storage_cleaner;
 #[path = "instance/terminate_fallback_ladder.rs"]
 pub mod terminate_fallback_ladder;
 #[path = "instance/tuning.rs"]

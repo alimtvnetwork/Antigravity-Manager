@@ -118,6 +118,8 @@ pub mod tests_page_cache_adjuster;
 pub mod tests_mmap_tuner;
 #[cfg(test)]
 pub mod tests_page_budget_controller;
+#[cfg(test)]
+pub mod tests_connection_checkout_limiter;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;

@@ -59,6 +59,10 @@ pub mod tests_http2_flow_controller;
 pub mod tests_endpoint_health_decay;
 #[cfg(test)]
 pub mod tests_endpoint_weight_matrix;
+#[cfg(test)]
+pub mod tests_streaming_timeout_sentinel;
+#[cfg(test)]
+pub mod tests_route_latency_calculator;
 
 pub use brotli_decompressor::*;
 pub use circuit_breaker_counter::*;
