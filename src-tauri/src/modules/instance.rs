@@ -225,6 +225,15 @@ pub mod tests_session_file_reclaimer;
 #[cfg(test)]
 #[path = "instance/tests_port_collision_evictor.rs"]
 pub mod tests_port_collision_evictor;
+#[cfg(test)]
+#[path = "instance/tests_cloned_guid_reseeder.rs"]
+pub mod tests_cloned_guid_reseeder;
+#[cfg(test)]
+#[path = "instance/tests_cloned_telemetry_salt.rs"]
+pub mod tests_cloned_telemetry_salt;
+#[cfg(test)]
+#[path = "instance/tests_env_token_scrubber.rs"]
+pub mod tests_env_token_scrubber;
 #[path = "instance/terminate_fallback_ladder.rs"]
 pub mod terminate_fallback_ladder;
 #[path = "instance/tuning.rs"]

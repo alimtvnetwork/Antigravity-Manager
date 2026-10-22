@@ -40,6 +40,7 @@ pub mod index_usage_inspector;
 pub mod json_extract;
 pub mod lock_checker;
 pub mod lock_contention_profiler;
+pub mod lock_contention_watchdog;
 pub mod lock_detector;
 pub mod lock_escalation_guard;
 pub mod migration_checksum;
@@ -106,6 +107,8 @@ pub mod tests_page_freelist;
 pub mod tests_busy_timeout_scaler;
 #[cfg(test)]
 pub mod tests_wal_fragmentation_surveyor;
+#[cfg(test)]
+pub mod tests_lock_contention_watchdog;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;
@@ -150,6 +153,7 @@ pub use index_usage_inspector::*;
 pub use json_extract::*;
 pub use lock_checker::*;
 pub use lock_contention_profiler::*;
+pub use lock_contention_watchdog::*;
 pub use lock_detector::*;
 pub use lock_escalation_guard::*;
 pub use migration_checksum::*;

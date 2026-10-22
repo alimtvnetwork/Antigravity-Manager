@@ -7,6 +7,7 @@ pub mod circuit_breaker_stats;
 pub mod client;
 pub mod connection_age_sentinel;
 pub mod connection_backoff_matrix;
+pub mod connection_health_probe;
 pub mod connection_keepalive_config;
 pub mod dns_failover_resolver;
 pub mod dynamic_dns_resolver;
@@ -14,6 +15,7 @@ pub mod dynamic_pool_sizer;
 pub mod dynamic_route_balancer;
 pub mod endpoint_health_decay;
 pub mod endpoint_weight_matrix;
+pub mod h2_ping_scheduler;
 pub mod h2_tuner;
 pub mod h2_window_recovery;
 pub mod health_decay;
@@ -37,12 +39,17 @@ pub mod tls_sni_sanitizer;
 pub mod transport_metrics_collector;
 #[cfg(test)]
 pub mod tests_backoff_and_probe;
+#[cfg(test)]
+pub mod tests_connection_health_probe;
+#[cfg(test)]
+pub mod tests_h2_ping_scheduler;
 
 pub use brotli_decompressor::*;
 pub use circuit_breaker_counter::*;
 pub use circuit_breaker_stats::*;
 pub use connection_age_sentinel::*;
 pub use connection_backoff_matrix::*;
+pub use connection_health_probe::*;
 pub use connection_keepalive_config::*;
 pub use dns_failover_resolver::*;
 pub use dynamic_dns_resolver::*;
@@ -50,6 +57,7 @@ pub use dynamic_pool_sizer::*;
 pub use dynamic_route_balancer::*;
 pub use endpoint_health_decay::*;
 pub use endpoint_weight_matrix::*;
+pub use h2_ping_scheduler::*;
 pub use h2_tuner::*;
 pub use h2_window_recovery::*;
 pub use health_decay::*;

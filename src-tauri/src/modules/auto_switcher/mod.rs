@@ -24,6 +24,7 @@ pub mod cooldown_timer;
 pub mod cooldown_watchdog;
 pub mod daemon;
 pub mod decision_telemetry_logger;
+pub mod drain_circuit_breaker;
 pub mod dynamic_quota_floor;
 pub mod entropy_candidate_shuffler;
 pub mod event_history_pruner;
@@ -105,6 +106,8 @@ pub mod tests_headroom_multiplier;
 #[cfg(test)]
 pub mod tests_quota_recovery_forecaster;
 #[cfg(test)]
+pub mod tests_drain_circuit_breaker;
+#[cfg(test)]
 pub(crate) use crate::models::account::Account;
 #[cfg(test)]
 pub(crate) use tests_a::make_test_account;
@@ -144,6 +147,7 @@ pub use cooldown_timer::*;
 pub use cooldown_watchdog::*;
 pub use daemon::*;
 pub use decision_telemetry_logger::*;
+pub use drain_circuit_breaker::*;
 pub use dynamic_quota_floor::*;
 pub use entropy_candidate_shuffler::*;
 pub use event_history_pruner::*;

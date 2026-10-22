@@ -10,6 +10,49 @@ use std::process::Command;
 
 use super::*;
 
+/// Helper to determine if a string prefix represents a valid cluster node identifier.
+pub fn is_valid_node_identifier(prefix_candidate: &str, cmd_candidate: &str) -> bool {
+    if prefix_candidate.is_empty() || cmd_candidate.is_empty() {
+        return false;
+    }
+    if prefix_candidate.contains(char::is_whitespace) {
+        return false;
+    }
+    let p_lower = prefix_candidate.to_lowercase();
+    p_lower.starts_with('w')
+        || p_lower.starts_with("node")
+        || p_lower.starts_with("vm")
+        || prefix_candidate.chars().all(|c| c.is_ascii_digit() || c == '.')
+        || prefix_candidate.eq_ignore_ascii_case("local")
+}
+
+/// Helper to check if the target node refers to the local machine instance.
+pub fn is_command_target_local(target_node: &str) -> bool {
+    super::node_label::is_current_machine(target_node)
+}
+
+/// Helper to extract (target_node, cmd_content) from an inbound Telegram command string.
+pub fn extract_node_targeted_command<'a>(
+    trimmed: &'a str,
+    lower_full: &str,
+) -> Option<(&'a str, &'a str)> {
+    if lower_full.starts_with("cmd:") || lower_full.starts_with("exec:") {
+        let parts: Vec<&str> = trimmed.splitn(3, ':').collect();
+        if parts.len() >= 3 {
+            return Some((parts[1].trim(), parts[2].trim()));
+        }
+        return None;
+    }
+    if let Some(colon_pos) = trimmed.find(':') {
+        let prefix_candidate = trimmed[..colon_pos].trim();
+        let cmd_candidate = trimmed[colon_pos + 1..].trim();
+        if is_valid_node_identifier(prefix_candidate, cmd_candidate) {
+            return Some((prefix_candidate, cmd_candidate));
+        }
+    }
+    None
+}
+
 /// Unified inbound Telegram command processor
 pub async fn process_telegram_command_text(text: &str) -> Option<String> {
     let trimmed = text.trim();
@@ -348,42 +391,13 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                     disp
                 ));
             }
-            let node_selector: Option<(&str, &str)> =
-                if lower_full.starts_with("cmd:") || lower_full.starts_with("exec:") {
-                    let parts: Vec<&str> = trimmed.splitn(3, ':').collect();
-                    if parts.len() >= 3 {
-                        Some((parts[1].trim(), parts[2].trim()))
-                    } else {
-                        None
-                    }
-                } else if let Some(colon_pos) = trimmed.find(':') {
-                    let prefix_candidate = trimmed[..colon_pos].trim();
-                    let cmd_candidate = trimmed[colon_pos + 1..].trim();
-                    let is_node_ident = !prefix_candidate.is_empty()
-                        && !cmd_candidate.is_empty()
-                        && !prefix_candidate.contains(char::is_whitespace)
-                        && (prefix_candidate.starts_with('W')
-                            || prefix_candidate.starts_with('w')
-                            || prefix_candidate.to_lowercase().starts_with("node")
-                            || prefix_candidate.to_lowercase().starts_with("vm")
-                            || prefix_candidate
-                                .chars()
-                                .all(|c| c.is_ascii_digit() || c == '.')
-                            || prefix_candidate.eq_ignore_ascii_case("local"));
-                    if is_node_ident {
-                        Some((prefix_candidate, cmd_candidate))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
+            let node_selector = extract_node_targeted_command(trimmed, &lower_full);
 
             if let Some((target_node, cmd_content)) = node_selector {
                 let s_config = supabase_sync::load_config().unwrap_or_default();
 
                 // If targeting current local node, execute directly!
-                if super::node_label::is_current_machine(target_node) {
+                if is_command_target_local(target_node) {
                     return Box::pin(process_telegram_command_text(cmd_content)).await;
                 }
 
