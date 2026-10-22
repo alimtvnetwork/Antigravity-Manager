@@ -30,8 +30,8 @@ Follow-up (same turn): "At end release both and make sure cicd is green"
 | 04 | Rerun auto-pick (randomized default, persisted, larger set) | AGM | DONE 2026-10-23 (worker: set 5→14, count 2→4, localStorage persistence; lead extended parity to PromptTreeContextMenu.tsx + PromptTreeViewModal.tsx) |
 | 05 | AGM pending-plan closeout (91 workflows, 88 push-settings, 139 UI, drain done plans, 105/86/04 triage) | AGM | DONE 2026-10-23 (worker; 9 plans filed to completed, 91 mostly done, 88 steps 001-006, 139 UI+CLI, 86 core - remainder + open PID question logged in-plan; most files swept into sync commit e431b369, remainder committed by lead) |
 | 06 | gitmap pending drain + CG residue sweeps | gitmap-v28 | DONE 2026-10-23 (worker; committed e08910720 - 24 plans drained, == false 106→1, cli/store fmt.Errorf 202→0, cli/cmd production 121→0) |
-| 07 | gitmap CG execute zero-to-end (prompts 24,12,13,14,18,22,29,25, efficiency, surfaces, meta) | gitmap-v28 | RUNNING (wave W3a) |
-| 08 | Build + E2E both repos + release both + CI green | both | BLOCKED on 01-07 |
+| 07 | gitmap CG execute zero-to-end (prompts 24,12,13,14,18,22,29,25, efficiency, surfaces, meta) | gitmap-v28 | DONE 2026-10-23 (waves W3a e65be2c0a, W3b 0ff1da47a, W3c 4b047dd82, W4a 4eaa3123e, W4b 9d2ee5960, W5 e5205bd2e; all 39 prompts at a terminal state - applied / partial with named remainders / documented closure; open items for 08 - 10 !IsSuccess linter residuals, 2 TS any sites, cmd_sends.go 628-line split, Python renames to port to coding-guidelines-v24 canonical) |
+| 08 | Build + E2E both repos + release both + CI green | both | ACTIVE |
 
 Subtask files: .ai-memory/plans/subtasks/190-gitmap-and-antigravity-tools-manager-updates-and-testing/
 
