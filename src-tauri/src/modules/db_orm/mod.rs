@@ -1,21 +1,27 @@
 //! Type-safe Rust ORM framework and Split-DB generator abstractions.
 
 pub mod builder;
+pub mod busy_handler;
 pub mod busy_retry;
+pub mod compile_options;
 pub mod connection;
 pub mod dump;
 pub mod fk_resolver;
 pub mod foreign_keys;
+pub mod fragmentation;
 pub mod generated;
 pub mod highwater;
 pub mod index_health;
 pub mod json_extract;
 pub mod lock_checker;
+pub mod lock_detector;
+pub mod migration_checksum;
 pub mod migration_gate;
 pub mod pagination;
 pub mod pool_limiter;
 pub mod pragmas;
 pub mod read_sandbox;
+pub mod rollback_guard;
 pub mod row_size;
 pub mod safety_guard;
 pub mod schema_inspector;
@@ -33,7 +39,9 @@ pub mod wal_watchdog;
 pub mod tests;
 
 pub use builder::{Order, QueryBuilder, ViewQueryBuilder};
+pub use busy_handler::*;
 pub use busy_retry::*;
+pub use compile_options::*;
 pub use connection::{
     init_split_db_schema, open_diesel_split_db, open_split_db, open_split_db_readonly,
     verify_split_db_integrity,
@@ -41,16 +49,20 @@ pub use connection::{
 pub use dump::*;
 pub use fk_resolver::*;
 pub use foreign_keys::*;
+pub use fragmentation::*;
 pub use generated::*;
 pub use highwater::*;
 pub use index_health::*;
 pub use json_extract::*;
 pub use lock_checker::*;
+pub use lock_detector::*;
+pub use migration_checksum::*;
 pub use migration_gate::*;
 pub use pagination::*;
 pub use pool_limiter::*;
 pub use pragmas::*;
 pub use read_sandbox::*;
+pub use rollback_guard::*;
 pub use row_size::*;
 pub use safety_guard::*;
 pub use schema_inspector::*;

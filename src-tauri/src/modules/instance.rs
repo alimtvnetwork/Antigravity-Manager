@@ -26,8 +26,14 @@ pub mod credentials;
 pub mod db_clone;
 #[path = "instance/executable.rs"]
 pub mod executable;
+#[path = "instance/extension_sanitizer.rs"]
+pub mod extension_sanitizer;
 #[path = "instance/fs_sync.rs"]
 pub mod fs_sync;
+#[path = "instance/health_probe.rs"]
+pub mod health_probe;
+#[path = "instance/identity_reseeder.rs"]
+pub mod identity_reseeder;
 #[path = "instance/instance_mgmt.rs"]
 pub mod instance_mgmt;
 #[path = "instance/keyring_flags.rs"]
@@ -57,6 +63,8 @@ pub mod pid_store;
 pub mod pid_util;
 #[path = "instance/port_detector.rs"]
 pub mod port_detector;
+#[path = "instance/port_matrix.rs"]
+pub mod port_matrix;
 #[path = "instance/post_switch_resume.rs"]
 pub mod post_switch_resume;
 #[path = "instance/process_cache.rs"]
@@ -87,6 +95,8 @@ pub mod settings_copy;
 pub mod smart_run;
 #[path = "instance/spawn.rs"]
 pub mod spawn;
+#[path = "instance/state_snapshot.rs"]
+pub mod state_snapshot;
 #[path = "instance/storage.rs"]
 pub mod storage;
 #[path = "instance/storage_scrubber.rs"]
@@ -120,20 +130,28 @@ pub mod vitality_scanner;
 pub mod workspace;
 #[path = "instance/workspace_continuity.rs"]
 pub mod workspace_continuity;
+#[path = "instance/workspace_hash.rs"]
+pub mod workspace_hash;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use arg_normalizer::*;
 pub use clone_checksum::*;
+pub use extension_sanitizer::*;
+pub use health_probe::*;
+pub use identity_reseeder::*;
 pub use keyring_flags::*;
 pub use lock_reclaimer::*;
 pub use path_sanitizer::*;
 pub use port_detector::*;
+pub use port_matrix::*;
 pub use project_uri::*;
 pub use sandbox_purger::*;
 pub use session_uuid::*;
+pub use state_snapshot::*;
 pub use storage_scrubber::*;
 pub use vitality_scanner::*;
 pub use workspace_continuity::*;
+pub use workspace_hash::*;
 
 pub use active::{
     bind_account_to_instance, get_active_instance_id, set_active_instance_id, set_default_instance,
