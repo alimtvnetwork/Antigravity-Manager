@@ -87,6 +87,7 @@ pub mod vacuum_optimizer;
 pub mod vacuum_scheduler;
 pub mod vacuum_stepper;
 pub mod version_drift;
+pub mod wal_fragmentation_surveyor;
 pub mod wal_header_inspector;
 pub mod wal_passive_checkpoint_scheduler;
 pub mod wal_recovery_sentinel;
@@ -103,6 +104,8 @@ pub mod tests_wal_schedulers;
 pub mod tests_page_freelist;
 #[cfg(test)]
 pub mod tests_busy_timeout_scaler;
+#[cfg(test)]
+pub mod tests_wal_fragmentation_surveyor;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;
@@ -194,6 +197,7 @@ pub use vacuum_optimizer::*;
 pub use vacuum_scheduler::*;
 pub use vacuum_stepper::*;
 pub use version_drift::*;
+pub use wal_fragmentation_surveyor::*;
 pub use wal_header_inspector::*;
 pub use wal_passive_checkpoint_scheduler::*;
 pub use wal_recovery_sentinel::*;

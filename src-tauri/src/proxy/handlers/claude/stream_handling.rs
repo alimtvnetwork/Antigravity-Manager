@@ -137,98 +137,8 @@ pub(crate) async fn handle_stream_success(
         return StreamOutcome::Retry;
     }
 
-    match first_data_chunk {
-        Some(bytes) => {
-            // We have data! Construct the combined stream
-            let stream_rest = claude_stream;
-            let combined_stream = futures::stream::once(async move { Ok(bytes) }).chain(
-                stream_rest.map(|result| -> Result<Bytes, std::io::Error> {
-                    match result {
-                        Ok(b) => Ok(b),
-                        Err(e) => Ok(Bytes::from(format!("data: {{\"error\":\"{}\"}}\n\n", e))),
-                    }
-                }),
-            );
-
-            // [FIX #Bug1] 针对 Claude 流增加空闲超时保护，从 300s 降至 120s
-            // 300s 会导致客户端等待长达 5 分钟；120s 仍有足够容错余量
-            let combined_stream = async_stream::stream! {
-                let mut s = Box::pin(combined_stream);
-                loop {
-                    match tokio::time::timeout(std::time::Duration::from_secs(120), s.next()).await {
-                        Ok(Some(item)) => yield item,
-                        Ok(None) => break,
-                        Err(_) => {
-                            tracing::error!("[Claude-SSE] Idle timeout after 120s, terminating stream");
-                            yield Ok::<Bytes, std::io::Error>(Bytes::from("data: {\"type\": \"message_stop\"}\n\ndata: [DONE]\n\n"));
-                            break;
-                        }
-                    }
-                }
-            };
-
-            // 判断客户端期望的格式
-            if client_wants_stream {
-                // 客户端本就要 Stream，直接返回 SSE
-                return StreamOutcome::Respond(
-                    Response::builder()
-                        .status(StatusCode::OK)
-                        .header(header::CONTENT_TYPE, "text/event-stream")
-                        .header(header::CACHE_CONTROL, "no-cache")
-                        .header(header::CONNECTION, "keep-alive")
-                        .header("X-Accel-Buffering", "no")
-                        .header("X-Account-Email", &email)
-                        .header("X-Mapped-Model", &request_with_mapped.model)
-                        .header("X-Session-Id", &client_session_id)
-                        .header("X-Antigravity-Session-Id", &client_session_id)
-                        .header("X-Context-Purified", "false")
-                        .header("X-Timing-Clean-Ms", format!("{:.3}", st.clean_ms))
-                        .header("X-Timing-Norm-Ms", format!("{:.3}", st.norm_ms))
-                        .header("X-Timing-Thinking-Ms", format!("{:.3}", st.think_fill_ms))
-                        .header("X-Timing-Ttft-Ms", format!("{:.3}", st.ttft_ms))
-                        .body(Body::from_stream(combined_stream))
-                        .unwrap(),
-                );
-            } else {
-                // 客户端要非 Stream，需要收集完整响应并转换为 JSON
-                use crate::proxy::handlers::claude::attempt::AttemptCall;
-                use crate::proxy::handlers::claude::attempt::AttemptState;
-                use crate::proxy::handlers::claude::attempt::StreamOutcome;
-                use crate::proxy::mappers::claude::collect_stream_to_json;
-
-                match collect_stream_to_json(Box::pin(combined_stream)).await {
-                    Ok(full_response) => {
-                        info!("[{}] ✓ Stream collected and converted to JSON", st.trace_id);
-                        return StreamOutcome::Respond(
-                            Response::builder()
-                                .status(StatusCode::OK)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .header("X-Account-Email", &email)
-                                .header("X-Mapped-Model", &request_with_mapped.model)
-                                .header("X-Session-Id", &client_session_id)
-                                .header("X-Antigravity-Session-Id", &client_session_id)
-                                .header("X-Context-Purified", "false")
-                                .header("X-Timing-Clean-Ms", format!("{:.3}", st.clean_ms))
-                                .header("X-Timing-Norm-Ms", format!("{:.3}", st.norm_ms))
-                                .header("X-Timing-Thinking-Ms", format!("{:.3}", st.think_fill_ms))
-                                .header("X-Timing-Ttft-Ms", format!("{:.3}", st.ttft_ms))
-                                .body(Body::from(serde_json::to_string(&full_response).unwrap()))
-                                .unwrap(),
-                        );
-                    }
-                    Err(e) => {
-                        return StreamOutcome::Respond(
-                            (
-                                StatusCode::INTERNAL_SERVER_ERROR,
-                                format!("Stream collection error: {}", e),
-                            )
-                                .into_response(),
-                        );
-                    }
-                }
-            }
-        }
-
+    let bytes = match first_data_chunk {
+        Some(chunk) => chunk,
         None => {
             tracing::warn!(
                 "[{}] Stream ended immediately (Empty Response), retrying...",
@@ -236,6 +146,95 @@ pub(crate) async fn handle_stream_success(
             );
             st.last_error = "Empty response stream (None)".to_string();
             return StreamOutcome::Retry;
+        }
+    };
+
+    // We have data! Construct the combined stream
+    let stream_rest = claude_stream;
+    let combined_stream = futures::stream::once(async move { Ok(bytes) }).chain(
+        stream_rest.map(|result| -> Result<Bytes, std::io::Error> {
+            match result {
+                Ok(b) => Ok(b),
+                Err(e) => Ok(Bytes::from(format!("data: {{\"error\":\"{}\"}}\n\n", e))),
+            }
+        }),
+    );
+
+    // [FIX #Bug1] 针对 Claude 流增加空闲超时保护，从 300s 降至 120s
+    // 300s 会导致客户端等待长达 5 分钟；120s 仍有足够容错余量
+    let combined_stream = async_stream::stream! {
+        let mut s = Box::pin(combined_stream);
+        loop {
+            match tokio::time::timeout(std::time::Duration::from_secs(120), s.next()).await {
+                Ok(Some(item)) => yield item,
+                Ok(None) => break,
+                Err(_) => {
+                    tracing::error!("[Claude-SSE] Idle timeout after 120s, terminating stream");
+                    yield Ok::<Bytes, std::io::Error>(Bytes::from("data: {\"type\": \"message_stop\"}\n\ndata: [DONE]\n\n"));
+                    break;
+                }
+            }
+        }
+    };
+
+    // 判断客户端期望的格式
+    if client_wants_stream {
+        // 客户端本就要 Stream，直接返回 SSE
+        return StreamOutcome::Respond(
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "text/event-stream")
+                .header(header::CACHE_CONTROL, "no-cache")
+                .header(header::CONNECTION, "keep-alive")
+                .header("X-Accel-Buffering", "no")
+                .header("X-Account-Email", &email)
+                .header("X-Mapped-Model", &request_with_mapped.model)
+                .header("X-Session-Id", &client_session_id)
+                .header("X-Antigravity-Session-Id", &client_session_id)
+                .header("X-Context-Purified", "false")
+                .header("X-Timing-Clean-Ms", format!("{:.3}", st.clean_ms))
+                .header("X-Timing-Norm-Ms", format!("{:.3}", st.norm_ms))
+                .header("X-Timing-Thinking-Ms", format!("{:.3}", st.think_fill_ms))
+                .header("X-Timing-Ttft-Ms", format!("{:.3}", st.ttft_ms))
+                .body(Body::from_stream(combined_stream))
+                .unwrap(),
+        );
+    }
+
+    // 客户端要非 Stream，需要收集完整响应并转换为 JSON
+    use crate::proxy::handlers::claude::attempt::AttemptCall;
+    use crate::proxy::handlers::claude::attempt::AttemptState;
+    use crate::proxy::handlers::claude::attempt::StreamOutcome;
+    use crate::proxy::mappers::claude::collect_stream_to_json;
+
+    match collect_stream_to_json(Box::pin(combined_stream)).await {
+        Ok(full_response) => {
+            info!("[{}] ✓ Stream collected and converted to JSON", st.trace_id);
+            StreamOutcome::Respond(
+                Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .header("X-Account-Email", &email)
+                    .header("X-Mapped-Model", &request_with_mapped.model)
+                    .header("X-Session-Id", &client_session_id)
+                    .header("X-Antigravity-Session-Id", &client_session_id)
+                    .header("X-Context-Purified", "false")
+                    .header("X-Timing-Clean-Ms", format!("{:.3}", st.clean_ms))
+                    .header("X-Timing-Norm-Ms", format!("{:.3}", st.norm_ms))
+                    .header("X-Timing-Thinking-Ms", format!("{:.3}", st.think_fill_ms))
+                    .header("X-Timing-Ttft-Ms", format!("{:.3}", st.ttft_ms))
+                    .body(Body::from(serde_json::to_string(&full_response).unwrap()))
+                    .unwrap(),
+            )
+        }
+        Err(e) => {
+            StreamOutcome::Respond(
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Stream collection error: {}", e),
+                )
+                    .into_response(),
+            )
         }
     }
 }

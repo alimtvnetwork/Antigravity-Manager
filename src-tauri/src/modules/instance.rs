@@ -216,6 +216,15 @@ pub mod tests_profile_hasher;
 #[cfg(test)]
 #[path = "instance/tests_binary_execution_probe.rs"]
 pub mod tests_binary_execution_probe;
+#[cfg(test)]
+#[path = "instance/tests_keyring_mock_writer.rs"]
+pub mod tests_keyring_mock_writer;
+#[cfg(test)]
+#[path = "instance/tests_session_file_reclaimer.rs"]
+pub mod tests_session_file_reclaimer;
+#[cfg(test)]
+#[path = "instance/tests_port_collision_evictor.rs"]
+pub mod tests_port_collision_evictor;
 #[path = "instance/terminate_fallback_ladder.rs"]
 pub mod terminate_fallback_ladder;
 #[path = "instance/tuning.rs"]

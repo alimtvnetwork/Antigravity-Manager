@@ -73,6 +73,22 @@ pub(crate) fn compute_weekly_hours_elapsed(
         .min(TOTAL_WEEK_HOURS)
 }
 
+/// Helper to check if an account is active, enabled, and permitted for proxy/switch usage.
+pub fn is_account_active_and_enabled(acc: &Account) -> bool {
+    !acc.disabled && !acc.proxy_disabled
+}
+
+/// Helper to check if candidate is eligible for switch scoring.
+pub fn is_candidate_eligible_for_switch(acc: &Account) -> bool {
+    is_account_active_and_enabled(acc) && acc.quota.is_some()
+}
+
+/// Helper to filter native Gemini models from third-party or Claude models.
+pub fn is_gemini_native_model(model_name: &str) -> bool {
+    let n = model_name.to_lowercase();
+    !n.contains("claude") && !n.contains("3p")
+}
+
 /// Headroom-weighted weekly quota scoring algorithm:
 /// - Any candidate with < 100% 4-hour quota (and period not finished) evaluates to `0.0`.
 /// - Fresh accounts with 168h headroom receive maximum scaling (Headroom Multiplier = 2.0).
@@ -83,7 +99,7 @@ pub(crate) fn compute_weekly_hours_elapsed(
 /// - Weekly quota < 8% treated as 0 (below viable threshold for Gemini).
 /// - Claude/3p buckets are excluded.
 pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
-    if acc.disabled || acc.proxy_disabled {
+    if !is_account_active_and_enabled(acc) {
         return 0.0;
     }
 
@@ -168,10 +184,7 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
                     let valid_models: Vec<_> = quota_data
                         .models
                         .iter()
-                        .filter(|m| {
-                            let n = m.name.to_lowercase();
-                            !n.contains("claude") && !n.contains("3p")
-                        })
+                        .filter(|m| is_gemini_native_model(&m.name))
                         .collect();
                     if !valid_models.is_empty() {
                         let sum: i32 = valid_models.iter().map(|m| m.percentage).sum();
@@ -198,7 +211,7 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
 /// - Only genuine 100% 4h quota accounts receive base weekly score.
 /// Sort direction: DESCENDING (highest score selected first).
 pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
-    if acc.disabled || acc.proxy_disabled {
+    if !is_account_active_and_enabled(acc) {
         return 0.0;
     }
 
@@ -218,7 +231,7 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
 ///   Score = 4h percentage % × (score what we have) = ((q_4h / 100.0) * base_weekly_score).
 /// - Accounts with weekly quota < 8% strictly evaluate to 0.0.
 pub fn score_candidate_account_fallback(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
-    if acc.disabled || acc.proxy_disabled {
+    if !is_account_active_and_enabled(acc) {
         return 0.0;
     }
 

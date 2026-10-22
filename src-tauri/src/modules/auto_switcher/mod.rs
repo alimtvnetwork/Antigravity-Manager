@@ -54,6 +54,7 @@ pub mod quota_acceleration_detector;
 pub mod quota_boundary_synchronizer;
 pub mod quota_forecaster;
 pub mod quota_gap;
+pub mod quota_recovery_forecaster;
 pub mod quota_reset_epoch_tracker;
 pub mod quota_ring_buffer;
 pub mod quota_window_align;
@@ -101,6 +102,8 @@ pub mod tests_score_and_decay;
 pub mod tests_account_staleness;
 #[cfg(test)]
 pub mod tests_headroom_multiplier;
+#[cfg(test)]
+pub mod tests_quota_recovery_forecaster;
 #[cfg(test)]
 pub(crate) use crate::models::account::Account;
 #[cfg(test)]
@@ -171,6 +174,7 @@ pub use quota_acceleration_detector::*;
 pub use quota_boundary_synchronizer::*;
 pub use quota_forecaster::*;
 pub use quota_gap::*;
+pub use quota_recovery_forecaster::*;
 pub use quota_reset_epoch_tracker::*;
 pub use quota_ring_buffer::*;
 pub use quota_window_align::*;

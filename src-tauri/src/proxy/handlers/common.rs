@@ -25,6 +25,7 @@ mod handle_detect_model;
 pub mod header_allowlist_filter;
 pub mod header_anonymizer;
 pub mod json_payload_sanitizer;
+pub mod request_cancellation_watcher;
 pub mod request_content_encoding_negotiator;
 pub mod request_content_length_validator;
 pub mod request_gzip_sniffer;
@@ -54,6 +55,10 @@ pub mod user_agent_normalizer;
 pub mod tests_request_gzip_sniffer;
 #[cfg(test)]
 pub mod tests_sse_splitter_padder;
+#[cfg(test)]
+pub mod tests_sse_delimiter_normalizer;
+#[cfg(test)]
+pub mod tests_request_cancellation_watcher;
 
 pub use abort_sentinel::*;
 pub use boundary_normalizer::StreamBoundaryNormalizer;
@@ -69,6 +74,7 @@ pub use frame_length_clamper::*;
 pub use header_allowlist_filter::*;
 pub use header_anonymizer::anonymize_forwarded_headers;
 pub use json_payload_sanitizer::*;
+pub use request_cancellation_watcher::*;
 pub use request_content_encoding_negotiator::*;
 pub use request_content_length_validator::*;
 pub use request_gzip_sniffer::*;
