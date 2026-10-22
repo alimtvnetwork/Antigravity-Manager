@@ -44,6 +44,7 @@ mod consts;
 mod error_handling;
 mod handler;
 mod helpers;
+pub mod message_content_flattener;
 #[cfg(test)]
 mod opus_tests;
 mod request_log;
@@ -63,6 +64,7 @@ mod warmup_tests;
 
 pub(crate) use apply_compression::apply_compression;
 pub use block_merger::*;
+pub use message_content_flattener::*;
 pub use stop_reason_normalizer::*;
 pub use stream_chunk_aggregator::*;
 pub use tool_use_stream_assembler::*;

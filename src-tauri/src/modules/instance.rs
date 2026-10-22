@@ -58,6 +58,8 @@ pub mod instance_mgmt;
 pub mod ipc_socket_cleaner;
 #[path = "instance/keychain_file_guard.rs"]
 pub mod keychain_file_guard;
+#[path = "instance/keychain_path_resolver.rs"]
+pub mod keychain_path_resolver;
 #[path = "instance/keyring_flags.rs"]
 pub mod keyring_flags;
 #[path = "instance/launch.rs"]
@@ -95,6 +97,8 @@ pub mod pid_scan;
 pub mod pid_store;
 #[path = "instance/pid_util.rs"]
 pub mod pid_util;
+#[path = "instance/pid_reclaim_barrier.rs"]
+pub mod pid_reclaim_barrier;
 #[path = "instance/pipe_socket_cleaner.rs"]
 pub mod pipe_socket_cleaner;
 #[path = "instance/port_collision_evictor.rs"]
@@ -105,6 +109,8 @@ pub mod port_detector;
 pub mod port_matrix;
 #[path = "instance/port_reclaim_sentinel.rs"]
 pub mod port_reclaim_sentinel;
+#[path = "instance/port_lease_tracker.rs"]
+pub mod port_lease_tracker;
 #[path = "instance/remote_debugging_port_allocator.rs"]
 pub mod remote_debugging_port_allocator;
 #[path = "instance/post_switch_resume.rs"]
@@ -117,6 +123,8 @@ pub mod process_record;
 pub mod process_vitality_probe;
 #[path = "instance/profile_clone_manifest.rs"]
 pub mod profile_clone_manifest;
+#[path = "instance/profile_clone_verifier.rs"]
+pub mod profile_clone_verifier;
 #[path = "instance/profile_dir_validator.rs"]
 pub mod profile_dir_validator;
 #[path = "instance/project_uri.rs"]
@@ -135,6 +143,8 @@ pub mod registry;
 pub mod sandbox_purger;
 #[path = "instance/session_file_reclaimer.rs"]
 pub mod session_file_reclaimer;
+#[path = "instance/session_cleanup_worker.rs"]
+pub mod session_cleanup_worker;
 #[path = "instance/session_uuid.rs"]
 pub mod session_uuid;
 #[path = "instance/session_trace_uuid.rs"]
@@ -204,6 +214,8 @@ pub mod workspace_hash;
 pub mod workspace_hash_sentinel;
 #[path = "instance/workspace_storage_migrator.rs"]
 pub mod workspace_storage_migrator;
+#[path = "instance/workspace_storage_sanitizer.rs"]
+pub mod workspace_storage_sanitizer;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use arg_normalizer::*;
@@ -340,19 +352,24 @@ pub use env_allowlist_filter::*;
 pub use env_whitelist_filter::*;
 pub use ipc_socket_cleaner::*;
 pub use keychain_file_guard::*;
+pub use keychain_path_resolver::*;
 pub use keyring_mock_writer::*;
 pub use launch_argv_builder::*;
 pub use launch_env_sanitizer::*;
 pub use mock_keyring_writer::*;
 pub use orphan_socket_sweeper::*;
+pub use pid_reclaim_barrier::*;
 pub use pipe_socket_cleaner::*;
 pub use port_collision_evictor::*;
+pub use port_lease_tracker::*;
 pub use port_reclaim_sentinel::*;
 pub use process_vitality_probe::*;
 pub use profile_clone_manifest::*;
+pub use profile_clone_verifier::*;
 pub use profile_dir_validator::*;
 pub use project_path_canonical_normalizer::*;
 pub use remote_debugging_port_allocator::*;
+pub use session_cleanup_worker::*;
 pub use session_file_reclaimer::*;
 pub use session_trace_uuid::*;
 pub use state_snapshot_exporter::*;
@@ -365,3 +382,4 @@ pub use window_state_restorer::*;
 pub use workspace_dir_validator::*;
 pub use workspace_hash_sentinel::*;
 pub use workspace_storage_migrator::*;
+pub use workspace_storage_sanitizer::*;
