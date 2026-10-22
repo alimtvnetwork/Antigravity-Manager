@@ -49,6 +49,7 @@ mod opus_tests;
 mod request_log;
 mod response_handling;
 mod setup_phase;
+pub mod stream_chunk_aggregator;
 mod stream_handling;
 mod thinking;
 mod variant;
@@ -60,6 +61,7 @@ mod warmup_tests;
 
 pub(crate) use apply_compression::apply_compression;
 pub use block_merger::*;
+pub use stream_chunk_aggregator::*;
 pub(crate) use attempt::{AttemptCall, AttemptState, ErrorOutcome, PrepOutcome, StreamOutcome};
 pub(crate) use attempt_setup::prepare_attempt;
 pub(crate) use compression::try_compress_with_summary;

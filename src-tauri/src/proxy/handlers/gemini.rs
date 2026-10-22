@@ -23,8 +23,11 @@ mod handle_generate;
 mod handle_generate_error;
 mod handle_list_models;
 mod response_has_inline_image_data;
+#[path = "gemini/part_envelope_validator.rs"]
+pub mod part_envelope_validator;
 pub mod system_sanitizer;
 
+pub use part_envelope_validator::*;
 pub use system_sanitizer::*;
 pub use handle_generate::handle_generate;
 pub(crate) use handle_generate_error::handle_generate_error;

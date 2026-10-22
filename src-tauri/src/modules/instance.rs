@@ -18,6 +18,8 @@ pub mod clone_checksum;
 pub mod clone_helpers;
 #[path = "instance/close.rs"]
 pub mod close;
+#[path = "instance/cloned_guid_reseeder.rs"]
+pub mod cloned_guid_reseeder;
 #[path = "instance/crash_loop_guard.rs"]
 pub mod crash_loop_guard;
 #[path = "instance/create.rs"]
@@ -26,6 +28,8 @@ pub mod create;
 pub mod credentials;
 #[path = "instance/db_clone.rs"]
 pub mod db_clone;
+#[path = "instance/env_whitelist_filter.rs"]
+pub mod env_whitelist_filter;
 #[path = "instance/executable.rs"]
 pub mod executable;
 #[path = "instance/extension_sanitizer.rs"]
@@ -38,6 +42,8 @@ pub mod health_probe;
 pub mod identity_reseeder;
 #[path = "instance/instance_mgmt.rs"]
 pub mod instance_mgmt;
+#[path = "instance/ipc_socket_cleaner.rs"]
+pub mod ipc_socket_cleaner;
 #[path = "instance/keyring_flags.rs"]
 pub mod keyring_flags;
 #[path = "instance/launch.rs"]
@@ -87,6 +93,8 @@ pub mod process_record;
 pub mod process_vitality_probe;
 #[path = "instance/profile_clone_manifest.rs"]
 pub mod profile_clone_manifest;
+#[path = "instance/profile_dir_validator.rs"]
+pub mod profile_dir_validator;
 #[path = "instance/project_uri.rs"]
 pub mod project_uri;
 #[path = "instance/projects.rs"]
@@ -115,6 +123,8 @@ pub mod smart_run;
 pub mod spawn;
 #[path = "instance/state_snapshot.rs"]
 pub mod state_snapshot;
+#[path = "instance/state_snapshot_exporter.rs"]
+pub mod state_snapshot_exporter;
 #[path = "instance/storage.rs"]
 pub mod storage;
 #[path = "instance/storage_scrubber.rs"]
@@ -142,6 +152,8 @@ pub mod tests_clone_b;
 #[cfg(test)]
 #[path = "instance/tests_e2e.rs"]
 pub mod tests_e2e;
+#[path = "instance/terminate_fallback_ladder.rs"]
+pub mod terminate_fallback_ladder;
 #[path = "instance/tuning.rs"]
 pub mod tuning;
 #[path = "instance/vitality_scanner.rs"]
@@ -281,7 +293,10 @@ pub use workspace::{
     restore_and_inject_prompts_for_instance, schedule_prompt_restore_after_launch,
     snapshot_active_workspaces,
 };
+pub use cloned_guid_reseeder::*;
 pub use crash_loop_guard::*;
+pub use env_whitelist_filter::*;
+pub use ipc_socket_cleaner::*;
 pub use launch_argv_builder::*;
 pub use launch_env_sanitizer::*;
 pub use mock_keyring_writer::*;
@@ -289,7 +304,10 @@ pub use orphan_socket_sweeper::*;
 pub use port_reclaim_sentinel::*;
 pub use process_vitality_probe::*;
 pub use profile_clone_manifest::*;
+pub use profile_dir_validator::*;
 pub use session_file_reclaimer::*;
+pub use state_snapshot_exporter::*;
 pub use telemetry_storage_cleaner::*;
+pub use terminate_fallback_ladder::*;
 pub use window_state_restorer::*;
 pub use workspace_storage_migrator::*;
