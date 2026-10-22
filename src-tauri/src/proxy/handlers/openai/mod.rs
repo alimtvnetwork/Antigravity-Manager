@@ -27,6 +27,7 @@ mod models;
 mod responses_history;
 mod responses_media;
 mod tool_cache;
+pub mod tool_call_assembler;
 #[cfg(test)]
 mod variant_tests;
 mod websocket;
@@ -43,4 +44,5 @@ pub use images_generations::{handle_images_generations, handle_images_generation
 pub use images_intercept::handle_chat_redirection;
 pub use models::handle_list_models;
 pub use tool_cache::{get_cached_tool_call, insert_cached_tool_call};
+pub use tool_call_assembler::*;
 pub use websocket::handle_responses_websocket;

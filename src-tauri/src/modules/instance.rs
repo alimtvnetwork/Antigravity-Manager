@@ -12,6 +12,8 @@ pub mod arg_normalizer;
 pub mod cdp_onboarding;
 #[path = "instance/clone.rs"]
 pub mod clone;
+#[path = "instance/child_health_monitor.rs"]
+pub mod child_health_monitor;
 #[path = "instance/clone_checksum.rs"]
 pub mod clone_checksum;
 #[path = "instance/clone_helpers.rs"]
@@ -20,6 +22,8 @@ pub mod clone_helpers;
 pub mod close;
 #[path = "instance/cloned_guid_reseeder.rs"]
 pub mod cloned_guid_reseeder;
+#[path = "instance/crash_loop_backoff.rs"]
+pub mod crash_loop_backoff;
 #[path = "instance/crash_loop_guard.rs"]
 pub mod crash_loop_guard;
 #[path = "instance/create.rs"]
@@ -44,6 +48,8 @@ pub mod identity_reseeder;
 pub mod instance_mgmt;
 #[path = "instance/ipc_socket_cleaner.rs"]
 pub mod ipc_socket_cleaner;
+#[path = "instance/keychain_file_guard.rs"]
+pub mod keychain_file_guard;
 #[path = "instance/keyring_flags.rs"]
 pub mod keyring_flags;
 #[path = "instance/launch.rs"]
@@ -77,6 +83,8 @@ pub mod pid_scan;
 pub mod pid_store;
 #[path = "instance/pid_util.rs"]
 pub mod pid_util;
+#[path = "instance/port_collision_evictor.rs"]
+pub mod port_collision_evictor;
 #[path = "instance/port_detector.rs"]
 pub mod port_detector;
 #[path = "instance/port_matrix.rs"]
@@ -127,6 +135,8 @@ pub mod state_snapshot;
 pub mod state_snapshot_exporter;
 #[path = "instance/storage.rs"]
 pub mod storage;
+#[path = "instance/storage_checksum_guard.rs"]
+pub mod storage_checksum_guard;
 #[path = "instance/storage_scrubber.rs"]
 pub mod storage_scrubber;
 #[path = "instance/telemetry_storage_cleaner.rs"]
@@ -166,6 +176,8 @@ pub mod workspace;
 pub mod workspace_continuity;
 #[path = "instance/workspace_hash.rs"]
 pub mod workspace_hash;
+#[path = "instance/workspace_hash_sentinel.rs"]
+pub mod workspace_hash_sentinel;
 #[path = "instance/workspace_storage_migrator.rs"]
 pub mod workspace_storage_migrator;
 
@@ -293,21 +305,27 @@ pub use workspace::{
     restore_and_inject_prompts_for_instance, schedule_prompt_restore_after_launch,
     snapshot_active_workspaces,
 };
+pub use child_health_monitor::*;
 pub use cloned_guid_reseeder::*;
+pub use crash_loop_backoff::*;
 pub use crash_loop_guard::*;
 pub use env_whitelist_filter::*;
 pub use ipc_socket_cleaner::*;
+pub use keychain_file_guard::*;
 pub use launch_argv_builder::*;
 pub use launch_env_sanitizer::*;
 pub use mock_keyring_writer::*;
 pub use orphan_socket_sweeper::*;
+pub use port_collision_evictor::*;
 pub use port_reclaim_sentinel::*;
 pub use process_vitality_probe::*;
 pub use profile_clone_manifest::*;
 pub use profile_dir_validator::*;
 pub use session_file_reclaimer::*;
 pub use state_snapshot_exporter::*;
+pub use storage_checksum_guard::*;
 pub use telemetry_storage_cleaner::*;
 pub use terminate_fallback_ladder::*;
 pub use window_state_restorer::*;
+pub use workspace_hash_sentinel::*;
 pub use workspace_storage_migrator::*;
