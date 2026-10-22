@@ -31,7 +31,7 @@ Follow-up (same turn): "At end release both and make sure cicd is green"
 | 05 | AGM pending-plan closeout (91 workflows, 88 push-settings, 139 UI, drain done plans, 105/86/04 triage) | AGM | DONE 2026-10-23 (worker; 9 plans filed to completed, 91 mostly done, 88 steps 001-006, 139 UI+CLI, 86 core - remainder + open PID question logged in-plan; most files swept into sync commit e431b369, remainder committed by lead) |
 | 06 | gitmap pending drain + CG residue sweeps | gitmap-v28 | DONE 2026-10-23 (worker; committed e08910720 - 24 plans drained, == false 106→1, cli/store fmt.Errorf 202→0, cli/cmd production 121→0) |
 | 07 | gitmap CG execute zero-to-end (prompts 24,12,13,14,18,22,29,25, efficiency, surfaces, meta) | gitmap-v28 | DONE 2026-10-23 (waves W3a e65be2c0a, W3b 0ff1da47a, W3c 4b047dd82, W4a 4eaa3123e, W4b 9d2ee5960, W5 e5205bd2e; all 39 prompts at a terminal state - applied / partial with named remainders / documented closure; open items for 08 - 10 !IsSuccess linter residuals, 2 TS any sites, cmd_sends.go 628-line split, Python renames to port to coding-guidelines-v24 canonical) |
-| 08 | Build + E2E both repos + release both + CI green | both | ACTIVE |
+| 08 | Build + E2E both repos + release both + CI green | both | DONE 2026-10-23 (gitmap: go build + go vet fully green after a 132-file repair - the tree did not compile at task start: duplicate constants and store types, stale Result-envelope callers, corrupted imports; binary E2E pass - help/version/typo-exit-1/scan/ls; AGM: vite build green, tsc shows exactly the 18 pre-existing errors also present at task start, zero new; live switch/restore E2E still requires a Windows/IDE machine. Released gitmap-v28 -> v6.590.0 and Antigravity-Manager -> v4.251.0, both pipelines 100% green) |
 
 Subtask files: .ai-memory/plans/subtasks/190-gitmap-and-antigravity-tools-manager-updates-and-testing/
 
@@ -42,3 +42,6 @@ Subtask files: .ai-memory/plans/subtasks/190-gitmap-and-antigravity-tools-manage
 - Workers never run git; lead commits via GitMap hyphen-format messages.
 - FIFO invariant in all dispatch/restore queries. No silent errors.
 - Release at the end: both repos, CI green (`gitmap pe -t`) before and after.
+
+## Closure (2026-10-23)
+All 8 subtasks DONE. Releases: gitmap-v28 -> v6.590.0, Antigravity-Manager -> v4.251.0; `gitmap pe -t` 100% green on both mains. Carried remainders (documented in the subtask files): live AGM switch/restore E2E on a Windows/IDE machine (plans 92/93 runbooks ready; plan 88 step 007 and plan 139 step 3 run there); plan 139 saved-PID decision (options A/B/C presented to the user, awaiting the pick); repo-wide prompt 22 decomposition backlog (7,044 functions over 15 lines) and prompt 18 DTO conversion as future programs; 10 boolean-linter `!IsSuccess` guard residuals; 2 TypeScript `any` sites in TerminalDrawer.tsx for a tsc-verified pass; Python script renames from prompt 26 to port into the coding-guidelines-v24 canonical copies before the next fleet sync; prompt 36 and 34/39 closures to revisit with a compiler available.
