@@ -121,44 +121,42 @@ pub fn select_candidate_profiles(
         .unwrap_or(60);
     let cooldown_secs: i64 = (cooldown_minutes as i64) * 60;
 
-    let mut effective_exclusions = excluded_account_ids.to_vec();
-    for in_use_id in get_active_in_use_account_ids() {
-        if !effective_exclusions.contains(&in_use_id) {
-            effective_exclusions.push(in_use_id);
+    let mut effective_exclusions: Vec<String> = excluded_account_ids
+        .iter()
+        .map(|s| s.trim().to_lowercase())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let mut push_exclusion = |val: &str| {
+        let clean = val.trim().to_lowercase();
+        if !clean.is_empty() && !effective_exclusions.contains(&clean) {
+            effective_exclusions.push(clean);
         }
+    };
+
+    for in_use_id in get_active_in_use_account_ids() {
+        push_exclusion(&in_use_id);
     }
     // Strictly exclude the current instance's own account so it cannot rotate to itself
     if let Some(cur_inst) = registry.instances.iter().find(|i| i.id == current_instance_id) {
         if let Some(ref acc_id) = cur_inst.bound_account_id {
-            if !effective_exclusions.contains(acc_id) {
-                effective_exclusions.push(acc_id.clone());
-            }
+            push_exclusion(acc_id);
             if let Ok(acc) = account::load_account(acc_id) {
-                if !effective_exclusions.contains(&acc.email) {
-                    effective_exclusions.push(acc.email.clone());
-                }
+                push_exclusion(&acc.email);
             }
         }
         if let Some(ref email) = cur_inst.bound_email {
-            if !effective_exclusions.contains(email) {
-                effective_exclusions.push(email.clone());
-            }
+            push_exclusion(email);
             if let Ok(Some(acc)) = account::get_account_by_email(email) {
-                if !effective_exclusions.contains(&acc.id) {
-                    effective_exclusions.push(acc.id.clone());
-                }
+                push_exclusion(&acc.id);
             }
         }
         let is_default = cur_inst.is_default || cur_inst.id == "default" || cur_inst.id == "__default__";
         if is_default {
             if let Ok(Some(def_id)) = account::get_current_account_id() {
-                if !effective_exclusions.contains(&def_id) {
-                    effective_exclusions.push(def_id.clone());
-                }
+                push_exclusion(&def_id);
                 if let Ok(acc) = account::load_account(&def_id) {
-                    if !effective_exclusions.contains(&acc.email) {
-                        effective_exclusions.push(acc.email.clone());
-                    }
+                    push_exclusion(&acc.email);
                 }
             }
         }
@@ -177,32 +175,22 @@ pub fn select_candidate_profiles(
                 }
             });
             if let Some(ref acc_id) = active_acc_id {
-                if !effective_exclusions.contains(acc_id) {
-                    effective_exclusions.push(acc_id.clone());
-                }
+                push_exclusion(acc_id);
                 if let Ok(acc) = account::load_account(acc_id) {
-                    if !effective_exclusions.contains(&acc.email) {
-                        effective_exclusions.push(acc.email.clone());
-                    }
+                    push_exclusion(&acc.email);
                 }
             }
             if let Some(ref email) = inst.bound_email {
-                if !effective_exclusions.contains(email) {
-                    effective_exclusions.push(email.clone());
-                }
+                push_exclusion(email);
                 if let Ok(Some(acc)) = account::get_account_by_email(email) {
-                    if !effective_exclusions.contains(&acc.id) {
-                        effective_exclusions.push(acc.id.clone());
-                    }
+                    push_exclusion(&acc.id);
                 }
             }
         }
     }
     for cross_vm_acc in crate::modules::email_inbound::fetch_recent_cross_vm_switched_accounts(3600)
     {
-        if !effective_exclusions.contains(&cross_vm_acc) {
-            effective_exclusions.push(cross_vm_acc);
-        }
+        push_exclusion(&cross_vm_acc);
     }
 
     // Helper closure to evaluate if an account is in cooldown window
@@ -428,19 +416,31 @@ pub fn select_candidate_profiles(
             "[AutoSwitcher] All {} healthy account(s) are currently in cooldown. Triggering graceful fallback to oldest last_used account.",
             cooldown_pool.len()
         ));
-        // Sort by oldest last_used (ascending last_used timestamp: smallest first)
-        cooldown_pool.sort_by(
-            |(a_cand, a_last), (b_cand, b_last)| match a_last.cmp(b_last) {
-                std::cmp::Ordering::Equal => match b_cand.score.partial_cmp(&a_cand.score) {
+        // Imp-05: Cooldown Fallback Never-Used Priority
+        // Sort by never-used first (last_used == 0), then by oldest last_used (ascending last_used timestamp: smallest first)
+        cooldown_pool.sort_by(|(a_cand, a_last), (b_cand, b_last)| {
+            match (*a_last == 0, *b_last == 0) {
+                (true, false) => std::cmp::Ordering::Less,    // a never used, prioritize a
+                (false, true) => std::cmp::Ordering::Greater, // b never used, prioritize b
+                (true, true) => match b_cand.score.partial_cmp(&a_cand.score) {
                     Some(std::cmp::Ordering::Equal) | None => a_cand
                         .email
                         .to_lowercase()
                         .cmp(&b_cand.email.to_lowercase()),
                     Some(ord) => ord,
                 },
-                ord => ord,
-            },
-        );
+                (false, false) => match a_last.cmp(b_last) {
+                    std::cmp::Ordering::Equal => match b_cand.score.partial_cmp(&a_cand.score) {
+                        Some(std::cmp::Ordering::Equal) | None => a_cand
+                            .email
+                            .to_lowercase()
+                            .cmp(&b_cand.email.to_lowercase()),
+                        Some(ord) => ord,
+                    },
+                    ord => ord,
+                },
+            }
+        });
         cooldown_pool.into_iter().map(|(cand, _)| cand).collect()
     } else {
         Vec::new()
@@ -680,8 +680,22 @@ pub async fn select_and_verify_next_best_profile(
             continue;
         }
 
-        // Live API Quota Refresh directly from Google API
-        let fetch_res = account::fetch_quota_with_retry(&mut cand_acc).await;
+        // Imp-06: Pre-Switch Live Refresh Timeout Guard (bounded 5000ms)
+        let fetch_res = match tokio::time::timeout(
+            std::time::Duration::from_millis(5000),
+            account::fetch_quota_with_retry(&mut cand_acc),
+        )
+        .await
+        {
+            Ok(res) => res,
+            Err(_) => {
+                logger::log_warn(&format!(
+                    "[AutoSwitcher] Live quota refresh timed out after 5000ms for candidate '{}'. Skipping...",
+                    masked_email
+                ));
+                continue;
+            }
+        };
         let fresh_4h_quota = match fetch_res {
             Ok(fresh_q) => {
                 cand_acc.quota = Some(fresh_q);

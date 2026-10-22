@@ -282,6 +282,20 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         };
     }, [isResizingTree, treeWidth, MIN_TREE_WIDTH, MAX_TREE_WIDTH]);
 
+    // Imp-59: Trap Escape key to close modal cleanly without losing draft state
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (projectContextMenu || isDetailsModalOpen) {
+                    return;
+                }
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [projectContextMenu, isDetailsModalOpen, onClose]);
+
     const handleProjectContextMenu = (e: React.MouseEvent, repoName: string, project?: AgmProjectTreeNode) => {
         e.preventDefault();
         e.stopPropagation();

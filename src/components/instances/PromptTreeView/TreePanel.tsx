@@ -142,6 +142,50 @@ export function TreePanel(props: TreePanelProps) {
         };
     }, []);
 
+    // Imp-60: Keyboard navigation across conversation nodes (ArrowUp / ArrowDown)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement | null;
+            if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+                return;
+            }
+
+            if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') {
+                return;
+            }
+
+            const flatConvs: { conv: AgmConversationNode; proj: AgmProjectTreeNode }[] = [];
+            for (const proj of activeProjects) {
+                if (expandedProjects[proj.id] !== false) {
+                    for (const conv of proj.conversations) {
+                        flatConvs.push({ conv, proj });
+                    }
+                }
+            }
+
+            if (flatConvs.length === 0) return;
+
+            const currentIndex = flatConvs.findIndex(item => item.conv.conversation_id === selectedConversationId);
+            let nextIndex = currentIndex;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                nextIndex = currentIndex < flatConvs.length - 1 ? currentIndex + 1 : 0;
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                nextIndex = currentIndex > 0 ? currentIndex - 1 : flatConvs.length - 1;
+            }
+
+            if (nextIndex >= 0 && nextIndex < flatConvs.length && nextIndex !== currentIndex) {
+                const targetItem = flatConvs[nextIndex];
+                onSelectConversation(targetItem.conv, targetItem.proj);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [activeProjects, expandedProjects, selectedConversationId, onSelectConversation]);
+
     const effectiveImageFilter = props.isImageFilterActive !== undefined ? props.isImageFilterActive : internalImageFilter;
 
     const handleOpenContextMenu = (menuProps: PromptTreeContextMenuProps) => {

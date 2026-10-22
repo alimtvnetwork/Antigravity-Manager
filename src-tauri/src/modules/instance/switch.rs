@@ -494,6 +494,10 @@ pub async fn switch_account_to_instance(
         );
     });
 
+    // Imp-12: Port Rebind Settling Delay on Switch
+    // Allow lingering CDP debugger sockets and localhost IPC ports to release bindings before spawning new IDE
+    std::thread::sleep(std::time::Duration::from_millis(500));
+
     // 5. [Step 4/5] Relaunch Antigravity preserving exact executable path and bound workspace folders
     crate::modules::logger::log_info(&format!(
         "[INSTANCE_SWITCH:STAGE_4_LAUNCH] Spawning instance IDE for '{}' (executable: {:?})",

@@ -191,6 +191,26 @@ pub fn copy_instance_with_options(
                 crate::modules::db::sanitize_session(&cloned_db),
                 "sanitize session db",
             );
+
+            // Imp-09: Cloned Profile Synthetic UUID Generation
+            let fresh_device_profile = crate::modules::device::generate_profile();
+            let cloned_storage_path = dst_path
+                .join("User")
+                .join("globalStorage")
+                .join("storage.json");
+            // Justification: device-profile bookkeeping; the existing profile persists if this fails
+            crate::error::record_ignored(
+                crate::modules::device::write_profile(&cloned_storage_path, &fresh_device_profile),
+                "write fresh cloned device profile",
+            );
+            // Justification: device-identity bookkeeping; the existing identity persists if this fails
+            crate::error::record_ignored(
+                crate::modules::db::write_service_machine_id(
+                    &cloned_db,
+                    &fresh_device_profile.mac_machine_id,
+                ),
+                "write cloned service machine id",
+            );
             if let Some(ref acc_id) = new_instance.bound_account_id {
                 if let Ok(acc) = crate::modules::account::load_account(acc_id) {
                     if let Ok(new_home) = get_instance_home_dir(&new_instance.id) {

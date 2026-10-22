@@ -84,6 +84,16 @@ pub async fn check_and_rotate_with_options(
             continue;
         };
 
+        // Suppress spurious low-quota warnings during the 10-second post-switch settling window
+        let is_settling = inst.last_used > 0 && (now - inst.last_used) < 10;
+        if is_settling && !force {
+            logger::log_info(&format!(
+                "[AutoSwitcher] Instance '{}' is in 10s post-switch settling window. Skipping threshold evaluation.",
+                inst.id
+            ));
+            continue;
+        }
+
         let mut bound_acc = match account::load_account(&bound_acc_id) {
             Ok(acc) => acc,
             Err(_) => continue,

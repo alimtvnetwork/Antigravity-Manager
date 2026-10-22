@@ -285,7 +285,8 @@ pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<Str
     let my_vm = crate::modules::email_watcher::detect_machine_name();
     let my_ip = crate::modules::email_watcher::detect_local_ip();
     let now = Utc::now().timestamp();
-    let cutoff = now - lookback_seconds;
+    let effective_lookback = if lookback_seconds <= 0 { 3600 } else { lookback_seconds.max(1800) };
+    let cutoff = now - effective_lookback;
     let mut excluded = Vec::new();
 
     for msg in messages {
@@ -343,13 +344,14 @@ pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<Str
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
-        let is_same_machine = vm_name == my_vm && local_ip == my_ip;
+        let is_same_machine = (!vm_name.is_empty() && vm_name.trim().eq_ignore_ascii_case(my_vm.trim()))
+            || (!local_ip.is_empty() && local_ip.trim() == my_ip.trim());
         let is_recent =
             (timestamp > 0 && timestamp >= cutoff) || (lease_expires > 0 && lease_expires > now);
 
         if !is_same_machine && is_recent && !new_email.is_empty() {
-            let email_clean = new_email.trim().to_string();
-            if !excluded.contains(&email_clean) {
+            let email_clean = new_email.trim().to_lowercase();
+            if !excluded.iter().any(|e| e.eq_ignore_ascii_case(&email_clean)) {
                 excluded.push(email_clean);
             }
         }

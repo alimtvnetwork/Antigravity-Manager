@@ -1162,8 +1162,12 @@ async fn dispatch_turn_rerun_execution(
     )
     .is_ok();
 
-    // Capture visual proof of delivery
-    let proof = super::open_shot::capture_and_send_proof_shot(&OpenShotTarget::Local).await;
+    // Detach visual proof capture into background task to eliminate 3-12s blocking wait
+    tauri::async_runtime::spawn(async move {
+        let proof_res = super::open_shot::capture_and_send_proof_shot(&OpenShotTarget::Local).await;
+        tracing::info!("Background local proof shot completed: {proof_res}");
+    });
+    let proof = "📸 <i>Delivery proof screenshot is being captured in background...</i>";
 
     let (preview_200w, word_count) =
         crate::modules::repo_db::extract_prompt_words_preview(&injected_text, 200);

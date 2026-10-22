@@ -82,6 +82,14 @@ pub(crate) fn init_tables(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| format!("Failed to create index on active_prompts: {}", e))?;
 
+    // Imp-45: Accelerate FIFO queue queries and strict dispatch ordering
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_active_prompts_fifo 
+         ON active_prompts(status, created_at, id)",
+        [],
+    )
+    .map_err(|e| format!("Failed to create FIFO index on active_prompts: {}", e))?;
+
     conn.execute(
         "CREATE TABLE IF NOT EXISTS agm_project_sequences (
             project_key TEXT PRIMARY KEY,

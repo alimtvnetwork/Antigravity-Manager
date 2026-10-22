@@ -145,6 +145,19 @@ impl InboundThinkingPipeline {
             tc = json!({
                 "includeThoughts": true
             });
+        } else {
+            // Imp-22: Gemini Thinking Budget Backfilling
+            // If thinking budget was omitted by client on a thinking model, backfill default 2048
+            let default_budget = 2048i64;
+            tc["thinkingBudget"] = json!(default_budget);
+            let min_overhead = 8192;
+            let current_max = generation_config
+                .get("maxOutputTokens")
+                .and_then(Value::as_i64)
+                .unwrap_or(65536);
+            if current_max <= default_budget {
+                generation_config["maxOutputTokens"] = json!(default_budget + min_overhead);
+            }
         }
 
         generation_config["thinkingConfig"] = tc;

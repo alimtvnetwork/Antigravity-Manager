@@ -203,7 +203,7 @@ pub fn switch_prompt_snapshot(instance_id: &str) -> SwitchPromptSnap {
                 instance_id = ?1
                 OR (?1 = 'default' AND instance_id IN ('default', '__default__', ''))
            )
-         ORDER BY updated_at DESC
+         ORDER BY created_at ASC, id ASC
          LIMIT 1",
         [instance_id],
         |row| {

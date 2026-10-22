@@ -374,13 +374,17 @@ pub fn sanitize_session(db_path: &std::path::Path) -> Result<(), String> {
         conn.busy_timeout(std::time::Duration::from_millis(2000)),
         "busy_timeout",
     );
+    // Imp-10: Keyring & Account Scrubbing on Clone
+    // Delete account, oauth, and token rows from cloned state.vscdb to eliminate session bleeding
     // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
     crate::error::record_ignored(
         conn.execute(
-            "DELETE FROM ItemTable WHERE key IN (?, ?)",
+            "DELETE FROM ItemTable WHERE key IN (?, ?, ?, ?) OR key LIKE 'authentication.session%' OR key LIKE 'accounts.%'",
             [
                 "antigravityUnifiedStateSync.oauthToken",
                 "antigravityUnifiedStateSync.userStatus",
+                "antigravity.auth.token",
+                "userDataSync.account",
             ],
         ),
         "db execute",

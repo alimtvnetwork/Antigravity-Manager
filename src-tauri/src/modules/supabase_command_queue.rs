@@ -207,7 +207,14 @@ pub async fn execute_and_report_command(
             target: "supabase_command_queue",
             command_id = %cmd.id,
             error = %e,
-            "Failed to update final status in command_queue"
+            "Failed to update final status in command_queue; recording to local task history as offline fallback"
+        );
+        crate::modules::task_history_db::record(
+            crate::modules::audit_action::AuditAction::Unknown,
+            &format!("cmd_offline_{}", cmd.id),
+            final_status.as_str(),
+            &format!("Exit code {}: {}", exit_code, stdout.chars().take(200).collect::<String>()),
+            None,
         );
     }
 

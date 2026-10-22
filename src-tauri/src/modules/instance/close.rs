@@ -920,9 +920,10 @@ pub fn close_instance(instance_id: &str) -> Result<(), String> {
         }
     }
 
+    // Imp-08: Graceful 3000ms Instance Stop Ladder
     // Synchronously wait for processes to exit to prevent SQLite locks and state overwrite
     let start_wait = std::time::Instant::now();
-    let max_graceful = std::time::Duration::from_millis(1500);
+    let max_graceful = std::time::Duration::from_millis(3000);
 
     loop {
         let has_alive = pids.iter().any(|&pid| is_pid_active_checked(pid));

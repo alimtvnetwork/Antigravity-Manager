@@ -43,6 +43,31 @@ pub fn simplify_payload_json(value: &Value) -> Value {
         }
     }
 
+    // Imp-54: Mask sensitive credentials and bearer tokens in debug audit payloads
+    for sec_key in [
+        "api_key",
+        "apiKey",
+        "access_token",
+        "client_secret",
+        "password",
+        "authorization",
+    ] {
+        if let Some(v) = inner.get(sec_key).or_else(|| value.get(sec_key)) {
+            if let Some(s) = v.as_str() {
+                if !s.is_empty() {
+                    let masked = if s.to_ascii_lowercase().starts_with("bearer ") {
+                        "Bearer ***REDACTED***".to_string()
+                    } else if s.len() > 8 {
+                        format!("{}...{}", &s[..4], &s[s.len() - 3..])
+                    } else {
+                        "***REDACTED***".to_string()
+                    };
+                    concise.insert(sec_key.to_string(), Value::String(masked));
+                }
+            }
+        }
+    }
+
     // 2. Thought signature and thinking
     for sig_key in [
         "thinking_signature",

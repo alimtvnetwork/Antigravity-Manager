@@ -212,12 +212,18 @@ impl ProxyPoolManager {
             .collect::<Vec<_>>()
             .await;
 
-        // Update statuses in batch
+        // Update statuses in batch with exponential decay latency scoring
         let mut config = self.config.write().await;
         for (id, is_healthy, latency) in results {
             if let Some(proxy) = config.proxies.iter_mut().find(|p| p.id == id) {
                 proxy.is_healthy = is_healthy;
-                proxy.latency = latency;
+                // Imp-52: Exponential moving average to smooth transient spikes (70% new + 30% previous)
+                proxy.latency = match (proxy.latency, latency) {
+                    (Some(prev), Some(curr)) => {
+                        Some(((prev as f64 * 0.3) + (curr as f64 * 0.7)).round() as u64)
+                    }
+                    (_, curr) => curr,
+                };
                 proxy.last_check_time = Some(chrono::Utc::now().timestamp());
             }
         }

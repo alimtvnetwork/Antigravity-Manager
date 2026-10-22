@@ -91,7 +91,9 @@ pub use restore::{
     switch_prompt_snapshot,
 };
 // ---- prompts_crud ----
-pub use prompts_crud::{insert_active_prompt, list_active_prompts, save_or_requeue_prompt};
+pub use prompts_crud::{
+    insert_active_prompt, list_active_prompts, save_or_requeue_prompt, update_prompt_status,
+};
 // ---- text_utils ----
 pub use text_utils::{
     extract_clean_user_prompt, extract_smart_prompt_summary, format_friendly_workspace_label,

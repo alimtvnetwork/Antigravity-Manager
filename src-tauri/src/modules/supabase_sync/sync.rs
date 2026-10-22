@@ -303,3 +303,13 @@ pub async fn sync_local_node_now() -> Result<(), AppError> {
 pub async fn trigger_manual_sync() -> Result<(), AppError> {
     sync_local_node_now().await
 }
+
+/// Spawn a non-blocking background task to push local node telemetry to Supabase,
+/// logging any network errors safely without blocking caller execution.
+pub fn spawn_background_telemetry_push() {
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = sync_local_node_now().await {
+            tracing::warn!("Background telemetry push to Supabase encountered non-fatal error: {e}");
+        }
+    });
+}
