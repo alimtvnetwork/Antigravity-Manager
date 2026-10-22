@@ -74,7 +74,7 @@ def upgrade_prompt_file(file_path: Path) -> bool:
             )
 
     # 4. Add SQLite Task DB instructions in Phase 2 if missing
-    if "gitmap agent log" not in content:
+    if "gitmap agent log" not in content and "46-agent-sqlite-task-manager.py" not in content:
         target_anchor = "### 7.3 Turn-Yielding & Verification Protocol"
         if target_anchor in content:
             replacement = SQLITE_STEP_SNIPPET.strip() + "\n\n" + target_anchor
