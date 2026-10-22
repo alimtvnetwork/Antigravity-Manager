@@ -1,21 +1,21 @@
 # Improvements Prompts (`30-improvements`) — Index & Catalog
 
 > [!IMPORTANT]
-> Category: `30-improvements`
-> Architecture: Canonical V6 Continuous Improvement Flywheel & Multi-Agent Protocol
-> Scope: System-Wide UX Optimization, Codebase Quality, UI/UX Materiality, and Automated Plan Enqueueing
+> Category: `30-improvements`  
+> Architecture: Canonical V6 Continuous Improvement Flywheel & Multi-Agent Protocol  
+> Scope: System-Wide UX Optimization, Codebase Quality, UI/UX Materiality, Multi-Step Plan Detailing, and Review-First Governance  
 
 ---
 
 ## Overview
 
-The `30-improvements` prompt category establishes an autonomous, recurring continuous improvement flywheel across the Prompt Architect meta-repository and connected fleet. Each prompt in this category conducts deep architectural audits, identifies 100 high-leverage improvements focused strictly on user and developer experience, and enqueues them as actionable, bite-sized plans into `.ai-memory/plans/pending/` with accompanying subtasks in `.ai-memory/plans/subtasks/`.
+The `30-improvements` prompt category establishes an autonomous, recurring continuous improvement flywheel and rigorous plan-detailing engine across the Prompt Architect meta-repository and connected fleet. Each prompt in this category conducts deep architectural audits, identifies high-leverage improvements focused strictly on user and developer experience, and details them into actionable, bite-sized plans and review dockets before execution.
 
-All improvements adhere to the structured **8-Part Specification Schema**, enforce the **Zero Harm / Regression Safety Matrix**, provide backward compatibility guarantees, and include concrete implementation blueprints.
+All improvements adhere to the structured **8-Part Specification Schema**, enforce the **Zero Harm / Regression Safety Matrix**, provide backward compatibility guarantees, and include concrete, copy-paste ready implementation blueprints.
 
 > [!NOTE]
-> **Continuous Improvement Flywheel Invariant:**
-> Running any prompt in this category persists the identified 100 improvement items into `.ai-memory/plans/pending/XX-<slug>.md` along with subtasks in `.ai-memory/plans/subtasks/XX-<slug>/`. Each subsequent cycle dynamically synthesizes the next 100 improvements, turning continuous quality enhancement into an automated, self-sustaining pipeline.
+> **Continuous Improvement Flywheel Invariant:**  
+> Running discovery prompts in this category persists the identified 100 improvement items into `.ai-memory/plans/pending/XX-<slug>.md` along with subtasks in `.ai-memory/plans/subtasks/XX-<slug>/`. Detailing prompts then expand these candidates into exhaustive multi-step execution roadmaps and review dockets, turning continuous quality enhancement into an automated, self-sustaining pipeline.
 >
 > **Strict Relative Git Paths Only:** All file paths, markdown links, and subtask citations must strictly use relative paths from the repository root (e.g. `02-spec/...`, `.ai-memory/...`, `cmd/...`). Absolute filesystem paths and `file:///` URIs are totally banned.
 
@@ -28,6 +28,50 @@ All improvements adhere to the structured **8-Part Specification Schema**, enfor
 | [`01-find-100-improvements-in-ui-level.md`](01-find-100-improvements-in-ui-level.md) | V6 / 1.0.0 | UI/UX & Design Tokens | 100 UI-level UX improvements covering design token registries, typography clamp formulas, WCAG AAA contrast, glassmorphic depth, virtualized trees, and presenter HUDs. |
 | [`02-find-100-improvements-in-code-base.md`](02-find-100-improvements-in-code-base.md) | V6 / 1.0.0 | Codebase Quality & Hygiene | 100 codebase-level improvements enforcing monadic Result envelopes, domain `*appfault.AppError`, positive booleans, parameter structs, map dispatch tables, and value semantics. |
 | [`03-find-100-improvements-in-whole-system.md`](03-find-100-improvements-in-whole-system.md) | V6 / 1.0.0 | Whole-System Architecture | 100 whole-system improvements across 10 UX clusters: DX/CLI ergonomics, UI tokens, agent swarms, prompt architecture, fleet sync, code quality, performance, diagnostics, test isolation, and spec governance. |
+| [`04-detail-plans-and-improvements-for-review.md`](04-detail-plans-and-improvements-for-review.md) | V6 / 1.0.0 | Multi-Step Detailing & Review Dockets | Autonomously details out active, pending, and completed plans and discovered improvements into exhaustive multi-step execution roadmaps, structural contracts, dependency graphs, and review dockets with strict review-first gating (no immediate execution without user review). |
+
+---
+
+## The Review-First Gate: Mandatory Pre-Execution Protocol
+
+A cornerstone invariant of the `30-improvements` category is the **Review-First Gate**:
+
+> [!CAUTION]
+> **Total Ban on Immediate / Unreviewed Code Execution:**  
+> When running improvement discovery or detailing prompts, agents are **STRICTLY PROHIBITED** from immediately applying code changes, modifying source files, running builds, or executing automated refactoring waves.  
+> All improvements and detailed plans must be presented and enqueued for review. Code execution is strictly blocked pending explicit user review and sign-off.
+
+### Why Review-First Gating Is Mandatory:
+1. **Zero Unintended Mutations:** Complex codebases require careful scrutiny of caller blast radius, API surface stability, and architectural boundary integrity before any refactoring begins.
+2. **Deterministic Risk Governance:** The centralized Review Docket (`02-spec/21-app/XX-<slug>/00-review-docket.md`) maps out risk tiers (Low/Medium/High/Critical), rollback complexity, and backward compatibility shims (e.g. `type Fault = AppError`) prior to code touch.
+3. **Multi-Stage Dependency Clarity:** Stakeholders review the proposed Directed Acyclic Graph (DAG) of execution waves, ensuring prerequisite data structures, types, and error envelopes land before dependent modules are modified.
+4. **Transparent User Control:** The user retains full control over project direction, approving, modifying, or prioritizing subtasks before any background worker swarm touches production code.
+
+---
+
+## Synergy: Finding 100 Improvements vs. Detailing Them for Review
+
+The four prompts within this category form a closed-loop, highly complementary continuous improvement flywheel:
+
+```mermaid
+flowchart TD
+    A["Discovery Prompts (01, 02, 03)<br/>Find 100 Improvements (UI / Code / System)"] -->|"Raw Discovery Cards<br/>& Enqueued Backlog"| B["Detailing Prompt (04)<br/>Detail Plans & Improvements for Review"]
+    B -->|"8-Field Specification Schema<br/>+ Multi-Step Roadmaps"| C["Centralized Review Docket<br/>(00-review-docket.md & Subtask Plans)"]
+    C -->|"Strict Review Gate<br/>User Review & Approval"| D{"User Decision"}
+    D -->|"Revise / Reprioritize"| B
+    D -->|"Approved"| E["Execution Engine (V6 Tree Swarm)<br/>execute-parent-task-with-n-steps-v6"]
+    E -->|"Completed & Verified Cycle"| A
+```
+
+### Operational Synergy Breakdown:
+- **Discovery Prompts (`01`, `02`, `03`) — Broad Architectural Radar:**  
+  Systematically scan the repository across UI/UX, codebase quality, or whole-system ergonomics to surface 100 grounded improvement opportunities. They capture the macro view and seed the backlog in `.ai-memory/plans/pending/`.
+- **Detailing Prompt (`04`) — Micro Precision & Structural Contracts:**  
+  Ingests raw discovery candidates or pending backlogs, inspects the codebase using GitMap high-speed streaming search, and expands each item into an exhaustive 8-Field Specification Card with concrete code blueprints, exact caller counts, and binary verification criteria.
+- **Review Docket Assembly (`00-review-docket.md`) — Risk & Dependency Governance:**  
+  Consolidates all detailed items into a unified review docket with an executive scorecard, risk matrix, and dependency DAG, clearly marking status as `PENDING USER REVIEW`.
+- **Handoff to Execution Engines — Safe, Confined Implementation:**  
+  Once the user reviews and signs off, the enqueued subtasks in `.ai-memory/plans/subtasks/XX-<slug>/` are executed wave-by-wave using canonical execution engines like [`execute-parent-task-with-n-steps-v6`](file;.agents/skills/execute-parent-task-with-n-steps-v6), ensuring 100% adherence to the agreed blueprint.
 
 ---
 
@@ -50,9 +94,9 @@ The whole-system improvements catalog (`03-find-100-improvements-in-whole-system
 
 ## 8-Part Structured Specification Schema
 
-Every improvement generated or executed under Category 30 adheres to the strict 8-part schema:
+Every improvement generated or detailed under Category 30 adheres to the strict 8-part schema:
 
-1. **Identifier & Subsystem:** `SYS-IMP-NNN`, Subsystem, and Target Boundaries.
+1. **Identifier & Subsystem:** `SYS-IMP-NNN` or `PLAN-DET-NNN`, Subsystem, and Target Boundaries.
 2. **System-Level User Experience (UX) Impact:** Cognitive load reduction, workflow velocity, error clarity.
 3. **Cause (Current Deficiency / Root Friction):** Root cause analysis in 1-2 sharp sentences.
 4. **Effect (Target State & Behavioral Outcome):** Quantitative metrics and target behavioral state.
@@ -68,9 +112,15 @@ Every improvement generated or executed under Category 30 adheres to the strict 
 Each prompt in this category is accompanied by symmetric, production-grade skills installed in both Antigravity Agents and Cursor IDE:
 
 - **Antigravity Agents:**
+  - [`find-100-improvements-in-ui-level`](file;.agents/skills/find-100-improvements-in-ui-level)
+  - [`find-100-improvements-in-code-base`](file;.agents/skills/find-100-improvements-in-code-base)
   - [`find-100-improvements-in-whole-system`](file;.agents/skills/find-100-improvements-in-whole-system)
+  - [`detail-plans-and-improvements-for-review`](file;.agents/skills/detail-plans-and-improvements-for-review)
 - **Cursor IDE:**
+  - [`find-100-improvements-in-ui-level`](file;.cursor/skills/find-100-improvements-in-ui-level)
+  - [`find-100-improvements-in-code-base`](file;.cursor/skills/find-100-improvements-in-code-base)
   - [`find-100-improvements-in-whole-system`](file;.cursor/skills/find-100-improvements-in-whole-system)
+  - [`detail-plans-and-improvements-for-review`](file;.cursor/skills/detail-plans-and-improvements-for-review)
 
 ---
 
@@ -81,5 +131,6 @@ Each prompt in this category is accompanied by symmetric, production-grade skill
 ├── 01-find-100-improvements-in-ui-level.md
 ├── 02-find-100-improvements-in-code-base.md
 ├── 03-find-100-improvements-in-whole-system.md
+├── 04-detail-plans-and-improvements-for-review.md
 └── readme.md
 ```
