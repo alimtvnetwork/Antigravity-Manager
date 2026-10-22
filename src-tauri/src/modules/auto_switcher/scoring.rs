@@ -89,6 +89,15 @@ pub fn is_gemini_native_model(model_name: &str) -> bool {
     !n.contains("claude") && !n.contains("3p")
 }
 
+/// Helper to check if a quota bucket belongs to Gemini weekly cycle.
+pub fn is_gemini_weekly_bucket(window: &str, bucket_id: &str) -> bool {
+    let win = window.to_lowercase();
+    let bid = bucket_id.to_lowercase();
+    let is_weekly = win.contains("week") || bid.contains("week");
+    let is_gemini = !bid.contains("3p") && !bid.contains("claude");
+    is_weekly && is_gemini
+}
+
 /// Headroom-weighted weekly quota scoring algorithm:
 /// - Any candidate with < 100% 4-hour quota (and period not finished) evaluates to `0.0`.
 /// - Fresh accounts with 168h headroom receive maximum scaling (Headroom Multiplier = 2.0).
@@ -144,23 +153,21 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
         if let Some(ref groups) = quota_data.quota_groups {
             for g in groups {
                 for b in &g.buckets {
-                    let win = b.window.to_lowercase();
-                    let bid = b.bucket_id.to_lowercase();
-                    // Gemini-only: skip 3p/claude buckets (Claude TODO)
-                    let is_gemini_weekly = (win.contains("week") || bid.contains("week"))
-                        && !bid.contains("3p")
-                        && !bid.contains("claude");
-                    if is_gemini_weekly && (0.0..=1.0).contains(&b.remaining_fraction) {
-                        let pct = (b.remaining_fraction * 100.0).round();
-                        let eff_pct = if pct < WEEKLY_ZERO_THRESHOLD {
-                            0.0
-                        } else {
-                            pct
-                        };
-                        // Modernized: remaining cycle headroom gives highest score to freshly reset accounts
-                        let remaining_hours = compute_weekly_remaining_headroom_hours(b, now_sec);
-                        gemini_weekly_scores.push(eff_pct * remaining_hours);
+                    if !is_gemini_weekly_bucket(&b.window, &b.bucket_id) {
+                        continue;
                     }
+                    if !(0.0..=1.0).contains(&b.remaining_fraction) {
+                        continue;
+                    }
+                    let pct = (b.remaining_fraction * 100.0).round();
+                    let eff_pct = if pct < WEEKLY_ZERO_THRESHOLD {
+                        0.0
+                    } else {
+                        pct
+                    };
+                    // Modernized: remaining cycle headroom gives highest score to freshly reset accounts
+                    let remaining_hours = compute_weekly_remaining_headroom_hours(b, now_sec);
+                    gemini_weekly_scores.push(eff_pct * remaining_hours);
                 }
             }
         }

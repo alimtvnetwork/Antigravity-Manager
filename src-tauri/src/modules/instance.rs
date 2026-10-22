@@ -252,6 +252,15 @@ pub mod tests_window_layout_anchor;
 #[cfg(test)]
 #[path = "instance/tests_vitality_scanner.rs"]
 pub mod tests_vitality_scanner;
+#[cfg(test)]
+#[path = "instance/tests_profile_fingerprint_hasher.rs"]
+pub mod tests_profile_fingerprint_hasher;
+#[cfg(test)]
+#[path = "instance/tests_remote_debugging_port_allocator.rs"]
+pub mod tests_remote_debugging_port_allocator;
+#[cfg(test)]
+#[path = "instance/tests_session_trace_uuid.rs"]
+pub mod tests_session_trace_uuid;
 #[path = "instance/terminate_fallback_ladder.rs"]
 pub mod terminate_fallback_ladder;
 #[path = "instance/tuning.rs"]

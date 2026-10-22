@@ -114,6 +114,8 @@ pub mod tests_lock_contention_watchdog;
 pub mod tests_index_fragmentation_scorer;
 #[cfg(test)]
 pub mod tests_page_cache_adjuster;
+#[cfg(test)]
+pub mod tests_mmap_tuner;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;
