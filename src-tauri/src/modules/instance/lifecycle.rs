@@ -166,6 +166,17 @@ pub fn is_conscious_ide_pid(pid: u32) -> bool {
     }
 }
 
+/// Imp-541: Affirmative predicate determining if an instance process is genuinely alive and healthy.
+/// Eliminates compound negative logic (`!running || !has_active_process`).
+pub fn is_instance_running_and_active(running: bool, has_active_process: bool) -> bool {
+    running && has_active_process
+}
+
+/// Imp-541: Determines whether a candidate lockfile is stale and safe to be unlinked.
+pub fn is_stale_lock_removable(is_pid_alive: bool, is_content_empty: bool) -> bool {
+    !is_pid_alive || is_content_empty
+}
+
 /// Imp-61: Stale Session Lock Recovery
 /// Scans the instance data path for stale IDE session lockfiles (`.vscode-server`, `.antigravity-session`,
 /// `SingletonLock`, `code.lock`). If the holding PID is dead in the OS process table or file is orphaned,
@@ -197,11 +208,10 @@ pub fn recover_stale_session_locks(data_path: &std::path::Path) -> usize {
                         sysinfo::ProcessesToUpdate::Some(&[sysinfo::Pid::from_u32(pid)]),
                         sysinfo::ProcessRefreshKind::new(),
                     );
-                    if system.process(sysinfo::Pid::from_u32(pid)).is_none() {
-                        should_remove = true;
-                    }
+                    let is_alive = system.process(sysinfo::Pid::from_u32(pid)).is_some();
+                    should_remove = is_stale_lock_removable(is_alive, false);
                 } else if trimmed.is_empty() {
-                    should_remove = true;
+                    should_remove = is_stale_lock_removable(false, true);
                 }
             } else {
                 should_remove = true;

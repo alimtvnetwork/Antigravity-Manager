@@ -101,6 +101,82 @@ fn read_step_from_full_transcript(path: &Path, target_step_index: usize) -> Opti
     None
 }
 
+/// Imp-542: Parses transcript content to extract user prompt and attached images.
+/// Uses early-return guard clauses to eliminate nested control flow.
+pub(crate) fn extract_user_prompt_and_media(
+    content: &str,
+    full_transcript_path: &Path,
+) -> (Option<String>, Option<String>) {
+    for line in content.lines().rev() {
+        if !line.contains("USER_INPUT") && !line.contains("USER_EXPLICIT") {
+            continue;
+        }
+        let Ok(val) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+        let s_type = val.get("type").and_then(|t| t.as_str()).unwrap_or("");
+        let s_source = val.get("source").and_then(|s| s.as_str()).unwrap_or("");
+        if s_type != "USER_INPUT" && s_source != "USER_EXPLICIT" {
+            continue;
+        }
+
+        let raw_txt = val.get("content").and_then(|c| c.as_str()).unwrap_or("");
+        if is_subagent_or_system_content(raw_txt) {
+            continue;
+        }
+
+        let is_truncated = raw_txt.contains("<truncated")
+            || val
+                .get("truncated_fields")
+                .and_then(|tf| tf.as_array())
+                .map(|arr| arr.iter().any(|v| v.as_str() == Some("content")))
+                .unwrap_or(false);
+
+        let resolved_txt = if is_truncated && full_transcript_path.exists() {
+            let target_step = val.get("step_index").and_then(|s| s.as_u64());
+            if let Some(target_idx) = target_step {
+                read_step_from_full_transcript(full_transcript_path, target_idx as usize)
+                    .unwrap_or_else(|| raw_txt.to_string())
+            } else {
+                raw_txt.to_string()
+            }
+        } else {
+            raw_txt.to_string()
+        };
+
+        let clean_txt = extract_clean_user_prompt(&resolved_txt);
+        if clean_txt.trim().is_empty() {
+            continue;
+        }
+
+        let mut image_payload: Option<String> = None;
+        if let Some(media_arr) = val.get("media").and_then(|m| m.as_array()) {
+            for m_item in media_arr {
+                let Some(uri) = m_item.get("uri").and_then(|u| u.as_str()) else {
+                    continue;
+                };
+                let clean_path = decode_uri_to_path(uri);
+                let p = Path::new(&clean_path);
+                if !p.exists() {
+                    continue;
+                }
+                if let Ok(bytes) = fs::read(p) {
+                    let mime = m_item
+                        .get("mime_type")
+                        .and_then(|mt| mt.as_str())
+                        .unwrap_or("image/png");
+                    let b64 = STANDARD.encode(&bytes);
+                    image_payload = Some(format!("data:{};base64,{}", mime, b64));
+                    break;
+                }
+            }
+        }
+
+        return (Some(clean_txt), image_payload);
+    }
+    (None, None)
+}
+
 /// Discover in-flight active conversations and running prompts directly from Antigravity core storage
 /// (~/.gemini/antigravity/conversation_summaries.db and brain/<cid>/.system_generated/logs/transcript.jsonl)
 pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<ActivePrompt> {
@@ -187,87 +263,13 @@ pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<Activ
             let full_transcript_path = logs_dir.join("transcript_full.jsonl");
             let transcript_file = resolve_transcript_path(&base_dir, &cid);
 
-            let mut user_prompt: Option<String> = None;
-            let mut image_payload: Option<String> = None;
-
-            if let Some(tf) = transcript_file {
-                if let Ok(content) = fs::read_to_string(&tf) {
-                    for line in content.lines().rev() {
-                        if !line.contains("USER_INPUT") && !line.contains("USER_EXPLICIT") {
-                            continue;
-                        }
-                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
-                            let s_type = val.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                            let s_source = val.get("source").and_then(|s| s.as_str()).unwrap_or("");
-                            if s_type == "USER_INPUT" || s_source == "USER_EXPLICIT" {
-                                let raw_txt =
-                                    val.get("content").and_then(|c| c.as_str()).unwrap_or("");
-                                if is_subagent_or_system_content(raw_txt) {
-                                    continue;
-                                }
-
-                                let is_truncated = raw_txt.contains("<truncated")
-                                    || val
-                                        .get("truncated_fields")
-                                        .and_then(|tf| tf.as_array())
-                                        .map(|arr| {
-                                            arr.iter().any(|v| v.as_str() == Some("content"))
-                                        })
-                                        .unwrap_or(false);
-
-                                let resolved_txt = if is_truncated && full_transcript_path.exists()
-                                {
-                                    let target_step =
-                                        val.get("step_index").and_then(|s| s.as_u64());
-                                    if let Some(target_idx) = target_step {
-                                        read_step_from_full_transcript(
-                                            &full_transcript_path,
-                                            target_idx as usize,
-                                        )
-                                        .unwrap_or_else(|| raw_txt.to_string())
-                                    } else {
-                                        raw_txt.to_string()
-                                    }
-                                } else {
-                                    raw_txt.to_string()
-                                };
-
-                                let clean_txt = extract_clean_user_prompt(&resolved_txt);
-                                if !clean_txt.trim().is_empty() {
-                                    user_prompt = Some(clean_txt);
-                                    if let Some(media_arr) =
-                                        val.get("media").and_then(|m| m.as_array())
-                                    {
-                                        for m_item in media_arr {
-                                            if let Some(uri) =
-                                                m_item.get("uri").and_then(|u| u.as_str())
-                                            {
-                                                let clean_path = decode_uri_to_path(uri);
-                                                let p = Path::new(&clean_path);
-                                                if p.exists() {
-                                                    if let Ok(bytes) = fs::read(p) {
-                                                        let mime = m_item
-                                                            .get("mime_type")
-                                                            .and_then(|mt| mt.as_str())
-                                                            .unwrap_or("image/png");
-                                                        let b64 = STANDARD.encode(&bytes);
-                                                        image_payload = Some(format!(
-                                                            "data:{};base64,{}",
-                                                            mime, b64
-                                                        ));
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            let (user_prompt, image_payload) = match transcript_file {
+                Some(tf) => match fs::read_to_string(&tf) {
+                    Ok(c) => extract_user_prompt_and_media(&c, &full_transcript_path),
+                    Err(_) => (None, None),
+                },
+                None => (None, None),
+            };
 
             // If reverse scan missed but inspection has recent clean prompt, use it
             if user_prompt.is_none() && inspection.latest_prompt.is_some() {

@@ -207,6 +207,15 @@ pub mod tests_e2e;
 #[cfg(test)]
 #[path = "instance/tests_sandboxed_environment.rs"]
 pub mod tests_sandboxed_environment;
+#[cfg(test)]
+#[path = "instance/tests_stale_pid_reaper.rs"]
+pub mod tests_stale_pid_reaper;
+#[cfg(test)]
+#[path = "instance/tests_profile_hasher.rs"]
+pub mod tests_profile_hasher;
+#[cfg(test)]
+#[path = "instance/tests_binary_execution_probe.rs"]
+pub mod tests_binary_execution_probe;
 #[path = "instance/terminate_fallback_ladder.rs"]
 pub mod terminate_fallback_ladder;
 #[path = "instance/tuning.rs"]

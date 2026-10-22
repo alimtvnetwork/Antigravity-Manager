@@ -99,6 +99,10 @@ pub mod write_ahead_flush;
 pub mod tests;
 #[cfg(test)]
 pub mod tests_wal_schedulers;
+#[cfg(test)]
+pub mod tests_page_freelist;
+#[cfg(test)]
+pub mod tests_busy_timeout_scaler;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;
