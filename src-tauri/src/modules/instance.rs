@@ -6,6 +6,8 @@
 
 #[path = "instance/active.rs"]
 pub mod active;
+#[path = "instance/arg_normalizer.rs"]
+pub mod arg_normalizer;
 #[path = "instance/cdp_onboarding.rs"]
 pub mod cdp_onboarding;
 #[path = "instance/clone.rs"]
@@ -35,12 +37,16 @@ pub mod launch;
 pub(crate) use launch::launch_instance_inner_with_extra_workspaces;
 #[path = "instance/lifecycle.rs"]
 pub mod lifecycle;
+#[path = "instance/lock_reclaimer.rs"]
+pub mod lock_reclaimer;
 #[path = "instance/merge.rs"]
 pub mod merge;
 #[path = "instance/misc.rs"]
 pub mod misc;
 #[path = "instance/observe.rs"]
 pub mod observe;
+#[path = "instance/path_sanitizer.rs"]
+pub mod path_sanitizer;
 #[path = "instance/paths.rs"]
 pub mod paths;
 #[path = "instance/pid_scan.rs"]
@@ -57,6 +63,8 @@ pub mod post_switch_resume;
 pub mod process_cache;
 #[path = "instance/process_record.rs"]
 pub mod process_record;
+#[path = "instance/project_uri.rs"]
+pub mod project_uri;
 #[path = "instance/projects.rs"]
 pub mod projects;
 #[path = "instance/projects_copy.rs"]
@@ -69,6 +77,8 @@ pub mod query;
 pub mod registry;
 #[path = "instance/sandbox_purger.rs"]
 pub mod sandbox_purger;
+#[path = "instance/session_uuid.rs"]
+pub mod session_uuid;
 #[path = "instance/settings.rs"]
 pub mod settings;
 #[path = "instance/settings_copy.rs"]
@@ -104,17 +114,25 @@ pub mod tests_clone_b;
 pub mod tests_e2e;
 #[path = "instance/tuning.rs"]
 pub mod tuning;
+#[path = "instance/vitality_scanner.rs"]
+pub mod vitality_scanner;
 #[path = "instance/workspace.rs"]
 pub mod workspace;
 #[path = "instance/workspace_continuity.rs"]
 pub mod workspace_continuity;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
+pub use arg_normalizer::*;
 pub use clone_checksum::*;
 pub use keyring_flags::*;
+pub use lock_reclaimer::*;
+pub use path_sanitizer::*;
 pub use port_detector::*;
+pub use project_uri::*;
 pub use sandbox_purger::*;
+pub use session_uuid::*;
 pub use storage_scrubber::*;
+pub use vitality_scanner::*;
 pub use workspace_continuity::*;
 
 pub use active::{

@@ -5,6 +5,11 @@ use std::time::{Duration, SystemTime};
 mod ratelimittracker_impl;
 mod ratelimittracker_impl_2;
 mod retryparsermode;
+pub mod sliding_window;
+pub mod token_bucket;
+
+pub use sliding_window::*;
+pub use token_bucket::*;
 
 pub(crate) use retryparsermode::has_explicit_quota_exhausted;
 pub(crate) use retryparsermode::is_active_persisted_long_image_limit;

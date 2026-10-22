@@ -48,3 +48,17 @@ export function formatRelativeTime(epochSec: number, nowSec = Math.floor(Date.no
 
   return { formatted, nextRefreshSeconds: 86400 };
 }
+
+/**
+ * Compact relative time string helper accepting number, ISO string, or Date.
+ */
+export function formatCompactRelativeTime(timestamp: number | string | Date): string {
+  const epochSec =
+    typeof timestamp === 'number'
+      ? timestamp > 100_000_000_000
+        ? Math.floor(timestamp / 1000)
+        : timestamp
+      : Math.floor(new Date(timestamp).getTime() / 1000);
+
+  return formatRelativeTime(epochSec).formatted;
+}
