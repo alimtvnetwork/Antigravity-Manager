@@ -65,6 +65,10 @@ pub mod tests_request_size_guard;
 pub mod tests_request_header_sanitizer;
 #[cfg(test)]
 pub mod tests_request_content_length_validator;
+#[cfg(test)]
+pub mod tests_response_content_type_matcher;
+#[cfg(test)]
+pub mod tests_compression_negotiator;
 
 pub use abort_sentinel::*;
 pub use boundary_normalizer::StreamBoundaryNormalizer;

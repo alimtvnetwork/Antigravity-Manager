@@ -13,6 +13,7 @@ interface SegmentedTabGroupProps<T extends string = string> {
   onChange: (id: T) => void;
   size?: 'sm' | 'md';
   className?: string;
+  'aria-label'?: string;
 }
 
 export function SegmentedTabGroup<T extends string = string>({
@@ -21,6 +22,7 @@ export function SegmentedTabGroup<T extends string = string>({
   onChange,
   size = 'sm',
   className = '',
+  'aria-label': ariaLabel = 'Navigation tabs',
 }: SegmentedTabGroupProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -33,6 +35,12 @@ export function SegmentedTabGroup<T extends string = string>({
       e.preventDefault();
       const prevIndex = (index - 1 + options.length) % options.length;
       onChange(options[prevIndex].id);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      if (options.length > 0) onChange(options[0].id);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      if (options.length > 0) onChange(options[options.length - 1].id);
     }
   };
 
@@ -42,6 +50,7 @@ export function SegmentedTabGroup<T extends string = string>({
     <div
       ref={containerRef}
       role="tablist"
+      aria-label={ariaLabel}
       className={`inline-flex items-center p-0.5 rounded-full bg-slate-900/80 border border-slate-700/60 backdrop-blur-md shadow-inner ${className}`}
     >
       {options.map((option, idx) => {
@@ -51,19 +60,22 @@ export function SegmentedTabGroup<T extends string = string>({
             key={option.id}
             role="tab"
             aria-selected={isActive}
+            aria-label={option.label}
+            aria-controls={`tabpanel-${option.id}`}
             tabIndex={isActive ? 0 : -1}
             onClick={() => onChange(option.id)}
             onKeyDown={(e) => handleKeyDown(e, idx)}
-            className={`inline-flex items-center gap-1.5 font-medium rounded-full transition-all duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-sky-400 ${padClasses} ${
+            className={`inline-flex items-center gap-1.5 font-medium rounded-full transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 ${padClasses} ${
               isActive
                 ? 'bg-slate-700/90 text-white shadow-sm border border-slate-600/60 font-semibold'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
           >
-            {option.icon && <span className="opacity-80">{option.icon}</span>}
+            {option.icon && <span className="opacity-80" aria-hidden="true">{option.icon}</span>}
             <span>{option.label}</span>
             {option.count !== undefined && (
               <span
+                aria-hidden="true"
                 className={`ml-0.5 px-1.5 py-0.2 text-[10px] rounded-full font-mono ${
                   isActive
                     ? 'bg-sky-500/20 text-sky-300 border border-sky-400/30'

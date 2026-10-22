@@ -87,13 +87,18 @@ export default function ModalDialog({
             {/* Draggable Top Region */}
             <div data-tauri-drag-region className="fixed top-0 left-0 right-0 h-8 z-[100000]" />
 
-            <div className={`modal-box relative ${maxWidth} w-full max-h-[90vh] flex flex-col bg-white dark:bg-base-100 shadow-2xl rounded-2xl p-0 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200 z-10`}>
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="modal-dialog-title"
+                className={`modal-box relative ${maxWidth} w-full max-h-[90vh] flex flex-col bg-white dark:bg-base-100 shadow-2xl rounded-2xl p-0 overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200 z-10`}
+            >
                 {handleCancel && (
                     <button
                         type="button"
                         disabled={isLoading}
                         onClick={handleCancel}
-                        className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-base-200 transition-colors cursor-pointer z-20"
+                        className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-base-200 transition-colors cursor-pointer z-20 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60"
                         title={t('common.close', 'Close')}
                         aria-label="Close dialog"
                     >
@@ -101,11 +106,11 @@ export default function ModalDialog({
                     </button>
                 )}
                 <div className="flex flex-col items-center text-center p-5 pt-6 sm:p-6 sm:pt-7 flex-1 min-h-0 overflow-hidden">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 shadow-sm shrink-0 ${getIconBg()}`}>
+                    <div aria-hidden="true" className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 shadow-sm shrink-0 ${getIconBg()}`}>
                         {getIcon()}
                     </div>
 
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-base-content mb-2 shrink-0">{title}</h3>
+                    <h3 id="modal-dialog-title" className="text-xl font-bold text-gray-900 dark:text-base-content mb-2 shrink-0">{title}</h3>
 
                     {children ? (
                         <div className="w-full text-left flex-1 min-h-0 overflow-y-auto px-1 py-1 mb-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-base-300">
@@ -119,7 +124,7 @@ export default function ModalDialog({
                         {showCancel && (
                             <button
                                 disabled={isLoading}
-                                className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-base-200 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-base-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-200 dark:focus:ring-base-300 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-base-200 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-base-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                 onClick={handleCancel}
                             >
                                 {finalCancelText}
@@ -127,7 +132,7 @@ export default function ModalDialog({
                         )}
                         <button
                             disabled={isLoading}
-                            className={`flex-1 px-4 py-2.5 text-white font-medium rounded-xl shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${isDestructive && type === 'confirm'
+                            className={`flex-1 px-4 py-2.5 text-white font-medium rounded-xl shadow-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 focus-visible:ring-offset-2 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${isDestructive && type === 'confirm'
                                 ? 'bg-red-500 hover:bg-red-600 focus:ring-red-500 shadow-red-100'
                                 : 'bg-blue-500 hover:bg-blue-600 focus:ring-blue-500 shadow-blue-100'
                                 }`}

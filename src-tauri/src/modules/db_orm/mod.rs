@@ -134,6 +134,10 @@ pub mod tests_index_coverage_verifier;
 pub mod tests_index_cardinality_analyzer;
 #[cfg(test)]
 pub mod tests_query_latency_histogram;
+#[cfg(test)]
+pub mod tests_commit_latency_observer;
+#[cfg(test)]
+pub mod tests_db_size_watchdog;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;

@@ -127,6 +127,8 @@ pub mod tests_binding_affinity;
 #[cfg(test)]
 pub mod tests_weekly_headroom_ratio;
 #[cfg(test)]
+pub mod tests_candidate_dedup;
+#[cfg(test)]
 pub(crate) use crate::models::account::Account;
 #[cfg(test)]
 pub(crate) use tests_a::make_test_account;

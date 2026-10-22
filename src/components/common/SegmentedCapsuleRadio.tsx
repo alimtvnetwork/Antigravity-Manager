@@ -15,6 +15,7 @@ export interface SegmentedCapsuleRadioProps<T extends string | number> {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   disabled?: boolean;
+  'aria-label'?: string;
 }
 
 export function SegmentedCapsuleRadio<T extends string | number>({
@@ -24,7 +25,29 @@ export function SegmentedCapsuleRadio<T extends string | number>({
   size = 'md',
   className = '',
   disabled = false,
+  'aria-label': ariaLabel = 'Options',
 }: SegmentedCapsuleRadioProps<T>) {
+  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
+    if (disabled) return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextIndex = (index + 1) % options.length;
+      if (!options[nextIndex].disabled) onChange(options[nextIndex].value);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prevIndex = (index - 1 + options.length) % options.length;
+      if (!options[prevIndex].disabled) onChange(options[prevIndex].value);
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      const first = options.find((o) => !o.disabled);
+      if (first) onChange(first.value);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      const last = [...options].reverse().find((o) => !o.disabled);
+      if (last) onChange(last.value);
+    }
+  };
+
   const getSizeClasses = () => {
     switch (size) {
       case 'sm':
@@ -40,6 +63,7 @@ export function SegmentedCapsuleRadio<T extends string | number>({
   return (
     <div
       role="radiogroup"
+      aria-label={ariaLabel}
       className={`inline-flex items-center p-0.5 rounded-full bg-slate-900/80 dark:bg-slate-950/80 border border-slate-700/60 shadow-inner backdrop-blur-md ${
         disabled ? 'opacity-50 pointer-events-none' : ''
       } ${className}`}
@@ -55,17 +79,20 @@ export function SegmentedCapsuleRadio<T extends string | number>({
             role="radio"
             aria-checked={isSelected}
             disabled={isOptionDisabled}
+            tabIndex={isSelected ? 0 : -1}
             onClick={() => !isOptionDisabled && onChange(opt.value)}
-            className={`relative flex items-center justify-center font-medium rounded-full transition-all duration-200 select-none ${getSizeClasses()} ${
+            onKeyDown={(e) => handleKeyDown(e, idx)}
+            className={`relative flex items-center justify-center font-medium rounded-full transition-all duration-200 select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 ${getSizeClasses()} ${
               isSelected
                 ? 'bg-sky-600/90 text-white shadow-[0_0_10px_rgba(2,132,199,0.35)]'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
             }`}
           >
-            {opt.icon && <span className="shrink-0">{opt.icon}</span>}
+            {opt.icon && <span className="shrink-0" aria-hidden="true">{opt.icon}</span>}
             <span>{opt.label}</span>
             {opt.badge !== undefined && (
               <span
+                aria-hidden="true"
                 className={`ml-1 px-1.5 py-0.2 text-[10px] font-mono rounded-full ${
                   isSelected
                     ? 'bg-sky-800 text-sky-100'

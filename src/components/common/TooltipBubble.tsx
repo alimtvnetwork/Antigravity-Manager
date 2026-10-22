@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useId } from 'react';
 
 export type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right';
 
@@ -19,6 +19,7 @@ export const TooltipBubble: React.FC<TooltipBubbleProps> = ({
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const tooltipId = useId();
 
   const show = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -40,6 +41,7 @@ export const TooltipBubble: React.FC<TooltipBubbleProps> = ({
   return (
     <div
       className="relative inline-flex items-center"
+      aria-describedby={isVisible ? tooltipId : undefined}
       onMouseEnter={show}
       onMouseLeave={hide}
       onFocus={show}
@@ -48,8 +50,9 @@ export const TooltipBubble: React.FC<TooltipBubbleProps> = ({
       {children}
       {isVisible && content && (
         <div
+          id={tooltipId}
           role="tooltip"
-          className={`absolute z-50 pointer-events-none px-2.5 py-1 text-xs font-normal text-slate-200 bg-slate-900/95 border border-slate-700/80 backdrop-blur-md rounded-lg shadow-xl whitespace-nowrap animate-in fade-in zoom-in-95 duration-100 ${placementStyles[placement]} ${className}`}
+          className={`absolute z-50 pointer-events-none px-2.5 py-1 text-xs font-normal text-slate-100 bg-slate-900/95 border border-slate-700/80 backdrop-blur-md rounded-lg shadow-xl whitespace-nowrap animate-in fade-in zoom-in-95 duration-100 ${placementStyles[placement]} ${className}`}
         >
           {content}
         </div>
