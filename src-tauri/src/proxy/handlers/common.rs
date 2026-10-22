@@ -12,32 +12,38 @@ use tracing::{debug, info};
 
 pub mod abort_sentinel;
 pub mod boundary_normalizer;
+pub mod canonical_role_mapper;
 pub mod context_guard;
 pub mod curl_gen;
 pub mod decompressor;
 pub mod frame_clamper;
 mod handle_detect_model;
 pub mod header_anonymizer;
+pub mod json_payload_sanitizer;
 pub(crate) mod retrystrategy;
 pub mod sse_comment_filter;
 pub mod sse_framing_validator;
 pub mod sse_heartbeat;
 pub mod status_mapper;
 pub mod stream_abort;
+pub mod stream_boundary_guard;
 pub mod stream_flusher;
 
 pub use abort_sentinel::*;
 pub use boundary_normalizer::StreamBoundaryNormalizer;
+pub use canonical_role_mapper::*;
 pub use context_guard::*;
 pub use curl_gen::generate_reproducible_curl;
 pub use decompressor::decompress_payload;
 pub use frame_clamper::*;
 pub use header_anonymizer::anonymize_forwarded_headers;
+pub use json_payload_sanitizer::*;
 pub use sse_comment_filter::*;
 pub use sse_framing_validator::*;
 pub use sse_heartbeat::*;
 pub use status_mapper::{map_upstream_status_to_canonical, CanonicalErrorPayload};
 pub use stream_abort::{StreamAbortHandle, StreamAbortReceiver};
+pub use stream_boundary_guard::*;
 pub use stream_flusher::{StreamFlusher, SSE_KEEPALIVE_BYTES};
 
 pub use handle_detect_model::build_dual_track_error;

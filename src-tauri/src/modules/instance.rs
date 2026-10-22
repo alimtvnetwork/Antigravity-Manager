@@ -18,6 +18,8 @@ pub mod clone_checksum;
 pub mod clone_helpers;
 #[path = "instance/close.rs"]
 pub mod close;
+#[path = "instance/crash_loop_guard.rs"]
+pub mod crash_loop_guard;
 #[path = "instance/create.rs"]
 pub mod create;
 #[path = "instance/credentials.rs"]
@@ -41,6 +43,8 @@ pub mod keyring_flags;
 #[path = "instance/launch.rs"]
 pub mod launch;
 pub(crate) use launch::launch_instance_inner_with_extra_workspaces;
+#[path = "instance/launch_env_sanitizer.rs"]
+pub mod launch_env_sanitizer;
 #[path = "instance/lifecycle.rs"]
 pub mod lifecycle;
 #[path = "instance/lock_reclaimer.rs"]
@@ -51,6 +55,8 @@ pub mod merge;
 pub mod misc;
 #[path = "instance/observe.rs"]
 pub mod observe;
+#[path = "instance/orphan_socket_sweeper.rs"]
+pub mod orphan_socket_sweeper;
 #[path = "instance/path_sanitizer.rs"]
 pub mod path_sanitizer;
 #[path = "instance/paths.rs"]
@@ -71,6 +77,8 @@ pub mod post_switch_resume;
 pub mod process_cache;
 #[path = "instance/process_record.rs"]
 pub mod process_record;
+#[path = "instance/profile_clone_manifest.rs"]
+pub mod profile_clone_manifest;
 #[path = "instance/project_uri.rs"]
 pub mod project_uri;
 #[path = "instance/projects.rs"]
@@ -101,6 +109,8 @@ pub mod state_snapshot;
 pub mod storage;
 #[path = "instance/storage_scrubber.rs"]
 pub mod storage_scrubber;
+#[path = "instance/telemetry_storage_cleaner.rs"]
+pub mod telemetry_storage_cleaner;
 #[path = "instance/switch.rs"]
 pub mod switch;
 #[path = "instance/switch_guards.rs"]
@@ -126,6 +136,8 @@ pub mod tests_e2e;
 pub mod tuning;
 #[path = "instance/vitality_scanner.rs"]
 pub mod vitality_scanner;
+#[path = "instance/window_state_restorer.rs"]
+pub mod window_state_restorer;
 #[path = "instance/workspace.rs"]
 pub mod workspace;
 #[path = "instance/workspace_continuity.rs"]
@@ -257,3 +269,9 @@ pub use workspace::{
     restore_and_inject_prompts_for_instance, schedule_prompt_restore_after_launch,
     snapshot_active_workspaces,
 };
+pub use crash_loop_guard::*;
+pub use launch_env_sanitizer::*;
+pub use orphan_socket_sweeper::*;
+pub use profile_clone_manifest::*;
+pub use telemetry_storage_cleaner::*;
+pub use window_state_restorer::*;
