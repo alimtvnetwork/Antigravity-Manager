@@ -14,6 +14,8 @@ pub mod cdp_onboarding;
 pub mod clone;
 #[path = "instance/child_health_monitor.rs"]
 pub mod child_health_monitor;
+#[path = "instance/child_process_tree_enumerator.rs"]
+pub mod child_process_tree_enumerator;
 #[path = "instance/clone_checksum.rs"]
 pub mod clone_checksum;
 #[path = "instance/clone_helpers.rs"]
@@ -67,6 +69,8 @@ pub mod lock_reclaimer;
 pub mod merge;
 #[path = "instance/misc.rs"]
 pub mod misc;
+#[path = "instance/keyring_mock_writer.rs"]
+pub mod keyring_mock_writer;
 #[path = "instance/mock_keyring_writer.rs"]
 pub mod mock_keyring_writer;
 #[path = "instance/observe.rs"]
@@ -75,6 +79,8 @@ pub mod observe;
 pub mod orphan_socket_sweeper;
 #[path = "instance/path_sanitizer.rs"]
 pub mod path_sanitizer;
+#[path = "instance/project_path_canonical_normalizer.rs"]
+pub mod project_path_canonical_normalizer;
 #[path = "instance/paths.rs"]
 pub mod paths;
 #[path = "instance/pid_scan.rs"]
@@ -91,6 +97,8 @@ pub mod port_detector;
 pub mod port_matrix;
 #[path = "instance/port_reclaim_sentinel.rs"]
 pub mod port_reclaim_sentinel;
+#[path = "instance/remote_debugging_port_allocator.rs"]
+pub mod remote_debugging_port_allocator;
 #[path = "instance/post_switch_resume.rs"]
 pub mod post_switch_resume;
 #[path = "instance/process_cache.rs"]
@@ -121,6 +129,8 @@ pub mod sandbox_purger;
 pub mod session_file_reclaimer;
 #[path = "instance/session_uuid.rs"]
 pub mod session_uuid;
+#[path = "instance/session_trace_uuid.rs"]
+pub mod session_trace_uuid;
 #[path = "instance/settings.rs"]
 pub mod settings;
 #[path = "instance/settings_copy.rs"]
@@ -137,6 +147,8 @@ pub mod state_snapshot_exporter;
 pub mod storage;
 #[path = "instance/storage_checksum_guard.rs"]
 pub mod storage_checksum_guard;
+#[path = "instance/storage_migration_guard.rs"]
+pub mod storage_migration_guard;
 #[path = "instance/storage_scrubber.rs"]
 pub mod storage_scrubber;
 #[path = "instance/telemetry_storage_cleaner.rs"]
@@ -306,12 +318,14 @@ pub use workspace::{
     snapshot_active_workspaces,
 };
 pub use child_health_monitor::*;
+pub use child_process_tree_enumerator::*;
 pub use cloned_guid_reseeder::*;
 pub use crash_loop_backoff::*;
 pub use crash_loop_guard::*;
 pub use env_whitelist_filter::*;
 pub use ipc_socket_cleaner::*;
 pub use keychain_file_guard::*;
+pub use keyring_mock_writer::*;
 pub use launch_argv_builder::*;
 pub use launch_env_sanitizer::*;
 pub use mock_keyring_writer::*;
@@ -321,9 +335,13 @@ pub use port_reclaim_sentinel::*;
 pub use process_vitality_probe::*;
 pub use profile_clone_manifest::*;
 pub use profile_dir_validator::*;
+pub use project_path_canonical_normalizer::*;
+pub use remote_debugging_port_allocator::*;
 pub use session_file_reclaimer::*;
+pub use session_trace_uuid::*;
 pub use state_snapshot_exporter::*;
 pub use storage_checksum_guard::*;
+pub use storage_migration_guard::*;
 pub use telemetry_storage_cleaner::*;
 pub use terminate_fallback_ladder::*;
 pub use window_state_restorer::*;
