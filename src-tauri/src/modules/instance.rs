@@ -43,6 +43,8 @@ pub mod keyring_flags;
 #[path = "instance/launch.rs"]
 pub mod launch;
 pub(crate) use launch::launch_instance_inner_with_extra_workspaces;
+#[path = "instance/launch_argv_builder.rs"]
+pub mod launch_argv_builder;
 #[path = "instance/launch_env_sanitizer.rs"]
 pub mod launch_env_sanitizer;
 #[path = "instance/lifecycle.rs"]
@@ -53,6 +55,8 @@ pub mod lock_reclaimer;
 pub mod merge;
 #[path = "instance/misc.rs"]
 pub mod misc;
+#[path = "instance/mock_keyring_writer.rs"]
+pub mod mock_keyring_writer;
 #[path = "instance/observe.rs"]
 pub mod observe;
 #[path = "instance/orphan_socket_sweeper.rs"]
@@ -71,12 +75,16 @@ pub mod pid_util;
 pub mod port_detector;
 #[path = "instance/port_matrix.rs"]
 pub mod port_matrix;
+#[path = "instance/port_reclaim_sentinel.rs"]
+pub mod port_reclaim_sentinel;
 #[path = "instance/post_switch_resume.rs"]
 pub mod post_switch_resume;
 #[path = "instance/process_cache.rs"]
 pub mod process_cache;
 #[path = "instance/process_record.rs"]
 pub mod process_record;
+#[path = "instance/process_vitality_probe.rs"]
+pub mod process_vitality_probe;
 #[path = "instance/profile_clone_manifest.rs"]
 pub mod profile_clone_manifest;
 #[path = "instance/project_uri.rs"]
@@ -93,6 +101,8 @@ pub mod query;
 pub mod registry;
 #[path = "instance/sandbox_purger.rs"]
 pub mod sandbox_purger;
+#[path = "instance/session_file_reclaimer.rs"]
+pub mod session_file_reclaimer;
 #[path = "instance/session_uuid.rs"]
 pub mod session_uuid;
 #[path = "instance/settings.rs"]
@@ -144,6 +154,8 @@ pub mod workspace;
 pub mod workspace_continuity;
 #[path = "instance/workspace_hash.rs"]
 pub mod workspace_hash;
+#[path = "instance/workspace_storage_migrator.rs"]
+pub mod workspace_storage_migrator;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use arg_normalizer::*;
@@ -270,8 +282,14 @@ pub use workspace::{
     snapshot_active_workspaces,
 };
 pub use crash_loop_guard::*;
+pub use launch_argv_builder::*;
 pub use launch_env_sanitizer::*;
+pub use mock_keyring_writer::*;
 pub use orphan_socket_sweeper::*;
+pub use port_reclaim_sentinel::*;
+pub use process_vitality_probe::*;
 pub use profile_clone_manifest::*;
+pub use session_file_reclaimer::*;
 pub use telemetry_storage_cleaner::*;
 pub use window_state_restorer::*;
+pub use workspace_storage_migrator::*;
