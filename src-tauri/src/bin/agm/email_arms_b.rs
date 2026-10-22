@@ -299,7 +299,19 @@ pub(crate) fn email_arm_dedupe(args: &[String], is_json: bool) {
     }
 
     if groups.is_empty() {
-        println!("[OK] No duplicate notification recipients found; nothing to merge.");
+        if is_json {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "duplicate_groups": 0,
+                    "rows_deleted": 0,
+                    "applied": true,
+                }))
+                .unwrap_or_default()
+            );
+        } else {
+            println!("[OK] No duplicate notification recipients found; nothing to merge.");
+        }
         return;
     }
 

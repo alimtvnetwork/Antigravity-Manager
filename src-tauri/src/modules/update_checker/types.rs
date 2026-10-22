@@ -2,9 +2,6 @@ use serde::{Deserialize, Serialize};
 
 use super::*;
 
-pub(crate) const GITHUB_API_URL: &str =
-    "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/latest";
-
 pub(crate) const GITHUB_RELEASES_API_URL: &str =
     "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases?per_page=15";
 
@@ -53,6 +50,22 @@ pub struct UpdateInfo {
     pub channel: Option<UpdateChannel>,
     #[serde(default)]
     pub updater_json_url: Option<String>,
+    /// True when `latest_version` was verified to have an installer asset
+    /// for this platform (plan 86, subtask 001).
+    #[serde(default)]
+    pub asset_verified: bool,
+    /// Download URL of the verified platform asset, when known.
+    #[serde(default)]
+    pub asset_url: Option<String>,
+    /// Verified installable versions, newest first (plan 86, subtask 001).
+    #[serde(default)]
+    pub candidates: Vec<String>,
+    /// Newer versions that were skipped, with reasons (plan 86, subtask 001).
+    #[serde(default)]
+    pub skipped_versions: Vec<super::update_types::SkippedVersion>,
+    /// Per-source failures gathered during the check (plan 86, subtask 001).
+    #[serde(default)]
+    pub source_errors: Vec<super::update_types::SourceError>,
 }
 
 fn default_true() -> bool {
@@ -98,22 +111,24 @@ impl Default for UpdateSettings {
     }
 }
 
-#[derive(Debug, Deserialize)]
-pub(crate) struct GitHubRelease {
-    pub(crate) tag_name: String,
-    pub(crate) html_url: String,
-    pub(crate) body: Option<String>,
-    pub(crate) published_at: Option<String>,
+#[derive(Debug, Clone, Deserialize)]
+pub struct GitHubRelease {
+    pub tag_name: String,
+    pub html_url: String,
+    pub body: Option<String>,
+    pub published_at: Option<String>,
     #[serde(default)]
-    pub(crate) prerelease: bool,
+    pub prerelease: bool,
     #[serde(default)]
-    pub(crate) assets: Vec<GitHubReleaseAsset>,
+    pub draft: bool,
+    #[serde(default)]
+    pub assets: Vec<GitHubReleaseAsset>,
 }
 
-#[derive(Debug, Deserialize)]
-pub(crate) struct GitHubReleaseAsset {
-    pub(crate) name: String,
-    pub(crate) browser_download_url: String,
+#[derive(Debug, Clone, Deserialize)]
+pub struct GitHubReleaseAsset {
+    pub name: String,
+    pub browser_download_url: String,
 }
 
 pub const STABLE_UPDATER_JSON_URL: &str =

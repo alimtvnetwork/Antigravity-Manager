@@ -181,7 +181,10 @@ pub(crate) fn extract_target_version(args: &[String]) -> Option<String> {
     None
 }
 
-use antigravity_tools_lib::modules::update_checker::UpdateChannel;
+use antigravity_tools_lib::modules::update_checker::{
+    compare_versions, resolve_installable_release, GitHubRelease, ReleaseAssetInfo,
+    SkippedVersion, UpdateChannel,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum UpdateExecutionMode {
@@ -307,6 +310,28 @@ fn query_latest_release(
     client: &reqwest::blocking::Client,
     channel: UpdateChannel,
 ) -> Option<ReleaseMeta> {
+    // Plan 86, subtask 007: resolve the newest release that actually has a
+    // platform asset; a newer release without one is skipped (and reported
+    // by fetch_skipped_versions) instead of being offered.
+    let list_url =
+        "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases?per_page=15";
+    if let Ok(resp) = client.get(list_url).send() {
+        if resp.status().is_success() {
+            if let Ok(releases) = resp.json::<Vec<GitHubRelease>>() {
+                let infos: Vec<ReleaseAssetInfo> =
+                    releases.iter().map(ReleaseAssetInfo::from).collect();
+                let resolution = resolve_installable_release(&infos, channel);
+                if let Some(selected) = resolution.selected {
+                    return Some(ReleaseMeta {
+                        tag_name: selected.version.clone(),
+                        release_html_url: selected.html_url.clone(),
+                        release_name: format!("v{}", selected.version),
+                    });
+                }
+            }
+        }
+    }
+
     let api_url = "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases/latest";
     if let Ok(resp) = client.get(api_url).send() {
         if resp.status().is_success() {
@@ -361,6 +386,34 @@ fn query_latest_release(
         ),
         release_name: format!("v{}", tag),
     })
+}
+
+/// Newer releases that cannot be installed on this platform (plan 86
+/// skipped-version reporting for the CLI update path). Best-effort: a
+/// failed list query yields an empty report, never a failed update.
+fn fetch_skipped_versions(
+    client: &reqwest::blocking::Client,
+    channel: UpdateChannel,
+    selected_tag: &str,
+) -> Vec<SkippedVersion> {
+    let list_url =
+        "https://api.github.com/repos/alimtvnetwork/Antigravity-Manager/releases?per_page=15";
+    let resp = match client.get(list_url).send() {
+        Ok(r) if r.status().is_success() => r,
+        _ => return Vec::new(),
+    };
+    let releases: Vec<GitHubRelease> = match resp.json() {
+        Ok(v) => v,
+        Err(_) => return Vec::new(),
+    };
+    let infos: Vec<ReleaseAssetInfo> = releases.iter().map(ReleaseAssetInfo::from).collect();
+    let resolution = resolve_installable_release(&infos, channel);
+    resolution
+        .skipped
+        .into_iter()
+        .filter(|s| s.version != selected_tag)
+        .filter(|s| compare_versions(&s.version, crate::common::VERSION))
+        .collect()
 }
 
 pub(crate) fn cmd_update(args: &[String]) {
@@ -608,6 +661,19 @@ pub(crate) fn cmd_update(args: &[String]) {
     let release_html_url = release_meta.release_html_url;
     let release_name = release_meta.release_name;
 
+    // Skipped-version reporting (plan 86): name the newer releases that are
+    // not installable here instead of dropping them silently.
+    let skipped_versions: Vec<SkippedVersion> = if has_explicit_target {
+        Vec::new()
+    } else {
+        fetch_skipped_versions(&client, channel, &tag_name)
+    };
+    if is_interactive {
+        for skipped in &skipped_versions {
+            println!("[!] Skipped v{}: {}", skipped.version, skipped.reason);
+        }
+    }
+
     if tag_name.is_empty() {
         if is_json {
             let err_obj = serde_json::json!({
@@ -787,6 +853,7 @@ pub(crate) fn cmd_update(args: &[String]) {
             "release_name": release_name,
             "release_url": release_html_url,
             "is_up_to_date": is_up_to_date,
+            "skipped_versions": skipped_versions,
             "updated": updated,
             "scope": if is_all { "fleet_and_repo" } else { "binary_only" },
             "repo": {

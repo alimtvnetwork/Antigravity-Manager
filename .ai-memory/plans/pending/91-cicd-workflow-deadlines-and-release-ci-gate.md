@@ -24,3 +24,12 @@ Keep CI green past the announced GitHub runner changes, and make a release impos
 ## Constraints
 - Workflow edits need a token with the `workflow` scope. Check `gh auth status` first; keep workflow edits in their own commit.
 - No releases or tags from this plan.
+
+## Progress (2026-10-23, subtask 190-05)
+
+- Subtask 01 implemented: all four workflows now pin `ubuntu-24.04`; `ci.yml` also has a non-blocking experimental Ubuntu 26.04 matrix entry for the Rust job so WebKitGTK package names can be validated without failing the required run.
+- Subtask 02 partially implemented: `actions/checkout` and `actions/setup-node` were moved to their Node 24-native v5 majors. `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true` was retained because the other actions used by these workflows were not verified as Node 24-native during this implementation-only pass; remove it only after that verification.
+- Subtask 03 implemented: `release.yml` → `verify-release-target` now requires the latest completed `ci.yml` run for `github.sha` to have concluded `success`; a cancelled or missing run fails the gate.
+- Subtask 04 implemented: `ci.yml` uses `cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}`, so runs on `main` are not cancelled by newer runs.
+- Subtask 05 partially implemented: `.gitignore` now ignores `.ai-memory/temp/recent-file-changes.json`. The `git rm --cached` untracking step was not executed by worker 05 because this subtask forbids all git commands; the lead must run the untrack when committing.
+- Acceptance is not yet verified: no CI run, test tag, build, or test execution was performed in the implementation phase. This plan remains pending.

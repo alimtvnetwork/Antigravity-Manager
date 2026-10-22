@@ -1,12 +1,33 @@
 import { create } from 'zustand';
 import { request as invoke } from '../utils/request';
 
+export interface SkippedVersion {
+  version: string;
+  reason: string;
+}
+
+export interface SourceError {
+  source: string;
+  message: string;
+}
+
 export interface UpdateInfo {
   has_update: boolean;
   latest_version: string;
   current_version: string;
   download_url: string;
   source?: string;
+  proxy_url?: string;
+  channel?: 'stable' | 'beta';
+  updater_json_url?: string;
+  /** True when latest_version was verified to have a platform installer asset (plan 86). */
+  asset_verified?: boolean;
+  asset_url?: string;
+  /** Verified installable versions, newest first (plan 86). */
+  candidates?: string[];
+  /** Newer versions skipped with reasons (plan 86). */
+  skipped_versions?: SkippedVersion[];
+  source_errors?: SourceError[];
 }
 
 interface UpdateStoreState {

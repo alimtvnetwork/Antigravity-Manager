@@ -53,7 +53,9 @@ pub fn collect_vault_files(vault_path: &Path) -> Result<Vec<PathBuf>, String> {
         let mut files: Vec<PathBuf> = Vec::new();
         let entries = std::fs::read_dir(vault_path)
             .map_err(|e| format!("Failed to read vault folder: {}", e))?;
-        for entry in entries.flatten() {
+        for entry in entries {
+            let entry = entry
+                .map_err(|e| format!("Failed to read an entry in the vault folder: {}", e))?;
             let path = entry.path();
             let is_json = path
                 .extension()
@@ -99,7 +101,17 @@ pub async fn push_settings(vault_path: &Path) -> PushReport {
         }
     };
 
-    let mut cfg = supabase_sync::load_config().unwrap_or_default();
+    let mut cfg = match supabase_sync::load_config() {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            report.steps.push(step(
+                "import",
+                false,
+                format!("Failed to load the existing Supabase config: {}", e),
+            ));
+            return report;
+        }
+    };
     let mut sync_flag: Option<bool> = None;
     let mut import_failed = false;
     for file in &files {

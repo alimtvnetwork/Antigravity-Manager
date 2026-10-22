@@ -48,13 +48,13 @@ then:
 
 | # | Step | Title | Status |
 | :--- | :--- | :--- | :--- |
-| `001` | [001-recipient-normalized-upsert-and-unique-index.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/001-recipient-normalized-upsert-and-unique-index.md) | Normalized upsert-or-skip for notification recipients | `pending` |
-| `002` | [002-route-all-email-paths-through-helper.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/002-route-all-email-paths-through-helper.md) | Every add/import path uses the helper and reports skipped counts | `pending` |
-| `003` | [003-existing-duplicates-report-and-merge.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/003-existing-duplicates-report-and-merge.md) | `agm email dedupe` for rows that already exist | `pending` |
-| `004` | [004-supabase-load-json-applies-sync-flag-from-vault.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/004-supabase-load-json-applies-sync-flag-from-vault.md) | `load-json` imports keys and applies the sync flag from the vault file | `pending` |
-| `005` | [005-agm-supabase-push-settings.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/005-agm-supabase-push-settings.md) | `agm supabase push-settings --vault <path>` | `pending` |
-| `006` | [006-one-liner-powershell-file-uses-agm-cli.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/006-one-liner-powershell-file-uses-agm-cli.md) | One-liner PowerShell file that imports keys through the AGM CLI | `pending` |
-| `007` | [007-live-verification-of-supabase-one-liner.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/007-live-verification-of-supabase-one-liner.md) | Run and verify the one-liner on this machine | `pending` |
+| `001` | [001-recipient-normalized-upsert-and-unique-index.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/001-recipient-normalized-upsert-and-unique-index.md) | Normalized upsert-or-skip for notification recipients | `implemented - verification deferred` |
+| `002` | [002-route-all-email-paths-through-helper.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/002-route-all-email-paths-through-helper.md) | Every add/import path uses the helper and reports skipped counts | `implemented - verification deferred` |
+| `003` | [003-existing-duplicates-report-and-merge.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/003-existing-duplicates-report-and-merge.md) | `agm email dedupe` for rows that already exist | `implemented - verification deferred` |
+| `004` | [004-supabase-load-json-applies-sync-flag-from-vault.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/004-supabase-load-json-applies-sync-flag-from-vault.md) | `load-json` imports keys and applies the sync flag from the vault file | `implemented - verification deferred` |
+| `005` | [005-agm-supabase-push-settings.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/005-agm-supabase-push-settings.md) | `agm supabase push-settings --vault <path>` | `implemented - verification deferred` |
+| `006` | [006-one-liner-powershell-file-uses-agm-cli.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/006-one-liner-powershell-file-uses-agm-cli.md) | One-liner PowerShell file that imports keys through the AGM CLI | `implemented - verification deferred` |
+| `007` | [007-live-verification-of-supabase-one-liner.md](../subtasks/88-email-recipient-dedupe-supabase-push-settings-and-vault-scripts/007-live-verification-of-supabase-one-liner.md) | Run and verify the one-liner on this machine | `deferred to subtask 190-08 E2E` |
 
 ## Order and Dependencies
 001 -> 002 -> 003 (email). 004 -> 005 (CLI). 006 after 005. 007 is the live proof and is last.
@@ -67,3 +67,11 @@ Screenshots from the original request are not stored in the repo (an email is vi
 
 ## Rollback
 Each subtask is one commit that can be reverted independently. Configuration and database migrations introduced here are additive; the dedupe `--apply` path writes a timestamped DB backup first.
+
+## Progress (2026-10-23, subtask 190-05)
+
+- Steps 001-003 implemented: recipient adds now normalize email once (trim + lowercase), return the existing row unchanged when a normalized duplicate already exists, and report skipped/failed counts through import summaries and the CLI/GUI add paths. Existing duplicate groups can be listed with masked addresses and merged oldest-first with `agm email dedupe`; `--apply` first writes a timestamped backup copy of the vault database and aborts if that copy fails.
+- Steps 004-005 implemented: Supabase JSON import now accepts the endpoints array, a bare endpoints array, and the credentials/plain-config shapes; it applies `is_sync_enabled` when the file carries it and defaults sync on when absent. A file's `node_alias` is intentionally never read, written, or printed. `agm supabase push-settings --vault <path>` (or `AGM_SUPABASE_VAULT`) imports the given file/folder, saves the finalized config, syncs the local node, and tests each enabled endpoint; the path can also come from the environment variable only for this command. No discovery outside the supplied path is performed.
+- Which-format note: the importable schemas `agm/supabase-endpoints` and `agm/supabase-credentials` are already registered for envelope extraction. The `agm/supabase-push-settings` envelope is an output-only report (the same pattern as the existing account refresh report), so it was not added to the import schema list.
+- Step 006 implemented: `scripts/setup-supabase.ps1` is now a thin PowerShell 5.1/7-compatible wrapper whose header carries the runnable one-liner; it requires `-VaultPath` or `AGM_SUPABASE_VAULT`, calls `agm supabase push-settings --vault <path>`, and propagates the CLI exit code. The duplicate `scripts/supabase-setup.ps1` was removed. Remaining truncated placeholder examples in `scripts/import-supabase-secrets.ps1` help text were outside this step's named scope and were not changed.
+- Step 007 was not run: live execution is forbidden during task 190's implementation phase. It is deferred to subtask 190-08's E2E phase. No build, test run, or live Supabase/email verification was performed for steps 001-006 in this pass, so this plan remains pending.

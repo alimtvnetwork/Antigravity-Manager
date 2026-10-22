@@ -34,3 +34,6 @@
 - [ ] Subtask 105-10: CLI global `--json` flag, `ls` and `--help` options verification.
 - [ ] Subtask 105-11: Local-only E2E test script (`scripts/e2e-instance-commands-test.ps1`) executing all CLI commands.
 - [ ] Subtask 105-12: Minor release bump, changelog update attributing `@aukgit`, push, and generate AI verification prompt.
+
+---
+Status note (2026-10-23, subtask 190-05 scope refresh): This is the largest open UI wave in the pending set (300-step continuous plan: Supabase top-level tab, audit pagination, account-switch details, instance view modes). It has NOT been started beyond Wave 0 ingestion, and it was explicitly NOT started in task 190 — it remains pending for its own dedicated run.

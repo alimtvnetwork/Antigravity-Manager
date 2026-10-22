@@ -106,32 +106,16 @@ pub(crate) struct UpdaterJson {
 }
 
 pub(crate) fn has_platform_asset_in_release(assets: &[GitHubReleaseAsset]) -> bool {
-    assets.iter().any(|asset| {
-        let name = asset.name.to_ascii_lowercase();
-        let url_ok = !asset.browser_download_url.trim().is_empty();
-        if !url_ok {
-            return false;
-        }
-        #[cfg(target_os = "windows")]
-        {
-            name.ends_with(".exe") || name.ends_with(".msi")
-        }
-        #[cfg(target_os = "macos")]
-        {
-            name.ends_with(".dmg") || name.ends_with(".app.tar.gz") || name.ends_with(".pkg")
-        }
-        #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
-        {
-            name.ends_with(".appimage") || name.ends_with(".deb") || name.ends_with(".rpm")
-        }
-    })
+    platform_asset(assets).is_some()
 }
 
-fn has_platform_asset_in_updater_json(platforms: &Option<serde_json::Value>) -> bool {
+/// Download URL of this platform's asset inside an updater.json `platforms`
+/// map, when present (plan 86).
+fn platform_asset_url_in_updater_json(platforms: &Option<serde_json::Value>) -> Option<String> {
     let Some(serde_json::Value::Object(map)) = platforms else {
-        return false;
+        return None;
     };
-    map.iter().any(|(key, val)| {
+    for (key, val) in map {
         let k = key.to_ascii_lowercase();
         let os_match = if cfg!(target_os = "windows") {
             k.contains("windows") || k.contains("win")
@@ -141,29 +125,26 @@ fn has_platform_asset_in_updater_json(platforms: &Option<serde_json::Value>) -> 
             k.contains("linux")
         };
         if !os_match {
-            return false;
+            continue;
         }
-        val.get("url")
-            .and_then(|u| u.as_str())
-            .map(|s| {
-                let lower = s.trim().to_ascii_lowercase();
-                if cfg!(target_os = "windows") {
-                    lower.ends_with(".exe")
-                        || lower.ends_with(".msi")
-                        || lower.ends_with(".nsis.zip")
-                } else if cfg!(target_os = "macos") {
-                    lower.ends_with(".dmg")
-                        || lower.ends_with(".app.tar.gz")
-                        || lower.ends_with(".pkg")
-                } else {
-                    lower.ends_with(".appimage")
-                        || lower.ends_with(".appimage.tar.gz")
-                        || lower.ends_with(".deb")
-                        || lower.ends_with(".rpm")
-                }
-            })
-            .unwrap_or(false)
-    })
+        if let Some(url) = val.get("url").and_then(|u| u.as_str()) {
+            let lower = url.trim().to_ascii_lowercase();
+            let suffix_ok = if cfg!(target_os = "windows") {
+                lower.ends_with(".exe") || lower.ends_with(".msi") || lower.ends_with(".nsis.zip")
+            } else if cfg!(target_os = "macos") {
+                lower.ends_with(".dmg") || lower.ends_with(".app.tar.gz") || lower.ends_with(".pkg")
+            } else {
+                lower.ends_with(".appimage")
+                    || lower.ends_with(".appimage.tar.gz")
+                    || lower.ends_with(".deb")
+                    || lower.ends_with(".rpm")
+            };
+            if suffix_ok {
+                return Some(url.trim().to_string());
+            }
+        }
+    }
+    None
 }
 
 pub(crate) async fn verify_tag_has_platform_asset(version: &str) -> bool {
@@ -275,6 +256,26 @@ async fn check_updater_json_channel(channel: UpdateChannel) -> Result<UpdateInfo
         false
     };
     let has_update = is_newer && has_asset;
+    // Skipped-version reporting (plan 86): a newer version without a
+    // platform asset is reported, never silently dropped.
+    let skipped_versions = if is_newer && !has_asset {
+        vec![SkippedVersion {
+            version: latest_version.clone(),
+            reason: "no installer asset for this platform".to_string(),
+        }]
+    } else {
+        Vec::new()
+    };
+    let asset_url = if has_update {
+        platform_asset_url_in_updater_json(&updater_info.platforms)
+    } else {
+        None
+    };
+    let candidates = if has_update {
+        vec![latest_version.clone()]
+    } else {
+        Vec::new()
+    };
 
     if has_update {
         logger::log_info(&format!(
@@ -313,6 +314,11 @@ async fn check_updater_json_channel(channel: UpdateChannel) -> Result<UpdateInfo
         proxy_url: None,
         channel: Some(channel),
         updater_json_url: Some(actual_url),
+        asset_verified: has_update,
+        asset_url,
+        candidates,
+        skipped_versions,
+        source_errors: Vec::new(),
     })
 }
 
@@ -357,64 +363,59 @@ async fn check_github_api_channel(channel: UpdateChannel) -> Result<UpdateInfo, 
         channel
     ));
 
-    let release = match channel {
-        UpdateChannel::Stable => {
-            let response = client
-                .get(GITHUB_API_URL)
-                .send()
-                .await
-                .map_err(|e| format!("Request failed: {}", e))?;
+    let response = client
+        .get(GITHUB_RELEASES_API_URL)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
 
-            if !response.status().is_success() {
-                return Err(format!("GitHub API returned status: {}", response.status()));
-            }
+    if !response.status().is_success() {
+        return Err(format!("GitHub API returned status: {}", response.status()));
+    }
 
-            response
-                .json::<GitHubRelease>()
-                .await
-                .map_err(|e| format!("Failed to parse release info: {}", e))?
-        }
-        UpdateChannel::Beta => {
-            let response = client
-                .get(GITHUB_RELEASES_API_URL)
-                .send()
-                .await
-                .map_err(|e| format!("Request failed: {}", e))?;
+    let releases: Vec<GitHubRelease> = response
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse releases: {}", e))?;
 
-            if !response.status().is_success() {
-                return Err(format!("GitHub API returned status: {}", response.status()));
-            }
+    if releases.is_empty() {
+        return Err("No releases found on GitHub".to_string());
+    }
 
-            let releases: Vec<GitHubRelease> = response
-                .json()
-                .await
-                .map_err(|e| format!("Failed to parse releases: {}", e))?;
-
-            // 优先查找最新的 pre-release
-            let latest_pre = releases
-                .into_iter()
-                .find(|r| r.prerelease)
-                .ok_or_else(|| "No pre-release found on GitHub".to_string())?;
-
-            latest_pre
-        }
-    };
-
-    let latest_version = release.tag_name.trim_start_matches('v').to_string();
+    // Resolve the newest installable release (plan 86, subtask 002): newer
+    // releases without a platform asset are skipped with reasons and an
+    // older verified release is offered instead.
+    let infos: Vec<ReleaseAssetInfo> = releases.iter().map(ReleaseAssetInfo::from).collect();
+    let resolution = resolve_installable_release(&infos, channel);
+    let newest_version = infos.first().map(|r| r.version.clone()).unwrap_or_default();
     let current_version = CURRENT_VERSION.to_string();
+
+    let selected = resolution.selected.clone();
+    let latest_version = selected
+        .as_ref()
+        .map(|r| r.version.clone())
+        .unwrap_or_else(|| newest_version.clone());
     let is_newer = compare_versions(&latest_version, &current_version);
-    let has_asset = has_platform_asset_in_release(&release.assets);
-    let has_update = is_newer && has_asset;
+    let has_update = selected.is_some() && is_newer;
+
+    // Only report skips for versions newer than the running one.
+    let skipped_versions: Vec<SkippedVersion> = resolution
+        .skipped
+        .iter()
+        .filter(|s| compare_versions(&s.version, &current_version))
+        .cloned()
+        .collect();
+    for skipped in &skipped_versions {
+        logger::log_warn(&format!(
+            "Skipping release {} (API {:?}): {}",
+            skipped.version, channel, skipped.reason
+        ));
+    }
 
     if has_update {
         logger::log_info(&format!(
             "New version found (API {:?}, platform asset verified): {} (Current: {})",
             channel, latest_version, current_version
-        ));
-    } else if is_newer {
-        logger::log_warn(&format!(
-            "Skipping release {} (API {:?}): no installer asset found for this OS yet",
-            latest_version, channel
         ));
     } else {
         logger::log_info(&format!(
@@ -423,15 +424,31 @@ async fn check_github_api_channel(channel: UpdateChannel) -> Result<UpdateInfo, 
         ));
     }
 
+    let (download_url, release_notes, published_at) = match &selected {
+        Some(sel) => (
+            sel.html_url.clone(),
+            sel.body.clone().unwrap_or_default(),
+            sel.published_at
+                .clone()
+                .unwrap_or_else(|| Utc::now().to_rfc3339()),
+        ),
+        None => (
+            releases[0].html_url.clone(),
+            releases[0].body.clone().unwrap_or_default(),
+            releases[0]
+                .published_at
+                .clone()
+                .unwrap_or_else(|| Utc::now().to_rfc3339()),
+        ),
+    };
+
     Ok(UpdateInfo {
         current_version,
         latest_version,
         has_update,
-        download_url: release.html_url,
-        release_notes: release.body.unwrap_or_default(),
-        published_at: release
-            .published_at
-            .unwrap_or_else(|| Utc::now().to_rfc3339()),
+        download_url,
+        release_notes,
+        published_at,
         source: Some(format!("GitHub API ({:?})", channel)),
         proxy_url: None,
         channel: Some(channel),
@@ -439,6 +456,11 @@ async fn check_github_api_channel(channel: UpdateChannel) -> Result<UpdateInfo, 
             UpdateChannel::Beta => Some(PREVIEW_UPDATER_JSON_URL.to_string()),
             UpdateChannel::Stable => Some(STABLE_UPDATER_JSON_URL.to_string()),
         },
+        asset_verified: selected.is_some(),
+        asset_url: resolution.selected_asset_url.clone(),
+        candidates: resolution.candidates.clone(),
+        skipped_versions,
+        source_errors: Vec::new(),
     })
 }
 
@@ -480,6 +502,20 @@ async fn check_static_url(url: &str, source_name: &str) -> Result<UpdateInfo, St
         false
     };
     let has_update = is_newer && has_asset;
+    // Skipped-version reporting (plan 86), same contract as the other sources.
+    let skipped_versions = if is_newer && !has_asset {
+        vec![SkippedVersion {
+            version: latest_version.clone(),
+            reason: "no installer asset for this platform".to_string(),
+        }]
+    } else {
+        Vec::new()
+    };
+    let candidates = if has_update {
+        vec![latest_version.clone()]
+    } else {
+        Vec::new()
+    };
 
     if has_update {
         logger::log_info(&format!(
@@ -517,5 +553,10 @@ async fn check_static_url(url: &str, source_name: &str) -> Result<UpdateInfo, St
         proxy_url: None,
         channel: Some(UpdateChannel::Stable),
         updater_json_url: Some(STABLE_UPDATER_JSON_URL.to_string()),
+        asset_verified: has_update,
+        asset_url: None,
+        candidates,
+        skipped_versions,
+        source_errors: Vec::new(),
     })
 }

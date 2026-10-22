@@ -2,21 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { X, Sparkles, Loader2, CheckCircle, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { relaunch as tauriRelaunch, exit as tauriExit } from '@tauri-apps/plugin-process';
-import { useUpdateStore } from '../stores/use-update-store';
+import { useUpdateStore, type UpdateInfo } from '../stores/use-update-store';
 import { useErrorStore } from '../stores/error-store';
 
-interface UpdateInfo {
-  has_update: boolean;
-  latest_version: string;
-  current_version: string;
-  download_url: string;
-  source?: string;
-  proxy_url?: string;
-  channel?: 'stable' | 'beta';
-  updater_json_url?: string;
-}
-
-type UpdateState = 'checking' | 'downloading' | 'ready' | 'error' | 'none' | 'manual';
+type UpdateState = 'checking' | 'downloading' | 'ready' | 'error' | 'none' | 'manual' | 'skipped';
 
 interface UpdateNotificationProps {
   onClose: () => void;
@@ -33,12 +22,18 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
   const [updateState, setUpdateState] = useState<UpdateState>(storeInfo?.has_update ? 'manual' : 'checking');
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isInstalling, setIsInstalling] = useState(false);
+  const [showSkippedDetails, setShowSkippedDetails] = useState(false);
   const downloadStarted = useRef(false);
 
   useEffect(() => {
     if (storeInfo?.has_update) {
       setUpdateInfo(storeInfo);
       setUpdateState('manual');
+      setTimeout(() => setIsVisible(true), 50);
+    } else if (storeInfo?.skipped_versions && storeInfo.skipped_versions.length > 0) {
+      // Newer versions exist but none is installable: tell the user (plan 86).
+      setUpdateInfo(storeInfo);
+      setUpdateState('skipped');
       setTimeout(() => setIsVisible(true), 50);
     } else {
       checkAndDownload();
@@ -48,7 +43,17 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
   const checkAndDownload = async () => {
     try {
       const info = await checkForUpdates(true);
-      if (!info || !info.has_update) {
+      if (!info) {
+        onClose();
+        return;
+      }
+      if (!info.has_update) {
+        if (info.skipped_versions && info.skipped_versions.length > 0) {
+          setUpdateInfo(info);
+          setUpdateState('skipped');
+          setTimeout(() => setIsVisible(true), 100);
+          return;
+        }
         onClose();
         return;
       }
@@ -169,11 +174,13 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                     ? t('update_notification.ready')
                     : updateState === 'manual'
                       ? t('update_notification.available_title', 'Update Available')
-                      : updateState === 'error'
-                        ? t('update_notification.toast.failed')
-                        : updateState === 'downloading'
-                          ? t('update_notification.title')
-                          : t('update_notification.checking_title', 'Checking for updates...')}
+                      : updateState === 'skipped'
+                        ? t('update_notification.no_installable_title', 'No installable update')
+                        : updateState === 'error'
+                          ? t('update_notification.toast.failed')
+                          : updateState === 'downloading'
+                            ? t('update_notification.title')
+                            : t('update_notification.checking_title', 'Checking for updates...')}
                 </h3>
                 {updateInfo && (
                   <div className="flex items-center gap-1.5 mt-1">
@@ -190,7 +197,7 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
               </div>
             </div>
 
-            {(updateState === 'error' || updateState === 'ready' || updateState === 'manual') && (
+            {(updateState === 'error' || updateState === 'ready' || updateState === 'manual' || updateState === 'skipped') && (
               <button
                 type="button"
                 data-ui-name="update-close-btn"
@@ -220,8 +227,54 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                   ? t('update_notification.installing_desc', 'Installing update in background...')
                   : t('update_notification.installer_available', 'A newer version is available. Upgrade now?')
               )}
+              {updateState === 'skipped' &&
+                t(
+                  'update_notification.no_installable_desc',
+                  'A newer version was released, but it has no installer for this platform yet.'
+                )}
             </p>
           </div>
+
+          {/* Skipped versions notice (plan 86): versions that were not offered, with reasons */}
+          {updateInfo?.skipped_versions && updateInfo.skipped_versions.length > 0 && (
+            <div className="mb-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-medium text-amber-700 dark:text-amber-300 leading-snug">
+                  {t('update_notification.skipped_notice', {
+                    defaultValue: 'v{{version}} skipped: {{reason}}',
+                    version: updateInfo.skipped_versions[0].version,
+                    reason: updateInfo.skipped_versions[0].reason,
+                  })}
+                </p>
+                <button
+                  type="button"
+                  data-ui-name="update-skipped-details-btn"
+                  data-ui-id="update-notification-skipped-details"
+                  onClick={() => setShowSkippedDetails((v) => !v)}
+                  className="shrink-0 text-[10px] font-semibold text-amber-700 dark:text-amber-300 underline underline-offset-2 cursor-pointer"
+                >
+                  {showSkippedDetails
+                    ? t('common.hide', 'Hide')
+                    : t('common.details', 'Details')}
+                </button>
+              </div>
+              {showSkippedDetails && (
+                <div className="mt-1.5 space-y-1">
+                  {updateInfo.skipped_versions.map((s) => (
+                    <p key={s.version} className="text-[10px] text-amber-700/90 dark:text-amber-200/80 leading-snug">
+                      v{s.version}: {s.reason}
+                    </p>
+                  ))}
+                  {updateInfo.candidates && updateInfo.candidates.length > 0 && (
+                    <p className="text-[10px] text-gray-600 dark:text-gray-300 leading-snug pt-0.5">
+                      {t('update_notification.verified_candidates', 'Verified installable:')}{' '}
+                      {updateInfo.candidates.map((v) => `v${v}`).join(', ')}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Progress bar during download */}
           {updateState === 'downloading' && (
@@ -352,6 +405,26 @@ export const UpdateNotification: React.FC<UpdateNotificationProps> = ({ onClose 
                 {t('update_notification.btn_view_github', 'View on GitHub')}
               </button>
             </div>
+          )}
+
+          {/* Skipped state — no Install action (plan 86): nothing installable to offer */}
+          {updateState === 'skipped' && (
+            <button
+              type="button"
+              data-ui-name="update-skipped-later-btn"
+              data-ui-id="update-notification-skipped-later"
+              onClick={handleClose}
+              className="
+                w-full px-3 py-1.5 rounded-full
+                border border-slate-300 dark:border-slate-700/60
+                bg-slate-100 hover:bg-slate-200 dark:bg-slate-800/60 dark:hover:bg-slate-700/60
+                text-slate-600 hover:text-slate-800 dark:text-slate-300 dark:hover:text-white
+                transition-all duration-200
+                text-xs font-medium cursor-pointer
+              "
+            >
+              {t('update_notification.btn_later')}
+            </button>
           )}
 
           {/* Error state — retry button */}

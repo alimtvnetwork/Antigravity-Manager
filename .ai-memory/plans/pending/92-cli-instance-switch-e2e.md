@@ -31,3 +31,9 @@
 ## Still open
 - [ ] Telegram message colors (email templates are updated; Telegram is HTML text, not these CSS rules).
 - [x] Conversation prune is `agm prune` and already skips running and queued prompts. `agm clean` / `agm purge` only delete build artifacts.
+
+## Runbook verification (2026-10-23, subtask 190-05)
+
+- The command forms used by this runbook were checked against the current AGM CLI router and instance dispatch surface: `instances switch`, `ff`, `restore-running-prompts --instance <id>`, `agm prune`, and `agm clean` / `agm purge` still exist. No command-name drift was found in this file.
+- The dated proof sections above describe an installed binary from 2026-10-01; statements about what that binary did are historical evidence for that run, not a claim about the current source tree.
+- This runbook was not executed in task 190's implementation phase. Execution remains with subtask 190-08's E2E phase.

@@ -180,10 +180,14 @@ pub fn find_duplicate_recipients_with_conn(
                 keeper_id: row.get(2)?,
             })
         })
-        .map_err(|e| format!("Failed to scan duplicate recipients: {}", e))?
-        .flatten()
-        .collect();
-    Ok(rows)
+        .map_err(|e| format!("Failed to scan duplicate recipients: {}", e))?;
+    let mut groups = Vec::new();
+    for row in rows {
+        groups.push(
+            row.map_err(|e| format!("Failed to read a duplicate recipient group: {}", e))?,
+        );
+    }
+    Ok(groups)
 }
 
 /// Merge duplicate recipients (plan 88, subtask 003): for each normalized

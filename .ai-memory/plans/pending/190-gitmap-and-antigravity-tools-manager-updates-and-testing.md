@@ -28,9 +28,9 @@ Follow-up (same turn): "At end release both and make sure cicd is green"
 | 02 | Re-attribution parity + honest restore outcomes (RC-2, RC-3, RC-6) | AGM | DONE 2026-10-23 (worker; RestoreOutcome; lead wired Stage-5 outcome logging in workspace.rs) |
 | 03 | Queue advancement + persisted resume + single backup DB (RC-4, RC-7, RC-8) | AGM | DONE 2026-10-23 (worker; lead wired rearm_persisted_resumes at startup in setup_app.rs + instance.rs re-export) |
 | 04 | Rerun auto-pick (randomized default, persisted, larger set) | AGM | DONE 2026-10-23 (worker: set 5→14, count 2→4, localStorage persistence; lead extended parity to PromptTreeContextMenu.tsx + PromptTreeViewModal.tsx) |
-| 05 | AGM pending-plan closeout (91 workflows, 88 push-settings, 139 UI, drain done plans, 105/86/04 triage) | AGM | RUNNING |
-| 06 | gitmap pending drain + CG residue sweeps | gitmap-v28 | RUNNING |
-| 07 | gitmap CG execute zero-to-end (prompts 24,12,13,14,18,22,29,25, efficiency, surfaces, meta) | gitmap-v28 | PENDING |
+| 05 | AGM pending-plan closeout (91 workflows, 88 push-settings, 139 UI, drain done plans, 105/86/04 triage) | AGM | DONE 2026-10-23 (worker; 9 plans filed to completed, 91 mostly done, 88 steps 001-006, 139 UI+CLI, 86 core - remainder + open PID question logged in-plan; most files swept into sync commit e431b369, remainder committed by lead) |
+| 06 | gitmap pending drain + CG residue sweeps | gitmap-v28 | DONE 2026-10-23 (worker; committed e08910720 - 24 plans drained, == false 106→1, cli/store fmt.Errorf 202→0, cli/cmd production 121→0) |
+| 07 | gitmap CG execute zero-to-end (prompts 24,12,13,14,18,22,29,25, efficiency, surfaces, meta) | gitmap-v28 | RUNNING (wave W3a) |
 | 08 | Build + E2E both repos + release both + CI green | both | BLOCKED on 01-07 |
 
 Subtask files: .ai-memory/plans/subtasks/190-gitmap-and-antigravity-tools-manager-updates-and-testing/

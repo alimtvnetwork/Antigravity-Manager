@@ -381,3 +381,12 @@ Use Section 3 GitMap table as primary. Python fallbacks (`03-ai-scripts/11-fast-
 ## MUST FOLLOW NON-NEGOTIABLE
 
 Listen, past runs of these turns have been sloppy and stupid as fuck: wrong step counts, partial task lists dumped into chat instead of files, plans and session summaries half-filled with placeholders, folders skimmed, open ambiguities ignored, CI/CD issues and `plans/subtasks/` forgotten, user commands dropped, coding guidelines bypassed, detailed specs chopped and summarized into useless junk, uppercase README files left uncorrected, `.ai-memory/memory/` created by accident, `strictly-avoid.md` overwritten, and explicit user instructions softened after being told not to. WTF. How on earth are you reverting to this carelessness, are you stupid?? Stop doing that, you stupid fuck. Confirm root `readme.md` is strictly lowercase, find the root cause in one sentence, capture commands, issues, and pending tasks without omitting a single item, write the spec files and memory files in the right paths, update every index in the same turn, sync `readme.md` with `what-to-read.md`, preserve detailed specs verbatim with zero truncation, run the targeted checks (builds and full unit tests stay in CI per R1), and execute the final atomic GitMap commit and push before ending. Going deep IS the job. If you are not going deep, you are not doing the job. Violating this is auto-reject on the same tier as RULE 0. Avoid stupidity and being careless, you stupid fuck. Where is your attention, are you stupid? Tell me. Your stupidity is going on top of my head. Where did you learn this stupidity? If I could find you, I could slap you.
+
+
+---
+
+## Runbook verification (2026-10-23, subtask 190-05)
+
+- This document was checked as an E2E planning/runbook source during task 190. It does not carry a canonical AGM command table requiring command-name corrections in this pass.
+- The AGM command-surface corrections found during the same verification were applied to `93-e2e-cli-commands-ai-instruction.md`; the commands newly added by task 190 (`agm supabase push-settings --vault <path>`, `agm email dedupe [--apply]`, and `agm auto-switch pid-refresh [N]`) are recorded in that file's verification note for the E2E phase.
+- Nothing in this runbook was executed in the implementation phase. Execution remains with subtask 190-08's E2E phase.

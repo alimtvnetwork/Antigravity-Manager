@@ -55,7 +55,7 @@ Command suite: `instances`, `instance`, `profile`, `ls`
 
 #### B. Create Isolated Sandbox Instance
 - **Command:** `agm instance create <name> [options]`
-- **Aliases:** `agm instances create`, `agm create`, `agm cp`
+- **Aliases:** `agm instances create`, `agm create`
 - **Parameters & Options:**
   - `<name>`: Friendly name or identifier for the instance (e.g. `"Worker-Alpha"`).
   - `--account, -a <email|id>`: Bind specific account (email or account ID). If omitted, binds to the next available unbound account.
@@ -120,7 +120,7 @@ Command suite: `instances`, `instance`, `profile`, `ls`
 
 #### G. Copy / Clone Instance Profile
 - **Command:** `agm instance copy <source_id> <new_name>`
-- **Aliases:** `agm instance clone`, `agm copy-profile`
+- **Aliases:** `agm instance clone`, `agm duplicate`, `agm clone`
 - **Examples:**
   ```powershell
   agm instance copy "default" "Worker-Backup"
@@ -732,3 +732,14 @@ Write-Host "Instance $($instA.id) preserved alive at PID $newPid in $($instA.dat
 | **Supabase Setup** | `scripts/setup-supabase.ps1` | One-liner PowerShell | Verifies & provisions Supabase backend connection |
 | **Telegram Daemon**| `scripts/telegram-agent-daemon.ps1` | Background daemon | Remote control via Telegram (`/status`, `/switch`, `/prune`) |
 | **E2E Flow Engine** | `agm test-instance-flow` | `--json` | Autonomous end-to-end verification engine |
+
+
+---
+
+## Runbook verification (2026-10-23, subtask 190-05)
+
+- The command sections were checked against the current AGM CLI router, the instance dispatch surface, and the library AGY prune handler.
+- Drift fixed in this pass: `agm cp` was removed from the aliases for instance creation because there is no top-level `cp` route for creating an instance; `agm copy-profile` was replaced with the routed copy aliases `agm duplicate` and `agm clone`.
+- The conversation-prune entries are retained: the top-level surface routes `agm prune`, `agm clear-cache`, and `agm cache-clear` to the prune handler, and the library AGY handler also provides the cache-clear/undo forms used in this document.
+- Commands added by task 190 and available for the E2E phase: `agm supabase push-settings --vault <path>`, `agm email dedupe [--apply] [--json]`, and `agm auto-switch pid-refresh [N]`.
+- This runbook was not executed in task 190's implementation phase. Execution remains with subtask 190-08's E2E phase.

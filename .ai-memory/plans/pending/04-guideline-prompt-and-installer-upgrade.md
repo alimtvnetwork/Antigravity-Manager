@@ -17,3 +17,6 @@
 - [x] 02-upgrade-installer-scripts.md: Modify scripts/generate-bundle-installers.mjs to add deletion logic (based on manifest array), never touch root version, and output .ai-memory/install-summary.json. (✅ Done)
 - 03-generate-02-improvements.md: Audit 02-spec/03-error-manage and draft 50 architectural/functional improvements.
 - 04-release-6.29.0.md: Release script execution and readme sync.
+
+---
+Status note (2026-10-23, subtask 190-05 scope refresh): Scope has drifted — subtask 02 is marked done in-plan, and the installer generation script paths referenced here no longer match the current scripts/ layout (installer generation has moved since this plan was written). Remaining items (01, 03, 04) need re-scoping against the current tree before execution. Left pending.
