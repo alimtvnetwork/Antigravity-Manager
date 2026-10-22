@@ -1,5 +1,9 @@
+pub mod breakdown;
+pub mod conflict_checker;
+pub mod cooldown_timer;
 pub mod daemon;
 pub mod instances;
+pub mod jitter;
 pub mod manual;
 pub mod quota;
 pub mod recovery;
@@ -18,8 +22,12 @@ pub(crate) use crate::models::account::Account;
 pub(crate) use tests_a::make_test_account;
 pub mod types;
 
+pub use breakdown::*;
+pub use conflict_checker::*;
+pub use cooldown_timer::*;
 pub use daemon::*;
 pub use instances::*;
+pub use jitter::*;
 pub use manual::*;
 pub use quota::*;
 pub use recovery::*;

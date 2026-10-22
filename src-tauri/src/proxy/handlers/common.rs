@@ -10,8 +10,13 @@ use std::collections::HashSet;
 use tokio::time::{sleep, Duration};
 use tracing::{debug, info};
 
+pub mod curl_gen;
 mod handle_detect_model;
 pub(crate) mod retrystrategy;
+pub mod status_mapper;
+
+pub use curl_gen::generate_reproducible_curl;
+pub use status_mapper::{map_upstream_status_to_canonical, CanonicalErrorPayload};
 
 pub use handle_detect_model::build_dual_track_error;
 pub use handle_detect_model::build_token_error_headers;

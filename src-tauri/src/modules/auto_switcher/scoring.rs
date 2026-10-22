@@ -228,7 +228,16 @@ pub fn score_candidate_account_fallback(acc: &Account, target_model: &str, now_s
     }
 
     let base_score = calculate_weekly_base_score(acc, target_model, now_sec);
-    (q_4h / 100.0) * base_score
+    calculate_proportional_fallback_score(q_4h, base_score)
+}
+
+/// Helper computing proportional score: (q_4h / 100.0) * weekly_score.
+/// Returns 0.0 if q_4h <= 0.0 or weekly_score <= 0.0.
+pub fn calculate_proportional_fallback_score(q_4h: f64, weekly_score: f64) -> f64 {
+    if q_4h <= 0.0 || weekly_score <= 0.0 {
+        return 0.0;
+    }
+    ((q_4h.clamp(0.0, 100.0)) / 100.0) * weekly_score
 }
 
 /// Specifically evaluate the 4-hour / 5-hour immediate rolling window quota (0-100%)

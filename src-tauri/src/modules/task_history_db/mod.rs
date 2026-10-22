@@ -1,4 +1,5 @@
 pub mod index;
+pub mod rest_history;
 pub mod scheduler;
 pub mod switch_history;
 pub mod switch_types;
@@ -7,6 +8,7 @@ pub mod tests;
 pub mod types;
 
 pub use index::*;
+pub use rest_history::*;
 pub use scheduler::*;
 pub use switch_history::*;
 pub use switch_types::*;

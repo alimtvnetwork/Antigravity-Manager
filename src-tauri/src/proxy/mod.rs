@@ -40,6 +40,7 @@ pub mod session_manager; // Session fingerprint management
 pub mod signature_cache; // Signature Cache (v3.3.16)
 pub mod sticky_config; // Sticky routing configuration
 pub mod thinking_store; // Server-side thinking block persistence
+pub mod token_stats; // Token statistics, analytics, and pricing calculations
 pub mod upstream; // Upstream client
 pub mod video; // Video processing module
 pub mod zai_vision_mcp; // Built-in Vision MCP server state
