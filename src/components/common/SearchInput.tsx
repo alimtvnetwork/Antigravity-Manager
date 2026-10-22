@@ -48,16 +48,25 @@ export function SearchInput({
         inputRef.current?.focus();
     };
 
+    const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Escape' && value) {
+            e.preventDefault();
+            handleClear();
+        }
+    };
+
     return (
         <div
+            role="search"
+            aria-label="Search"
             className={cn(
                 'relative flex items-center rounded-xl border transition-all duration-150',
                 'bg-white/80 dark:bg-slate-900/80 backdrop-blur-md',
-                'border-slate-200 dark:border-slate-800 focus-within:border-purple-500/80 focus-within:ring-2 focus-within:ring-purple-500/20',
+                'border-slate-200 dark:border-slate-800 focus-within:border-sky-500/80 dark:focus-within:border-sky-500/80 focus-within:ring-2 focus-within:ring-sky-500/20',
                 className
             )}
         >
-            <Search className="w-3.5 h-3.5 ml-3 text-slate-400 shrink-0 pointer-events-none" />
+            <Search className="w-3.5 h-3.5 ml-3 text-slate-400 shrink-0 pointer-events-none" aria-hidden="true" />
 
             <input
                 ref={inputRef}
@@ -65,7 +74,9 @@ export function SearchInput({
                 value={value}
                 autoFocus={autoFocus}
                 onChange={(e) => onChange(e.target.value)}
+                onKeyDown={handleInputKeyDown}
                 placeholder={placeholder}
+                aria-label={placeholder || 'Search'}
                 className="w-full pl-2 pr-7 py-1.5 text-xs bg-transparent border-0 focus:ring-0 focus:outline-none text-slate-800 dark:text-slate-100 placeholder:text-slate-400"
             />
 
@@ -73,13 +84,18 @@ export function SearchInput({
                 <button
                     type="button"
                     onClick={handleClear}
-                    className="absolute right-2 p-0.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                    aria-label="Clear search input"
+                    title="Clear search"
+                    className="absolute right-2 p-0.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 transition-colors"
                 >
-                    <X className="w-3 h-3" />
+                    <X className="w-3 h-3" aria-hidden="true" />
                 </button>
             ) : (
                 shortcutKey && (
-                    <kbd className="absolute right-2.5 px-1.5 py-0.2 font-mono text-[9px] font-semibold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded">
+                    <kbd
+                        aria-hidden="true"
+                        className="absolute right-2.5 px-1.5 py-0.2 font-mono text-[9px] font-semibold text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/60 rounded select-none"
+                    >
                         {shortcutKey}
                     </kbd>
                 )

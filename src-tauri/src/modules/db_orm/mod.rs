@@ -138,6 +138,10 @@ pub mod tests_query_latency_histogram;
 pub mod tests_commit_latency_observer;
 #[cfg(test)]
 pub mod tests_db_size_watchdog;
+#[cfg(test)]
+pub mod tests_deadlock_detector;
+#[cfg(test)]
+pub mod tests_compile_options;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;
