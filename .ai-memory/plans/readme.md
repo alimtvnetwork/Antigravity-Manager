@@ -149,3 +149,6 @@ Updated 2026-10-21T16:50:00Z from `git log` (HEAD `33ea5d83`). Referenced by `.a
 
 
 | 155 | [155-ui-ux-improvements-and-bug-fixes.md](./pending/155-ui-ux-improvements-and-bug-fixes.md) | COMPLETED | UI/UX coloring restoration, stark white regression fixes, Scoreboard hover card contrast, Header navigation icons capsule refinement, PromptTree 30s live auto-sync, Rerun logic fixes, and Telegram speed optimizations. |
+| 156 | [156-fast-forward-logic-and-improvement-detailing.md](./completed/156-fast-forward-logic-and-improvement-detailing.md) | COMPLETED | Fast-forward account selection logic bugfix (prevent selecting active/exhausted accounts), formal spec authoring, and comprehensive AI implementation detailing. |
+| 157 | [157-improvements-planning-and-execution.md](./completed/157-improvements-planning-and-execution.md) | COMPLETED | Execution of first 30 system, gateway, database, and UI improvements (1–30). |
+| 158 | [158-improvements-planning-and-execution.md](./completed/158-improvements-planning-and-execution.md) | COMPLETED | Execution of next 30 system, gateway, database, and UI improvements (31–60) across Telegram, Supabase, Split-SQLite, Proxy, and UI. |

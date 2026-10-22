@@ -324,20 +324,30 @@ export function usePromptTreePromptActions({
         }
 
         images.forEach((imgUrl, index) => {
-            const a = document.createElement('a');
-            a.href = imgUrl;
-            let ext = 'png';
-            if (imgUrl.includes('image/jpeg') || imgUrl.endsWith('.jpg') || imgUrl.endsWith('.jpeg')) {
-                ext = 'jpg';
-            } else if (imgUrl.includes('image/webp') || imgUrl.endsWith('.webp')) {
-                ext = 'webp';
-            } else if (imgUrl.includes('image/svg') || imgUrl.endsWith('.svg')) {
-                ext = 'svg';
+            try {
+                const a = document.createElement('a');
+                a.href = imgUrl;
+                let ext = 'png';
+                if (imgUrl.includes('image/jpeg') || imgUrl.endsWith('.jpg') || imgUrl.endsWith('.jpeg')) {
+                    ext = 'jpg';
+                } else if (imgUrl.includes('image/webp') || imgUrl.endsWith('.webp')) {
+                    ext = 'webp';
+                } else if (imgUrl.includes('image/svg') || imgUrl.endsWith('.svg')) {
+                    ext = 'svg';
+                }
+                a.download = `prompt-image-${selectedConversation?.short_id || 'img'}-${index + 1}.${ext}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } catch (err) {
+                useErrorStore.getState().trackWarning(
+                    err instanceof Error ? err : new Error(String(err)),
+                    {
+                        source: 'usePromptTreePromptActions.handleSaveImages',
+                        triggerAction: 'downloadPromptImage',
+                    }
+                );
             }
-            a.download = `prompt-image-${selectedConversation?.short_id || 'img'}-${index + 1}.${ext}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
         });
 
         setActionMsg(`Saved ${images.length} image(s) to downloads!`);

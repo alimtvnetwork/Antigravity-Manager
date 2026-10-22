@@ -63,7 +63,7 @@ pub fn format_prompt_history(limit: usize) -> (String, Value) {
     for (index, prompt) in prompts.iter().enumerate() {
         let id8 = id_prefix(&prompt.id);
         let preview = prompt_preview(prompt, summary_words);
-        text.push_str(&format!(
+        let block = format!(
             "\n<b>{}.</b> <code>{}</code> <i>{}</i> • <i>{}</i>\n   {}\n   <pre>{}</pre>\n",
             index + 1,
             clean_for_telegram_html(&id8, 16),
@@ -71,7 +71,13 @@ pub fn format_prompt_history(limit: usize) -> (String, Value) {
             clean_for_telegram_html(prompt.status.trim(), 24),
             prompt_destination(prompt),
             preview,
-        ));
+        );
+        // Telegram 4000-char boundary guard preserving code block formatting
+        if text.len() + block.len() > 3900 {
+            text.push_str("\n<i>... (additional history truncated to prevent Telegram size limit rejection)</i>\n");
+            break;
+        }
+        text.push_str(&block);
         // A row whose id cannot round-trip through a callback payload simply
         // gets no button instead of corrupting the keyboard.
         if let Some(payload) = rerun_callback(prompt) {

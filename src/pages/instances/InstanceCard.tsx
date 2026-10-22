@@ -343,6 +343,12 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                             <span>PID: {inst.pid}</span>
                                         </>
                                     ) : null}
+                                    {inst.memory_mb ? (
+                                        <>
+                                            <span className="text-emerald-500/50 dark:text-[#1af18d]/50 font-sans select-none">·</span>
+                                            <span>{Math.round(inst.memory_mb)}MB</span>
+                                        </>
+                                    ) : null}
                                 </span>
                             ) : (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-medium bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-400/20">

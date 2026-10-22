@@ -76,7 +76,7 @@ pub struct EndpointTestResult {
 }
 
 /// Normalize Supabase endpoint URL by trimming whitespace, trailing slashes, redundant `/rest/v1` suffixes,
-/// and auto-correcting known Lovable endpoint domain typos.
+/// stripping redundant default ports (:443 for https, :80 for http), and auto-correcting known Lovable endpoint domain typos.
 pub fn normalize_supabase_url(raw: &str) -> String {
     let cleaned = raw.trim().replace(
         "pezjuuddecbyrmqxytrv.supabase.co",
@@ -90,6 +90,16 @@ pub fn normalize_supabase_url(raw: &str) -> String {
         trimmed = stripped;
         while trimmed.ends_with('/') {
             trimmed = &trimmed[..trimmed.len() - 1];
+        }
+    }
+    // Strip redundant default ports (:443 for https, :80 for http)
+    if let Some(stripped) = trimmed.strip_suffix(":443") {
+        if stripped.starts_with("https://") {
+            trimmed = stripped;
+        }
+    } else if let Some(stripped) = trimmed.strip_suffix(":80") {
+        if stripped.starts_with("http://") {
+            trimmed = stripped;
         }
     }
     trimmed.to_string()

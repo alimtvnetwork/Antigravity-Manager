@@ -146,3 +146,18 @@ pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
 
     Ok(())
 }
+
+/// Imp-47: Rapidly update active prompt status and timestamp using cached prepared statement
+pub fn update_prompt_status(prompt_id: &str, new_status: &str) -> Result<bool, String> {
+    let conn = connect_db()?;
+    let now = Utc::now().timestamp();
+    let mut stmt = conn
+        .prepare_cached("UPDATE active_prompts SET status = ?1, updated_at = ?2 WHERE id = ?3")
+        .map_err(|e| format!("Failed to prepare update_prompt_status statement: {e}"))?;
+
+    let rows_affected = stmt
+        .execute(params![new_status, now, prompt_id])
+        .map_err(|e| format!("Failed to execute update_prompt_status: {e}"))?;
+
+    Ok(rows_affected > 0)
+}

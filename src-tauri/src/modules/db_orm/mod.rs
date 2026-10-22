@@ -9,6 +9,9 @@ pub mod traits;
 pub mod tests;
 
 pub use builder::{Order, QueryBuilder, ViewQueryBuilder};
-pub use connection::{init_split_db_schema, open_diesel_split_db, open_split_db};
+pub use connection::{
+    init_split_db_schema, open_diesel_split_db, open_split_db, open_split_db_readonly,
+    verify_split_db_integrity,
+};
 pub use generated::*;
 pub use traits::{Entity, FromRow, ToValues, ValueParam, ViewEntity};

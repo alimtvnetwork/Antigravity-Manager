@@ -83,16 +83,21 @@ export function AlgorithmScoreCell({
         setTooltipCoords(null);
     };
 
-    // Close tooltip on any scroll event to prevent floating detachment
+    // Close tooltip on any scroll event or Escape key to prevent floating detachment (Imp-57)
     useEffect(() => {
         if (!isHovered) return;
-        const handleScroll = () => {
+        const handleScrollOrEscape = (e: Event) => {
+            if (e instanceof KeyboardEvent && e.key !== 'Escape') {
+                return;
+            }
             setIsHovered(false);
             setTooltipCoords(null);
         };
-        window.addEventListener('scroll', handleScroll, true);
+        window.addEventListener('scroll', handleScrollOrEscape, true);
+        window.addEventListener('keydown', handleScrollOrEscape, true);
         return () => {
-            window.removeEventListener('scroll', handleScroll, true);
+            window.removeEventListener('scroll', handleScrollOrEscape, true);
+            window.removeEventListener('keydown', handleScrollOrEscape, true);
         };
     }, [isHovered]);
 

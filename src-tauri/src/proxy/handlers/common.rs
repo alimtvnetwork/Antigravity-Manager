@@ -34,3 +34,33 @@ pub(crate) use retrystrategy::tests;
 pub use retrystrategy::FailureStatusTracker;
 pub use retrystrategy::RequestRetryState;
 pub use retrystrategy::RetryStrategy;
+
+/// Imp-49: Fast zero-allocation case-insensitive header comparison
+pub fn header_eq_ignore_case(headers: &axum::http::HeaderMap, key: &str, expected: &str) -> bool {
+    if let Some(val) = headers.get(key) {
+        if let Ok(val_str) = val.to_str() {
+            return val_str.trim().eq_ignore_ascii_case(expected.trim());
+        }
+    }
+    false
+}
+
+/// Imp-49: Fast zero-allocation case-insensitive header substring matching
+pub fn header_contains_ignore_case(headers: &axum::http::HeaderMap, key: &str, needle: &str) -> bool {
+    if let Some(val) = headers.get(key) {
+        if let Ok(val_str) = val.to_str() {
+            let v_bytes = val_str.as_bytes();
+            let n_bytes = needle.as_bytes();
+            if n_bytes.is_empty() {
+                return true;
+            }
+            if v_bytes.len() < n_bytes.len() {
+                return false;
+            }
+            return v_bytes
+                .windows(n_bytes.len())
+                .any(|window| window.eq_ignore_ascii_case(n_bytes));
+        }
+    }
+    false
+}
