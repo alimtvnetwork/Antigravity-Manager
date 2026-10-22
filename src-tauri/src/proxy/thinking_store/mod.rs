@@ -17,6 +17,7 @@ mod hashing;
 mod model;
 mod session_extract;
 mod session_scope;
+pub mod signature_validator;
 mod signatures;
 mod store;
 mod store_restore;
@@ -70,6 +71,7 @@ pub use thought_parts::{
     is_thought_part, place_turn_signature,
 };
 pub use turn_accumulator::TurnAccumulator;
+pub use signature_validator::*;
 
 pub(crate) use common::{
     idle_ttl, max_turns_per_session, ModelTurnMeta, MAX_BYTES_PER_SESSION, MAX_SESSIONS,

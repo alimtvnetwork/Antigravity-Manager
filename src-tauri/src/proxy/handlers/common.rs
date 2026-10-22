@@ -11,12 +11,18 @@ use tokio::time::{sleep, Duration};
 use tracing::{debug, info};
 
 pub mod curl_gen;
+pub mod decompressor;
 mod handle_detect_model;
 pub(crate) mod retrystrategy;
 pub mod status_mapper;
+pub mod stream_abort;
+pub mod stream_flusher;
 
 pub use curl_gen::generate_reproducible_curl;
+pub use decompressor::decompress_payload;
 pub use status_mapper::{map_upstream_status_to_canonical, CanonicalErrorPayload};
+pub use stream_abort::{StreamAbortHandle, StreamAbortReceiver};
+pub use stream_flusher::{StreamFlusher, SSE_KEEPALIVE_BYTES};
 
 pub use handle_detect_model::build_dual_track_error;
 pub use handle_detect_model::build_token_error_headers;

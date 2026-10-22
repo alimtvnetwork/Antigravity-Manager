@@ -8,9 +8,13 @@
 #![allow(dead_code)]
 
 pub mod agy;
+pub mod ascii_tree;
+pub mod attachment_hasher;
+pub mod attachment_mime;
 pub mod auto_resume;
 pub mod backup;
 pub mod clone_rows;
+pub mod depth_guard;
 pub mod detection;
 pub mod discovery;
 pub mod dispatch;
@@ -39,6 +43,11 @@ pub mod tree_nodes;
 pub mod tree_phases;
 pub mod tree_text;
 pub mod verification;
+
+pub use ascii_tree::*;
+pub use attachment_hasher::*;
+pub use attachment_mime::*;
+pub use depth_guard::*;
 
 // ---- models ----
 pub use models::{
