@@ -16,7 +16,7 @@ pub struct ProfileCandidate {
 pub fn is_model_matching_target(model_name: &str, target_model: &str) -> bool {
     let m = model_name.trim().to_lowercase();
     let t = target_model.trim().to_lowercase();
-    if t.is_empty() {
+    if t.is_empty() || t == "*" {
         return true;
     }
     if m == t || m.contains(&t) || t.contains(&m) {
@@ -25,6 +25,7 @@ pub fn is_model_matching_target(model_name: &str, target_model: &str) -> bool {
     let is_target_flash = t.contains("flash");
     let is_target_pro = t.contains("pro");
     let is_target_claude = t.contains("claude") || t.contains("sonnet");
+    let is_target_gpt = t.contains("gpt") || t.contains("o1") || t.contains("o3");
     if is_target_flash && m.contains("flash") {
         return true;
     }
@@ -32,6 +33,9 @@ pub fn is_model_matching_target(model_name: &str, target_model: &str) -> bool {
         return true;
     }
     if is_target_claude && (m.contains("claude") || m.contains("sonnet")) {
+        return true;
+    }
+    if is_target_gpt && (m.contains("gpt") || m.contains("o1") || m.contains("o3")) {
         return true;
     }
     false

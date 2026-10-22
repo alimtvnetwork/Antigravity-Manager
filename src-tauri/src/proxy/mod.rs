@@ -18,6 +18,7 @@ pub mod token_manager;
 // New architecture modules
 pub mod audio; // Audio processing module
 pub mod cache_manager; // Context Cache management (prefix hash -> cache_id mapping)
+pub mod canonical; // Canonical IR Envelope (Imp-19)
 pub mod cli_sync; // CLI configuration sync (v3.3.35)
 pub mod common; // Common utilities
 pub mod debug_logger;

@@ -683,7 +683,7 @@ export function usePromptTreeData({
         }
     }, [isOpen, instanceId, initialSelectedProjectId, loadTree, performAutoSelection, setArchivedProjectIds, setPinnedProjectIds, setTreeData]);
 
-    // Configurable auto-sync interval timer (minimum 15s floor)
+    // Imp-16: Dynamic 2s Auto-Sync Acceleration when active prompts are running (fallback to configured interval when idle)
     useEffect(() => {
         if (!isOpen || syncInterval === 'off') return;
 
@@ -693,14 +693,15 @@ export function usePromptTreeData({
         else if (syncInterval === '1m') intervalMs = 60000;
         else if (syncInterval === '2m') intervalMs = 120000;
 
-        const safeIntervalMs = Math.max(intervalMs, 15000);
+        const hasActiveRunningPrompt = treeData.some((p) => isProjectRunning(p));
+        const effectiveIntervalMs = hasActiveRunningPrompt ? 2000 : Math.max(intervalMs, 15000);
 
         const timer = setInterval(() => {
             loadTree(false, true);
-        }, safeIntervalMs);
+        }, effectiveIntervalMs);
 
         return () => clearInterval(timer);
-    }, [isOpen, syncInterval, instanceId, loadTree]);
+    }, [isOpen, syncInterval, instanceId, loadTree, treeData]);
 
     return { selectConversation, loadTree };
 }

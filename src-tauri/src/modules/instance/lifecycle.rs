@@ -143,3 +143,25 @@ pub fn clone_instance(
         copy_projects,
     )
 }
+
+/// Imp-07: Conscious IDE PID Process Verification
+/// Verify that a candidate process executable name or process name genuinely belongs to the Antigravity IDE family
+pub fn is_conscious_ide_pid(pid: u32) -> bool {
+    let mut system = sysinfo::System::new();
+    system.refresh_processes_specifics(
+        sysinfo::ProcessesToUpdate::Some(&[sysinfo::Pid::from_u32(pid)]),
+        sysinfo::ProcessRefreshKind::new()
+            .with_cmd(sysinfo::UpdateKind::Always)
+            .with_exe(sysinfo::UpdateKind::Always),
+    );
+    if let Some(proc) = system.process(sysinfo::Pid::from_u32(pid)) {
+        let p_name = proc.name().to_string_lossy().to_lowercase();
+        let p_exe = proc
+            .exe()
+            .map(|p| p.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        p_name.contains("antigravity") || p_exe.contains("antigravity")
+    } else {
+        false
+    }
+}

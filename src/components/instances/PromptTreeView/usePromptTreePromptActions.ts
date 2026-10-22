@@ -63,6 +63,33 @@ export function buildPromptAndAiMarkdown(promptBody: string, conv: AgmConversati
     return sections.join('\n\n');
 }
 
+/**
+ * Imp-18: Dual-MIME Rich Clipboard Formatter
+ * Provides structured multi-turn markdown copying for prompt turns and verification records.
+ */
+export function buildStructuredTurnsMarkdown(conv: AgmConversationNode, promptBody?: string): string {
+    const parts: string[] = [`# Conversation: ${conv.title || conv.short_id || 'Prompt Run'}\n`];
+    if (conv.prompts && conv.prompts.length > 0) {
+        for (const turn of conv.prompts) {
+            parts.push(`## Turn ${turn.turn_number}${turn.is_running ? ' (RUNNING)' : ''}`);
+            parts.push(`\n**Prompt:**\n\n${turn.prompt_text || '*(empty)*'}\n`);
+            if (turn.response_text) {
+                parts.push(`**Response:**\n\n${turn.response_text}\n`);
+            }
+        }
+    } else {
+        const body = promptBody || resolvePromptBody(conv);
+        parts.push(`**Prompt:**\n\n${body || '*(empty)*'}\n`);
+        if (conv.latest_response) {
+            parts.push(`**Response:**\n\n${conv.latest_response}\n`);
+        }
+    }
+    if (conv.execution_results) {
+        parts.push(`### Execution Results\n\n${conv.execution_results}\n`);
+    }
+    return parts.join('\n');
+}
+
 export function buildPromptAiCopyPayload(
     kind: PromptAiCopyKind,
     conv: AgmConversationNode,
@@ -1254,6 +1281,10 @@ export async function handleRerunConversation(
         }
         if (!originalPrompt) {
             originalPrompt = (conv.full_prompt_text || conv.prompt_preview_200w || '').trim();
+        }
+        // Imp-17: 3-Tier Fallback: turn summary -> root prompt title/summary -> ledger
+        if (!originalPrompt) {
+            originalPrompt = (conv.summary || conv.title || '').trim();
         }
     }
 
