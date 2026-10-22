@@ -45,6 +45,7 @@ mod error_handling;
 mod handler;
 mod helpers;
 pub mod message_content_flattener;
+pub mod message_turn_validator;
 #[cfg(test)]
 mod opus_tests;
 mod request_log;
@@ -67,6 +68,7 @@ mod warmup_tests;
 pub(crate) use apply_compression::apply_compression;
 pub use block_merger::*;
 pub use message_content_flattener::*;
+pub use message_turn_validator::*;
 pub use role_prefix_sanitizer::*;
 pub use stop_reason_normalizer::*;
 pub use stop_sequence_matcher::*;

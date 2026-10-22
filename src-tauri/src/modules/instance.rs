@@ -240,6 +240,18 @@ pub mod process_spawn_ladder;
 pub mod port_allocation_guard;
 #[path = "instance/workspace_directory_guard.rs"]
 pub mod workspace_directory_guard;
+#[path = "instance/env_path_normalizer.rs"]
+pub mod env_path_normalizer;
+#[path = "instance/stale_pid_reaper.rs"]
+pub mod stale_pid_reaper;
+#[path = "instance/profile_state_hasher.rs"]
+pub mod profile_state_hasher;
+#[path = "instance/binary_execution_probe.rs"]
+pub mod binary_execution_probe;
+#[path = "instance/remote_port_guard.rs"]
+pub mod remote_port_guard;
+#[path = "instance/directory_permission_guard.rs"]
+pub mod directory_permission_guard;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use arg_normalizer::*;
@@ -419,3 +431,9 @@ pub use profile_telemetry_isolation::*;
 pub use process_spawn_ladder::*;
 pub use port_allocation_guard::*;
 pub use workspace_directory_guard::*;
+pub use env_path_normalizer::*;
+pub use stale_pid_reaper::*;
+pub use profile_state_hasher::*;
+pub use binary_execution_probe::*;
+pub use remote_port_guard::*;
+pub use directory_permission_guard::*;
