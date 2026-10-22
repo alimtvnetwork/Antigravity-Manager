@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.250.11-3B82F6?style=flat-square" alt="Version v4.250.11">
+    <img src="https://img.shields.io/badge/Version-v4.251.0-3B82F6?style=flat-square" alt="Version v4.251.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,7 +116,7 @@ irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/ins
 ```
 
 <<<<<<< HEAD
-**Bar 2: Version-Based Installation (v4.250.11)**
+**Bar 2: Version-Based Installation (v4.251.0)**
 =======
 **Bar 2: Version-Based Installation (v4.245.0)**
 >>>>>>> 054af6ca (Feature: telegram-fleet - backup prompt tree terminal indentation fleet caching and w1 lead alignment)
