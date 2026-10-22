@@ -118,7 +118,7 @@ const DISMISS_SECURITY_NOTICE_JS: &str = r#"(async () => {
   }
 })()"#;
 
-fn candidate_devtools_port_files(data_dir: &Path) -> Vec<PathBuf> {
+pub(crate) fn candidate_devtools_port_files(data_dir: &Path) -> Vec<PathBuf> {
     let mut files = vec![
         data_dir.join("DevToolsActivePort"),
         data_dir

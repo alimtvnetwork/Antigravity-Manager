@@ -451,6 +451,12 @@ pub fn copy_instance_with_options(
     );
     sync_instance_ide_parity(&new_instance.id).map_err(|e| e.to_string())?;
 
+    // Imp-64: Deep-Merge Telemetry Scrubbing
+    scrub_storage_json_telemetry(&dst_path, &new_instance.id);
+    if let Ok(dst_home) = get_instance_home_dir(&new_instance.id) {
+        scrub_storage_json_telemetry(&dst_home, &new_instance.id);
+    }
+
     crate::modules::task_history_db::record(
         crate::modules::audit_action::AuditAction::CloneInstance,
         &source.id,
@@ -473,4 +479,54 @@ pub fn copy_instance_with_options(
     );
 
     Ok(new_instance)
+}
+
+/// Imp-64: Deep-Merge Telemetry Scrubbing
+/// Scrubs and regenerates machine-identifying telemetry keys in `storage.json`
+/// (`telemetry.machineId`, `telemetry.macMachineId`, `telemetry.devDeviceId`, `telemetry.sqmId`, `telemetry.sessionId`)
+/// so cloned profiles have completely isolated synthetic telemetry identities.
+pub fn scrub_storage_json_telemetry(dst_data_dir: &std::path::Path, instance_id: &str) {
+    let candidate_paths = [
+        dst_data_dir.join("User").join("globalStorage").join("storage.json"),
+        dst_data_dir.join("globalStorage").join("storage.json"),
+        dst_data_dir.join("storage.json"),
+        dst_data_dir.join("AppData").join("Roaming").join("Antigravity").join("User").join("globalStorage").join("storage.json"),
+    ];
+
+    for storage_path in &candidate_paths {
+        if !storage_path.exists() {
+            continue;
+        }
+
+        if let Ok(raw) = std::fs::read_to_string(storage_path) {
+            if let Ok(mut json) = serde_json::from_str::<serde_json::Value>(&raw) {
+                if let Some(obj) = json.as_object_mut() {
+                    use sha2::{Digest, Sha256};
+                    let machine_seed = format!("{}-machine-{}", instance_id, uuid::Uuid::new_v4());
+                    let mut hasher = Sha256::new();
+                    hasher.update(machine_seed.as_bytes());
+                    let new_machine_id = format!("{:x}", hasher.finalize());
+
+                    let mac_seed = format!("{}-mac-{}", instance_id, uuid::Uuid::new_v4());
+                    let mut mac_hasher = Sha256::new();
+                    mac_hasher.update(mac_seed.as_bytes());
+                    let new_mac_machine_id = format!("{:x}", mac_hasher.finalize());
+
+                    let new_dev_device_id = uuid::Uuid::new_v4().to_string();
+                    let new_sqm_id = format!("{{{}}}", uuid::Uuid::new_v4().to_string().to_uppercase());
+
+                    obj.insert("telemetry.machineId".to_string(), serde_json::Value::String(new_machine_id));
+                    obj.insert("telemetry.macMachineId".to_string(), serde_json::Value::String(new_mac_machine_id));
+                    obj.insert("telemetry.devDeviceId".to_string(), serde_json::Value::String(new_dev_device_id));
+                    obj.insert("telemetry.sqmId".to_string(), serde_json::Value::String(new_sqm_id));
+                    obj.insert("telemetry.sessionId".to_string(), serde_json::Value::String(uuid::Uuid::new_v4().to_string()));
+
+                    if let Ok(serialized) = serde_json::to_string_pretty(&json) {
+                        // Justification: best-effort telemetry scrubbing for cloned profile isolation
+                        let _ = std::fs::write(storage_path, serialized);
+                    }
+                }
+            }
+        }
+    }
 }

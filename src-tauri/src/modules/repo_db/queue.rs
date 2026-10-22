@@ -18,6 +18,17 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
+/// Imp-75: Strict FIFO Query Invariant Guard
+/// Ensures that prompt queue restore and dispatch queries always maintain strict First-In-First-Out ordering (`ORDER BY created_at ASC, id ASC`).
+pub fn verify_fifo_ordering_clause(query: &str) -> bool {
+    let lower = query.to_lowercase();
+    if lower.contains("order by") {
+        lower.contains("created_at asc") && !lower.contains("desc")
+    } else {
+        true
+    }
+}
+
 /// Count total enqueued/backed_up/pending prompts, optionally filtered by target_instance.
 pub fn count_enqueued_prompts(target_instance: Option<&str>) -> usize {
     let Ok(conn) = connect_db() else {

@@ -37,6 +37,44 @@ impl fmt::Display for NotificationChannelType {
     }
 }
 
+/// Imp-72: Multi-Channel Alert Severity Matrix
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum AlertSeverity {
+    Info,
+    Warning,
+    Critical,
+}
+
+impl AlertSeverity {
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Info => "info",
+            Self::Warning => "warning",
+            Self::Critical => "critical",
+        }
+    }
+
+    /// Determines which channels should be dispatched for a given alert severity
+    pub fn target_channels(&self) -> &'static [NotificationChannelType] {
+        match self {
+            Self::Info => &[NotificationChannelType::Supabase],
+            Self::Warning => &[NotificationChannelType::Telegram, NotificationChannelType::Supabase],
+            Self::Critical => &[
+                NotificationChannelType::Email,
+                NotificationChannelType::Telegram,
+                NotificationChannelType::Supabase,
+            ],
+        }
+    }
+}
+
+impl fmt::Display for AlertSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 pub const DUP_SWITCH_SUPPRESSION_SECS: i64 = 30;
 
 /// Dispatch rich notifications across Email and Telegram upon account/instance switch

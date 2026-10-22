@@ -40,6 +40,7 @@ pub mod notification_hub;
 pub mod oauth;
 pub mod oauth_server;
 pub mod process;
+pub mod process_cleaner;
 pub mod proxy_db;
 pub mod quota;
 pub mod repo_db;

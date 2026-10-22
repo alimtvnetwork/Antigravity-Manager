@@ -75,6 +75,36 @@ pub fn verify_split_db_integrity(conn: &Connection, db_name: &str) -> Result<boo
     }
 }
 
+/// Imp-73: WAL Concurrency Checkpointer
+/// Runs `PRAGMA wal_checkpoint(...)` to merge WAL log frames into the main database file without blocking active readers.
+/// Returns (busy, log_frames, checkpointed_frames).
+pub fn checkpoint_split_db(conn: &Connection, mode: &str) -> Result<(i32, i32, i32), AppError> {
+    let mode_upper = mode.trim().to_uppercase();
+    let valid_mode = match mode_upper.as_str() {
+        "PASSIVE" | "FULL" | "RESTART" | "TRUNCATE" => mode_upper.as_str(),
+        _ => "PASSIVE",
+    };
+    let sql = format!("PRAGMA wal_checkpoint({});", valid_mode);
+    let mut stmt = conn.prepare(&sql).map_err(AppError::Database)?;
+    let mut rows = stmt.query([]).map_err(AppError::Database)?;
+    if let Some(row) = rows.next().map_err(AppError::Database)? {
+        let busy: i32 = row.get(0).unwrap_or(0);
+        let log: i32 = row.get(1).unwrap_or(0);
+        let checkpointed: i32 = row.get(2).unwrap_or(0);
+        Ok((busy, log, checkpointed))
+    } else {
+        Ok((0, 0, 0))
+    }
+}
+
+/// Imp-74: PRAGMA Optimize Idle Maintenance
+/// Executes `PRAGMA optimize;` to refresh SQLite query planner statistics and optimize table indices.
+pub fn optimize_split_db(conn: &Connection) -> Result<(), AppError> {
+    conn.execute_batch("PRAGMA optimize;")
+        .map_err(AppError::Database)?;
+    Ok(())
+}
+
 /// Opens a compile-time type-safe Diesel SQLite connection for Split-DB architecture.
 pub fn open_diesel_split_db(path: &Path) -> Result<SqliteConnection, AppError> {
     if let Some(parent) = path.parent() {

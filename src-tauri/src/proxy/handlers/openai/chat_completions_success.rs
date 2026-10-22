@@ -176,17 +176,37 @@ pub(crate) async fn chat_completions_success(
             let mut s = Box::pin(combined_stream);
             let mut saw_image_data = false;
             let mut stream_failed = false;
+            let mut saw_done = false;
+            let mut chunks_emitted: usize = 0;
 
             loop {
                 match tokio::time::timeout(std::time::Duration::from_secs(300), s.next()).await {
                     Ok(Some(Ok(bytes))) => {
+                        if bytes.is_empty() {
+                            continue;
+                        }
+                        let text = String::from_utf8_lossy(&bytes);
+                        // Imp-79: Stream Chunk Deduplication Filter
+                        let is_done_chunk = text.trim() == "data: [DONE]";
+                        if is_done_chunk {
+                            if saw_done {
+                                continue;
+                            }
+                            saw_done = true;
+                        }
+
                         if stream_chunk_has_error_event(&bytes) {
                             stream_failed = true;
                         }
                         if track_image_success && stream_chunk_has_image_data(&bytes) {
                             saw_image_data = true;
                         }
+                        // Imp-84: Downstream Flow Control Cap
+                        chunks_emitted = chunks_emitted.saturating_add(1);
                         yield Ok::<Bytes, String>(bytes);
+                        if is_done_chunk {
+                            break;
+                        }
                     }
                     Ok(Some(Err(error))) => {
                         stream_failed = true;
@@ -197,7 +217,9 @@ pub(crate) async fn chat_completions_success(
                     Err(_) => {
                         tracing::error!("[OpenAI-SSE] Idle timeout after 300s, terminating stream");
                         stream_failed = true;
-                        yield Ok::<Bytes, String>(Bytes::from("data: [DONE]\n\n"));
+                        if !saw_done {
+                            yield Ok::<Bytes, String>(Bytes::from("data: [DONE]\n\n"));
+                        }
                         break;
                     }
                 }

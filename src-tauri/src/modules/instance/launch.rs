@@ -143,6 +143,7 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
         let inst_home_opt = if has_custom_data {
             app_args.push(format!("--user-data-dir={}", data_dir));
             app_args.push("--password-store=basic".to_string());
+            app_args.push("--use-mock-keychain".to_string());
             let home_opt = get_instance_home_dir(instance_id).ok();
             write_keyring_bypass_markers(&target_data_path, home_opt.as_deref());
             if let Some(ref inst_home) = home_opt {
@@ -402,6 +403,7 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
         if has_custom_data {
             cmd.arg(format!("--user-data-dir={}", data_dir));
             cmd.arg("--password-store=basic");
+            cmd.arg("--use-mock-keychain");
             write_keyring_bypass_markers(&target_data_path, inst_home_opt.as_deref());
             cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
             cmd.env("SSH_CLIENT", "127.0.0.1 50000 22");
@@ -507,6 +509,7 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
                         if has_custom_data {
                             fallback_cmd.arg(format!("--user-data-dir={}", data_dir));
                             fallback_cmd.arg("--password-store=basic");
+                            fallback_cmd.arg("--use-mock-keychain");
                             fallback_cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
                             fallback_cmd.env("SSH_CLIENT", "127.0.0.1 50000 22");
                             fallback_cmd.env("SSH_TTY", "pty/0");
@@ -591,6 +594,7 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
                             if has_custom_data {
                                 shell_args.push(format!("--user-data-dir={}", data_dir));
                                 shell_args.push("--password-store=basic".to_string());
+                                shell_args.push("--use-mock-keychain".to_string());
                             }
                             if let Some(ref ext_dir) = extensions_dir {
                                 shell_args.push(format!("--extensions-dir={}", ext_dir));

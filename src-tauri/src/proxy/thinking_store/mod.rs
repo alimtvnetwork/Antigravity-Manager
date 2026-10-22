@@ -66,8 +66,8 @@ pub use signatures::{
 };
 pub use store::ThinkingStore;
 pub use thought_parts::{
-    extract_think_tags, is_meaningful_thought, is_placeholder_thought, is_thought_part,
-    place_turn_signature,
+    extract_think_tags, heal_empty_thought_parts, is_meaningful_thought, is_placeholder_thought,
+    is_thought_part, place_turn_signature,
 };
 pub use turn_accumulator::TurnAccumulator;
 

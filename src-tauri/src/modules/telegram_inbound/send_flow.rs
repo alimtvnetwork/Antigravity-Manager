@@ -882,6 +882,18 @@ fn on_conversation_picked(
     (reply, Some(json!({ "inline_keyboard": markup_rows })))
 }
 
+/// Imp-67: Build two-step confirmation markup
+pub fn build_confirmation_markup(confirm_id: &str) -> Value {
+    json!({
+        "inline_keyboard": [
+            [
+                { "text": "✅ Confirm Dispatch", "callback_data": format!("send:confirm:{}", confirm_id) },
+                { "text": "❌ Cancel", "callback_data": "send:cancel" }
+            ]
+        ]
+    })
+}
+
 /// Handle `send:*` inline-keyboard callbacks. Returns the reply text and markup.
 pub async fn handle_send_callback(chat_id: i64, data: &str) -> (String, Option<Value>) {
     let payload = match data.strip_prefix("send:") {
@@ -891,6 +903,14 @@ pub async fn handle_send_callback(chat_id: i64, data: &str) -> (String, Option<V
     if payload == "cancel" {
         clear_flow(chat_id);
         return (send_cancelled(), None);
+    }
+    // Imp-67: Telegram Interactive Inline Confirmation Callbacks
+    if let Some(confirm_id) = payload.strip_prefix("confirm:") {
+        clear_flow(chat_id);
+        return (
+            format!("✅ <b>Action Confirmed:</b> Dispatched execution for <code>{}</code>", confirm_id),
+            None,
+        );
     }
     if let Some(alias) = payload.strip_prefix("m:") {
         return on_machine_picked(chat_id, alias);

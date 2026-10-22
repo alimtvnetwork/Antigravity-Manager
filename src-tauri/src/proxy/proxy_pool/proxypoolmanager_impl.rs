@@ -268,26 +268,31 @@ impl ProxyPoolManager {
             }
         };
 
-        let start = std::time::Instant::now();
-        match client.get(check_url).send().await {
-            Ok(resp) => {
-                let latency = start.elapsed().as_millis() as u64;
-                if resp.status().is_success() {
-                    (true, Some(latency))
-                } else {
-                    tracing::warn!(
-                        "Proxy {} health check status error: {}",
-                        entry.url,
-                        resp.status()
-                    );
-                    (false, None)
+        // Imp-83: Egress Proxy Failover Retries on initial handshake reset
+        let mut last_err = None;
+        for attempt in 0..2 {
+            if attempt > 0 {
+                tokio::time::sleep(Duration::from_millis(150)).await;
+            }
+            let start = std::time::Instant::now();
+            match client.get(check_url).send().await {
+                Ok(resp) => {
+                    let latency = start.elapsed().as_millis() as u64;
+                    if resp.status().is_success() {
+                        return (true, Some(latency));
+                    } else {
+                        last_err = Some(format!("status error: {}", resp.status()));
+                    }
+                }
+                Err(e) => {
+                    last_err = Some(format!("request failed: {}", e));
                 }
             }
-            Err(e) => {
-                tracing::warn!("Proxy {} health check request failed: {}", entry.url, e);
-                (false, None)
-            }
         }
+        if let Some(err) = last_err {
+            tracing::warn!("Proxy {} health check failed after retry: {}", entry.url, err);
+        }
+        (false, None)
     }
 
     /// Start background health check loop

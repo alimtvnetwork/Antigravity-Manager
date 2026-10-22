@@ -49,7 +49,7 @@ pub fn resolve_instance_id_from_project_or_fallback(
 
 /// Save or re-queue an active prompt into active_prompts and running_projects
 pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
-    let conn = connect_db()?;
+    let mut conn = connect_db()?;
     let now = Utc::now().timestamp();
     let clean_repo_name = Path::new(&prompt.repo_path)
         .file_name()
@@ -95,10 +95,13 @@ pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
         })
         .unwrap_or_default();
 
+    // Imp-76: Transactional Rollback Protection
+    let tx = conn
+        .transaction()
+        .map_err(|e| format!("Failed to begin transaction for active prompt: {e}"))?;
+
     if !ws_path.trim().is_empty() {
-        // Justification: project-row scaffolding is auxiliary; the prompt row insert below is the authoritative op
-        crate::error::record_ignored(
-            conn.execute(
+        tx.execute(
             "INSERT INTO running_projects
              (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
@@ -120,12 +123,11 @@ pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
                 now,
                 now
             ],
-        ),
-            "upsert running project for prompt",
-        );
+        )
+        .map_err(|e| format!("Failed to upsert running project: {e}"))?;
     }
 
-    conn.execute(
+    tx.execute(
         "INSERT OR REPLACE INTO active_prompts 
          (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -143,6 +145,9 @@ pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
             &prompt.image_payload,
         ],
     ).map_err(|e| format!("Failed to insert active prompt: {}", e))?;
+
+    tx.commit()
+        .map_err(|e| format!("Failed to commit active prompt transaction: {e}"))?;
 
     Ok(())
 }

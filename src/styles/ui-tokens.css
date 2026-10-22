@@ -13,6 +13,14 @@
    ========================================================================== */
 
 :root {
+  /* ---- Standard app layout aliases and RGB fallbacks ---- */
+  --app-bg: var(--ui-canvas);
+  --app-bg-rgb: 9, 6, 17;
+  --app-surface: var(--ui-surface-1);
+  --app-surface-rgb: 23, 16, 37;
+  --app-border: var(--ui-border-subtle);
+  --app-border-rgb: 64, 40, 94;
+
   /* ---- Core surfaces and text (Royal Violet) ---- */
   --ui-canvas: #090611;            /* App background */
   --ui-surface-1: #171025;         /* Main panel / card */

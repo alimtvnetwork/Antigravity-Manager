@@ -370,6 +370,31 @@ pub fn build_copy_prompt_reply_markup(
     })
 }
 
+static TELEGRAM_RATE_LIMITER: once_cell::sync::Lazy<tokio::sync::Mutex<(std::time::Instant, u32)>> =
+    once_cell::sync::Lazy::new(|| tokio::sync::Mutex::new((std::time::Instant::now(), 30)));
+
+/// Imp-69: Telegram Rate-Limited Queue Pacer
+/// Token bucket rate limiter preventing Telegram API 429 rate limit errors (max 30 req/sec globally).
+pub async fn pace_telegram_request() {
+    let mut guard = TELEGRAM_RATE_LIMITER.lock().await;
+    let now = std::time::Instant::now();
+    let elapsed = now.duration_since(guard.0);
+    if elapsed >= Duration::from_secs(1) {
+        guard.0 = now;
+        guard.1 = 30;
+    }
+    if guard.1 == 0 {
+        let sleep_duration = Duration::from_secs(1).saturating_sub(elapsed);
+        drop(guard);
+        tokio::time::sleep(sleep_duration).await;
+        let mut guard = TELEGRAM_RATE_LIMITER.lock().await;
+        guard.0 = std::time::Instant::now();
+        guard.1 = 29;
+    } else {
+        guard.1 -= 1;
+    }
+}
+
 /// Send a text message to a Telegram chat with optional reply markup (e.g. inline keyboard)
 /// and optional link-preview suppression (for compact status notifications).
 pub async fn send_telegram_message_with_markup(
@@ -420,6 +445,7 @@ pub async fn send_telegram_message_with_markup(
             }
         }
 
+        pace_telegram_request().await;
         let resp = client.post(&url).json(&payload_html).send().await;
         match resp {
             Ok(r) if r.status().is_success() => continue,

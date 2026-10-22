@@ -76,3 +76,28 @@ export async function copyToClipboard(text: string): Promise<boolean> {
         return false;
     }
 }
+
+/**
+ * Imp-88: Copy both HTML and plain text dual-MIME payload to clipboard.
+ * Allows pasting rich formatted markdown or rendered HTML into office / email / chat apps,
+ * while pasting clean plain text into code editors / terminals.
+ */
+export async function copyHtmlAndTextToClipboard(html: string, plainText: string): Promise<boolean> {
+    ensureDocumentFocus();
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+        try {
+            const blobHtml = new Blob([html], { type: 'text/html' });
+            const blobText = new Blob([plainText], { type: 'text/plain' });
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    'text/html': blobHtml,
+                    'text/plain': blobText,
+                }),
+            ]);
+            return true;
+        } catch {
+            // Fall back to plain text
+        }
+    }
+    return copyToClipboard(plainText);
+}

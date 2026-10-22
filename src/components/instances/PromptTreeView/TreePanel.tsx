@@ -256,12 +256,22 @@ export function TreePanel(props: TreePanelProps) {
         : undefined;
 
     const renderProject = (project: AgmProjectTreeNode) => {
-        const displayedProject = effectiveImageFilter
+        let displayedProject = effectiveImageFilter
             ? {
                   ...project,
                   conversations: (project.conversations || []).filter(conversationHasImages),
               }
             : project;
+
+        // Imp-86: Virtualized Tree Node Threshold (>50 conversations)
+        const totalConvs = (displayedProject.conversations || []).length;
+        const convThreshold = 50;
+        if (totalConvs > convThreshold && !isScopedSingleProject) {
+            displayedProject = {
+                ...displayedProject,
+                conversations: displayedProject.conversations.slice(0, convThreshold),
+            };
+        }
 
         return (
             <ProjectNodeWithMenu

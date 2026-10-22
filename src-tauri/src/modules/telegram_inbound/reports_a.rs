@@ -68,6 +68,16 @@ pub fn format_ping_report() -> String {
                 ),
             ),
             kv(palette, "Uptime", &format!("{}m", uptime_min)),
+            kv(
+                palette,
+                "Instances",
+                &format!("{}", instance::list_instances().map(|i| i.len()).unwrap_or(0)),
+            ),
+            kv(
+                palette,
+                "DB State",
+                if repo_db::connect_db().is_ok() { "Healthy" } else { "Degraded" },
+            ),
         ],
     );
     format!(

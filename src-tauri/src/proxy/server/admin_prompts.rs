@@ -310,3 +310,38 @@ pub(crate) async fn admin_vacuum_system(
         "error": null,
     })))
 }
+
+/// Imp-81: Token Budget Sliding Window Rate Limiter
+/// In-memory sliding-window tracker monitoring token consumption per client API key across a 60-second window.
+#[derive(Debug, Clone)]
+pub struct SlidingTokenBudgetLimiter {
+    window_secs: u64,
+    max_tokens_per_window: u64,
+    // (timestamp_epoch, token_count)
+    history: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<String, Vec<(u64, u64)>>>>,
+}
+
+impl SlidingTokenBudgetLimiter {
+    pub fn new(window_secs: u64, max_tokens_per_window: u64) -> Self {
+        Self {
+            window_secs,
+            max_tokens_per_window,
+            history: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
+        }
+    }
+
+    pub async fn check_and_consume(&self, client_key: &str, requested_tokens: u64) -> bool {
+        let now = chrono::Utc::now().timestamp() as u64;
+        let cutoff = now.saturating_sub(self.window_secs);
+        let mut map = self.history.lock().await;
+        let entry = map.entry(client_key.to_string()).or_default();
+        entry.retain(|(ts, _)| *ts >= cutoff);
+        let current_tokens: u64 = entry.iter().map(|(_, c)| *c).sum();
+        if current_tokens + requested_tokens > self.max_tokens_per_window {
+            false
+        } else {
+            entry.push((now, requested_tokens));
+            true
+        }
+    }
+}

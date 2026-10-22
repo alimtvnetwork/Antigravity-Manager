@@ -217,3 +217,26 @@ pub(crate) fn part_has_signature(part: &Value) -> bool {
         .and_then(|s| s.as_str())
         .is_some_and(is_real_signature)
 }
+
+/// Imp-80: Thinking Block Graceful Healing
+/// Ensures empty or malformed thinking blocks in parts array are gracefully backfilled with placeholder content
+/// to satisfy upstream Gemini structural constraints without losing conversation flow.
+pub fn heal_empty_thought_parts(parts: &mut [Value]) -> usize {
+    let mut healed = 0;
+    for part in parts.iter_mut() {
+        if is_thought_part(part) {
+            let is_empty = part
+                .get("text")
+                .and_then(|t| t.as_str())
+                .map(|s| s.trim().is_empty())
+                .unwrap_or(true);
+            if is_empty {
+                if let Some(obj) = part.as_object_mut() {
+                    obj.insert("text".to_string(), json!("..."));
+                    healed += 1;
+                }
+            }
+        }
+    }
+    healed
+}

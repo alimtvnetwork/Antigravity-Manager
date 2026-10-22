@@ -279,9 +279,57 @@ pub fn matches_target_node_or_ip(target: &str, local_ip: &str, local_name: &str)
     false
 }
 
+/// Imp-70: MIME Body Polish
+/// Strips hidden tracking pixels (<img src=... width="1" height="1"...>),
+/// common mobile email footers ("Sent from my iPhone", "Get Outlook for iOS"),
+/// and trailing boilerplate signatures.
+pub fn sanitize_inbound_email_body(body: &str) -> String {
+    let lower_body = body.to_lowercase();
+
+    let truncate_markers = [
+        "sent from my iphone",
+        "sent from my android",
+        "get outlook for ios",
+        "get outlook for android",
+        "sent from mail for windows",
+        "________________________________",
+    ];
+
+    let mut cut_index = body.len();
+    for marker in &truncate_markers {
+        if let Some(pos) = lower_body.find(marker) {
+            if pos < cut_index {
+                cut_index = pos;
+            }
+        }
+    }
+
+    let raw_trimmed = &body[..cut_index];
+    let mut cleaned = String::new();
+
+    for line in raw_trimmed.lines() {
+        let trimmed_line = line.trim();
+        let lower_line = trimmed_line.to_lowercase();
+        if lower_line.contains("<img")
+            && (lower_line.contains("width=\"1\"")
+                || lower_line.contains("height=\"1\"")
+                || lower_line.contains("width='1'")
+                || lower_line.contains("height='1'")
+                || lower_line.contains("display:none"))
+        {
+            continue;
+        }
+        cleaned.push_str(line);
+        cleaned.push('\n');
+    }
+
+    cleaned.trim().to_string()
+}
+
 /// Extract prompt name and prompt instruction from email body (stripping any footer after ---)
 pub fn parse_prompt_body(body: &str) -> (String, String) {
-    let body_before_footer = body.split("\n---").next().unwrap_or(body).trim();
+    let sanitized = sanitize_inbound_email_body(body);
+    let body_before_footer = sanitized.split("\n---").next().unwrap_or(&sanitized).trim();
     let mut prompt_name = String::new();
     let mut prompt_instruction = String::new();
     let mut in_instruction = false;
