@@ -270,6 +270,36 @@ pub(crate) fn parse_raw_fetch_response(resp: &str) -> Option<RawEmailMessage> {
     })
 }
 
+/// Helper to check if telemetry originated from the current local machine.
+pub fn is_telemetry_from_current_machine(
+    vm_name: &str,
+    local_ip: &str,
+    my_vm: &str,
+    my_ip: &str,
+) -> bool {
+    let vm_clean = vm_name.trim();
+    let my_vm_clean = my_vm.trim();
+    if !vm_clean.is_empty() && vm_clean.eq_ignore_ascii_case(my_vm_clean) {
+        return true;
+    }
+    let ip_clean = local_ip.trim();
+    let my_ip_clean = my_ip.trim();
+    !ip_clean.is_empty() && ip_clean == my_ip_clean
+}
+
+/// Helper to determine if a telemetry lease or event is still actively within lookback window.
+pub fn is_telemetry_event_active(
+    timestamp: i64,
+    cutoff: i64,
+    lease_expires: i64,
+    now: i64,
+) -> bool {
+    if timestamp > 0 && timestamp >= cutoff {
+        return true;
+    }
+    lease_expires > 0 && lease_expires > now
+}
+
 /// Query IMAP inbox for recent account switch [JSON] telemetry events from sibling VMs
 pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<String> {
     let default_acc = match email_vault_db::get_default_account() {
@@ -344,16 +374,19 @@ pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<Str
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
-        let is_same_machine = (!vm_name.is_empty() && vm_name.trim().eq_ignore_ascii_case(my_vm.trim()))
-            || (!local_ip.is_empty() && local_ip.trim() == my_ip.trim());
-        let is_recent =
-            (timestamp > 0 && timestamp >= cutoff) || (lease_expires > 0 && lease_expires > now);
+        if is_telemetry_from_current_machine(vm_name, local_ip, &my_vm, &my_ip) {
+            continue;
+        }
+        if !is_telemetry_event_active(timestamp, cutoff, lease_expires, now) {
+            continue;
+        }
+        if new_email.is_empty() {
+            continue;
+        }
 
-        if !is_same_machine && is_recent && !new_email.is_empty() {
-            let email_clean = new_email.trim().to_lowercase();
-            if !excluded.iter().any(|e| e.eq_ignore_ascii_case(&email_clean)) {
-                excluded.push(email_clean);
-            }
+        let email_clean = new_email.trim().to_lowercase();
+        if !excluded.iter().any(|e| e.eq_ignore_ascii_case(&email_clean)) {
+            excluded.push(email_clean);
         }
     }
 

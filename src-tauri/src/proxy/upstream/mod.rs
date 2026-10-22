@@ -43,6 +43,10 @@ pub mod tests_backoff_and_probe;
 pub mod tests_connection_health_probe;
 #[cfg(test)]
 pub mod tests_h2_ping_scheduler;
+#[cfg(test)]
+pub mod tests_dynamic_route_balancer;
+#[cfg(test)]
+pub mod tests_tls_sni_sanitizer;
 
 pub use brotli_decompressor::*;
 pub use circuit_breaker_counter::*;

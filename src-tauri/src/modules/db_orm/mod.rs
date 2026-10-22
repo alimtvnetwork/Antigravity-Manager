@@ -36,6 +36,7 @@ pub mod index_coverage_verifier;
 pub mod index_health;
 pub mod index_health_checker;
 pub mod index_fragmentation_analyzer;
+pub mod index_fragmentation_scorer;
 pub mod index_usage_inspector;
 pub mod json_extract;
 pub mod lock_checker;
@@ -109,6 +110,8 @@ pub mod tests_busy_timeout_scaler;
 pub mod tests_wal_fragmentation_surveyor;
 #[cfg(test)]
 pub mod tests_lock_contention_watchdog;
+#[cfg(test)]
+pub mod tests_index_fragmentation_scorer;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;
@@ -149,6 +152,7 @@ pub use index_coverage_verifier::*;
 pub use index_health::*;
 pub use index_health_checker::*;
 pub use index_fragmentation_analyzer::*;
+pub use index_fragmentation_scorer::*;
 pub use index_usage_inspector::*;
 pub use json_extract::*;
 pub use lock_checker::*;

@@ -26,6 +26,7 @@ pub mod daemon;
 pub mod decision_telemetry_logger;
 pub mod drain_circuit_breaker;
 pub mod dynamic_quota_floor;
+pub mod epoch_drift_compensator;
 pub mod entropy_candidate_shuffler;
 pub mod event_history_pruner;
 pub mod failover_ladder;
@@ -108,6 +109,8 @@ pub mod tests_quota_recovery_forecaster;
 #[cfg(test)]
 pub mod tests_drain_circuit_breaker;
 #[cfg(test)]
+pub mod tests_epoch_drift_compensator;
+#[cfg(test)]
 pub(crate) use crate::models::account::Account;
 #[cfg(test)]
 pub(crate) use tests_a::make_test_account;
@@ -149,6 +152,7 @@ pub use daemon::*;
 pub use decision_telemetry_logger::*;
 pub use drain_circuit_breaker::*;
 pub use dynamic_quota_floor::*;
+pub use epoch_drift_compensator::*;
 pub use entropy_candidate_shuffler::*;
 pub use event_history_pruner::*;
 pub use failover_ladder::*;

@@ -234,6 +234,15 @@ pub mod tests_cloned_telemetry_salt;
 #[cfg(test)]
 #[path = "instance/tests_env_token_scrubber.rs"]
 pub mod tests_env_token_scrubber;
+#[cfg(test)]
+#[path = "instance/tests_crash_loop_backoff.rs"]
+pub mod tests_crash_loop_backoff;
+#[cfg(test)]
+#[path = "instance/tests_crash_loop_guard.rs"]
+pub mod tests_crash_loop_guard;
+#[cfg(test)]
+#[path = "instance/tests_child_health_monitor.rs"]
+pub mod tests_child_health_monitor;
 #[path = "instance/terminate_fallback_ladder.rs"]
 pub mod terminate_fallback_ladder;
 #[path = "instance/tuning.rs"]
