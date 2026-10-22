@@ -119,6 +119,8 @@ pub mod tests_dynamic_quota_floor;
 #[cfg(test)]
 pub mod tests_quota_acceleration_detector;
 #[cfg(test)]
+pub mod tests_cooldown_decay_stepper;
+#[cfg(test)]
 pub(crate) use crate::models::account::Account;
 #[cfg(test)]
 pub(crate) use tests_a::make_test_account;

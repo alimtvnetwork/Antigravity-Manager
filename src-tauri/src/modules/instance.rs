@@ -279,6 +279,9 @@ pub mod tests_workspace_dir_validator;
 #[cfg(test)]
 #[path = "instance/tests_sandboxed_storage_cleaner.rs"]
 pub mod tests_sandboxed_storage_cleaner;
+#[cfg(test)]
+#[path = "instance/tests_sandbox_purger.rs"]
+pub mod tests_sandbox_purger;
 #[path = "instance/terminate_fallback_ladder.rs"]
 pub mod terminate_fallback_ladder;
 #[path = "instance/tuning.rs"]

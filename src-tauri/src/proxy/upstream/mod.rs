@@ -63,6 +63,8 @@ pub mod tests_endpoint_weight_matrix;
 pub mod tests_streaming_timeout_sentinel;
 #[cfg(test)]
 pub mod tests_route_latency_calculator;
+#[cfg(test)]
+pub mod tests_h2_window_recovery;
 
 pub use brotli_decompressor::*;
 pub use circuit_breaker_counter::*;

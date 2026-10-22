@@ -59,6 +59,8 @@ pub mod tests_sse_splitter_padder;
 pub mod tests_sse_delimiter_normalizer;
 #[cfg(test)]
 pub mod tests_request_cancellation_watcher;
+#[cfg(test)]
+pub mod tests_request_size_guard;
 
 pub use abort_sentinel::*;
 pub use boundary_normalizer::StreamBoundaryNormalizer;

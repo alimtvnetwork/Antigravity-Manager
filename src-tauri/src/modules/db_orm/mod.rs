@@ -120,6 +120,8 @@ pub mod tests_mmap_tuner;
 pub mod tests_page_budget_controller;
 #[cfg(test)]
 pub mod tests_connection_checkout_limiter;
+#[cfg(test)]
+pub mod tests_free_page_stepper;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;

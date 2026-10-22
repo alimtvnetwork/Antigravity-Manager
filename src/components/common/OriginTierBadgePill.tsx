@@ -23,30 +23,30 @@ export const OriginTierBadgePill: React.FC<OriginTierBadgePillProps> = ({
   const normalized = origin.toUpperCase();
 
   let label = 'System';
-  let badgeStyle = 'bg-zinc-800/80 text-zinc-300 border-zinc-700/60';
-  let icon = <Terminal className="w-3 h-3 text-zinc-400" />;
+  let badgeStyle = 'bg-zinc-100 text-zinc-800 border-zinc-300 dark:bg-zinc-800/80 dark:text-zinc-300 dark:border-zinc-700/60';
+  let icon = <Terminal className="w-3 h-3 text-zinc-600 dark:text-zinc-400" />;
 
   switch (normalized) {
     case 'USER_PROMPT':
       label = 'User';
-      badgeStyle = 'bg-sky-950/70 text-sky-300 border-sky-600/50 shadow-sm shadow-sky-900/20';
-      icon = <User className="w-3 h-3 text-sky-400" />;
+      badgeStyle = 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-950/70 dark:text-sky-300 dark:border-sky-600/50 shadow-xs shadow-sky-900/20';
+      icon = <User className="w-3 h-3 text-sky-600 dark:text-sky-400" />;
       break;
     case 'SUBAGENT_INSTRUCTION':
       label = 'Subagent';
-      badgeStyle = 'bg-purple-950/70 text-purple-300 border-purple-600/50 shadow-sm shadow-purple-900/20';
-      icon = <Bot className="w-3 h-3 text-purple-400" />;
+      badgeStyle = 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-950/70 dark:text-purple-300 dark:border-purple-600/50 shadow-xs shadow-purple-900/20';
+      icon = <Bot className="w-3 h-3 text-purple-600 dark:text-purple-400" />;
       break;
     case 'TOOL_OUTPUT':
       label = 'Tool';
-      badgeStyle = 'bg-amber-950/70 text-amber-300 border-amber-600/50 shadow-sm shadow-amber-900/20';
-      icon = <Wrench className="w-3 h-3 text-amber-400" />;
+      badgeStyle = 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-600/50 shadow-xs shadow-amber-900/20';
+      icon = <Wrench className="w-3 h-3 text-amber-600 dark:text-amber-400" />;
       break;
     case 'SYSTEM_MESSAGE':
     default:
       label = 'System';
-      badgeStyle = 'bg-zinc-800/80 text-zinc-300 border-zinc-700/60';
-      icon = <Terminal className="w-3 h-3 text-zinc-400" />;
+      badgeStyle = 'bg-zinc-100 text-zinc-800 border-zinc-300 dark:bg-zinc-800/80 dark:text-zinc-300 dark:border-zinc-700/60';
+      icon = <Terminal className="w-3 h-3 text-zinc-600 dark:text-zinc-400" />;
       break;
   }
 
