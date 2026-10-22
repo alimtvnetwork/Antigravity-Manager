@@ -29,6 +29,26 @@ export function SegmentedPillGroup({
         md: 'text-sm px-3.5 py-1.5 gap-2',
     }[size];
 
+    const enabledOptions = options.filter(opt => !opt.disabled);
+
+    const handleKeyDown = (e: React.KeyboardEvent, currentId: string) => {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            const currentIndex = enabledOptions.findIndex(o => o.id === currentId);
+            const nextIndex = (currentIndex + 1) % enabledOptions.length;
+            if (enabledOptions[nextIndex]) {
+                onChange(enabledOptions[nextIndex].id);
+            }
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            const currentIndex = enabledOptions.findIndex(o => o.id === currentId);
+            const prevIndex = (currentIndex - 1 + enabledOptions.length) % enabledOptions.length;
+            if (enabledOptions[prevIndex]) {
+                onChange(enabledOptions[prevIndex].id);
+            }
+        }
+    };
+
     return (
         <div
             role="tablist"
@@ -46,10 +66,13 @@ export function SegmentedPillGroup({
                         type="button"
                         role="tab"
                         aria-selected={isActive}
+                        tabIndex={isActive ? 0 : -1}
                         disabled={opt.disabled}
                         onClick={() => !opt.disabled && onChange(opt.id)}
+                        onKeyDown={(e) => handleKeyDown(e, opt.id)}
                         className={cn(
                             'inline-flex items-center justify-center font-medium rounded-full transition-all duration-150',
+                            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-900',
                             sizeClasses,
                             isActive
                                 ? 'bg-white dark:bg-purple-600 text-slate-900 dark:text-white shadow-xs font-semibold'

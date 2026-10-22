@@ -23,13 +23,17 @@ export const DarkGlassPopover: React.FC<DarkGlassPopoverProps> = ({
   closeOnEscape = true,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
 
   useClickOutside(containerRef, () => {
     if (isOpen) onClose();
   }, isOpen);
 
   useEffect(() => {
-    if (!isOpen || !closeOnEscape) return;
+    if (!isOpen) return;
+    popoverRef.current?.focus();
+
+    if (!closeOnEscape) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -62,9 +66,12 @@ export const DarkGlassPopover: React.FC<DarkGlassPopoverProps> = ({
 
       {isOpen && (
         <div
+          ref={popoverRef}
           role="dialog"
           aria-modal="true"
-          className={`absolute z-50 min-w-[200px] p-3 bg-slate-900/95 dark:bg-slate-950/95 border border-slate-700/80 rounded-2xl shadow-2xl backdrop-blur-xl animate-in fade-in-0 zoom-in-95 ${getPositionClasses()} ${className}`}
+          tabIndex={-1}
+          aria-label="Dialog popover"
+          className={`absolute z-50 min-w-[200px] p-3 bg-slate-900/95 dark:bg-slate-950/95 border border-slate-700/80 rounded-2xl shadow-2xl backdrop-blur-xl focus:outline-none animate-in fade-in-0 zoom-in-95 ${getPositionClasses()} ${className}`}
         >
           {children}
         </div>

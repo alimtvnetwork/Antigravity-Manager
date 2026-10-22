@@ -65,6 +65,10 @@ pub mod tests_streaming_timeout_sentinel;
 pub mod tests_route_latency_calculator;
 #[cfg(test)]
 pub mod tests_h2_window_recovery;
+#[cfg(test)]
+pub mod tests_response_chunk_assembler;
+#[cfg(test)]
+pub mod tests_connection_age_sentinel;
 
 pub use brotli_decompressor::*;
 pub use circuit_breaker_counter::*;

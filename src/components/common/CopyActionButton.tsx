@@ -23,13 +23,25 @@ export const CopyActionButton: React.FC<CopyActionButtonProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const triggerCopy = async () => {
     const success = await copyToClipboard(text);
     if (success) {
       setCopied(true);
       if (onCopySuccess) onCopySuccess();
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await triggerCopy();
+  };
+
+  const handleKeyDown = async (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      await triggerCopy();
     }
   };
 
@@ -48,8 +60,10 @@ export const CopyActionButton: React.FC<CopyActionButtonProps> = ({
       <button
         type="button"
         onClick={handleCopy}
+        onKeyDown={handleKeyDown}
         title={copied ? successLabel : label}
-        className={`p-1.5 rounded-lg border border-slate-700/60 transition-all ${
+        aria-label={copied ? successLabel : label}
+        className={`p-1.5 rounded-lg border border-slate-700/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 transition-all ${
           copied
             ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
             : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 bg-slate-900/60'
@@ -65,7 +79,9 @@ export const CopyActionButton: React.FC<CopyActionButtonProps> = ({
       <button
         type="button"
         onClick={handleCopy}
-        className={`inline-flex items-center text-xs font-mono transition-colors ${
+        onKeyDown={handleKeyDown}
+        aria-label={copied ? successLabel : label}
+        className={`inline-flex items-center text-xs font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 rounded px-1 transition-colors ${
           copied ? 'text-emerald-400' : 'text-slate-400 hover:text-slate-200'
         } ${className}`}
       >
@@ -84,7 +100,9 @@ export const CopyActionButton: React.FC<CopyActionButtonProps> = ({
     <button
       type="button"
       onClick={handleCopy}
-      className={`inline-flex items-center justify-center font-medium rounded-full border transition-all duration-200 active:scale-95 ${getSizeClasses()} ${
+      onKeyDown={handleKeyDown}
+      aria-label={copied ? successLabel : label}
+      className={`inline-flex items-center justify-center font-medium rounded-full border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 transition-all duration-200 active:scale-95 ${getSizeClasses()} ${
         copied
           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-[0_0_8px_rgba(16,185,129,0.3)]'
           : 'bg-slate-900/60 hover:bg-slate-800/80 text-slate-300 border-slate-700/60'

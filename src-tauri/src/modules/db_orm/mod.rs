@@ -122,6 +122,10 @@ pub mod tests_page_budget_controller;
 pub mod tests_connection_checkout_limiter;
 #[cfg(test)]
 pub mod tests_free_page_stepper;
+#[cfg(test)]
+pub mod tests_column_nullability_validator;
+#[cfg(test)]
+pub mod tests_column_type_affinity_validator;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;
