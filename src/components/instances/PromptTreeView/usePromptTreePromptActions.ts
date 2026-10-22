@@ -1197,10 +1197,10 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
             });
         }
 
-        // Add an async pause between iterations if rerunCount > 1,
+        // Add an async pause (1 second) between iterations if rerunCount > 1,
         // preventing the second iteration from immediately cancelling the first via send_prompt_now's preemption logic.
         if (i < requested - 1) {
-            await new Promise((r) => setTimeout(r, 800));
+            await new Promise((r) => setTimeout(r, 1000));
         }
     }
     return result;
