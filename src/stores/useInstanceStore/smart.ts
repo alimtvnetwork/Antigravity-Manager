@@ -120,24 +120,51 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
             const { useAccountStore } = await import('../useAccountStore');
             await useAccountStore.getState().fetchAccounts();
             const accounts = useAccountStore.getState().accounts;
-            const currentAccountId = cur?.config.bound_account_id || useAccountStore.getState().currentAccount?.id;
+            const curAccount = cur?.config.bound_account_id
+                ? accounts.find(a => a.id === cur.config.bound_account_id)
+                : cur?.config.bound_email
+                ? accounts.find(a => a.email.toLowerCase() === cur.config.bound_email?.toLowerCase())
+                : useAccountStore.getState().currentAccount;
+            const currentAccountId = curAccount?.id;
+            const currentAccountEmail = curAccount?.email || cur?.config.bound_email;
 
             // 2. Discover active non-stale instances and exclude in-use accounts with >0% credits
             //    Bindings older than stale_binding_timeout_hours (default 6h) with no running process or 0% credits are treated as inactive
             const activeInUseAccountIds = get()
                 .instances.filter(i => {
-                    if (!i.config.bound_account_id) return false;
+                    const hasBinding = Boolean(i.config.bound_account_id || i.config.bound_email);
+                    if (!hasBinding) return false;
                     if (instanceService.isInstanceBindingStale(i, 6)) return false;
-                    const boundAcc = accounts.find(a => a.id === i.config.bound_account_id);
+                    const boundAcc = accounts.find(
+                        a =>
+                            (i.config.bound_account_id && a.id === i.config.bound_account_id) ||
+                            (i.config.bound_email && a.email.toLowerCase() === i.config.bound_email.toLowerCase())
+                    );
                     if (boundAcc && instanceService.extract4hWindowQuotaPercent(boundAcc) <= 0) {
                         return false;
                     }
                     return i.is_running;
                 })
-                .map(i => i.config.bound_account_id as string)
-                .filter(id => id !== currentAccountId);
+                .flatMap(i => {
+                    const idsOrEmails: string[] = [];
+                    if (i.config.bound_account_id) idsOrEmails.push(i.config.bound_account_id);
+                    if (i.config.bound_email) idsOrEmails.push(i.config.bound_email);
+                    const acc = accounts.find(
+                        a =>
+                            (i.config.bound_account_id && a.id === i.config.bound_account_id) ||
+                            (i.config.bound_email && a.email.toLowerCase() === i.config.bound_email.toLowerCase())
+                    );
+                    if (acc) {
+                        if (!idsOrEmails.includes(acc.id)) idsOrEmails.push(acc.id);
+                        if (!idsOrEmails.includes(acc.email)) idsOrEmails.push(acc.email);
+                    }
+                    return idsOrEmails;
+                });
             if (currentAccountId && !activeInUseAccountIds.includes(currentAccountId)) {
                 activeInUseAccountIds.push(currentAccountId);
+            }
+            if (currentAccountEmail && !activeInUseAccountIds.some(x => x.toLowerCase() === currentAccountEmail.toLowerCase())) {
+                activeInUseAccountIds.push(currentAccountEmail);
             }
 
             // 3. Filter eligible accounts (not disabled, not proxy_disabled, not forbidden, not blocked)

@@ -104,3 +104,4 @@
 
 
 | 155-ui-ux-improvements-and-bug-fixes | [spec.md](./155-ui-ux-improvements-and-bug-fixes/spec.md) | Eliminated stark white regressions in PromptTreeView left sidebar and Scoreboard candidate hover card, refined Header navigation capsule to unified segmented pill, enabled 30s live PromptTree auto-sync with cache bypass, fixed Rerun logic and preserved Send/Enqueue buttons, and accelerated Telegram prompt dispatch to sub-second responses with async proof capture. |
+| 156-fast-forward-logic-and-improvement-detailing | [spec.md](./156-fast-forward-logic-and-improvement-detailing/spec.md) | Formalized Fast-Forward (FF) auto-switching architecture; enforced strict 100% 4h quota invariant (sub-100% scores 0.0 in primary pass); resolved dual-key in-use account collision bug across running sibling instances and email bindings; detailed out 200 cataloged improvements with file-by-file AI implementation journeys. |

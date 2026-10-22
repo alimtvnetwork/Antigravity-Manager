@@ -114,7 +114,8 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
 
     let mut weekly_effective_score = 0.0_f64;
 
-    if is_period_finished {
+    let q_4h_check = calculate_4h_window_quota(acc, target_model).unwrap_or(0.0);
+    if is_period_finished && q_4h_check >= 100.0 {
         // Reset boundary: credits refresh to full 100% capacity with maximum headroom
         weekly_effective_score = TOTAL_WEEK_HOURS * 100.0;
     } else if let Some(quota_data) = acc.quota.as_ref() {
@@ -189,28 +190,19 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
 }
 
 /// Primary candidate scoring ("usually"):
-/// - If 4h quota is less than 100% (and period not finished): strictly returns 0.0.
-/// - Otherwise (4h quota == 100% or period finished): returns base weekly score.
+/// - If 4h quota is less than 100% (even reduced by 1% or 2%): strictly returns 0.0.
+/// - Only genuine 100% 4h quota accounts receive base weekly score.
 /// Sort direction: DESCENDING (highest score selected first).
 pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
     if acc.disabled || acc.proxy_disabled {
         return 0.0;
     }
 
-    let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
-    let is_period_finished = period_stat
-        .as_ref()
-        .map(|s| s.is_period_finished)
-        .unwrap_or(false);
-    let q_4h = period_stat
-        .as_ref()
-        .map(|s| s.quota_percent)
-        .or_else(|| calculate_4h_window_quota(acc, target_model))
-        .unwrap_or(0.0);
+    let q_4h = calculate_4h_window_quota(acc, target_model).unwrap_or(0.0);
 
     // Primary 100% 4-Hour Quota Gate:
-    // If 4h time is less than 100%, usually it should be 0.
-    if q_4h < 100.0 && !is_period_finished {
+    // Any candidate with < 100% 4-hour quota (even reduced by 1% or 2%) strictly evaluates to 0.0.
+    if q_4h < 100.0 {
         return 0.0;
     }
 
@@ -226,21 +218,7 @@ pub fn score_candidate_account_fallback(acc: &Account, target_model: &str, now_s
         return 0.0;
     }
 
-    let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
-    let is_period_finished = period_stat
-        .as_ref()
-        .map(|s| s.is_period_finished)
-        .unwrap_or(false);
-    let q_4h = if is_period_finished {
-        100.0
-    } else {
-        period_stat
-            .as_ref()
-            .map(|s| s.quota_percent)
-            .or_else(|| calculate_4h_window_quota(acc, target_model))
-            .unwrap_or(0.0)
-    };
-
+    let q_4h = calculate_4h_window_quota(acc, target_model).unwrap_or(0.0);
     if q_4h <= 0.0 {
         return 0.0;
     }

@@ -53,6 +53,14 @@ pub fn is_instance_binding_stale_or_exhausted(
             }
         }
     }
+    if let Some(ref email) = inst.bound_email {
+        if let Ok(Some(acc)) = account::get_account_by_email(email) {
+            let q_4h = calculate_4h_window_quota(&acc, target_model).unwrap_or(100.0);
+            if q_4h <= 0.0 {
+                return true;
+            }
+        }
+    }
 
     false
 }
@@ -76,13 +84,24 @@ pub fn get_active_in_use_account_ids() -> Vec<String> {
         ) {
             continue;
         }
-        let acc_id_opt = inst
-            .bound_account_id
-            .clone()
-            .or_else(|| account::get_current_account_id().ok().flatten());
-        if let Some(acc_id) = acc_id_opt {
-            if !in_use.contains(&acc_id) {
-                in_use.push(acc_id);
+        if let Some(ref acc_id) = inst.bound_account_id {
+            if !in_use.contains(acc_id) {
+                in_use.push(acc_id.clone());
+            }
+            if let Ok(acc) = account::load_account(acc_id) {
+                if !in_use.contains(&acc.email) {
+                    in_use.push(acc.email.clone());
+                }
+            }
+        }
+        if let Some(ref email) = inst.bound_email {
+            if !in_use.contains(email) {
+                in_use.push(email.clone());
+            }
+            if let Ok(Some(acc)) = account::get_account_by_email(email) {
+                if !in_use.contains(&acc.id) {
+                    in_use.push(acc.id.clone());
+                }
             }
         }
     }

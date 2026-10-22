@@ -10,7 +10,7 @@ import {
     rankSmartCandidates,
     getSubscriptionTierMultiplier,
     tierMultipliersFromSettings,
-} from '../instanceService';
+} from '../instanceService/scoring';
 import type { Account, QuotaData } from '../../types/account';
 
 let passed = 0;
@@ -169,6 +169,41 @@ test('calculateMultiplicativeScore honors custom multipliers end-to-end', () => 
     const scoreA = calculateMultiplicativeScore(accA, [], undefined, undefined, custom);
     assertEqual(scoreA.score, 0.3);
     assertEqual(scoreA.tierMultiplier, 3);
+});
+
+// ── Test 5: Sub-100% 4-Hour Quota Primacy Invariant ──────────────────────────
+test('calculateMultiplicativeScore strictly returns 0 for any 4h quota < 100%', () => {
+    const accSub63 = makeSyntheticAccount('synth_user_63', 'synth_63@test.local', 'pro', 100, 100);
+    // Reduce 4h model quota to 63%
+    accSub63.quota!.models[0].percentage = 63;
+    const score63 = calculateMultiplicativeScore(accSub63, []);
+    assertEqual(score63.score, 0);
+
+    const accSub98 = makeSyntheticAccount('synth_user_98', 'synth_98@test.local', 'pro', 100, 100);
+    // Reduce 4h model quota by even 2% (98%)
+    accSub98.quota!.models[0].percentage = 98;
+    const score98 = calculateMultiplicativeScore(accSub98, []);
+    assertEqual(score98.score, 0);
+});
+
+// ── Test 6: In-Use Exclusion by Email ────────────────────────────────────────
+test('calculateMultiplicativeScore strictly excludes in-use accounts matching by email', () => {
+    const accA = makeSyntheticAccount('synth_user_a', 'synth_a@test.local', 'pro', 100, 100);
+    // In-use list containing the email rather than the ID
+    const inUseScoreEmail = calculateMultiplicativeScore(accA, ['synth_a@test.local']);
+    assertEqual(inUseScoreEmail.score, 0);
+});
+
+// ── Test 7: Primary Pass Excludes Sub-100% Accounts When 100% Account Exists ─
+test('rankSmartCandidates selects 100% account and excludes 63% account from primary pass', () => {
+    const acc100 = makeSyntheticAccount('synth_100', 'synth_100@test.local', 'pro', 100, 100);
+    const acc63 = makeSyntheticAccount('synth_63', 'synth_63@test.local', 'pro', 100, 100);
+    acc63.quota!.models[0].percentage = 63;
+
+    const ranked = rankSmartCandidates([acc63, acc100], []);
+    assertEqual(ranked.length, 1);
+    assertEqual(ranked[0].account.id, 'synth_100');
+    assertEqual(ranked[0].score, 0.2);
 });
 
 if (failed > 0) {

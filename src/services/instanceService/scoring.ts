@@ -1,6 +1,16 @@
 import type { Account } from '../../types/account';
 import type { InstanceStatus } from './types';
-import { parseFlexibleDate } from '../../utils/format';
+
+export function parseFlexibleDate(dateStr: string | undefined | null): Date | null {
+    if (!dateStr || dateStr.trim() === '') return null;
+    const trimmed = dateStr.trim();
+    if (/^\d+$/.test(trimmed)) {
+        const num = parseInt(trimmed, 10);
+        return new Date(trimmed.length <= 10 ? num * 1000 : num);
+    }
+    const parsed = new Date(trimmed);
+    return isNaN(parsed.getTime()) ? null : parsed;
+}
 
 export function findBestSmartPlayAccount(
     accounts: Account[],
@@ -266,23 +276,21 @@ export function calculateMultiplicativeScore(
     targetModel?: string,
     tierMultipliers: TierMultipliers = DEFAULT_TIER_MULTIPLIERS
 ): MultiplicativeCandidateResult {
-    const isInUse = activeInUseAccountIds.includes(acc.id);
-    const isCurrent = Boolean(currentAccountId && acc.id === currentAccountId);
+    const isInUse = activeInUseAccountIds.some(
+        idOrEmail => idOrEmail === acc.id || idOrEmail.toLowerCase() === (acc.email || '').toLowerCase()
+    );
+    const isCurrent = Boolean(
+        currentAccountId && (acc.id === currentAccountId || (acc.email && currentAccountId.toLowerCase() === acc.email.toLowerCase()))
+    );
     const activeFactor = isInUse || isCurrent ? 0 : 1;
 
     const tierMultiplier = getSubscriptionTierMultiplier(acc.quota?.subscription_tier, tierMultipliers);
     const weeklyQuotaPercent = extractWeeklyQuotaPercent(acc);
     const fourHourQuotaPercent = extract4hWindowQuotaPercent(acc, targetModel);
 
-    const nowMs = Date.now();
-    const hasResetTimePassed = (acc.quota?.models || []).some(m => {
-        if (!m.reset_time) return false;
-        const rDate = parseFlexibleDate(m.reset_time);
-        return rDate ? rDate.getTime() <= nowMs : false;
-    });
-
-    const isFull4h = fourHourQuotaPercent >= 100 || hasResetTimePassed;
-    if (!isFull4h || activeFactor === 0) {
+    // Primary 100% 4-Hour Quota Gate:
+    // Any candidate with < 100% 4-hour quota (even reduced by 1% or 2%) strictly evaluates to 0 score.
+    if (fourHourQuotaPercent < 100 || activeFactor === 0) {
         return {
             account: acc,
             score: 0,
@@ -299,6 +307,7 @@ export function calculateMultiplicativeScore(
     const rawScore = activeFactor * tierMultiplier * weeklyQuotaPercent;
     const score = Number((rawScore / 1000).toFixed(4));
 
+    const nowMs = Date.now();
     const daysUntilRefill = calculateAccountRefillDays(acc, nowMs);
     const nowSec = Math.floor(nowMs / 1000);
     const idleSec = acc.last_used ? Math.max(0, nowSec - acc.last_used) : 0;
@@ -329,8 +338,12 @@ export function calculateFallbackMultiplicativeScore(
     targetModel?: string,
     tierMultipliers: TierMultipliers = DEFAULT_TIER_MULTIPLIERS
 ): MultiplicativeCandidateResult {
-    const isInUse = activeInUseAccountIds.includes(acc.id);
-    const isCurrent = Boolean(currentAccountId && acc.id === currentAccountId);
+    const isInUse = activeInUseAccountIds.some(
+        idOrEmail => idOrEmail === acc.id || idOrEmail.toLowerCase() === (acc.email || '').toLowerCase()
+    );
+    const isCurrent = Boolean(
+        currentAccountId && (acc.id === currentAccountId || (acc.email && currentAccountId.toLowerCase() === acc.email.toLowerCase()))
+    );
     const activeFactor = isInUse || isCurrent ? 0 : 1;
 
     const isDisabled = Boolean(acc.disabled) || Boolean(acc.proxy_disabled);
@@ -341,14 +354,7 @@ export function calculateFallbackMultiplicativeScore(
     const weeklyQuotaPercent = extractWeeklyQuotaPercent(acc);
     const fourHourQuotaPercent = extract4hWindowQuotaPercent(acc, targetModel);
 
-    const nowMs = Date.now();
-    const hasResetTimePassed = (acc.quota?.models || []).some(m => {
-        if (!m.reset_time) return false;
-        const rDate = parseFlexibleDate(m.reset_time);
-        return rDate ? rDate.getTime() <= nowMs : false;
-    });
-
-    const effectiveFourHour = hasResetTimePassed ? 100 : fourHourQuotaPercent;
+    const effectiveFourHour = fourHourQuotaPercent;
     if (
         activeFactor === 0 ||
         isDisabled ||
@@ -374,6 +380,7 @@ export function calculateFallbackMultiplicativeScore(
     const rawScore = activeFactor * tierMultiplier * proportionalQuota;
     const score = Number((rawScore / 1000).toFixed(4));
 
+    const nowMs = Date.now();
     const daysUntilRefill = calculateAccountRefillDays(acc, nowMs);
     const nowSec = Math.floor(nowMs / 1000);
     const idleSec = acc.last_used ? Math.max(0, nowSec - acc.last_used) : 0;
@@ -430,8 +437,19 @@ export function rankSmartCandidates(
 ): MultiplicativeCandidateResult[] {
     const baseEligible = accounts.filter(acc => {
         // Never allow the current account or active in-use accounts to be considered as candidates to rotate into
-        if (currentAccountId && acc.id === currentAccountId) return false;
-        if (activeInUseAccountIds.includes(acc.id)) return false;
+        if (
+            currentAccountId &&
+            (acc.id === currentAccountId || (acc.email && currentAccountId.toLowerCase() === acc.email.toLowerCase()))
+        ) {
+            return false;
+        }
+        if (
+            activeInUseAccountIds.some(
+                idOrEmail => idOrEmail === acc.id || idOrEmail.toLowerCase() === (acc.email || '').toLowerCase()
+            )
+        ) {
+            return false;
+        }
 
         const isDisabled = Boolean(acc.disabled) || Boolean(acc.proxy_disabled);
         if (isDisabled) return false;
@@ -445,16 +463,10 @@ export function rankSmartCandidates(
 
     if (baseEligible.length === 0) return [];
 
-    // Pass 1 (Primary): Rank candidates with >= 100% 4-hour rolling window quota
+    // Pass 1 (Primary): Rank candidates strictly with >= 100% 4-hour rolling window quota
     const primaryEligible = baseEligible.filter(acc => {
         const q4h = extract4hWindowQuotaPercent(acc);
-        const nowMs = Date.now();
-        const hasResetTimePassed = (acc.quota?.models || []).some(m => {
-            if (!m.reset_time) return false;
-            const rDate = parseFlexibleDate(m.reset_time);
-            return rDate ? rDate.getTime() <= nowMs : false;
-        });
-        return q4h >= 100 || hasResetTimePassed;
+        return q4h >= 100;
     });
 
     const primaryScored = primaryEligible

@@ -43,6 +43,18 @@ pub async fn trigger_manual_rotation_for_instance(
             }
         }
     }
+    if let Some(target) = registry.instances.iter().find(|i| i.id == inst_id) {
+        if let Some(ref email) = target.bound_email {
+            if !excluded.contains(email) {
+                excluded.push(email.clone());
+            }
+            if let Ok(Some(acc)) = account::get_account_by_email(email) {
+                if !excluded.contains(&acc.id) {
+                    excluded.push(acc.id.clone());
+                }
+            }
+        }
+    }
     for inst in &registry.instances {
         let is_running_sibling =
             inst.id != inst_id && instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
