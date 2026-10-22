@@ -228,6 +228,18 @@ pub mod workspace_hash_sentinel;
 pub mod workspace_storage_migrator;
 #[path = "instance/workspace_storage_sanitizer.rs"]
 pub mod workspace_storage_sanitizer;
+#[path = "instance/env_token_scrubber.rs"]
+pub mod env_token_scrubber;
+#[path = "instance/socket_lock_recovery.rs"]
+pub mod socket_lock_recovery;
+#[path = "instance/profile_telemetry_isolation.rs"]
+pub mod profile_telemetry_isolation;
+#[path = "instance/process_spawn_ladder.rs"]
+pub mod process_spawn_ladder;
+#[path = "instance/port_allocation_guard.rs"]
+pub mod port_allocation_guard;
+#[path = "instance/workspace_directory_guard.rs"]
+pub mod workspace_directory_guard;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use arg_normalizer::*;
@@ -401,3 +413,9 @@ pub use workspace_dir_validator::*;
 pub use workspace_hash_sentinel::*;
 pub use workspace_storage_migrator::*;
 pub use workspace_storage_sanitizer::*;
+pub use env_token_scrubber::*;
+pub use socket_lock_recovery::*;
+pub use profile_telemetry_isolation::*;
+pub use process_spawn_ladder::*;
+pub use port_allocation_guard::*;
+pub use workspace_directory_guard::*;
