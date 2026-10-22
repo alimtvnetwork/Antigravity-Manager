@@ -50,6 +50,10 @@ pub mod stream_early_abort_sentinel;
 pub mod stream_flusher;
 pub mod tool_response_formatter;
 pub mod user_agent_normalizer;
+#[cfg(test)]
+pub mod tests_request_gzip_sniffer;
+#[cfg(test)]
+pub mod tests_sse_splitter_padder;
 
 pub use abort_sentinel::*;
 pub use boundary_normalizer::StreamBoundaryNormalizer;

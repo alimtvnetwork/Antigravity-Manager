@@ -92,6 +92,12 @@ mod tests_a;
 #[cfg(test)]
 mod tests_b;
 #[cfg(test)]
+pub mod tests_consecutive_switch;
+#[cfg(test)]
+pub mod tests_quota_and_cooldown;
+#[cfg(test)]
+pub mod tests_score_and_decay;
+#[cfg(test)]
 pub(crate) use crate::models::account::Account;
 #[cfg(test)]
 pub(crate) use tests_a::make_test_account;

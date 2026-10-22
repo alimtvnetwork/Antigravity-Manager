@@ -97,6 +97,8 @@ pub mod write_ahead_flush;
 
 #[cfg(test)]
 pub mod tests;
+#[cfg(test)]
+pub mod tests_wal_schedulers;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;

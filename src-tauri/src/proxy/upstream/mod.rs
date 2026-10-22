@@ -35,6 +35,8 @@ pub mod tls_alpn_negotiator;
 pub mod tls_fingerprint_config;
 pub mod tls_sni_sanitizer;
 pub mod transport_metrics_collector;
+#[cfg(test)]
+pub mod tests_backoff_and_probe;
 
 pub use brotli_decompressor::*;
 pub use circuit_breaker_counter::*;

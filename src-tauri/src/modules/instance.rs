@@ -204,6 +204,9 @@ pub mod tests_clone_b;
 #[cfg(test)]
 #[path = "instance/tests_e2e.rs"]
 pub mod tests_e2e;
+#[cfg(test)]
+#[path = "instance/tests_sandboxed_environment.rs"]
+pub mod tests_sandboxed_environment;
 #[path = "instance/terminate_fallback_ladder.rs"]
 pub mod terminate_fallback_ladder;
 #[path = "instance/tuning.rs"]

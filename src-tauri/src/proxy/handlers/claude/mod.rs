@@ -48,6 +48,8 @@ pub mod message_content_flattener;
 pub mod message_turn_validator;
 #[cfg(test)]
 mod opus_tests;
+#[cfg(test)]
+pub mod tests_message_validator;
 mod request_log;
 mod response_handling;
 pub mod role_prefix_sanitizer;
