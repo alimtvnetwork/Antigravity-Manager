@@ -1,11 +1,14 @@
 // Upstream module - upstream client
 // Corresponds to upstream communication interfaces
 
+pub mod brotli_decompressor;
 pub mod circuit_breaker_counter;
 pub mod circuit_breaker_stats;
 pub mod client;
+pub mod connection_age_sentinel;
 pub mod connection_keepalive_config;
 pub mod dynamic_dns_resolver;
+pub mod dynamic_pool_sizer;
 pub mod endpoint_health_decay;
 pub mod endpoint_weight_matrix;
 pub mod h2_tuner;
@@ -28,10 +31,13 @@ pub mod tls_fingerprint_config;
 pub mod tls_sni_sanitizer;
 pub mod transport_metrics_collector;
 
+pub use brotli_decompressor::*;
 pub use circuit_breaker_counter::*;
 pub use circuit_breaker_stats::*;
+pub use connection_age_sentinel::*;
 pub use connection_keepalive_config::*;
 pub use dynamic_dns_resolver::*;
+pub use dynamic_pool_sizer::*;
 pub use endpoint_health_decay::*;
 pub use endpoint_weight_matrix::*;
 pub use h2_tuner::*;

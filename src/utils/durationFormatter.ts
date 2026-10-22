@@ -1,73 +1,40 @@
 /**
- * durationFormatter - Formats duration values (milliseconds) into concise, readable strings.
- */
-
-export interface DurationFormatOptions {
-    compact?: boolean;
-    decimals?: number;
-    includeMs?: boolean;
-}
-
-/**
- * Formats a duration in milliseconds to a human-readable string.
+ * High-Precision Duration Formatter Utility
  *
- * Examples:
- * - formatDuration(350) => "350ms"
- * - formatDuration(4250) => "4.3s"
- * - formatDuration(75000) => "1m 15s"
- * - formatDuration(75000, { compact: true }) => "1m"
- * - formatDuration(7200000) => "2h 0m"
- * - formatDuration(90000000) => "1d 1h"
+ * Converts milliseconds or seconds into concise, human-readable duration strings
+ * (e.g. 850ms, 14s, 3m 20s, 2h 15m, 1d 4h).
  */
-export function formatDuration(ms: number, options: DurationFormatOptions = {}): string {
-    if (!Number.isFinite(ms) || ms < 0) {
-        return '0ms';
-    }
 
-    const {
-        compact = false,
-        decimals = 1,
-        includeMs = true,
-    } = options;
+export function formatDurationMs(ms: number): string {
+  if (ms < 1000) {
+    return `${Math.round(ms)}ms`;
+  }
 
-    if (ms < 1000) {
-        return includeMs ? `${Math.round(ms)}ms` : '<1s';
-    }
-
-    const totalSeconds = ms / 1000;
-    if (totalSeconds < 60) {
-        const factor = Math.pow(10, decimals);
-        const rounded = Math.round(totalSeconds * factor) / factor;
-        return `${rounded}s`;
-    }
-
-    const totalMinutes = Math.floor(totalSeconds / 60);
-    const remSeconds = Math.round(totalSeconds % 60);
-
-    if (totalMinutes < 60) {
-        if (compact || remSeconds === 0) {
-            return `${totalMinutes}m`;
-        }
-        return `${totalMinutes}m ${remSeconds}s`;
-    }
-
-    const totalHours = Math.floor(totalMinutes / 60);
-    const remMinutes = totalMinutes % 60;
-
-    if (totalHours < 24) {
-        if (compact || remMinutes === 0) {
-            return `${totalHours}h`;
-        }
-        return `${totalHours}h ${remMinutes}m`;
-    }
-
-    const totalDays = Math.floor(totalHours / 24);
-    const remHours = totalHours % 24;
-
-    if (compact || remHours === 0) {
-        return `${totalDays}d`;
-    }
-    return `${totalDays}d ${remHours}h`;
+  const totalSeconds = Math.floor(ms / 1000);
+  return formatDurationSeconds(totalSeconds);
 }
 
-export default formatDuration;
+export function formatDurationSeconds(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  const remainingSecs = seconds % 60;
+
+  if (minutes < 60) {
+    return remainingSecs > 0 ? `${minutes}m ${remainingSecs}s` : `${minutes}m`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const remainingMins = minutes % 60;
+
+  if (hours < 24) {
+    return remainingMins > 0 ? `${hours}h ${remainingMins}m` : `${hours}h`;
+  }
+
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+
+  return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+}

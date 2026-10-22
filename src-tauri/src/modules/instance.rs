@@ -67,6 +67,8 @@ pub mod launch;
 pub(crate) use launch::launch_instance_inner_with_extra_workspaces;
 #[path = "instance/launch_argv_builder.rs"]
 pub mod launch_argv_builder;
+#[path = "instance/launch_argv_sanitizer.rs"]
+pub mod launch_argv_sanitizer;
 #[path = "instance/launch_env_sanitizer.rs"]
 pub mod launch_env_sanitizer;
 #[path = "instance/lifecycle.rs"]
@@ -109,6 +111,8 @@ pub mod port_detector;
 pub mod port_matrix;
 #[path = "instance/port_reclaim_sentinel.rs"]
 pub mod port_reclaim_sentinel;
+#[path = "instance/port_reclaim_watchdog.rs"]
+pub mod port_reclaim_watchdog;
 #[path = "instance/port_lease_tracker.rs"]
 pub mod port_lease_tracker;
 #[path = "instance/remote_debugging_port_allocator.rs"]
@@ -125,6 +129,8 @@ pub mod process_vitality_probe;
 pub mod profile_clone_manifest;
 #[path = "instance/profile_clone_verifier.rs"]
 pub mod profile_clone_verifier;
+#[path = "instance/profile_fingerprint_hasher.rs"]
+pub mod profile_fingerprint_hasher;
 #[path = "instance/profile_dir_validator.rs"]
 pub mod profile_dir_validator;
 #[path = "instance/project_uri.rs"]
@@ -139,8 +145,12 @@ pub mod protection;
 pub mod query;
 #[path = "instance/registry.rs"]
 pub mod registry;
+#[path = "instance/runtime_crash_counter.rs"]
+pub mod runtime_crash_counter;
 #[path = "instance/sandbox_purger.rs"]
 pub mod sandbox_purger;
+#[path = "instance/sandboxed_storage_cleaner.rs"]
+pub mod sandboxed_storage_cleaner;
 #[path = "instance/session_file_reclaimer.rs"]
 pub mod session_file_reclaimer;
 #[path = "instance/session_cleanup_worker.rs"]
@@ -200,6 +210,8 @@ pub mod terminate_fallback_ladder;
 pub mod tuning;
 #[path = "instance/vitality_scanner.rs"]
 pub mod vitality_scanner;
+#[path = "instance/window_layout_anchor.rs"]
+pub mod window_layout_anchor;
 #[path = "instance/window_state_restorer.rs"]
 pub mod window_state_restorer;
 #[path = "instance/workspace.rs"]
@@ -355,6 +367,7 @@ pub use keychain_file_guard::*;
 pub use keychain_path_resolver::*;
 pub use keyring_mock_writer::*;
 pub use launch_argv_builder::*;
+pub use launch_argv_sanitizer::*;
 pub use launch_env_sanitizer::*;
 pub use mock_keyring_writer::*;
 pub use orphan_socket_sweeper::*;
@@ -363,12 +376,16 @@ pub use pipe_socket_cleaner::*;
 pub use port_collision_evictor::*;
 pub use port_lease_tracker::*;
 pub use port_reclaim_sentinel::*;
+pub use port_reclaim_watchdog::*;
 pub use process_vitality_probe::*;
 pub use profile_clone_manifest::*;
 pub use profile_clone_verifier::*;
 pub use profile_dir_validator::*;
+pub use profile_fingerprint_hasher::*;
 pub use project_path_canonical_normalizer::*;
 pub use remote_debugging_port_allocator::*;
+pub use runtime_crash_counter::*;
+pub use sandboxed_storage_cleaner::*;
 pub use session_cleanup_worker::*;
 pub use session_file_reclaimer::*;
 pub use session_trace_uuid::*;
@@ -378,6 +395,7 @@ pub use storage_checksum_guard::*;
 pub use storage_migration_guard::*;
 pub use telemetry_storage_cleaner::*;
 pub use terminate_fallback_ladder::*;
+pub use window_layout_anchor::*;
 pub use window_state_restorer::*;
 pub use workspace_dir_validator::*;
 pub use workspace_hash_sentinel::*;
