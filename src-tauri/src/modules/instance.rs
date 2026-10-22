@@ -243,6 +243,15 @@ pub mod tests_crash_loop_guard;
 #[cfg(test)]
 #[path = "instance/tests_child_health_monitor.rs"]
 pub mod tests_child_health_monitor;
+#[cfg(test)]
+#[path = "instance/tests_window_state_restorer.rs"]
+pub mod tests_window_state_restorer;
+#[cfg(test)]
+#[path = "instance/tests_window_layout_anchor.rs"]
+pub mod tests_window_layout_anchor;
+#[cfg(test)]
+#[path = "instance/tests_vitality_scanner.rs"]
+pub mod tests_vitality_scanner;
 #[path = "instance/terminate_fallback_ladder.rs"]
 pub mod terminate_fallback_ladder;
 #[path = "instance/tuning.rs"]
@@ -460,6 +469,7 @@ pub use telemetry_storage_cleaner::*;
 pub use terminate_fallback_ladder::*;
 pub use window_layout_anchor::*;
 pub use window_state_restorer::*;
+pub use vitality_scanner::*;
 pub use workspace_dir_validator::*;
 pub use workspace_hash_sentinel::*;
 pub use workspace_storage_migrator::*;

@@ -47,6 +47,10 @@ pub mod tests_h2_ping_scheduler;
 pub mod tests_dynamic_route_balancer;
 #[cfg(test)]
 pub mod tests_tls_sni_sanitizer;
+#[cfg(test)]
+pub mod tests_transport_metrics_collector;
+#[cfg(test)]
+pub mod tests_dynamic_pool_sizer;
 
 pub use brotli_decompressor::*;
 pub use circuit_breaker_counter::*;
