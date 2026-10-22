@@ -10,6 +10,8 @@ pub mod active;
 pub mod cdp_onboarding;
 #[path = "instance/clone.rs"]
 pub mod clone;
+#[path = "instance/clone_checksum.rs"]
+pub mod clone_checksum;
 #[path = "instance/clone_helpers.rs"]
 pub mod clone_helpers;
 #[path = "instance/close.rs"]
@@ -26,6 +28,8 @@ pub mod executable;
 pub mod fs_sync;
 #[path = "instance/instance_mgmt.rs"]
 pub mod instance_mgmt;
+#[path = "instance/keyring_flags.rs"]
+pub mod keyring_flags;
 #[path = "instance/launch.rs"]
 pub mod launch;
 pub(crate) use launch::launch_instance_inner_with_extra_workspaces;
@@ -45,6 +49,8 @@ pub mod pid_scan;
 pub mod pid_store;
 #[path = "instance/pid_util.rs"]
 pub mod pid_util;
+#[path = "instance/port_detector.rs"]
+pub mod port_detector;
 #[path = "instance/post_switch_resume.rs"]
 pub mod post_switch_resume;
 #[path = "instance/process_cache.rs"]
@@ -61,6 +67,8 @@ pub mod protection;
 pub mod query;
 #[path = "instance/registry.rs"]
 pub mod registry;
+#[path = "instance/sandbox_purger.rs"]
+pub mod sandbox_purger;
 #[path = "instance/settings.rs"]
 pub mod settings;
 #[path = "instance/settings_copy.rs"]
@@ -71,6 +79,8 @@ pub mod smart_run;
 pub mod spawn;
 #[path = "instance/storage.rs"]
 pub mod storage;
+#[path = "instance/storage_scrubber.rs"]
+pub mod storage_scrubber;
 #[path = "instance/switch.rs"]
 pub mod switch;
 #[path = "instance/switch_guards.rs"]
@@ -96,8 +106,17 @@ pub mod tests_e2e;
 pub mod tuning;
 #[path = "instance/workspace.rs"]
 pub mod workspace;
+#[path = "instance/workspace_continuity.rs"]
+pub mod workspace_continuity;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
+pub use clone_checksum::*;
+pub use keyring_flags::*;
+pub use port_detector::*;
+pub use sandbox_purger::*;
+pub use storage_scrubber::*;
+pub use workspace_continuity::*;
+
 pub use active::{
     bind_account_to_instance, get_active_instance_id, set_active_instance_id, set_default_instance,
 };

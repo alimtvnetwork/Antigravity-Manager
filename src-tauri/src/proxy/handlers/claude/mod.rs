@@ -38,6 +38,7 @@ mod apply_compression;
 mod attempt;
 mod attempt_setup;
 mod background;
+pub mod block_merger;
 mod compression;
 mod consts;
 mod error_handling;
@@ -58,6 +59,7 @@ mod warmup;
 mod warmup_tests;
 
 pub(crate) use apply_compression::apply_compression;
+pub use block_merger::*;
 pub(crate) use attempt::{AttemptCall, AttemptState, ErrorOutcome, PrepOutcome, StreamOutcome};
 pub(crate) use attempt_setup::prepare_attempt;
 pub(crate) use compression::try_compress_with_summary;
