@@ -130,6 +130,10 @@ pub mod tests_column_type_affinity_validator;
 pub mod tests_column_default_validator;
 #[cfg(test)]
 pub mod tests_index_coverage_verifier;
+#[cfg(test)]
+pub mod tests_index_cardinality_analyzer;
+#[cfg(test)]
+pub mod tests_query_latency_histogram;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;

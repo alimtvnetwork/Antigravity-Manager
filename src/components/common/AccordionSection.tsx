@@ -30,6 +30,7 @@ export const AccordionSection: React.FC<AccordionSectionProps> = ({
 }) => {
     const [internalOpen, setInternalOpen] = useState(defaultOpen);
     const contentId = useId();
+    const headerId = `${contentId}-header`;
 
     const isExpanded = controlledOpen !== undefined ? controlledOpen : internalOpen;
 
@@ -53,13 +54,14 @@ export const AccordionSection: React.FC<AccordionSectionProps> = ({
             className={`rounded-xl border border-slate-200 dark:border-slate-800/80 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md overflow-hidden transition-all duration-200 ${className}`}
         >
             <div
+                id={headerId}
                 role="button"
                 tabIndex={0}
                 aria-expanded={isExpanded}
                 aria-controls={contentId}
                 onClick={handleToggle}
                 onKeyDown={handleKeyDown}
-                className={`flex items-center justify-between px-4 py-3 cursor-pointer select-none transition-colors hover:bg-slate-100/60 dark:hover:bg-slate-800/50 focus:outline-none focus:ring-1 focus:ring-purple-500/30 ${headerClassName}`}
+                className={`flex items-center justify-between px-4 py-3 cursor-pointer select-none transition-colors hover:bg-slate-100/60 dark:hover:bg-slate-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 ${headerClassName}`}
             >
                 <div className="flex items-center gap-3 min-w-0">
                     {icon && <span className="text-slate-400 shrink-0">{icon}</span>}
@@ -90,6 +92,7 @@ export const AccordionSection: React.FC<AccordionSectionProps> = ({
                 <div
                     id={contentId}
                     role="region"
+                    aria-labelledby={headerId}
                     className={`px-4 pb-4 pt-1 border-t border-slate-100 dark:border-slate-800/40 text-sm text-slate-600 dark:text-slate-300 animate-in fade-in-50 duration-150 ${contentClassName}`}
                 >
                     {children}

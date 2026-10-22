@@ -54,13 +54,28 @@ export function DropdownMenu({
 
     return (
         <div ref={containerRef} className={cn('relative inline-block text-left', className)}>
-            <div onClick={() => setIsOpen(!isOpen)} role="button" tabIndex={0}>
+            <div
+                onClick={() => setIsOpen(!isOpen)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        setIsOpen(true);
+                    }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-haspopup="true"
+                aria-expanded={isOpen}
+                aria-label="Toggle menu"
+                className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 rounded-lg"
+            >
                 {trigger}
             </div>
 
             {isOpen && (
                 <div
                     role="menu"
+                    aria-orientation="vertical"
                     className={cn(
                         'absolute z-50 mt-1 min-w-[160px] py-1 rounded-xl shadow-xl',
                         'bg-white/95 dark:bg-slate-900/95 backdrop-blur-md',
@@ -84,6 +99,7 @@ export function DropdownMenu({
                             }}
                             className={cn(
                                 'w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors duration-150',
+                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 focus-visible:bg-slate-100 dark:focus-visible:bg-slate-800',
                                 item.disabled && 'opacity-40 cursor-not-allowed',
                                 !item.disabled && item.danger && 'text-rose-600 dark:text-rose-400 hover:bg-rose-500/10',
                                 !item.disabled &&

@@ -61,6 +61,10 @@ pub mod tests_sse_delimiter_normalizer;
 pub mod tests_request_cancellation_watcher;
 #[cfg(test)]
 pub mod tests_request_size_guard;
+#[cfg(test)]
+pub mod tests_request_header_sanitizer;
+#[cfg(test)]
+pub mod tests_request_content_length_validator;
 
 pub use abort_sentinel::*;
 pub use boundary_normalizer::StreamBoundaryNormalizer;

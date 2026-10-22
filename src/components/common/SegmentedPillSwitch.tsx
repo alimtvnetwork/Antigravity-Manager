@@ -14,6 +14,7 @@ interface SegmentedPillSwitchProps<T extends string | number> {
   size?: 'sm' | 'md';
   className?: string;
   disabled?: boolean;
+  'aria-label'?: string;
 }
 
 export function SegmentedPillSwitch<T extends string | number>({
@@ -23,6 +24,7 @@ export function SegmentedPillSwitch<T extends string | number>({
   size = 'md',
   className = '',
   disabled = false,
+  'aria-label': ariaLabel = 'Options',
 }: SegmentedPillSwitchProps<T>): React.ReactElement {
   const handleKeyDown = (e: React.KeyboardEvent, currentIndex: number) => {
     if (disabled) return;
@@ -42,6 +44,7 @@ export function SegmentedPillSwitch<T extends string | number>({
   return (
     <div
       role="radiogroup"
+      aria-label={ariaLabel}
       className={`inline-flex items-center p-0.5 rounded-full bg-slate-900/90 border border-slate-700/70 shadow-inner backdrop-blur-md ${
         disabled ? 'opacity-50 pointer-events-none' : ''
       } ${className}`}
@@ -55,6 +58,7 @@ export function SegmentedPillSwitch<T extends string | number>({
             type="button"
             role="radio"
             aria-checked={isSelected}
+            aria-label={option.label}
             disabled={disabled}
             tabIndex={isSelected ? 0 : -1}
             onClick={() => onChange(option.value)}
@@ -67,10 +71,11 @@ export function SegmentedPillSwitch<T extends string | number>({
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
             }`}
           >
-            {option.icon && <span className="opacity-90">{option.icon}</span>}
+            {option.icon && <span className="opacity-90" aria-hidden="true">{option.icon}</span>}
             <span>{option.label}</span>
             {option.badge !== undefined && (
               <span
+                aria-hidden="true"
                 className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
                   isSelected
                     ? 'bg-sky-400/30 text-sky-200'
