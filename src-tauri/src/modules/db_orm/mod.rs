@@ -116,6 +116,8 @@ pub mod tests_index_fragmentation_scorer;
 pub mod tests_page_cache_adjuster;
 #[cfg(test)]
 pub mod tests_mmap_tuner;
+#[cfg(test)]
+pub mod tests_page_budget_controller;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;

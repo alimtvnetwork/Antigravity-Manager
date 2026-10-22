@@ -55,6 +55,10 @@ pub mod tests_dynamic_pool_sizer;
 pub mod tests_latency_exponential_smoother;
 #[cfg(test)]
 pub mod tests_http2_flow_controller;
+#[cfg(test)]
+pub mod tests_endpoint_health_decay;
+#[cfg(test)]
+pub mod tests_endpoint_weight_matrix;
 
 pub use brotli_decompressor::*;
 pub use circuit_breaker_counter::*;

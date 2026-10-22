@@ -261,6 +261,15 @@ pub mod tests_remote_debugging_port_allocator;
 #[cfg(test)]
 #[path = "instance/tests_session_trace_uuid.rs"]
 pub mod tests_session_trace_uuid;
+#[cfg(test)]
+#[path = "instance/tests_child_termination_guard.rs"]
+pub mod tests_child_termination_guard;
+#[cfg(test)]
+#[path = "instance/tests_process_vitality_probe.rs"]
+pub mod tests_process_vitality_probe;
+#[cfg(test)]
+#[path = "instance/tests_ipc_socket_cleaner.rs"]
+pub mod tests_ipc_socket_cleaner;
 #[path = "instance/terminate_fallback_ladder.rs"]
 pub mod terminate_fallback_ladder;
 #[path = "instance/tuning.rs"]

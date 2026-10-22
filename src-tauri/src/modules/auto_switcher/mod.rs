@@ -115,6 +115,8 @@ pub mod tests_hourly_entropy_guard;
 #[cfg(test)]
 pub mod tests_score_variance_guard;
 #[cfg(test)]
+pub mod tests_dynamic_quota_floor;
+#[cfg(test)]
 pub(crate) use crate::models::account::Account;
 #[cfg(test)]
 pub(crate) use tests_a::make_test_account;
