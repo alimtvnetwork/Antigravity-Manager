@@ -696,7 +696,7 @@ export function usePromptTreeData({
         const safeIntervalMs = Math.max(intervalMs, 15000);
 
         const timer = setInterval(() => {
-            loadTree(false, false);
+            loadTree(false, true);
         }, safeIntervalMs);
 
         return () => clearInterval(timer);

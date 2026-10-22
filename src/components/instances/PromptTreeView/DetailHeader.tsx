@@ -305,7 +305,35 @@ export function DetailHeader(props: DetailHeaderProps) {
             const targetConvId = conversationTargetMode === 'new'
                 ? (newConversationTitle?.trim() || undefined)
                 : selectedConversation.conversation_id;
-            const originalPrompt = activePromptText || selectedConversation?.prompt_preview_200w || '';
+
+            // Resolve originalPrompt from active turns / prompt history rather than leaving it undefined
+            let originalPrompt = activePromptText?.trim() || '';
+            if (!originalPrompt && selectedConversation) {
+                if (selectedConversation.selected_turn_number != null && selectedConversation.prompts && selectedConversation.prompts.length > 0) {
+                    const matchedTurn = selectedConversation.prompts.find((p) => p.turn_number === selectedConversation.selected_turn_number);
+                    if (matchedTurn?.prompt_text?.trim()) {
+                        originalPrompt = matchedTurn.prompt_text.trim();
+                    }
+                }
+                if (!originalPrompt && selectedConversation.prompts && selectedConversation.prompts.length > 0) {
+                    const runningTurn = selectedConversation.prompts.find((p) => Boolean(p.is_running) && Boolean(p.prompt_text?.trim()));
+                    if (runningTurn?.prompt_text?.trim()) {
+                        originalPrompt = runningTurn.prompt_text.trim();
+                    } else {
+                        const lastTurnWithText = [...selectedConversation.prompts].reverse().find((p) => Boolean(p.prompt_text?.trim()));
+                        if (lastTurnWithText?.prompt_text?.trim()) {
+                            originalPrompt = lastTurnWithText.prompt_text.trim();
+                        }
+                    }
+                }
+                if (!originalPrompt) {
+                    originalPrompt = (selectedConversation.full_prompt_text || selectedConversation.prompt_preview_200w || '').trim();
+                }
+            }
+
+            // 3-tier fallback for repoPath: rerunRepoPath -> conversation repo_path -> default workspace
+            const effectiveRepoPath = rerunRepoPath || (selectedConversation as { repo_path?: string })?.repo_path || '.';
+
             // Preserve both existing conversation media paths and any newly attached rerun image
             let promptWithImage = originalPrompt;
             const existingMedia: string[] = selectedConversation?.media_paths || [];
@@ -318,15 +346,22 @@ export function DetailHeader(props: DetailHeaderProps) {
             if (attachedImage && !promptWithImage.includes(attachedImage.path)) {
                 promptWithImage = `${promptWithImage.trim()}\n\n![attached-image](${attachedImage.path})`;
             }
+
+            const rerunMediaList: string[] = Array.from(new Set([
+                ...existingMedia,
+                ...(attachedImage ? [attachedImage.dataUri, attachedImage.path] : []),
+            ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+
             const result = await dispatchRerunMessages({
                 targetInstId,
-                repoPath: rerunRepoPath ?? '',
+                repoPath: effectiveRepoPath,
                 convId: targetConvId,
                 count: rerunCount,
                 messageOption: rerunMessageOption,
                 originalPrompt: promptWithImage,
                 source: 'DetailHeader.rerunSection',
-            } as any);
+                mediaPaths: rerunMediaList,
+            });
             if (result.failed > 0) {
                 // Each failed rerun already landed in the error module via
                 // dispatchRerunMessages; surface a visible summary as well.
@@ -944,7 +979,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             onClick={handleToggleDispatchMenu}
                             data-ui-name="prompt-dispatch-options-btn"
                             data-ui-id={`prompt-dispatch-options-${selectedConversation.conversation_id}`}
-                            className="flex items-center justify-center px-1.5 py-1 rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[var(--ui-surface-hover,#2a1c3f)] text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center justify-center px-1.5 py-1 rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             aria-label="Unified dispatch configuration popover"
                             title="Dispatch options & Rerun settings"
                         >
@@ -970,45 +1005,45 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     </span>
                                     <div className="inline-flex rounded-lg bg-slate-100 dark:bg-[var(--ui-canvas,rgba(0,0,0,0.3))] p-0.5 border border-slate-200/80 dark:border-[var(--ui-border-subtle,rgba(255,255,255,0.1))] text-[11px]">
                                         <button
-                                            type="button"
-                                            onClick={() => handleSwitchDispatchMode('send')}
-                                            title="Cancel & Send / Send (Preempt): Cancels any running task to execute immediately"
-                                            className={cn(
-                                                "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
-                                                primaryDispatchAction === 'send'
-                                                    ? "bg-white dark:bg-[var(--ui-surface-hover,rgba(255,255,255,0.1))] text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
-                                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                                            )}
-                                        >
-                                            Send (Preempt)
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleSwitchDispatchMode('enqueue')}
-                                            title="Enqueue (FIFO): Queues prompt behind active task in IDE"
-                                            className={cn(
-                                                "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
-                                                primaryDispatchAction === 'enqueue'
-                                                    ? "bg-white dark:bg-[var(--ui-surface-hover,rgba(255,255,255,0.1))] text-amber-600 dark:text-amber-400 shadow-2xs font-semibold"
-                                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                                            )}
-                                        >
-                                            Enqueue (FIFO)
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleSwitchDispatchMode('rerun')}
-                                            className={cn(
-                                                "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
-                                                primaryDispatchAction === 'rerun'
-                                                    ? "bg-white dark:bg-[var(--ui-surface-hover,rgba(255,255,255,0.1))] text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
-                                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                                            )}
-                                        >
-                                            Rerun Turn
-                                        </button>
-                                    </div>
-                                </div>
+                                             type="button"
+                                             onClick={() => handleSwitchDispatchMode('send')}
+                                             title="Cancel & Send / Send (Preempt): Cancels any running task to execute immediately"
+                                             className={cn(
+                                                 "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                 primaryDispatchAction === 'send'
+                                                     ? "bg-white dark:bg-[var(--ui-surface-hover,rgba(255,255,255,0.1))] text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
+                                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 dark:hover:bg-slate-800/80"
+                                             )}
+                                         >
+                                             Send (Preempt)
+                                         </button>
+                                         <button
+                                             type="button"
+                                             onClick={() => handleSwitchDispatchMode('enqueue')}
+                                             title="Enqueue (FIFO): Queues prompt behind active task in IDE"
+                                             className={cn(
+                                                 "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                 primaryDispatchAction === 'enqueue'
+                                                     ? "bg-white dark:bg-[var(--ui-surface-hover,rgba(255,255,255,0.1))] text-amber-600 dark:text-amber-400 shadow-2xs font-semibold"
+                                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 dark:hover:bg-slate-800/80"
+                                             )}
+                                         >
+                                             Enqueue (FIFO)
+                                         </button>
+                                         <button
+                                             type="button"
+                                             onClick={() => handleSwitchDispatchMode('rerun')}
+                                             className={cn(
+                                                 "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                 primaryDispatchAction === 'rerun'
+                                                     ? "bg-white dark:bg-[var(--ui-surface-hover,rgba(255,255,255,0.1))] text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
+                                                     : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 dark:hover:bg-slate-800/80"
+                                             )}
+                                         >
+                                             Rerun Turn
+                                         </button>
+                                     </div>
+                                 </div>
 
                                 {/* CONTEXTUAL OPTIONS: SEND or ENQUEUE MODE */}
                                 {(primaryDispatchAction === 'send' || primaryDispatchAction === 'enqueue') && (
@@ -1062,7 +1097,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                                         <button
                                                             type="button"
                                                             onClick={() => setIsSuffixPopoverOpen((prev) => !prev)}
-                                                            className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-purple-950/40 border border-slate-200/80 dark:border-purple-500/20 text-slate-800 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200/80 dark:hover:bg-purple-900/50 transition-colors cursor-pointer max-w-[140px]"
+                                                            className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-purple-950/40 border border-slate-200/80 dark:border-purple-500/20 text-slate-800 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200/80 dark:hover:bg-slate-800/80 transition-colors cursor-pointer max-w-[140px]"
                                                             title="Select confirmation suffix or verification template"
                                                         >
                                                             <span className="truncate">{currentSuffixLabel}</span>
@@ -1137,7 +1172,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                                                             setIsSuffixPopoverOpen(false);
                                                                             setIsSuffixModalOpen(true);
                                                                         }}
-                                                                        className="w-full flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition-colors cursor-pointer"
+                                                                        className="w-full flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-slate-800/80 transition-colors cursor-pointer"
                                                                     >
                                                                         <span>+ Manage Suffix Templates...</span>
                                                                     </button>
@@ -1169,8 +1204,8 @@ export function DetailHeader(props: DetailHeaderProps) {
                                                         className={cn(
                                                             "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                             rerunCount === n
-                                                                ? "bg-white dark:bg-[#2c1a4d] text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
-                                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                                                ? "bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
+                                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 dark:hover:bg-slate-800/80"
                                                         )}
                                                         title={`Dispatch the nudge ${n} time(s)`}
                                                     >
@@ -1252,7 +1287,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                                             reportPromptActionError(err, 'DetailHeader.rerunAttachImage');
                                                         })}
                                                         disabled={isAttachingImage}
-                                                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-semibold text-sky-700 dark:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 transition-colors cursor-pointer disabled:opacity-50"
+                                                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px] font-semibold text-sky-700 dark:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20 dark:hover:bg-slate-800/80 border border-sky-500/30 transition-colors cursor-pointer disabled:opacity-50"
                                                     >
                                                         <ImageIcon className={cn('w-3.5 h-3.5', isAttachingImage && 'animate-pulse')} />
                                                         <span>{isAttachingImage ? 'Reading…' : 'Attach image'}</span>

@@ -145,3 +145,4 @@ Updated 2026-10-21T16:50:00Z from `git log` (HEAD `33ea5d83`). Referenced by `.a
 
 
 
+| 155 | [155-ui-ux-improvements-and-bug-fixes.md](./pending/155-ui-ux-improvements-and-bug-fixes.md) | COMPLETED | UI/UX coloring restoration, stark white regression fixes, Scoreboard hover card contrast, Header navigation icons capsule refinement, PromptTree 30s live auto-sync, Rerun logic fixes, and Telegram speed optimizations. |

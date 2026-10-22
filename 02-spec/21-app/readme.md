@@ -103,3 +103,4 @@
 
 
 
+| 155-ui-ux-improvements-and-bug-fixes | [spec.md](./155-ui-ux-improvements-and-bug-fixes/spec.md) | Eliminated stark white regressions in PromptTreeView left sidebar and Scoreboard candidate hover card, refined Header navigation capsule to unified segmented pill, enabled 30s live PromptTree auto-sync with cache bypass, fixed Rerun logic and preserved Send/Enqueue buttons, and accelerated Telegram prompt dispatch to sub-second responses with async proof capture. |

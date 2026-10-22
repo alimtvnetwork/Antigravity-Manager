@@ -21,6 +21,55 @@ pub(crate) fn normalize_cmd_callback_payload(data: &str) -> String {
     }
 }
 
+/// Immediately answer callback query so Telegram client dismisses button spinner without waiting
+pub(crate) async fn answer_callback_query(
+    client: &reqwest::Client,
+    token: &str,
+    cb_id: &str,
+) {
+    let clean_token = token.trim();
+    let clean_cb = cb_id.trim();
+    if clean_token.is_empty() || clean_cb.is_empty() {
+        return;
+    }
+    let ans_url = format!("https://api.telegram.org/bot{}/answerCallbackQuery", clean_token);
+    // Justification: best-effort callback query answer to dismiss button spinners immediately; failure logged without changing control flow
+    crate::error::record_ignored(
+        client
+            .post(&ans_url)
+            .json(&json!({ "callback_query_id": clean_cb }))
+            .send()
+            .await,
+        "answerCallbackQuery",
+    );
+}
+
+/// Send chat action (e.g. "typing") to indicate background processing immediately to the user
+pub(crate) async fn send_chat_action(
+    client: &reqwest::Client,
+    token: &str,
+    chat_id: i64,
+    action: &str,
+) {
+    let clean_token = token.trim();
+    if clean_token.is_empty() || chat_id == 0 {
+        return;
+    }
+    let url = format!("https://api.telegram.org/bot{}/sendChatAction", clean_token);
+    // Justification: best-effort chat action indicator; failure logged without changing control flow
+    crate::error::record_ignored(
+        client
+            .post(&url)
+            .json(&json!({
+                "chat_id": chat_id,
+                "action": action
+            }))
+            .send()
+            .await,
+        "sendChatAction",
+    );
+}
+
 /// Handle `send:*` inline-keyboard callbacks for the `/send` two-step flow.
 /// Returns true when the callback belonged to the flow (caller should `continue`).
 async fn deliver_send_flow_callback(
@@ -33,6 +82,9 @@ async fn deliver_send_flow_callback(
     if !data.starts_with("send:") {
         return false;
     }
+    // Dismiss button spinner immediately before evaluating send-flow state
+    answer_callback_query(client, token, cb_id).await;
+
     let (reply, markup) = super::send_flow::handle_send_callback(chat_id, data).await;
     // Justification: the picker reply is already computed and flow state is
     // updated; a Telegram send failure is logged without changing the flow.
@@ -41,18 +93,6 @@ async fn deliver_send_flow_callback(
         crate::error::record_ignored(
             send_telegram_message_with_markup(token, chat_id, &reply, markup, false).await,
             "send /send picker reply",
-        );
-    }
-    if !cb_id.is_empty() {
-        let ans_url = format!("https://api.telegram.org/bot{}/answerCallbackQuery", token);
-        // Justification: best-effort send; failure logged without changing control flow
-        crate::error::record_ignored(
-            client
-                .post(&ans_url)
-                .json(&json!({ "callback_query_id": cb_id }))
-                .send()
-                .await,
-            "answerCallbackQuery",
         );
     }
     true
@@ -580,6 +620,9 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
                 let data = cb["data"].as_str().unwrap_or("").trim();
 
                 if chat_id != 0 && !data.is_empty() {
+                    // Immediately answer callback query so Telegram button spinners dismiss instantly
+                    answer_callback_query(&client, &clean_token, cb_id).await;
+
                     if deliver_send_flow_callback(&clean_token, chat_id, cb_id, data, &client).await
                     {
                         continue;
@@ -594,28 +637,13 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
 
                     if let Some(allowed) = config.allowed_chat_id {
                         if chat_id == allowed {
+                            send_chat_action(&client, &clean_token, chat_id, "typing").await;
                             let cmd_str = normalize_cmd_callback_payload(data);
 
                             if let Some(reply) =
                                 deliver_ui_or_command(&clean_token, chat_id, &cmd_str, &None).await
                             {
                                 processed.push((chat_id, cmd_str, reply));
-                            }
-
-                            if !cb_id.is_empty() {
-                                let ans_url = format!(
-                                    "https://api.telegram.org/bot{}/answerCallbackQuery",
-                                    clean_token
-                                );
-                                // Justification: best-effort send; failure logged without changing control flow
-                                crate::error::record_ignored(
-                                    client
-                                        .post(&ans_url)
-                                        .json(&json!({ "callback_query_id": cb_id }))
-                                        .send()
-                                        .await,
-                                    "answerCallbackQuery",
-                                );
                             }
                         }
                     }
@@ -652,6 +680,9 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
                 }
             }
 
+            // Send "typing" chat action immediately when command or message is received
+            send_chat_action(&client, &clean_token, chat_id, "typing").await;
+
             let reply =
                 deliver_ui_or_command(&clean_token, chat_id, text_raw, &saved_media_opt).await;
             if let Some(reply) = reply {
@@ -682,8 +713,8 @@ pub fn start_telegram_daemon() {
     }
 
     tauri::async_runtime::spawn(async move {
-        // Enforce 60-second startup quiet period: nothing runs until 1 minute after launch
-        tokio::time::sleep(Duration::from_secs(60)).await;
+        // Start Telegram inbound polling immediately upon launch (sub-second turnaround)
+        tokio::time::sleep(Duration::from_millis(500)).await;
         let mut last_update_id = 0i64;
 
         loop {
@@ -765,6 +796,9 @@ pub fn start_telegram_daemon() {
                                         let data = cb["data"].as_str().unwrap_or("").trim();
 
                                         if chat_id != 0 && !data.is_empty() {
+                                            // Immediately answer callback query so Telegram button spinners dismiss instantly
+                                            answer_callback_query(&http_client, &clean_token, cb_id).await;
+
                                             if deliver_send_flow_callback(
                                                 &clean_token,
                                                 chat_id,
@@ -789,6 +823,9 @@ pub fn start_telegram_daemon() {
 
                                             if let Some(allowed) = config.allowed_chat_id {
                                                 if chat_id == allowed {
+                                                    // Send "typing" action to indicate command dispatch
+                                                    send_chat_action(&http_client, &clean_token, chat_id, "typing").await;
+
                                                     // Same unified pipeline the one-shot poller
                                                     // uses, so `cmd:` buttons behave identically on
                                                     // both paths (exports, UI actions, and the
@@ -820,22 +857,6 @@ pub fn start_telegram_daemon() {
                                                             )
                                                             .await,
                                                             "send unknown callback action notice",
-                                                        );
-                                                    }
-
-                                                    if !cb_id.is_empty() {
-                                                        let ans_url = format!(
-                                                            "https://api.telegram.org/bot{}/answerCallbackQuery",
-                                                            clean_token
-                                                        );
-                                                        // Justification: best-effort send; failure logged without changing control flow
-                                                        crate::error::record_ignored(
-                                                            http_client
-                                                                .post(&ans_url)
-                                                                .json(&json!({ "callback_query_id": cb_id }))
-                                                                .send()
-                                                                .await,
-                                                            "answerCallbackQuery",
                                                         );
                                                     }
                                                 }
@@ -881,19 +902,25 @@ pub fn start_telegram_daemon() {
                                         }
                                     }
 
+                                    // Send "typing" chat action immediately when command or message is received
+                                    send_chat_action(&http_client, &config.bot_token, chat_id, "typing").await;
+
                                     {
                                         let mut st = LAST_TELEGRAM_STATUS.write().await;
                                         st.last_message_received = Some(text_raw.to_string());
                                         st.last_update_id = last_update_id;
                                     }
 
-                                    let _ = deliver_ui_or_command(
+                                    let delivered_opt = deliver_ui_or_command(
                                         &config.bot_token,
                                         chat_id,
                                         text_raw,
                                         &saved_media_opt,
                                     )
                                     .await;
+                                    if delivered_opt.is_none() {
+                                        tracing::debug!("deliver_ui_or_command produced no reply for chat {}", chat_id);
+                                    }
                                 }
                             }
                         }

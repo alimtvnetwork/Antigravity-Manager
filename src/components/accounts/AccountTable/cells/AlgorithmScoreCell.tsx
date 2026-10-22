@@ -133,20 +133,20 @@ export function AlgorithmScoreCell({
             {isHovered && tooltipCoords && typeof document !== 'undefined' && createPortal(
                 <div
                     style={{ top: `${tooltipCoords.top}px`, left: `${tooltipCoords.left}px` }}
-                    className="pointer-events-none fixed z-[99999] backdrop-blur-md bg-white/95 dark:bg-[var(--app-surface,#18181b)]/95 border border-slate-200 dark:border-[var(--app-border,#334155)] shadow-2xl rounded-xl p-3.5 text-xs w-96 max-w-[calc(100vw-2rem)] transition-opacity animate-in fade-in duration-150 whitespace-normal select-none"
+                    className="pointer-events-none fixed z-[99999] backdrop-blur-md bg-slate-900/95 dark:bg-slate-900/95 border border-slate-700/60 shadow-2xl rounded-xl p-3.5 text-xs w-96 max-w-[calc(100vw-2rem)] text-slate-100 transition-opacity animate-in fade-in duration-150 whitespace-normal select-none"
                 >
                     {/* Header: Title, Tier Badge, Readiness % */}
-                    <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 dark:border-slate-800/80 pb-2 mb-2">
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-700/80 pb-2 mb-2">
                         <div>
-                            <div className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                            <div className="font-semibold text-slate-100 flex items-center gap-1.5">
                                 <span>Algorithm Candidate Score</span>
                             </div>
-                            <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                            <div className="text-[10px] text-slate-400 mt-0.5">
                                 Multi-factor Candidate Readiness
                             </div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="px-1.5 py-0.5 rounded font-bold text-[10px] uppercase tracking-wider bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                            <span className="px-1.5 py-0.5 rounded font-bold text-[10px] uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">
                                 {result.tier.toUpperCase()} {result.tierMultiplier.toFixed(1)}x
                             </span>
                             <span className={cn("font-bold text-xs font-mono", result.colorScale.text)}>
@@ -156,40 +156,40 @@ export function AlgorithmScoreCell({
                     </div>
 
                     {/* Formula */}
-                    <div className="font-mono text-[10px] px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-[var(--app-surface-hover,#27272a)] border border-slate-200/80 dark:border-[var(--app-border,#334155)]/60 text-slate-700 dark:text-slate-300 mb-2.5 leading-relaxed break-words whitespace-normal">
-                        <span className="text-slate-400 dark:text-slate-500 select-none mr-1.5">Formula:</span>
-                        <span className="font-semibold text-slate-900 dark:text-slate-100">{result.mathBreakdown.formulaString}</span>
+                    <div className="font-mono text-[10px] px-2.5 py-1.5 rounded-lg bg-slate-950/80 border border-slate-800 text-emerald-300 mb-2.5 leading-relaxed break-words whitespace-normal">
+                        <span className="text-slate-400 select-none mr-1.5">Formula:</span>
+                        <span className="font-semibold text-emerald-300">{result.mathBreakdown.formulaString}</span>
                     </div>
 
                     {/* Mathematical calculation breakdown */}
                     <div className="space-y-1.5 font-mono text-[11px]">
                         {/* Status Factor */}
-                        <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                            <span className="text-slate-500 dark:text-slate-400">Status Factor (S_active):</span>
-                            <span className={cn("font-semibold", result.activeFactor === 1 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400")}>
+                        <div className="flex items-center justify-between text-slate-300">
+                            <span className="text-slate-400">Status Factor (S_active):</span>
+                            <span className={cn("font-semibold", result.activeFactor === 1 ? "text-emerald-400" : "text-rose-400")}>
                                 {result.activeFactor === 1 ? "1 (Active / Available)" : `0 (${result.disqualificationReason || "Disqualified"})`}
                             </span>
                         </div>
 
                         {/* Multipliers */}
-                        <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                            <span className="text-slate-500 dark:text-slate-400">Multipliers:</span>
-                            <span className="text-slate-800 dark:text-slate-200 font-medium">
+                        <div className="flex items-center justify-between text-slate-300">
+                            <span className="text-slate-400">Multipliers:</span>
+                            <span className="text-slate-200 font-medium">
                                 {result.mathBreakdown.multiplicationStep}
                             </span>
                         </div>
 
                         {/* Division */}
-                        <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                            <span className="text-slate-500 dark:text-slate-400">Division:</span>
-                            <span className="text-slate-800 dark:text-slate-200 font-medium">
+                        <div className="flex items-center justify-between text-slate-300">
+                            <span className="text-slate-400">Division:</span>
+                            <span className="text-slate-200 font-medium">
                                 {result.mathBreakdown.divisionStep}
                             </span>
                         </div>
 
                         {/* Readiness */}
-                        <div className="flex items-center justify-between text-slate-600 dark:text-slate-400">
-                            <span className="text-slate-500 dark:text-slate-400">Readiness:</span>
+                        <div className="flex items-center justify-between text-slate-300">
+                            <span className="text-slate-400">Readiness:</span>
                             <span className={cn("font-semibold", result.colorScale.text)}>
                                 {result.mathBreakdown.percentageStep}
                             </span>
@@ -197,16 +197,16 @@ export function AlgorithmScoreCell({
 
                         {/* Disqualification / Liveness Cooldown */}
                         {result.disqualificationReason ? (
-                            <div className="mt-2 pt-1.5 border-t border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between text-rose-500 dark:text-rose-400 text-[10px]">
-                                <span className="font-medium">Disqualification:</span>
-                                <span className="font-semibold px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/20">
+                            <div className="mt-2 pt-1.5 border-t border-slate-800 flex items-center justify-between text-rose-400 text-[10px]">
+                                <span className="font-medium text-slate-400">Disqualification:</span>
+                                <span className="font-semibold px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-300">
                                     {result.disqualificationReason}
                                 </span>
                             </div>
                         ) : (
-                            <div className="mt-2 pt-1.5 border-t border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between text-slate-500 dark:text-slate-400 text-[10px]">
-                                <span>Liveness:</span>
-                                <span className="font-medium text-slate-700 dark:text-slate-300">{result.mathBreakdown.cooldownSummary}</span>
+                            <div className="mt-2 pt-1.5 border-t border-slate-800 flex items-center justify-between text-slate-300 text-[10px]">
+                                <span className="text-slate-400">Liveness:</span>
+                                <span className="font-medium text-slate-200">{result.mathBreakdown.cooldownSummary}</span>
                             </div>
                         )}
                     </div>

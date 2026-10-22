@@ -103,9 +103,10 @@ export interface VerificationTemplateContext {
  * Context supplied specifically for rerun nudges.
  */
 export interface RerunTemplateContext {
-    originalPrompt: string;
-    round: number;
-    total: number;
+    originalPrompt?: string;
+    prompt?: string;
+    round?: number;
+    total?: number;
     instanceId?: string;
     repoPath?: string;
     convId?: string;
@@ -834,21 +835,55 @@ export function buildRerunPrompt(
         let customNudge = '';
 
         if (typeof promptOrContext === 'object' && promptOrContext !== null) {
-            originalPrompt = promptOrContext.originalPrompt || '';
-            currentRound = promptOrContext.round || 1;
-            totalRounds = promptOrContext.total || 1;
+            originalPrompt = promptOrContext.originalPrompt || promptOrContext.prompt || '';
+            currentRound = promptOrContext.round || round || 1;
+            totalRounds = promptOrContext.total || total || 1;
             customNudge = promptOrContext.customNudgeMessage || '';
         } else {
-            originalPrompt = typeof promptOrContext === 'string' ? promptOrContext : '';
+            const rawStr = typeof promptOrContext === 'string' ? promptOrContext.trim() : '';
             currentRound = round ?? 1;
             totalRounds = total ?? 1;
+
+            const lower = rawStr.toLowerCase();
+            const isNudge =
+                lower === 'is it done?' ||
+                lower === 'is it published?' ||
+                lower === 'done?' ||
+                lower === 'published?' ||
+                lower.startsWith('is it done') ||
+                lower.startsWith('is it published') ||
+                lower.startsWith('quick status check') ||
+                lower.includes('status check') ||
+                lower.includes('progress update') ||
+                lower.includes('ping me when') ||
+                (rawStr.length <= 120 && (rawStr.endsWith('?') || lower.includes('done') || lower.includes('published')));
+
+            if (isNudge) {
+                customNudge = rawStr;
+                originalPrompt = '';
+            } else {
+                originalPrompt = rawStr;
+            }
         }
 
-        const customNudgeSection = customNudge
-            ? `\n> **Specific Nudge:** ${customNudge}\n`
-            : '';
+        // If customNudge is still empty and originalPrompt looks like a nudge message, shift it
+        if (!customNudge && originalPrompt) {
+            const lower = originalPrompt.toLowerCase().trim();
+            if (
+                lower === 'is it done?' ||
+                lower === 'is it published?' ||
+                lower === 'done?' ||
+                lower === 'published?' ||
+                lower.startsWith('is it done') ||
+                lower.startsWith('is it published')
+            ) {
+                customNudge = originalPrompt.trim();
+                originalPrompt = '';
+            }
+        }
 
-        return [
+        const trimmedPrompt = originalPrompt.trim();
+        const lines: string[] = [
             `# 🔄 RERUN EXECUTION NUDGE — ROUND ${currentRound} OF ${totalRounds}`,
             '',
             '> [!NOTE]',
@@ -857,16 +892,31 @@ export function buildRerunPrompt(
             '> - **State Preservation:** Review files already modified and steps already completed. Do NOT duplicate work.',
             '> - **Forward Progress:** Focus immediately on remaining incomplete or unverified action items.',
             '> - **Self-Correction:** If an earlier step resulted in an error, apply the 4-part Root Cause Analysis (RCA) and correct it now.',
-            customNudgeSection,
-            '### Original Task Prompt:',
-            '---',
-            '<<<ORIGINAL_TASK_PROMPT_START>>>',
-            originalPrompt.trim(),
-            '<<<ORIGINAL_TASK_PROMPT_END>>>',
-            '---',
+        ];
+
+        if (customNudge) {
+            lines.push('>', `> **Specific Nudge:** ${customNudge}`);
+        }
+
+        // Only include original prompt section when text is actually present
+        if (trimmedPrompt) {
+            lines.push(
+                '',
+                '### Original Task Prompt:',
+                '---',
+                '<<<ORIGINAL_TASK_PROMPT_START>>>',
+                trimmedPrompt,
+                '<<<ORIGINAL_TASK_PROMPT_END>>>',
+                '---'
+            );
+        }
+
+        lines.push(
             '',
-            'Please provide an updated status of your progress in this round and complete any remaining work.',
-        ].join('\n');
+            'Please provide an updated status of your progress in this round and complete any remaining work.'
+        );
+
+        return lines.join('\n');
     } catch (err) {
         useErrorStore.getState().trackWarning(err, {
             source: 'verificationTemplates.buildRerunPrompt',
@@ -874,7 +924,7 @@ export function buildRerunPrompt(
         });
         const fallback =
             typeof promptOrContext === 'object' && promptOrContext !== null
-                ? promptOrContext.originalPrompt || ''
+                ? promptOrContext.customNudgeMessage || promptOrContext.originalPrompt || promptOrContext.prompt || ''
                 : typeof promptOrContext === 'string'
                   ? promptOrContext
                   : '';

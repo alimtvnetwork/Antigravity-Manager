@@ -150,7 +150,34 @@ pub async fn rerun_prompt_by_id(id8: &str) -> (String, Option<Value>) {
     // is not attempted because template expansion is not invertible (resolved
     // template bodies are opaque text).
     let injected = super::injection::execute_prompt_injection(&args).await;
-    let proof = capture_and_send_proof_shot(&OpenShotTarget::Local).await;
+
+    // Send immediate confirmation to Telegram chat
+    let (token, chat_id) = match super::config::load_config() {
+        Ok(cfg) => (
+            cfg.bot_token.trim().to_string(),
+            cfg.allowed_chat_id.unwrap_or(0),
+        ),
+        Err(_) => (String::new(), 0),
+    };
+    if !token.is_empty() && chat_id != 0 {
+        // Justification: immediate rerun confirmation for sub-second user responsiveness
+        crate::error::record_ignored(
+            super::formatting::send_telegram_message(
+                &token,
+                chat_id,
+                "✅ Prompt dispatched to IDE!",
+            )
+            .await,
+            "send immediate rerun confirmation",
+        );
+    }
+
+    // Detach screenshot proof capture into an async background task to eliminate 3-12s blocking wait
+    tauri::async_runtime::spawn(async move {
+        let proof_res = capture_and_send_proof_shot(&OpenShotTarget::Local).await;
+        tracing::info!("Background rerun proof shot completed: {proof_res}");
+    });
+    let proof = "📸 <i>Delivery proof screenshot is being captured in background...</i>";
     let image_note = prompt
         .image_payload
         .as_deref()

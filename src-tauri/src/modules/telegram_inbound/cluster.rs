@@ -2,8 +2,11 @@ use crate::modules::email_watcher;
 use crate::modules::supabase_client::SupabaseClient;
 use crate::modules::supabase_sync;
 use chrono::Utc;
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::process::Command;
+use std::sync::RwLock;
+use std::time::{Duration, Instant};
 
 use super::*;
 
@@ -16,6 +19,23 @@ pub struct ClusterNodeInfo {
     pub source: String,
     pub last_seen: Option<String>,
     pub uptime_seconds: u64,
+}
+
+#[derive(Debug, Clone)]
+struct GitMapClusterCache {
+    nodes: Vec<ClusterNodeInfo>,
+    cached_at: Instant,
+}
+
+static GITMAP_CLUSTER_CACHE: Lazy<RwLock<Option<GitMapClusterCache>>> =
+    Lazy::new(|| RwLock::new(None));
+const GITMAP_CLUSTER_CACHE_TTL: Duration = Duration::from_secs(30);
+
+/// Invalidate the in-memory GitMap cluster nodes cache
+pub fn invalidate_gitmap_cluster_cache() {
+    if let Ok(mut guard) = GITMAP_CLUSTER_CACHE.write() {
+        *guard = None;
+    }
 }
 
 /// Parse GitMap cluster status output (e.g. Node vm-01: Connected (Last Seen: ...))
@@ -53,8 +73,30 @@ pub fn parse_gitmap_cluster_status(output: &str) -> Vec<ClusterNodeInfo> {
     nodes
 }
 
-/// Query GitMap cluster nodes via CLI with JSON output first, falling back to text status
+/// Query GitMap cluster nodes via CLI with JSON output first, falling back to text status.
+/// Results are cached in-memory with a 30-second TTL to avoid sequential `gitmap` process spawns.
 pub fn query_gitmap_cluster_nodes() -> Vec<ClusterNodeInfo> {
+    if let Ok(guard) = GITMAP_CLUSTER_CACHE.read() {
+        if let Some(ref cache) = *guard {
+            if cache.cached_at.elapsed() < GITMAP_CLUSTER_CACHE_TTL {
+                return cache.nodes.clone();
+            }
+        }
+    }
+
+    let nodes = fetch_gitmap_cluster_nodes_uncached();
+
+    if let Ok(mut guard) = GITMAP_CLUSTER_CACHE.write() {
+        *guard = Some(GitMapClusterCache {
+            nodes: nodes.clone(),
+            cached_at: Instant::now(),
+        });
+    }
+
+    nodes
+}
+
+fn fetch_gitmap_cluster_nodes_uncached() -> Vec<ClusterNodeInfo> {
     // 1. Prefer gitmap cluster nodes --json for exact aliases and IPs
     let mut cmd_json = Command::new("gitmap");
     #[cfg(target_os = "windows")]
@@ -104,7 +146,7 @@ pub fn query_gitmap_cluster_nodes() -> Vec<ClusterNodeInfo> {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
+        cmd_json.creation_flags(0x08000000);
     }
     let output_res = cmd.args(["cluster", "status"]).output();
     if let Ok(out) = output_res {

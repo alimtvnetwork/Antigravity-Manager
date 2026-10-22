@@ -76,11 +76,11 @@ pub fn get_project_conversation_tree_cached(
     let conversation_count: usize = tree_nodes.iter().map(|p| p.conversations.len()).sum();
     if let Ok(json_str) = serde_json::to_string(&tree_nodes) {
         if let Ok(conn) = connect_db() {
-            // Justification: prompt-tree cache write has a 120-second TTL; the computed tree is returned regardless
+            // Justification: prompt-tree cache write has a 30-second TTL to stay synchronized with the user's 30s auto-sync cadence; the computed tree is returned regardless
             crate::error::record_ignored(
                 conn.execute(
                 "INSERT INTO prompt_tree_cache (cache_key, instance_id, tree_json, project_count, conversation_count, updated_at, ttl_seconds)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, 120)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, 30)
                  ON CONFLICT(cache_key) DO UPDATE SET
                     instance_id = excluded.instance_id,
                     tree_json = excluded.tree_json,

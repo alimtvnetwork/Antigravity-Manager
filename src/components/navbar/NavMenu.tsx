@@ -74,18 +74,6 @@ export function NavMenu({ navItems }: NavMenuProps) {
     const activeDropdownItem = dropdownNavItems.find(item => isActive(location.pathname, item.path));
     const isDropdownRouteActive = Boolean(activeDropdownItem);
 
-    // Segmented capsule rounding: first visible button gets the circular left
-    // edge, the last gets the circular right edge, middle buttons stay
-    // rectangular so the three join into one continuous pill.
-    const visibleDirect = [accountsItem, instancesItem, settingsItem].filter(
-        (x): x is NavItem => Boolean(x)
-    );
-    const segRounding = (item: NavItem) => {
-        const i = visibleDirect.indexOf(item);
-        if (i === 0) return 'rounded-l-full rounded-r-none';
-        return 'rounded-none';
-    };
-
     const checkForUpdates = useUpdateStore((s) => s.checkForUpdates);
     const handleCheckUpdates = async () => {
         setIsMenuOpen(false);
@@ -107,7 +95,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
     };
 
     return (
-        <div className="flex items-center rounded-full bg-gray-100 dark:bg-[#171025] border border-gray-200/60 dark:border-[#40285e] p-0.5 shadow-xs divide-x divide-gray-200/70 dark:divide-[#40285e]/70">
+        <div className="flex items-center rounded-full bg-gray-100 dark:bg-slate-900/90 border border-gray-200/60 dark:border-slate-800 p-0.5 shadow-xs divide-x divide-gray-200/70 dark:divide-slate-800/80">
             {/* 1. Accounts direct button (Icon-only with tooltip) */}
             {accountsItem && (
                 <div className="relative group">
@@ -115,11 +103,10 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         to="/accounts"
                         draggable="false"
                         className={cn(
-                            "flex items-center justify-center px-2.5 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none",
-                            segRounding(accountsItem),
+                            "flex items-center justify-center px-2.5 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-full",
                             isAccountsActive
                                 ? "bg-blue-600 text-white shadow-xs"
-                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]"
+                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-gray-200/80 dark:hover:bg-slate-800/60"
                         )}
                         aria-label="Accounts (Profile Vault)"
                         title="Accounts (Profile Vault)"
@@ -139,11 +126,10 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         to="/instances"
                         draggable="false"
                         className={cn(
-                            "flex items-center justify-center px-2.5 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none",
-                            segRounding(instancesItem),
+                            "flex items-center justify-center px-2.5 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-full",
                             isInstancesActive
                                 ? "bg-blue-600 text-white shadow-xs"
-                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]"
+                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-gray-200/80 dark:hover:bg-slate-800/60"
                         )}
                         aria-label="Instances (Engine Runner)"
                         title="Instances (Engine Runner)"
@@ -162,10 +148,10 @@ export function NavMenu({ navItems }: NavMenuProps) {
                     type="button"
                     onClick={() => setIsTelegramGuideOpen(true)}
                     className={cn(
-                        "flex items-center justify-center px-2.5 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-none",
+                        "flex items-center justify-center px-2.5 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-full",
                         isActive(location.pathname, '/telegram')
                             ? "bg-blue-600 text-white shadow-xs"
-                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]"
+                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-gray-200/80 dark:hover:bg-slate-800/60"
                     )}
                     aria-label="Telegram Remote Control Guide"
                     title="Telegram Remote Control Guide"
@@ -184,10 +170,10 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         to="/settings"
                         draggable="false"
                         className={cn(
-                            "flex items-center justify-center px-2.5 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-none",
+                            "flex items-center justify-center px-2.5 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-full",
                             isSettingsActive
                                 ? "bg-blue-600 text-white shadow-xs"
-                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]"
+                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-gray-200/80 dark:hover:bg-slate-800/60"
                         )}
                         aria-label="Settings"
                         title="Settings"
@@ -212,10 +198,10 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         }
                     }}
                     className={cn(
-                        "h-7 px-2 rounded-r-full rounded-l-none flex items-center justify-center transition-all duration-150 cursor-pointer",
+                        "h-7 px-2 flex items-center justify-center transition-all duration-150 cursor-pointer rounded-full",
                         isDropdownRouteActive || isMenuOpen
                             ? "bg-blue-600 text-white shadow-xs"
-                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]"
+                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-gray-200/80 dark:hover:bg-slate-800/60"
                     )}
                     title={activeDropdownItem ? `${activeDropdownItem.label} (More)` : t('common.menu', 'More Views')}
                     aria-label="More Navigation"

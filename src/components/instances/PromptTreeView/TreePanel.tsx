@@ -300,7 +300,7 @@ export function TreePanel(props: TreePanelProps) {
                                 "p-1 rounded-md transition-colors cursor-pointer shrink-0",
                                 pinnedProjectIds.includes(selectedProjectScope)
                                     ? "text-amber-500 bg-amber-50 dark:bg-amber-950/40"
-                                    : "text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#40285e]"
+                                    : "text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#1f1730]"
                             )}
                             title={pinnedProjectIds.includes(selectedProjectScope) ? "Unpin project" : "Pin project to prompt view"}
                         >
@@ -311,7 +311,7 @@ export function TreePanel(props: TreePanelProps) {
                         <button
                             type="button"
                             onClick={handleExpandCollapseAll}
-                            className="p-1 rounded-md text-slate-400 hover:text-purple-400 hover:bg-slate-100 dark:hover:bg-[#25173e] transition-colors cursor-pointer shrink-0"
+                            className="p-1 rounded-md text-slate-400 hover:text-purple-400 hover:bg-slate-100 dark:hover:bg-[#1f1730] transition-colors cursor-pointer shrink-0"
                             title={effectiveIsAllExpanded ? "Collapse all projects" : "Expand all projects"}
                             aria-label={effectiveIsAllExpanded ? "Collapse all projects" : "Expand all projects"}
                         >
@@ -326,7 +326,7 @@ export function TreePanel(props: TreePanelProps) {
                         <button
                             type="button"
                             onClick={onToggleCollapse}
-                            className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#25173e] transition-colors cursor-pointer shrink-0"
+                            className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1f1730] transition-colors cursor-pointer shrink-0"
                             title="Collapse tree panel"
                         >
                             <PanelLeftClose className="w-3.5 h-3.5" />
@@ -356,7 +356,7 @@ export function TreePanel(props: TreePanelProps) {
                                 "flex-1 py-1 text-[10px] font-medium rounded-l-md transition-colors text-center cursor-pointer",
                                 categoryFilter === 'all'
                                     ? "bg-blue-600 text-white shadow-2xs font-semibold"
-                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-[#1f1730]"
                             )}
                             aria-label="All prompt types"
                         >
@@ -369,7 +369,7 @@ export function TreePanel(props: TreePanelProps) {
                                 "flex-1 py-1 text-[10px] font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer",
                                 categoryFilter === 'user'
                                     ? "bg-sky-600 text-white shadow-2xs font-semibold"
-                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-[#1f1730]"
                             )}
                             aria-label="User Prompts submitted by humans"
                         >
@@ -383,7 +383,7 @@ export function TreePanel(props: TreePanelProps) {
                                 "flex-1 py-1 text-[10px] font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer",
                                 categoryFilter === 'subagent'
                                     ? "bg-purple-600 text-white shadow-2xs font-semibold"
-                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-[#1f1730]"
                             )}
                             aria-label="Automated subagent and background task instructions"
                         >
@@ -397,7 +397,7 @@ export function TreePanel(props: TreePanelProps) {
                                 "flex-1 py-1 text-[10px] font-medium rounded-r-md transition-colors flex items-center justify-center gap-1 cursor-pointer",
                                 categoryFilter === 'system'
                                     ? "bg-slate-700 dark:bg-slate-600 text-white shadow-2xs font-semibold"
-                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-[#1f1730]"
                             )}
                             aria-label="System messages & tool outputs"
                         >
@@ -417,7 +417,7 @@ export function TreePanel(props: TreePanelProps) {
                                 "px-2.5 py-0.5 text-[10px] font-medium rounded-l-md transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1",
                                 activeFilter === 'running'
                                     ? "bg-emerald-600 text-white shadow-2xs font-semibold"
-                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-[#1f1730]"
                             )}
                             aria-label="Active running prompts"
                         >
@@ -431,7 +431,7 @@ export function TreePanel(props: TreePanelProps) {
                                 "px-2.5 py-0.5 text-[10px] font-medium rounded-none transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1",
                                 activeFilter === 'queued'
                                     ? "bg-amber-600 text-white shadow-2xs font-semibold"
-                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-[#1f1730]"
                             )}
                             aria-label="Queued prompts"
                         >
@@ -445,7 +445,7 @@ export function TreePanel(props: TreePanelProps) {
                                 "px-2 py-0.5 text-[10px] font-medium transition-colors whitespace-nowrap cursor-pointer flex items-center gap-0.5",
                                 activeFilter === 'pinned'
                                     ? "bg-blue-600 text-white shadow-2xs font-semibold"
-                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-[#1f1730]"
                             )}
                             aria-label="Pinned prompts"
                         >
@@ -459,7 +459,7 @@ export function TreePanel(props: TreePanelProps) {
                                 "px-2 py-0.5 text-[10px] font-medium rounded-r-md transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1",
                                 effectiveImageFilter
                                     ? "bg-sky-600 text-white shadow-2xs font-semibold"
-                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-[#1f1730]"
                             )}
                             aria-label="Filter prompts with attached images"
                             title={effectiveImageFilter ? "Showing only conversations with images (Click to clear)" : "Filter projects and prompts with images"}
@@ -477,7 +477,7 @@ export function TreePanel(props: TreePanelProps) {
                                 "flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-l-md transition-colors whitespace-nowrap cursor-pointer",
                                 effectiveAutomatedHidden
                                     ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 font-semibold"
-                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-[#1f1730]"
                             )}
                             aria-label="Toggle automated prompts"
                             title={effectiveAutomatedHidden ? "Automated prompts hidden (Click to show)" : "Automated prompts visible (Click to hide)"}
@@ -617,7 +617,7 @@ export function TreePanel(props: TreePanelProps) {
                                     <div className="space-y-0.5 mt-2 pt-2 border-t border-slate-200 dark:border-[#40285e]">
                                         <div
                                             onClick={() => setIsArchivedProjectsExpanded(!isArchivedProjectsExpanded)}
-                                            className="group flex items-center justify-between rounded-md px-2.5 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#171025] cursor-pointer transition-colors"
+                                            className="group flex items-center justify-between rounded-md px-2.5 py-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#1f1730] cursor-pointer transition-colors"
                                             title="Toggle Archived Projects"
                                         >
                                             <div className="flex items-center gap-1.5 min-w-0">

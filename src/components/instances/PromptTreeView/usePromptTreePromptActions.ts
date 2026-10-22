@@ -119,6 +119,7 @@ export interface PromptTreePromptActions {
     setIsVerificationModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     verificationModalConv: AgmConversationNode | null;
     enqueueVerificationRounds: (options: MultiRoundVerificationOptions) => Promise<boolean>;
+    handleRerunConversation: (options?: Partial<HandleRerunConversationOptions>) => Promise<RerunDispatchResult>;
 }
 
 interface UsePromptTreePromptActionsProps {
@@ -981,6 +982,21 @@ ${activePromptText}
         [instanceId, setActionMsg, setError]
     );
 
+    const handleRerunConversationAction = useCallback(
+        async (overrides?: Partial<HandleRerunConversationOptions>): Promise<RerunDispatchResult> => {
+            const conv = selectedConversationRef.current || selectedConversation;
+            const proj = selectedProjectRef.current || selectedProject;
+            return handleRerunConversation({
+                conversation: conv,
+                project: proj,
+                instanceId,
+                activePromptText: editedPromptText.trim() || activePromptTextRef.current || activePromptText,
+                ...overrides,
+            });
+        },
+        [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, instanceId, editedPromptText, activePromptText, activePromptTextRef]
+    );
+
     return {
         handleCopyAllWithRichImages,
         handleCopyWithImagesRich,
@@ -1005,6 +1021,7 @@ ${activePromptText}
         setIsVerificationModalOpen,
         verificationModalConv,
         enqueueVerificationRounds,
+        handleRerunConversation: handleRerunConversationAction,
     };
 }
 
@@ -1108,7 +1125,16 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
     };
     for (let i = 0; i < requested; i += 1) {
         const { message: rawMessage, pickedIndex } = resolveRerunMessage(ctx.messageOption);
-        const richPrompt = buildRerunPrompt(ctx.originalPrompt || '', i + 1, requested);
+        const richPrompt = buildRerunPrompt({
+            prompt: ctx.originalPrompt,
+            originalPrompt: ctx.originalPrompt,
+            customNudgeMessage: rawMessage,
+            round: i + 1,
+            total: requested,
+            convId: ctx.convId,
+            instanceId: ctx.targetInstId,
+            repoPath: ctx.repoPath,
+        });
         const message = richPrompt || rawMessage;
         const { rewrittenPrompt, images } = extractPromptImages(message);
         const rerunMedia: string[] = Array.from(new Set([
@@ -1170,8 +1196,98 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
                 message: errorObj.message,
             });
         }
+
+        // Add an async pause between iterations if rerunCount > 1,
+        // preventing the second iteration from immediately cancelling the first via send_prompt_now's preemption logic.
+        if (i < requested - 1) {
+            await new Promise((r) => setTimeout(r, 800));
+        }
     }
     return result;
+}
+
+export interface HandleRerunConversationOptions {
+    conversation?: AgmConversationNode | null;
+    project?: { repo_path?: string; instance_id?: string } | null;
+    instanceId?: string;
+    repoPath?: string;
+    count?: number;
+    messageOption?: RerunMessageOption;
+    originalPrompt?: string;
+    activePromptText?: string;
+    mediaPaths?: string[];
+    source?: string;
+    targetConvId?: string;
+}
+
+/**
+ * High-level orchestration for rerun conversation:
+ * - Resolves originalPrompt from active turns / prompt history rather than leaving it undefined.
+ * - Enforces 3-tier fallback for targetRepoPath (selected project repo_path -> conversation repo_path -> default workspace).
+ * - Dispatches through dispatchRerunMessages.
+ */
+export async function handleRerunConversation(
+    options: HandleRerunConversationOptions
+): Promise<RerunDispatchResult> {
+    const conv = options.conversation;
+    const proj = options.project;
+
+    // Tiered resolution of originalPrompt from active turns / prompt history
+    let originalPrompt = options.originalPrompt?.trim() || options.activePromptText?.trim() || '';
+    if (!originalPrompt && conv) {
+        if (conv.selected_turn_number != null && conv.prompts && conv.prompts.length > 0) {
+            const matchedTurn = conv.prompts.find((p) => p.turn_number === conv.selected_turn_number);
+            if (matchedTurn?.prompt_text?.trim()) {
+                originalPrompt = matchedTurn.prompt_text.trim();
+            }
+        }
+        if (!originalPrompt && conv.prompts && conv.prompts.length > 0) {
+            const runningTurn = conv.prompts.find((p) => Boolean(p.is_running) && Boolean(p.prompt_text?.trim()));
+            if (runningTurn?.prompt_text?.trim()) {
+                originalPrompt = runningTurn.prompt_text.trim();
+            } else {
+                const lastTurnWithText = [...conv.prompts].reverse().find((p) => Boolean(p.prompt_text?.trim()));
+                if (lastTurnWithText?.prompt_text?.trim()) {
+                    originalPrompt = lastTurnWithText.prompt_text.trim();
+                }
+            }
+        }
+        if (!originalPrompt) {
+            originalPrompt = (conv.full_prompt_text || conv.prompt_preview_200w || '').trim();
+        }
+    }
+
+    // 3-tier fallback for targetRepoPath: selected project repo_path -> conversation repo_path -> default workspace
+    const targetRepoPath =
+        proj?.repo_path?.trim() ||
+        options.repoPath?.trim() ||
+        (conv as { repo_path?: string })?.repo_path?.trim() ||
+        '.';
+
+    const targetInstId =
+        options.instanceId ||
+        conv?.instance_id ||
+        proj?.instance_id ||
+        'default';
+
+    const convMedia: string[] = Array.from(new Set([
+        ...(options.mediaPaths || []),
+        ...(conv?.media_paths || []),
+        ...(conv?.media_thumbnails || []),
+        ...(conv?.prompts?.flatMap((p) => p.media_paths || []) || []),
+        ...(conv?.sub_runs?.flatMap((s) => s.media_paths || []) || []),
+    ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+
+    return dispatchRerunMessages({
+        targetInstId,
+        repoPath: targetRepoPath,
+        convId: options.targetConvId ?? conv?.conversation_id,
+        count: options.count ?? RERUN_DEFAULT_COUNT,
+        messageOption: options.messageOption ?? 'is-it-done',
+        originalPrompt,
+        source: options.source ?? 'handleRerunConversation',
+        mediaPaths: convMedia,
+    });
 }
 // END RERUN SECTION (Task-04)
 

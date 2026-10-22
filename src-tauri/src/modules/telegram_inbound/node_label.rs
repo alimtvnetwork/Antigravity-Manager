@@ -51,6 +51,7 @@ pub fn is_current_machine(alias: &str) -> bool {
         }
     }
 
+    // Hit the 30-second in-memory cached cluster nodes to prevent sequential CLI spawns
     let cluster_nodes = super::cluster::query_gitmap_cluster_nodes();
     if let Some(matched_cluster) = cluster_nodes.iter().find(|n| {
         target.eq_ignore_ascii_case(&n.alias)

@@ -797,7 +797,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             <div
                 onClick={(e) => e.stopPropagation()}
                 onDoubleClick={(e) => e.stopPropagation()}
-                className={`flex flex-col overflow-hidden bg-white dark:bg-[var(--app-bg,#090611)]/95 backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-slate-200 dark:border-[var(--app-border,#334155)]/60 transition-all relative z-10 ${isFullscreen
+                className={`flex flex-col overflow-hidden bg-white dark:bg-[#0c0817]/95 backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-slate-200 dark:border-purple-900/40 transition-all relative z-10 ${isFullscreen
                     ? "h-full w-full rounded-none border-0"
                     : "h-[90vh] w-full max-w-7xl rounded-2xl"
                     }`}
@@ -893,7 +893,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                         <>
                             <div
                                 style={{ width: `${treeWidth}px` }}
-                                className="shrink-0 flex flex-col border-r border-slate-200 dark:border-[var(--app-border,#334155)] bg-slate-50/50 dark:bg-[var(--app-bg,#090611)]/60 overflow-hidden select-none"
+                                className="shrink-0 flex flex-col border-r border-slate-200 dark:border-[#40285e] bg-slate-50/50 dark:bg-[#090611]/80 overflow-hidden select-none"
                             >
                                 <NowRunningUpNext
                                     items={runningUpNext.items}
@@ -974,7 +974,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                     "w-1.5 hover:w-2 -ml-0.5 cursor-col-resize flex items-center justify-center transition-all group z-30 select-none shrink-0",
                                     isResizingTree
                                         ? "bg-blue-500 w-2 cursor-col-resize"
-                                        : "hover:bg-blue-500/50 bg-slate-200 dark:bg-[var(--app-border,#334155)]/50"
+                                        : "hover:bg-blue-500/50 bg-slate-200 dark:bg-slate-800"
                                 )}
                                 title="Drag to resize tree panel (280px - 760px) · Double-click to reset (450px)"
                             >
@@ -985,11 +985,11 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                             </div>
                         </>
                     ) : (
-                        <div className="w-10 shrink-0 border-r border-slate-200 dark:border-[var(--app-border,#334155)] bg-slate-50/70 dark:bg-[var(--app-bg,#090611)]/70 flex flex-col items-center py-3 gap-3">
+                        <div className="w-10 shrink-0 border-r border-slate-200 dark:border-[#40285e] bg-slate-50/70 dark:bg-[#090611]/80 flex flex-col items-center py-3 gap-3">
                             <button
                                 type="button"
                                 onClick={() => setIsTreeCollapsed(false)}
-                                className="p-1.5 rounded-lg text-slate-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400 hover:bg-slate-200/60 dark:hover:bg-[var(--app-surface-hover,#1e293b)] transition-colors cursor-pointer"
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
                                 title="Expand Tree Panel"
                             >
                                 <PanelLeftOpen className="w-4 h-4" />
@@ -1004,7 +1004,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                     )}
 
                     {/* Right Panel: Prompt Details */}
-                    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[var(--app-surface,#18181b)]">
+                    <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#171025]">
                         <PromptTreeErrorBoundary onReset={() => setSelectedConversation(null)}>
                             {selectedConversation ? (
                                 <div className="flex-1 flex flex-col px-5 py-3.5 overflow-y-auto space-y-1.5">

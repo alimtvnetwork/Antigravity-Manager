@@ -1308,6 +1308,8 @@ async fn handle_turn_image_callback(chat_id: i64, payload: &str) -> (String, Opt
 /// Dispatch the prompt through the existing prompt-injection path and confirm
 /// with a screenshot of the destination machine as proof of delivery.
 async fn dispatch_send_prompt(
+    token: &str,
+    chat_id: i64,
     machine: &str,
     instance: &str,
     conversation: &str,
@@ -1327,7 +1329,40 @@ async fn dispatch_send_prompt(
         format!("{conversation} --instance {instance} --node {machine} {prompt}")
     };
     let injected = execute_prompt_injection(&args).await;
-    let proof = super::open_shot::capture_and_send_proof_shot(&target).await;
+
+    // Immediately send confirmation to user via Telegram
+    let (target_token, target_chat_id) = if !token.trim().is_empty() && chat_id != 0 {
+        (token.trim().to_string(), chat_id)
+    } else {
+        match super::config::load_config() {
+            Ok(cfg) => (
+                cfg.bot_token.trim().to_string(),
+                cfg.allowed_chat_id.unwrap_or(0),
+            ),
+            Err(_) => (String::new(), 0),
+        }
+    };
+    if !target_token.is_empty() && target_chat_id != 0 {
+        // Justification: immediate dispatch confirmation for sub-second user responsiveness
+        crate::error::record_ignored(
+            super::formatting::send_telegram_message(
+                &target_token,
+                target_chat_id,
+                "✅ Prompt dispatched to IDE!",
+            )
+            .await,
+            "send immediate dispatch confirmation",
+        );
+    }
+
+    // Detach screenshot proof capture into an async background task to eliminate 3-12s blocking wait
+    let target_clone = target.clone();
+    tauri::async_runtime::spawn(async move {
+        let proof_res = super::open_shot::capture_and_send_proof_shot(&target_clone).await;
+        tracing::info!("Background proof shot completed: {proof_res}");
+    });
+    let proof = "📸 <i>Delivery proof screenshot is being captured in background...</i>";
+
     let ide_line = ide_exe_line_for(instance).unwrap_or_default();
     let now_utc = Utc::now();
     let utc_str = now_utc.to_rfc3339();
@@ -1383,7 +1418,7 @@ async fn dispatch_send_prompt(
 /// pending for this chat. Returns `None` for commands, empty text, and when
 /// no flow is waiting for typed input — those fall through to normal routing.
 pub async fn consume_send_prompt(
-    _token: &str,
+    token: &str,
     chat_id: i64,
     text: &str,
     saved_media_opt: &Option<(std::path::PathBuf, Option<String>)>,
@@ -1506,7 +1541,17 @@ pub async fn consume_send_prompt(
                 (false, None) => trimmed.to_string(),
                 (true, None) => return None,
             };
-            Some(dispatch_send_prompt(&machine, &instance, &conversation, &prompt_text).await)
+            Some(
+                dispatch_send_prompt(
+                    token,
+                    chat_id,
+                    &machine,
+                    &instance,
+                    &conversation,
+                    &prompt_text,
+                )
+                .await,
+            )
         }
     }
 }
