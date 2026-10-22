@@ -974,18 +974,7 @@ def upgrade_prompt_file(file_path: Path) -> bool:
 
 
 def mirror_to_v4(src_file: Path) -> bool:
-    """Mirror upgraded prompt file to 01-prompts/v4/15-cg-execute/ with exact parity."""
-    if not src_file.exists():
-        return False
-
-    v4_target = V4_PROMPTS_DIR / src_file.name
-    content = src_file.read_text(encoding="utf-8")
-
-    if not v4_target.exists() or v4_target.read_text(encoding="utf-8") != content:
-        v4_target.parent.mkdir(parents=True, exist_ok=True)
-        v4_target.write_text(content, encoding="utf-8", newline="\n")
-        return True
-
+    """No-op: v4 prompts are permanently archived under 06-archive/v4/."""
     return False
 
 
