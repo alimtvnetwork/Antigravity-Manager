@@ -7,6 +7,7 @@ use antigravity_tools_lib::modules::{
     notification_hub, oauth, proxy_db, repo_db, security_db, ssh_manager, supabase_client,
     supabase_schema, supabase_sync, telegram_inbound, training_api, workspace_lease_manager,
 };
+use chrono::Utc;
 use std::fs;
 
 pub(crate) fn email_arm_ls(args: &[String], is_json: bool) {
@@ -145,22 +146,30 @@ pub(crate) fn email_arm_add(args: &[String], is_json: bool) {
             group_name: Some("default".to_string()),
             is_active: Some(true),
         };
-        match email_vault_db::add_notify_recipient(input) {
-            Ok(rec) => {
-                notification_hub::notify_email_config_added(
-                    "Notification Recipient Added (CLI)",
-                    serde_json::json!({
-                        "event": "notify_recipient_added",
-                        "id": rec.id,
-                        "email": rec.email,
-                        "group_name": rec.group_name,
-                        "is_active": rec.is_active,
-                    }),
-                );
-                println!(
-                            "[SUCCESS] Added notification recipient '{}' (ID: {}) and queued JSON self-email.",
-                            rec.email, rec.id
-                        );
+        match email_vault_db::add_notify_recipient_outcome(input) {
+            Ok(outcome) => {
+                let rec = outcome.recipient().clone();
+                if outcome.is_added() {
+                    notification_hub::notify_email_config_added(
+                        "Notification Recipient Added (CLI)",
+                        serde_json::json!({
+                            "event": "notify_recipient_added",
+                            "id": rec.id,
+                            "email": rec.email,
+                            "group_name": rec.group_name,
+                            "is_active": rec.is_active,
+                        }),
+                    );
+                    println!(
+                                "[SUCCESS] Added notification recipient '{}' (ID: {}) and queued JSON self-email.",
+                                rec.email, rec.id
+                            );
+                } else {
+                    println!(
+                        "[INFO] Notification recipient '{}' already existed (ID: {}); not added again.",
+                        rec.email, rec.id
+                    );
+                }
             }
             Err(e) => {
                 eprintln!("[ERROR] Failed to add recipient: {}", e);
@@ -222,6 +231,122 @@ pub(crate) fn email_arm_add(args: &[String], is_json: bool) {
         }
         Err(e) => {
             eprintln!("[ERROR] Failed to add email account: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+/// Mask an email for display: first character of the local part plus domain.
+/// Never prints a full address (plan 88, subtask 003).
+fn mask_email(normalized_email: &str) -> String {
+    let mut parts = normalized_email.splitn(2, '@');
+    let local = parts.next().unwrap_or("");
+    let domain = parts.next().unwrap_or("");
+    let first: String = local.chars().take(1).collect();
+    if domain.is_empty() {
+        format!("{}***", first)
+    } else {
+        format!("{}***@{}", first, domain)
+    }
+}
+
+pub(crate) fn email_arm_dedupe(args: &[String], is_json: bool) {
+    let is_apply = args.iter().any(|a| a == "--apply");
+
+    let groups = match email_vault_db::find_duplicate_recipients() {
+        Ok(g) => g,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to scan duplicate recipients: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    if !is_apply {
+        if is_json {
+            let masked: Vec<serde_json::Value> = groups
+                .iter()
+                .map(|g| {
+                    serde_json::json!({
+                        "masked_email": mask_email(&g.normalized_email),
+                        "row_count": g.row_count,
+                    })
+                })
+                .collect();
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "duplicate_groups": masked,
+                    "group_count": groups.len(),
+                    "applied": false,
+                }))
+                .unwrap_or_default()
+            );
+            return;
+        }
+        if groups.is_empty() {
+            println!("[OK] No duplicate notification recipients found.");
+            return;
+        }
+        println!(
+            "Duplicate notification recipient groups ({}):",
+            groups.len()
+        );
+        for g in &groups {
+            println!("  {} — {} rows", mask_email(&g.normalized_email), g.row_count);
+        }
+        println!("Dry run only. Re-run with --apply to merge (a timestamped DB backup is taken first).");
+        return;
+    }
+
+    if groups.is_empty() {
+        println!("[OK] No duplicate notification recipients found; nothing to merge.");
+        return;
+    }
+
+    // Validate before deleting: take the timestamped DB backup first and
+    // abort if the copy fails.
+    let db_path = match email_vault_db::get_email_vault_db_path() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[ERROR] Failed to resolve email vault DB path: {}", e);
+            std::process::exit(1);
+        }
+    };
+    let stamp = Utc::now().format("%Y%m%d-%H%M%S");
+    let backup_name = format!("email_vault.db.bak-{}", stamp);
+    let backup_path = db_path.with_file_name(&backup_name);
+    if let Err(e) = fs::copy(&db_path, &backup_path) {
+        eprintln!(
+            "[ERROR] Failed to back up email vault DB before dedupe: {}. Aborting; nothing was changed.",
+            e
+        );
+        std::process::exit(1);
+    }
+
+    match email_vault_db::merge_duplicate_recipients() {
+        Ok(deleted) => {
+            if is_json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&serde_json::json!({
+                        "duplicate_groups": groups.len(),
+                        "rows_deleted": deleted,
+                        "backup_file": backup_name,
+                        "applied": true,
+                    }))
+                    .unwrap_or_default()
+                );
+            } else {
+                println!(
+                    "[SUCCESS] Merged {} duplicate group(s), deleted {} row(s). DB backup saved as '{}' next to the email vault DB.",
+                    groups.len(),
+                    deleted,
+                    backup_name
+                );
+            }
+        }
+        Err(e) => {
+            eprintln!("[ERROR] Failed to merge duplicate recipients: {}", e);
             std::process::exit(1);
         }
     }
@@ -445,8 +570,12 @@ pub(crate) fn email_arm_import(args: &[String], is_json: bool) {
 
     match email_io::import_from_json_with_password(&payload, password_opt.as_deref()) {
         Ok(sum) => println!(
-            "[SUCCESS] Imported {} account(s) and {} recipient(s) from '{}'.",
-            sum.accounts_imported, sum.recipients_imported, source_label
+            "[SUCCESS] Imported {} account(s) and {} recipient(s) from '{}' ({} recipient duplicate(s) skipped, {} failed).",
+            sum.accounts_imported,
+            sum.recipients_imported,
+            source_label,
+            sum.recipients_skipped_duplicates,
+            sum.recipients_failed
         ),
         Err(e) => {
             eprintln!("[ERROR] Failed to import email config: {}", e);

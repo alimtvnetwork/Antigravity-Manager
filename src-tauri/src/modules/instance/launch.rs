@@ -336,8 +336,8 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
             wait_for_instance_prompt_channel(instance_id);
             // Justification: background restore; prompts are re-restored on the next launch
             crate::error::record_ignored(
-                crate::modules::backup_prompts_db::restore_running_prompts(
-                    Some(instance_id),
+                crate::modules::backup_prompts_db::restore_running_prompts_scoped_with_fallback(
+                    instance_id,
                     false,
                     None,
                 ),

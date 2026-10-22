@@ -12,11 +12,18 @@
 //! does NOT add a parallel backup/restore pipeline, so backed-up prompts keep
 //! their `running -> backed_up -> dispatched` status transitions, keep
 //! bypassing the dispatch cache, and are never re-injected twice.
+//!
+//! RC-7: a scheduled task is also persisted to `post_switch_resume_state.json`
+//! in the app data dir (the same atomic-write mechanism as the instance
+//! registry), so an app restart cannot lose it: [`rearm_persisted_resumes`]
+//! re-arms any persisted task whose restore has not completed yet.
 
 use chrono::Utc;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::async_runtime::JoinHandle;
@@ -67,6 +74,109 @@ struct InternalResumeTask {
 /// instance; scheduling a new one aborts the previous one.
 static POST_SWITCH_RESUME_TASKS: Lazy<Mutex<HashMap<String, InternalResumeTask>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
+
+// ---------------------------------------------------------------------------
+// Persistence (RC-7): scheduled resumes survive an app restart.
+//
+// The state lives in a module-owned JSON file inside the app data dir and is
+// written with the same atomic-write mechanism as the instance registry
+// (`crate::utils::fs::write_atomic`). The in-memory timer above stays the
+// runtime source of truth; the file is only the restart-recovery record.
+// ---------------------------------------------------------------------------
+
+/// File name (inside the app data dir) holding scheduled post-switch resumes.
+const PERSISTED_RESUME_STATE_FILE: &str = "post_switch_resume_state.json";
+
+/// One scheduled resume as persisted to disk: everything needed to re-arm
+/// the timer after a restart (target instance, backed-up count, deadline).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PersistedResumeTask {
+    instance_id: String,
+    backed_up_count: usize,
+    scheduled_at_ms: u64,
+    fire_at_ms: u64,
+}
+
+/// On-disk shape of [`PERSISTED_RESUME_STATE_FILE`].
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct PersistedResumeState {
+    #[serde(default)]
+    tasks: Vec<PersistedResumeTask>,
+}
+
+fn persisted_resume_state_path() -> Result<PathBuf, String> {
+    Ok(crate::modules::account::get_data_dir()?.join(PERSISTED_RESUME_STATE_FILE))
+}
+
+/// Load the persisted resume state. A missing file is an empty state; a
+/// corrupt file is logged and treated as empty so a bad state file can never
+/// block the in-memory scheduler.
+fn load_persisted_resume_state() -> PersistedResumeState {
+    let path = match persisted_resume_state_path() {
+        Ok(path) => path,
+        Err(err) => {
+            crate::modules::logger::log_warn(&format!(
+                "[PostSwitchResume] Cannot resolve persisted resume state path: {err}"
+            ));
+            return PersistedResumeState::default();
+        }
+    };
+    if !path.exists() {
+        return PersistedResumeState::default();
+    }
+    let parsed = fs::read_to_string(&path)
+        .map_err(|e| e.to_string())
+        .and_then(|content| serde_json::from_str(&content).map_err(|e| e.to_string()));
+    match parsed {
+        Ok(state) => state,
+        Err(err) => {
+            crate::modules::logger::log_warn(&format!(
+                "[PostSwitchResume] Failed to read persisted resume state at {path:?}: {err}; treating as empty"
+            ));
+            PersistedResumeState::default()
+        }
+    }
+}
+
+fn save_persisted_resume_state(state: &PersistedResumeState) -> Result<(), String> {
+    let path = persisted_resume_state_path()?;
+    let json = serde_json::to_string_pretty(state)
+        .map_err(|e| format!("Failed to serialize post-switch resume state: {}", e))?;
+    crate::utils::fs::write_atomic(&path, json.as_bytes())
+        .map_err(|e| format!("Failed to write post-switch resume state: {}", e))
+}
+
+/// Persist (or replace) the persisted record for `entry`'s instance.
+fn persist_resume_task(entry: &ScheduledResumeEntry) {
+    let mut state = load_persisted_resume_state();
+    state.tasks.retain(|t| t.instance_id != entry.instance_id);
+    state.tasks.push(PersistedResumeTask {
+        instance_id: entry.instance_id.clone(),
+        backed_up_count: entry.prompt_count,
+        scheduled_at_ms: entry.scheduled_at_ms,
+        fire_at_ms: entry.fire_at_ms,
+    });
+    // Justification: persistence is best-effort restart insurance; the in-memory timer still fires this run even if the state file cannot be written
+    crate::error::record_ignored(
+        save_persisted_resume_state(&state),
+        "persist post-switch resume task",
+    );
+}
+
+/// Drop the persisted record for `instance_id`, if any.
+fn clear_persisted_resume_task(instance_id: &str) {
+    let mut state = load_persisted_resume_state();
+    let count_before = state.tasks.len();
+    state.tasks.retain(|t| t.instance_id != instance_id);
+    if state.tasks.len() == count_before {
+        return;
+    }
+    // Justification: best-effort cleanup; a stale record is re-validated against live backed-up prompts on re-arm and dropped when the restore already completed
+    crate::error::record_ignored(
+        save_persisted_resume_state(&state),
+        "clear persisted post-switch resume task",
+    );
+}
 
 /// Collect previews of prompts currently waiting to be restored for `instance_id`
 pub fn collect_pending_prompt_previews(instance_id: &str) -> Vec<PendingPromptPreview> {
@@ -216,12 +326,24 @@ pub fn schedule_post_switch_resume(instance_id: String) {
         );
     }
 
-    let timer_instance_id = instance_id.clone();
+    persist_resume_task(&entry);
+    arm_resume_timer(entry);
+}
+
+/// Spawn the resume timer for `entry` and register it, aborting any displaced
+/// task for the same instance. Lock scope is sync-only: no .await while the
+/// guard is held. Aborting a displaced handle covers the tiny race between
+/// cancel and insert.
+fn arm_resume_timer(entry: ScheduledResumeEntry) {
+    let delay = entry.total_delay_seconds;
+    let timer_instance_id = entry.instance_id.clone();
     let handle = tauri::async_runtime::spawn(async move {
         tokio::time::sleep(Duration::from_secs(delay)).await;
         let restored = run_resume_with_retry(&timer_instance_id).await;
         // Remove our own registry entry; a cancel that lost the race finds nothing.
         remove_timer_entry(&timer_instance_id);
+        // The resume ran to completion; its persisted record must not re-arm it.
+        clear_persisted_resume_task(&timer_instance_id);
         emit_prompts_restored(&timer_instance_id, restored);
         audit_resume_lifecycle(
             "fired",
@@ -229,13 +351,13 @@ pub fn schedule_post_switch_resume(instance_id: String) {
             &format!("resume fired; {restored} prompt(s) restored"),
         );
     });
-
-    // Lock scope is sync-only: no .await while the guard is held. Aborting a
-    // displaced handle covers the tiny race between cancel and insert.
     let mut timers = POST_SWITCH_RESUME_TASKS
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if let Some(displaced) = timers.insert(instance_id, InternalResumeTask { handle, entry }) {
+    if let Some(displaced) = timers.insert(
+        entry.instance_id.clone(),
+        InternalResumeTask { handle, entry },
+    ) {
         displaced.handle.abort();
     }
 }
@@ -250,6 +372,9 @@ pub fn cancel_post_switch_resume(instance_id: &str, reason: &str) -> bool {
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         timers.remove(instance_id)
     };
+    // A cancel also drops the persisted record, so an app restart cannot
+    // resurrect a resume that was already cancelled or superseded.
+    clear_persisted_resume_task(instance_id);
     if let Some(task) = removed {
         task.handle.abort();
         crate::modules::logger::log_info(&format!(
@@ -274,6 +399,78 @@ pub fn cancel_post_switch_resume(instance_id: &str, reason: &str) -> bool {
 /// Public alias for user-driven cancellations
 pub fn cancel_scheduled_resume(instance_id: &str) -> bool {
     cancel_post_switch_resume(instance_id, "User requested cancellation")
+}
+
+/// Re-arm persisted post-switch resumes after an app restart (RC-7). Call
+/// once during app startup. A persisted task is re-armed only when its
+/// restore has not completed — i.e. backed-up prompts for the instance still
+/// exist; otherwise the stale record is cleared. A deadline that passed
+/// while the app was closed fires immediately.
+pub fn rearm_persisted_resumes() {
+    for task in load_persisted_resume_state().tasks {
+        rearm_persisted_task(&task);
+    }
+}
+
+fn rearm_persisted_task(task: &PersistedResumeTask) {
+    let instance_id = task.instance_id.as_str();
+    let is_already_armed = get_instance_pending_resume(instance_id).is_some();
+    if is_already_armed {
+        return;
+    }
+    let previews = collect_pending_prompt_previews(instance_id);
+    if previews.is_empty() {
+        crate::modules::logger::log_info(&format!(
+            "[PostSwitchResume] Persisted resume for '{instance_id}' has no backed-up prompts left; restore already completed, clearing record"
+        ));
+        clear_persisted_resume_task(instance_id);
+        return;
+    }
+    let now_ms = Utc::now().timestamp_millis() as u64;
+    let entry = build_rearm_entry(task, previews, now_ms);
+    crate::modules::logger::log_info(&format!(
+        "[PostSwitchResume] Re-arming persisted resume for instance '{instance_id}' after restart ({}s remaining, {} prompt(s), {} backed up at schedule time)",
+        entry.total_delay_seconds, entry.prompt_count, task.backed_up_count
+    ));
+    audit_resume_lifecycle(
+        "rearmed",
+        instance_id,
+        &format!(
+            "resume re-armed after restart ({}s remaining)",
+            entry.total_delay_seconds
+        ),
+    );
+    if let Some(app_handle) = crate::modules::log_bridge::get_app_handle() {
+        crate::error::record_ignored(
+            app_handle.emit("prompts://resume-scheduled", &entry),
+            "emit prompts://resume-scheduled",
+        );
+    }
+    arm_resume_timer(entry);
+}
+
+/// Build the registry entry for a re-armed persisted task. The original
+/// deadline is kept; the delay is the remaining time until it (0 when the
+/// deadline passed while the app was closed, so the resume fires at once).
+fn build_rearm_entry(
+    task: &PersistedResumeTask,
+    previews: Vec<PendingPromptPreview>,
+    now_ms: u64,
+) -> ScheduledResumeEntry {
+    let remaining_seconds = if task.fire_at_ms > now_ms {
+        ((task.fire_at_ms - now_ms) + 999) / 1000
+    } else {
+        0
+    };
+    ScheduledResumeEntry {
+        instance_id: task.instance_id.clone(),
+        scheduled_at_ms: task.scheduled_at_ms,
+        fire_at_ms: task.fire_at_ms,
+        remaining_seconds: remaining_seconds as i64,
+        total_delay_seconds: remaining_seconds,
+        prompt_count: previews.len(),
+        prompts: previews,
+    }
 }
 
 /// Immediately force-dispatch pending prompts for an instance without waiting for timer expiry

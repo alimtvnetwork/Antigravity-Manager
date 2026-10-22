@@ -34,6 +34,9 @@ import {
     exportConversationAsSqlite,
     extractConversationPromptsList,
     dispatchRerunMessages,
+    loadPersistedRerunCount,
+    loadPersistedRerunMessageOption,
+    RERUN_MESSAGE_OPTIONS,
 } from './usePromptTreePromptActions';
 import { enqueuePrompt } from '../../../services/instanceService';
 import { cn } from '../../../utils/cn';
@@ -447,6 +450,12 @@ export function ConversationContextMenu({
         }
     };
 
+    // Rerun uses the same persisted option + count as the DetailHeader rerun
+    // picker (default: randomized nudge) instead of a hardcoded nudge.
+    const persistedRerunOption = loadPersistedRerunMessageOption();
+    const persistedRerunOptionLabel =
+        RERUN_MESSAGE_OPTIONS.find((opt) => opt.value === persistedRerunOption)?.label ?? persistedRerunOption;
+
     const handleDoRerun = async (e: React.MouseEvent) => {
         e.stopPropagation();
         if (isRerunning) return;
@@ -456,7 +465,7 @@ export function ConversationContextMenu({
             return;
         }
         if (onRerunConversation) {
-            onRerunConversation(conversationId, 'is-it-done');
+            onRerunConversation(conversationId, loadPersistedRerunMessageOption());
             onClose();
             return;
         }
@@ -469,8 +478,8 @@ export function ConversationContextMenu({
                 targetInstId: instanceId || 'default',
                 repoPath: repoPath || '',
                 convId: conversationId,
-                count: 1,
-                messageOption: 'is-it-done',
+                count: loadPersistedRerunCount(),
+                messageOption: loadPersistedRerunMessageOption(),
                 originalPrompt,
                 source: 'ConversationContextMenu.handleDoRerun',
             });
@@ -817,11 +826,11 @@ export function ConversationContextMenu({
                 disabled={isRerunning}
                 className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-sky-500/10 hover:text-sky-600 dark:hover:text-sky-400 cursor-pointer disabled:opacity-50"
                 onClick={handleDoRerun}
-                title="Dispatch a fast rerun nudge (is-it-done) to this conversation"
+                title={`Dispatch a fast rerun nudge (${persistedRerunOptionLabel}) to this conversation`}
             >
                 <div className="flex items-center gap-2.5">
                     <Repeat className={cn("w-3.5 h-3.5 text-sky-500 shrink-0", isRerunning && "animate-spin")} />
-                    <span className="font-medium">{isRerunning ? 'Rerunning…' : 'Rerun Nudge (Is It Done?)'}</span>
+                    <span className="font-medium">{isRerunning ? 'Rerunning…' : `Rerun Nudge (${persistedRerunOptionLabel})`}</span>
                 </div>
                 <span className="text-[9px] font-mono text-sky-400 font-bold">Rerun</span>
             </button>

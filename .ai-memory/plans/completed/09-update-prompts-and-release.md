@@ -17,3 +17,6 @@ pm run sync to ensure health scores, version maps, and the README are correctly 
 ## Subtasks
 - 01-update-prompts.md: Run the prompt updater script.
 - 02-release.md: Run the release ceremony.
+
+---
+Closure (2026-10-23, subtask 190-05): SUPERSEDED per research 01 audit of task 190; its scope is covered by later prompt/release work. Filed to completed.

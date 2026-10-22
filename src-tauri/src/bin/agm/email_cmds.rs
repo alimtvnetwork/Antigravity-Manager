@@ -94,8 +94,18 @@ pub(crate) fn cmd_broadcast_email(args: &[String]) {
                         .or(Some("broadcast".to_string())),
                     is_active: Some(true),
                 };
-                match email_vault_db::add_notify_recipient(input) {
-                    Ok(r) => println!("[SUCCESS] Added recipient '{}' ({})", r.email, r.id),
+                match email_vault_db::add_notify_recipient_outcome(input) {
+                    Ok(outcome) if outcome.is_added() => {
+                        let r = outcome.recipient();
+                        println!("[SUCCESS] Added recipient '{}' ({})", r.email, r.id)
+                    }
+                    Ok(outcome) => {
+                        let r = outcome.recipient();
+                        println!(
+                            "[INFO] Recipient '{}' already existed ({}); not added again.",
+                            r.email, r.id
+                        )
+                    }
                     Err(e) => eprintln!("[ERROR] Failed to add recipient: {}", e),
                 }
                 return;

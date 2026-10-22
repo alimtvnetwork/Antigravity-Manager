@@ -23,6 +23,7 @@ import {
     exportConversationAsJson,
     exportConversationAsYaml,
     exportConversationAsSqlite,
+    loadPersistedRerunMessageOption,
 } from './usePromptTreePromptActions';
 import { copyPromptWithRichImages } from './clipboard';
 import { stripImagesFromPrompt } from './formatters';
@@ -433,7 +434,7 @@ export function PromptTreeContextMenu(props: PromptTreeContextMenuProps) {
                         <button
                             type="button"
                             onClick={() => {
-                                onRerunConversation(conversationId, 'is-it-done');
+                                onRerunConversation(conversationId, loadPersistedRerunMessageOption());
                                 onClose();
                             }}
                             className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left hover:bg-slate-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer text-xs"

@@ -223,9 +223,16 @@ export function useAccountHandlers(s: EmailNotificationsState) {
                 group_name: newRecipientGroup.trim() || 'default',
                 is_active: true,
             });
-            setRecipients([...recipients, added]);
+            // The backend skips duplicates by normalized email and returns the
+            // existing row unchanged; do not append a second copy locally.
+            const isExisting = recipients.some((r) => r.id === added.id);
+            if (isExisting) {
+                showToast('Recipient already existed', 'success');
+            } else {
+                setRecipients([...recipients, added]);
+                showToast('Recipient added', 'success');
+            }
             setNewRecipientEmail('');
-            showToast('Recipient added', 'success');
         } catch (e: any) {
             showToast('Failed to add recipient: ' + (e?.message || e), 'error');
         }

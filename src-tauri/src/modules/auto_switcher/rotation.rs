@@ -433,19 +433,25 @@ pub async fn execute_profile_rotation_with_context(
     });
 
     // Step 3: Post-switch prompt verification and status notification
-    // Note: switch_account_to_instance already synchronously restores and dispatches backed-up prompts.
+    // RC-3: report the real restored count — backed-up prompts re-attributed
+    // to the target that have already left `backed_up` status — instead of
+    // passing backed_up_count as both the backed-up and restored numbers.
+    // The deferred post-switch restore may still be pending at this point,
+    // in which case the honest restored count is 0.
     let target_inst_id_clone = inst_id.clone();
     let proj_names_clone = proj_names.clone();
     let backed_up_count_val = backed_up_count;
+    let still_backed_up = crate::modules::repo_db::count_backed_up_prompts(&target_inst_id_clone);
+    let restored_count_val = backed_up_count_val.saturating_sub(still_backed_up);
     let verified_running = crate::modules::repo_db::verify_prompts_running();
     logger::log_info(&format!(
-        "[AutoSwitcher] Post-switch prompt verification: {} backed-up, {} verified active running for instance '{}'",
-        backed_up_count_val, verified_running, target_inst_id_clone
+        "[AutoSwitcher] Post-switch prompt verification: {} backed-up, {} restored, {} verified active running for instance '{}'",
+        backed_up_count_val, restored_count_val, verified_running, target_inst_id_clone
     ));
     crate::modules::notification_hub::notify_post_switch_prompt_status(
         &target_inst_id_clone,
         backed_up_count_val,
-        backed_up_count_val,
+        restored_count_val,
         verified_running,
         proj_names_clone,
     );

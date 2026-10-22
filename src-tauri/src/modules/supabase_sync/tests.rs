@@ -9,6 +9,65 @@ pub(crate) mod tests {
     use super::*;
 
     #[test]
+    pub(crate) fn test_merge_endpoints_shape_applies_sync_flag_and_ignores_alias() {
+        // Plan 88, subtask 004: plain config shape with `endpoints`.
+        let mut cfg = SupabaseConfig::default();
+        let alias_before = cfg.node_alias.clone();
+        let val = json!({
+            "endpoints": [{
+                "id": "ep-a", "name": "A", "url": "https://a.supabase.co",
+                "api_key": "key-a", "role": "root", "is_enabled": true,
+                "prune_threshold_mb": 400, "priority": 1, "notes": null, "tags": []
+            }],
+            "is_sync_enabled": false,
+            "node_alias": "Should-Be-Ignored"
+        });
+        let out = merge_supabase_json_into_config(&mut cfg, val, "vault.json");
+        assert_eq!(out.endpoints_added, 1);
+        assert_eq!(out.sync_flag, Some(false));
+        assert_eq!(cfg.endpoints.len(), 1);
+        // node_alias from the file must have no effect.
+        assert_eq!(cfg.node_alias, alias_before);
+        finalize_imported_config(&mut cfg, out.sync_flag);
+        assert!(!cfg.is_sync_enabled);
+    }
+
+    #[test]
+    pub(crate) fn test_merge_credentials_shape() {
+        // Plan 88, subtask 004: credentials object shape.
+        let mut cfg = SupabaseConfig::default();
+        let val = json!({
+            "credentials": {
+                "endpoint": "https://b.supabase.co",
+                "api_key": "key-b",
+                "service": "root-db",
+                "is_sync_enabled": true
+            }
+        });
+        let out = merge_supabase_json_into_config(&mut cfg, val, "creds.json");
+        assert_eq!(out.credentials_added, 1);
+        assert_eq!(out.endpoints_added, 0);
+        assert_eq!(out.sync_flag, Some(true));
+        assert_eq!(cfg.endpoints.len(), 1);
+        assert_eq!(cfg.endpoints[0].role, "root");
+    }
+
+    #[test]
+    pub(crate) fn test_merge_bare_array_shape() {
+        // Plan 88, subtask 004: bare endpoints array shape.
+        let mut cfg = SupabaseConfig::default();
+        let val = json!([{
+            "id": "ep-c", "name": "C", "url": "https://c.supabase.co",
+            "api_key": "key-c", "role": "secondary", "is_enabled": true,
+            "prune_threshold_mb": 200, "priority": 2, "notes": null, "tags": []
+        }]);
+        let out = merge_supabase_json_into_config(&mut cfg, val, "arr.json");
+        assert_eq!(out.endpoints_added, 1);
+        assert_eq!(out.sync_flag, None);
+        assert_eq!(cfg.endpoints.len(), 1);
+    }
+
+    #[test]
     pub(crate) fn test_default_supabase_config() {
         let def = SupabaseConfig::default();
         assert!(!def.is_sync_enabled);

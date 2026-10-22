@@ -16,3 +16,6 @@ Remediate Code Red enum, boolean, and query wrapper violations across the codeba
 5. Ensure all `try-catch` blocks log errors according to `02-spec/03-error-manage` guidelines.
 6. Verify CI/CD builds and tests pass.
 7. Update `.ai-memory/memory/` with these new wrapper, error management, and enum rules.
+
+---
+Closure (2026-10-23, subtask 190-05): DONE-IN-CODE per research 01 audit of task 190; remediation verified present in the codebase. Filed to completed.

@@ -109,4 +109,5 @@ scratch/*.dump
 .antigravity_*.json
 *.db
 AGM_INSTANCE_STATUS.md
+.ai-memory/temp/recent-file-changes.json
 

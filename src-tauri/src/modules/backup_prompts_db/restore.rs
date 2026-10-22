@@ -14,6 +14,21 @@ pub fn restore_running_prompts(
     restore_running_prompts_for_instance(instance_id, keep_backup, custom_file)
 }
 
+/// Real counts produced by a restore pass (RC-3). `restored` counts backup
+/// records actually re-injected into `active_prompts`; `dispatched` counts
+/// prompts the dispatch pass actually sent; `skipped_live` counts records
+/// preserved because their live row is already `running`/`completed` (RC-6);
+/// `failed` counts re-injection failures plus a failed dispatch pass, with
+/// `last_error` carrying the most recent failure message.
+#[derive(Debug, Clone, Default)]
+pub struct RestoreOutcome {
+    pub restored: usize,
+    pub dispatched: usize,
+    pub failed: usize,
+    pub skipped_live: usize,
+    pub last_error: Option<String>,
+}
+
 /// Restore running prompts: re-inserts them into repo_db and updates restoration flags.
 ///
 /// Scoping contract:
@@ -30,6 +45,19 @@ pub fn restore_running_prompts_for_instance(
     keep_backup: bool,
     custom_file: Option<&str>,
 ) -> Result<Vec<PromptBackupRecord>, String> {
+    let (records, _outcome) =
+        restore_running_prompts_for_instance_with_outcome(instance_id, keep_backup, custom_file)?;
+    Ok(records)
+}
+
+/// Same restore as `restore_running_prompts_for_instance`, additionally
+/// returning the real [`RestoreOutcome`] counts instead of swallowing the
+/// re-injection and dispatch results (RC-3).
+pub fn restore_running_prompts_for_instance_with_outcome(
+    instance_id: Option<&str>,
+    keep_backup: bool,
+    custom_file: Option<&str>,
+) -> Result<(Vec<PromptBackupRecord>, RestoreOutcome), String> {
     // Regression guard: restore must never run on the resend path.
     // `resend_queued_prompts_for_instance` runs its own single dispatch pass;
     // a nested restore would dispatch every prompt a second time.
@@ -43,6 +71,7 @@ pub fn restore_running_prompts_for_instance(
     let unscoped = instance_id.is_none();
     let conn = connect_backup_db(custom_file)?;
     let now = Utc::now().timestamp();
+    let mut outcome = RestoreOutcome::default();
 
     // Query unrestored prompts: unscoped restores every instance (FIFO); otherwise
     // scoped strictly to the target instance.
@@ -103,6 +132,9 @@ pub fn restore_running_prompts_for_instance(
     // Re-inject into repo_db active_prompts table if records exist in backup DB.
     // Queued prompts stay queued. Anything that was running is marked backed_up so
     // dispatch sends that prompt again and leaves the queue untouched.
+    // RC-6: probe live statuses first — a row already `running`/`completed`
+    // must never be overwritten by the INSERT OR REPLACE in save_or_requeue_prompt.
+    let live_conn = repo_db::connect_db().ok();
     for rec in &records {
         let eff_inst = rec.instance_id.as_deref().unwrap_or(target_inst);
         let restored_status = prompt_status_after_restore(&rec.status);
@@ -131,11 +163,31 @@ pub fn restore_running_prompts_for_instance(
             updated_at: now,
             image_payload: rec.images_payload.clone(),
         };
-        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-        crate::error::record_ignored(
-            repo_db::save_or_requeue_prompt(&active_p),
-            "save_or_requeue_prompt",
-        );
+        let live_status = live_conn
+            .as_ref()
+            .and_then(|c| live_prompt_status(c, &rec.prompt_id));
+        let has_live_final_status = is_live_status_preserved(live_status.as_deref());
+        if has_live_final_status {
+            outcome.skipped_live += 1;
+            crate::modules::logger::log_info(&format!(
+                "[BackupDB] Restore preserving live prompt {} on {} (live status: {})",
+                rec.prompt_id,
+                eff_inst,
+                live_status.as_deref().unwrap_or("unknown")
+            ));
+            continue;
+        }
+        match repo_db::save_or_requeue_prompt(&active_p) {
+            Ok(()) => outcome.restored += 1,
+            Err(e) => {
+                outcome.failed += 1;
+                crate::modules::logger::log_error(&format!(
+                    "[BackupDB] Restore failed to re-inject prompt {} on {}: {}",
+                    rec.prompt_id, eff_inst, e
+                ));
+                outcome.last_error = Some(e);
+            }
+        }
     }
 
     if !keep_backup && !records.is_empty() {
@@ -161,14 +213,22 @@ pub fn restore_running_prompts_for_instance(
     // Automatically trigger resend and execute restored prompts via CLI.
     // Unscoped restores fan out across every instance the backups belong to;
     // scoped restores stay on the target instance.
-    // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-    crate::error::record_ignored(
-        repo_db::resend_running_commands_for_instance(
-            if unscoped { None } else { Some(target_inst) },
-            20,
-        ),
-        "resend_running_commands_for_instance",
-    );
+    // RC-3: the dispatch pass is no longer swallowed — the real sent count and
+    // any failure are returned to the caller as outcome data, not silence.
+    match repo_db::resend_running_commands_for_instance(
+        if unscoped { None } else { Some(target_inst) },
+        20,
+    ) {
+        Ok(sent) => outcome.dispatched = sent.len(),
+        Err(e) => {
+            outcome.failed += 1;
+            crate::modules::logger::log_error(&format!(
+                "[BackupDB] Restore dispatch pass failed for instance '{}': {}",
+                target_inst, e
+            ));
+            outcome.last_error = Some(e);
+        }
+    }
     // Re-arm prompt-goal heartbeats for every instance that received restored prompts.
     {
         use std::collections::HashSet;
@@ -187,7 +247,7 @@ pub fn restore_running_prompts_for_instance(
         }
     }
 
-    Ok(records)
+    Ok((records, outcome))
 }
 
 /// Queued stays queued. A running, dispatched, or already backed-up prompt is
@@ -198,6 +258,83 @@ pub(crate) fn prompt_status_after_restore(saved: &str) -> &'static str {
     } else {
         "backed_up"
     }
+}
+
+/// RC-6 dedup probe: current live `active_prompts` status for a prompt id,
+/// when a live row already exists.
+fn live_prompt_status(conn: &Connection, prompt_id: &str) -> Option<String> {
+    conn.query_row(
+        "SELECT status FROM active_prompts WHERE id = ?1",
+        params![prompt_id],
+        |row| row.get::<_, String>(0),
+    )
+    .ok()
+}
+
+/// RC-6: a live row that is already `running` or `completed` must never be
+/// overwritten by a backup re-injection (`save_or_requeue_prompt` upserts
+/// with INSERT OR REPLACE). Mirrors the live-status dedup in
+/// `resend_queued_prompts_for_instance`.
+fn is_live_status_preserved(status: Option<&str>) -> bool {
+    matches!(status, Some("running") | Some("completed"))
+}
+
+/// Count unrestored backup records recorded under instance ids other than
+/// `instance_id` — records a strictly scoped restore for `instance_id`
+/// cannot see (RC-2 fallback probe).
+pub fn count_unrestored_prompts_for_other_instances(
+    instance_id: &str,
+    custom_file: Option<&str>,
+) -> Result<usize, String> {
+    let conn = connect_backup_db(custom_file)?;
+    let is_target_default = instance_id == "default" || instance_id == "__default__";
+    let count: i64 = if is_target_default {
+        conn.query_row(
+            "SELECT COUNT(*) FROM prompt_backups
+             WHERE is_restored = 0
+               AND instance_id IS NOT NULL
+               AND instance_id NOT IN ('', 'default', '__default__')",
+            [],
+            |row| row.get(0),
+        )
+    } else {
+        conn.query_row(
+            "SELECT COUNT(*) FROM prompt_backups
+             WHERE is_restored = 0
+               AND (instance_id IS NULL OR instance_id != ?1)",
+            params![instance_id],
+            |row| row.get(0),
+        )
+    }
+    .map_err(|e| format!("Failed to count unrestored prompts for other instances: {}", e))?;
+    Ok(count as usize)
+}
+
+/// Scoped restore with the RC-2 fallback: when the strictly scoped pass
+/// restores nothing but unrestored records exist under other instance ids,
+/// retry with unscoped semantics so backups recorded under a previous
+/// instance are not orphaned by a launch/switch into a new one.
+pub fn restore_running_prompts_scoped_with_fallback(
+    instance_id: &str,
+    keep_backup: bool,
+    custom_file: Option<&str>,
+) -> Result<Vec<PromptBackupRecord>, String> {
+    let records =
+        restore_running_prompts_for_instance(Some(instance_id), keep_backup, custom_file)?;
+    let has_restored = !records.is_empty();
+    if has_restored {
+        return Ok(records);
+    }
+    let other_count = count_unrestored_prompts_for_other_instances(instance_id, custom_file)?;
+    let has_orphaned = other_count > 0;
+    if !has_orphaned {
+        return Ok(records);
+    }
+    crate::modules::logger::log_info(&format!(
+        "[BackupDB] Scoped restore for instance '{}' found nothing; {} unrestored record(s) exist under other instances — falling back to unscoped restore",
+        instance_id, other_count
+    ));
+    restore_running_prompts_for_instance(None, keep_backup, custom_file)
 }
 
 /// Query storage information of the split database

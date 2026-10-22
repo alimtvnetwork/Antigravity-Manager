@@ -21,3 +21,6 @@ Audit and eliminate multi-clause compound conditional expressions, mixed polarit
 - `cd src-tauri && cargo clippy --all-targets --all-features` (exit 0)
 - `cargo test --lib modules::repo_db` (exit 0)
 - `npm run build` (exit 0)
+
+---
+Closure (2026-10-23, subtask 190-05): DONE-IN-CODE per research 01 audit of task 190; boolean/complex-condition remediation verified in the codebase. Filed to completed.

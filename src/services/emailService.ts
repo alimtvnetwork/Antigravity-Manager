@@ -67,6 +67,8 @@ export interface EmailNotificationSettings {
 export interface ImportSummary {
     accounts_imported: number;
     recipients_imported: number;
+    recipients_skipped_duplicates?: number;
+    recipients_failed?: number;
     settings_updated: boolean;
     errors: string[];
 }

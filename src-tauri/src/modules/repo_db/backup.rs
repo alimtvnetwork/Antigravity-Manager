@@ -434,23 +434,25 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
     let recent_dispatched_cutoff = now - 120;
 
     // Transition in-flight and active prompts in active_prompts to 'backed_up' before switch (scoped to target instance).
-    // Only recently dispatched prompts (within 120s) are treated as in-flight so old finished rows are not resurrected.
+    // RC-1: 'dispatched' rows transition at ANY age. A row still in
+    // 'dispatched' was never marked 'completed', so the old 120s recency
+    // window silently dropped long-running prompts from every restore query.
     let transitioned = if instance_id == "all" {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE (status IN ('running', 'in_flight') OR (status = 'dispatched' AND updated_at >= ?2))",
-            params![now, recent_dispatched_cutoff],
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched')",
+            params![now],
         )
         .unwrap_or(0)
     } else if is_all_or_default {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE (status IN ('running', 'in_flight') OR (status = 'dispatched' AND updated_at >= ?2)) AND instance_id IN ('default', '__default__')",
-            params![now, recent_dispatched_cutoff],
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched') AND instance_id IN ('default', '__default__')",
+            params![now],
         )
         .unwrap_or(0)
     } else {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE (status IN ('running', 'in_flight') OR (status = 'dispatched' AND updated_at >= ?2)) AND instance_id = ?3",
-            params![now, recent_dispatched_cutoff, instance_id],
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched') AND instance_id = ?2",
+            params![now, instance_id],
         )
         .unwrap_or(0)
     };
@@ -464,7 +466,7 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                     || p.instance_id == instance_id;
                 let is_inflight_status = p.status == "running"
                     || p.status == "in_flight"
-                    || (p.status == "dispatched" && p.updated_at >= recent_dispatched_cutoff);
+                    || p.status == "dispatched";
                 if is_inflight_status && matches_inst {
                     p.status = "backed_up".to_string();
                     p.updated_at = now;
@@ -805,6 +807,98 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
 
     invalidate_prompt_tree_cache(Some(instance_id));
     Ok(backed_up_count)
+}
+
+/// FIFO-ordered ids of incomplete prompts for an instance scope: rows in
+/// 'running' / 'in_flight' / 'dispatched' (never 'completed', any age).
+/// 'default' and '__default__' share one scope; 'all' is unscoped.
+fn select_incomplete_prompt_ids(
+    conn: &Connection,
+    instance_id: &str,
+) -> Result<Vec<String>, String> {
+    let is_default_scope = instance_id == "default" || instance_id == "__default__";
+    let is_unscoped = instance_id == "all" || is_default_scope;
+    let sql = if instance_id == "all" {
+        "SELECT id FROM active_prompts
+         WHERE status IN ('running', 'in_flight', 'dispatched')
+         ORDER BY created_at ASC, id ASC"
+    } else if is_default_scope {
+        "SELECT id FROM active_prompts
+         WHERE status IN ('running', 'in_flight', 'dispatched')
+           AND instance_id IN ('default', '__default__')
+         ORDER BY created_at ASC, id ASC"
+    } else {
+        "SELECT id FROM active_prompts
+         WHERE status IN ('running', 'in_flight', 'dispatched') AND instance_id = ?1
+         ORDER BY created_at ASC, id ASC"
+    };
+    let mut stmt = conn
+        .prepare(sql)
+        .map_err(|e| format!("Failed to prepare incomplete-prompt sweep query: {}", e))?;
+    let map_id = |row: &rusqlite::Row| row.get::<_, String>(0);
+    let ids: Vec<String> = if is_unscoped {
+        stmt.query_map([], map_id)
+            .map_err(|e| format!("Failed to query incomplete prompts: {}", e))?
+            .flatten()
+            .collect()
+    } else {
+        stmt.query_map(params![instance_id], map_id)
+            .map_err(|e| format!("Failed to query incomplete prompts: {}", e))?
+            .flatten()
+            .collect()
+    };
+    Ok(ids)
+}
+
+/// Mirror swept prompt ids into the in-memory prompt map as 'backed_up'
+/// so live views agree with the database after a sweep.
+fn mark_swept_prompts_in_memory(ids: &[String], now: i64) {
+    if let Ok(mut map) = get_memory_prompts_map().lock() {
+        let id_set: HashSet<&str> = ids.iter().map(|id| id.as_str()).collect();
+        for p in map.values_mut() {
+            if id_set.contains(p.id.as_str()) {
+                p.status = "backed_up".to_string();
+                p.updated_at = now;
+            }
+        }
+    }
+}
+
+/// Incomplete-prompt sweep (RC-1): transition every prompt for
+/// `instance_id` that never reached 'completed' — status 'running',
+/// 'in_flight', or 'dispatched', at ANY age — to 'backed_up', claiming
+/// rows in FIFO order (created_at ASC, id ASC). Prompts dispatched more
+/// than 120s before a switch used to fall out of every restore query;
+/// this sweep makes them visible to restore. Returns the swept count.
+pub fn sweep_incomplete_prompts_for_instance(instance_id: &str) -> Result<usize, String> {
+    let conn = connect_db()?;
+    let now = Utc::now().timestamp();
+    let ids = select_incomplete_prompt_ids(&conn, instance_id)?;
+    let mut swept_ids: Vec<String> = Vec::new();
+    for id in &ids {
+        // The status guard keeps a row that completed after selection
+        // from being clobbered back to 'backed_up'.
+        let changed = conn
+            .execute(
+                "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1
+                 WHERE id = ?2 AND status IN ('running', 'in_flight', 'dispatched')",
+                params![now, id],
+            )
+            .map_err(|e| format!("Failed to sweep incomplete prompt '{}': {}", id, e))?;
+        if changed > 0 {
+            swept_ids.push(id.clone());
+        }
+    }
+    let swept = swept_ids.len();
+    if swept > 0 {
+        mark_swept_prompts_in_memory(&swept_ids, now);
+        crate::modules::logger::log_info(&format!(
+            "[RepoDB] Swept {} incomplete prompt(s) to 'backed_up' for instance '{}'",
+            swept, instance_id
+        ));
+        invalidate_prompt_tree_cache(Some(instance_id));
+    }
+    Ok(swept)
 }
 
 /// Verified count of active prompts or running processes across workspaces

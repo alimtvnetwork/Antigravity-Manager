@@ -155,6 +155,33 @@ export function PollingSettings(props: AutoSwitcherApi) {
                                 </div>
                             </div>
 
+                            {/* PID Refresh Interval (full process-table rebuild) */}
+                            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 space-y-2">
+                                <div className="flex justify-between items-center text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                    <span>{t('settings.auto_switcher.pid_refresh_label', 'PID Refresh Interval (seconds)')}</span>
+                                    <span className="text-blue-600 dark:text-blue-400 font-mono font-bold">
+                                        {Math.round((currentConfig.pid_refresh_seconds || 600) / 60)} min ({currentConfig.pid_refresh_seconds || 600}s)
+                                    </span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="180"
+                                    max="1200"
+                                    step="60"
+                                    value={currentConfig.pid_refresh_seconds || 600}
+                                    onChange={(e) => onChange({ ...currentConfig, pid_refresh_seconds: Number(e.target.value) })}
+                                    className="w-full accent-blue-600 cursor-pointer"
+                                />
+                                <div className="flex justify-between text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                                    <span>180s (3m)</span>
+                                    <span>600s (10m Default)</span>
+                                    <span>1200s (20m)</span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed pt-0.5">
+                                    How often the full process table is rebuilt to track instance PIDs. Lower values detect IDE starts/stops sooner at a small CPU cost.
+                                </p>
+                            </div>
+
                             {/* Critical Polling Interval (<= 12% Credits) */}
                             <div className="p-3.5 rounded-xl bg-rose-50/60 dark:bg-rose-950/30 border border-rose-200/60 dark:border-rose-900/40 space-y-2">
                                 <div className="flex justify-between items-center text-xs font-semibold text-rose-800 dark:text-rose-300">

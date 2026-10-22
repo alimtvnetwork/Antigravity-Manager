@@ -14,3 +14,6 @@ Implement deep copy for instance cloning (IDE settings, themes, read folders, br
 6. `06-account-row-selection-highlight.md` — Dark blackish background with yellow/gold distinguished text in `AccountTable.tsx`.
 7. `07-email-section-display-enhancement.md` — Rich connection badges and status telemetry in `src/pages/Email.tsx`.
 8. `08-verification-and-release.md` — Pre-flight checks (`cargo fmt`, `cargo clippy`, `npm run build`), minor version bump, changelog sync with `@aukgit`, commit, and CI/CD verification.
+
+---
+Closure (2026-10-23, subtask 190-05): DONE-IN-CODE per research 01 audit of task 190; implementation verified present in the codebase. Filed to completed.

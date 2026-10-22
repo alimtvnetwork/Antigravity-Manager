@@ -24,12 +24,12 @@ Follow-up (same turn): "At end release both and make sure cicd is green"
 
 | ID | Subtask | Repo | Status |
 |---|---|---|---|
-| 01 | Incomplete-prompt sweep + backup durability (RC-1, RC-5) | AGM | PENDING |
-| 02 | Re-attribution parity + honest restore outcomes (RC-2, RC-3, RC-6) | AGM | PENDING |
-| 03 | Queue advancement + persisted resume + single backup DB (RC-4, RC-7, RC-8) | AGM | PENDING |
-| 04 | Rerun auto-pick (randomized default, persisted, larger set) | AGM | PENDING |
-| 05 | AGM pending-plan closeout (91 workflows, 88 push-settings, 139 UI, drain done plans, 105/86/04 triage) | AGM | PENDING |
-| 06 | gitmap pending drain + CG residue sweeps | gitmap-v28 | PENDING |
+| 01 | Incomplete-prompt sweep + backup durability (RC-1, RC-5) | AGM | DONE 2026-10-23 (worker; sweep fn + 120s removal + cap exemption) |
+| 02 | Re-attribution parity + honest restore outcomes (RC-2, RC-3, RC-6) | AGM | DONE 2026-10-23 (worker; RestoreOutcome; lead wired Stage-5 outcome logging in workspace.rs) |
+| 03 | Queue advancement + persisted resume + single backup DB (RC-4, RC-7, RC-8) | AGM | DONE 2026-10-23 (worker; lead wired rearm_persisted_resumes at startup in setup_app.rs + instance.rs re-export) |
+| 04 | Rerun auto-pick (randomized default, persisted, larger set) | AGM | DONE 2026-10-23 (worker: set 5→14, count 2→4, localStorage persistence; lead extended parity to PromptTreeContextMenu.tsx + PromptTreeViewModal.tsx) |
+| 05 | AGM pending-plan closeout (91 workflows, 88 push-settings, 139 UI, drain done plans, 105/86/04 triage) | AGM | RUNNING |
+| 06 | gitmap pending drain + CG residue sweeps | gitmap-v28 | RUNNING |
 | 07 | gitmap CG execute zero-to-end (prompts 24,12,13,14,18,22,29,25, efficiency, surfaces, meta) | gitmap-v28 | PENDING |
 | 08 | Build + E2E both repos + release both + CI green | both | BLOCKED on 01-07 |
 

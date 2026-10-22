@@ -16,14 +16,17 @@ env:
 jobs:
   verify-release-target:
     name: Verify Branch & Release Type Compatibility
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
     outputs:
       release_tag: ${{ steps.gate.outputs.release_tag }}
       is_prerelease: ${{ steps.gate.outputs.is_prerelease }}
       release_type: ${{ steps.gate.outputs.release_type }}
     steps:
       - name: Checkout repository with full history
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -93,6 +96,22 @@ jobs:
           echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
           echo "release_type=$RELEASE_TYPE" >> "$GITHUB_OUTPUT"
 
+      # Plan 91 step 03: a release is impossible on a commit whose CI is not green.
+      # A cancelled or missing CI run for github.sha fails the gate.
+      - name: Release gate - CI must be green for this commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          CONCLUSION=$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?head_sha=${{ github.sha }}&status=completed&per_page=1" --jq '.workflow_runs[0].conclusion // "missing"')
+          echo "Latest completed CI run for ${{ github.sha }} concluded: $CONCLUSION"
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "::error::❌ [Release Gate Intercept] CI for commit ${{ github.sha }} concluded '$CONCLUSION', not 'success'. Release refused."
+            exit 1
+          fi
+          echo "✅ CI gate passed: CI is green for ${{ github.sha }}."
+
       - name: Rust setup (rustfmt only)
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -131,7 +150,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Optimize Windows Runner I/O
         if: startsWith(matrix.platform, 'windows')
@@ -169,7 +188,7 @@ jobs:
           cache-targets: "true"
 
       - name: Node.js setup
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: "npm"
@@ -331,14 +350,14 @@ jobs:
 
   publish-release:
     needs: [verify-release-target, build-tauri]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: always() && !cancelled() && needs.verify-release-target.result == 'success' && needs.build-tauri.result != 'cancelled'
     permissions:
       contents: write
       actions: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # 下载所有构建产物 (仅限 release 相关的 assets 和 updater)
       - name: Download all artifacts
@@ -625,11 +644,11 @@ jobs:
 
   docker-build-amd64:
     needs: verify-release-target
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.event_name != 'pull_request' && vars.ENABLE_DOCKER_PUSH == 'true'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -659,7 +678,7 @@ jobs:
     if: github.event_name != 'pull_request' && vars.ENABLE_DOCKER_PUSH == 'true'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -685,7 +704,7 @@ jobs:
 
   docker-manifest:
     needs: [verify-release-target, docker-build-amd64, docker-build-arm64]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.event_name != 'pull_request' && vars.ENABLE_DOCKER_PUSH == 'true'
     steps:
       - name: Login to Docker Hub

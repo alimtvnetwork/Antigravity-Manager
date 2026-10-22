@@ -12,7 +12,7 @@ import type { PromptTreeViewModalProps } from './types';
 import { usePromptTreeState } from './usePromptTreeState';
 import { usePromptTreeData, invalidatePromptTreeCache } from './usePromptTreeData';
 import { usePromptTreeCoreActions } from './usePromptTreeCoreActions';
-import { usePromptTreePromptActions, dispatchRerunMessages, type RerunMessageOption } from './usePromptTreePromptActions';
+import { usePromptTreePromptActions, dispatchRerunMessages, loadPersistedRerunCount, loadPersistedRerunMessageOption, type RerunMessageOption } from './usePromptTreePromptActions';
 import { isGhostConversation, isStaleOrEmptyConversation, getConversationStatus } from './conversationGuards';
 import { classifyPromptTier } from './tierClassification';
 import { ModalHeader } from './ModalHeader';
@@ -351,12 +351,12 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
     const handleRerunConversation = (convoId: string, nudgeType: string) => {
         const targetInstId = selectedProject?.instance_id || instanceId || 'default';
         const targetRepoPath = selectedProject?.repo_path || '';
-        const msgOption: RerunMessageOption = nudgeType === 'is-it-published' ? 'is-it-published' : 'is-it-done';
+        const msgOption: RerunMessageOption = nudgeType === 'is-it-published' ? 'is-it-published' : loadPersistedRerunMessageOption();
         void dispatchRerunMessages({
             targetInstId,
             repoPath: targetRepoPath,
             convId: convoId,
-            count: 1,
+            count: loadPersistedRerunCount(),
             messageOption: msgOption,
             source: 'PromptTreeViewModal.onRerunConversation',
         });

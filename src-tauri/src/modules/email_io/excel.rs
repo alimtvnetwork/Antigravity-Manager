@@ -155,6 +155,8 @@ pub fn import_from_excel(payload: &str) -> Result<ImportSummary, String> {
     let mut summary = ImportSummary {
         accounts_imported: 0,
         recipients_imported: 0,
+        recipients_skipped_duplicates: 0,
+        recipients_failed: 0,
         settings_updated: false,
         errors: Vec::new(),
     };
@@ -242,9 +244,8 @@ pub fn import_from_excel(payload: &str) -> Result<ImportSummary, String> {
                         is_active: Some(is_act),
                     };
 
-                    if let Ok(_) = email_vault_db::add_notify_recipient(input) {
-                        summary.recipients_imported += 1;
-                    }
+                    let outcome = email_vault_db::add_notify_recipient_outcome(input);
+                    summary.record_recipient_outcome(&outcome);
                 }
             } else {
                 break;

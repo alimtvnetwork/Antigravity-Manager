@@ -42,3 +42,6 @@
 
 ### Wave 5: Preflight Checks, Minor Bump & Release
 - [ ] Subtask 106-17: Rust fmt & clippy, frontend build, minor bump (`npm run bump minor`), changelogs (@aukgit attribution), and release (Task-17).
+
+---
+Closure (2026-10-23, subtask 190-05): DONE-IN-CODE per research 01 audit of task 190; implementation verified present in the codebase. Filed to completed.

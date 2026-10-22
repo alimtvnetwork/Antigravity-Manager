@@ -19,10 +19,50 @@ pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, St
     resend_running_commands_for_instance(None, limit)
 }
 
+/// Maximum dispatch passes per resend call. A pass dispatches at most one
+/// prompt per repo (FIFO preserved inside the pass); prompts preserved in
+/// place for their workspace get another pass while progress is being made,
+/// so a restored queue drains within one call instead of waiting for the
+/// agy-exit drain alone (RC-4).
+const MAX_RESEND_PASSES: usize = 10;
+
 /// Resend and restore previous running/backed-up/queued commands scoped to an optional `instance_id`.
 /// Strictly filters to unrestored/backed-up/queued prompts, prioritizes the latest running prompts,
 /// and deduplicates against already dispatched prompts and workspace repositories.
+/// Runs bounded passes (see [`MAX_RESEND_PASSES`]) while each pass dispatches
+/// at least one prompt, until `limit` prompts have been resent in total.
 pub fn resend_running_commands_for_instance(
+    instance_id: Option<&str>,
+    limit: usize,
+) -> Result<Vec<ActivePrompt>, String> {
+    let mut resent_all = Vec::new();
+    for pass_index in 0..MAX_RESEND_PASSES {
+        let remaining = limit.saturating_sub(resent_all.len());
+        if pass_index > 0 && remaining == 0 {
+            break;
+        }
+        if pass_index > 0 {
+            crate::modules::logger::log_info(&format!(
+                "[RepoDB] Resend pass {} for instance '{}': {} prompt(s) dispatched so far, continuing queue drain",
+                pass_index + 1,
+                instance_id.unwrap_or("all"),
+                resent_all.len()
+            ));
+        }
+        let pass_resent = resend_single_pass(instance_id, remaining)?;
+        let is_progress = !pass_resent.is_empty();
+        resent_all.extend(pass_resent);
+        if !is_progress {
+            break;
+        }
+    }
+    Ok(resent_all)
+}
+
+/// Single dispatch pass over the resend candidates: at most one prompt per
+/// repo_path is dispatched; later prompts for the same repo are preserved in
+/// place as `queued` for a subsequent pass or the agy-exit drain.
+fn resend_single_pass(
     instance_id: Option<&str>,
     limit: usize,
 ) -> Result<Vec<ActivePrompt>, String> {

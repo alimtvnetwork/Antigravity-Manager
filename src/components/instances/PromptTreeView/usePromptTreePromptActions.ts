@@ -1089,11 +1089,20 @@ export const RERUN_MESSAGE_OPTIONS: ReadonlyArray<{ value: RerunMessageOption; l
     },
 ];
 
-/** Small built-in set of follow-up nudges used by the "randomized" option. */
+/** Built-in set of follow-up nudges used by the "randomized" option. */
 export const RERUN_RANDOM_MESSAGE_SET: ReadonlyArray<string> = [
     'Quick status check â€” is it done yet?',
     'Please continue where you left off and confirm when finished.',
     'Give me a brief progress update.',
+    'Checking in: how is it going? Any blockers?',
+    'Status update please: what is done and what is left?',
+    'Are we there yet? Let me know the current state.',
+    'Please keep working and report back when complete.',
+    'Quick check-in: is everything on track?',
+    'Have you finished? If not, please continue.',
+    'How is progress? Share a short summary of where things stand.',
+    'Still working on it? Wrap up and confirm once it is done.',
+    'Any update on this? Please confirm when it is published or finished.',
     'Are you finished? Summarize the result.',
     'Keep going â€” ping me when it is published.',
 ];
@@ -1103,9 +1112,76 @@ export const RERUN_FIXED_MESSAGES: Record<Exclude<RerunMessageOption, 'randomize
     'is-it-published': 'Is it published?',
 };
 
-export const RERUN_DEFAULT_COUNT = 2;
+export const RERUN_DEFAULT_COUNT = 4;
 export const RERUN_MIN_COUNT = 1;
 export const RERUN_MAX_COUNT = 5;
+
+/** Rerun option used when no choice has been persisted yet: the randomized nudge. */
+export const RERUN_DEFAULT_MESSAGE_OPTION: RerunMessageOption = 'randomized';
+
+const RERUN_MESSAGE_OPTION_STORAGE_KEY = 'agm_prompt_tree_rerun_message_option';
+const RERUN_COUNT_STORAGE_KEY = 'agm_prompt_tree_rerun_count';
+
+function isRerunMessageOption(value: string | null): value is RerunMessageOption {
+    return value === 'is-it-done' || value === 'is-it-published' || value === 'randomized';
+}
+
+/** Load the persisted rerun message option (defaults to the randomized nudge). */
+export function loadPersistedRerunMessageOption(): RerunMessageOption {
+    try {
+        if (typeof window === 'undefined' || !window.localStorage) {
+            return RERUN_DEFAULT_MESSAGE_OPTION;
+        }
+        const raw = window.localStorage.getItem(RERUN_MESSAGE_OPTION_STORAGE_KEY);
+        return isRerunMessageOption(raw) ? raw : RERUN_DEFAULT_MESSAGE_OPTION;
+    } catch {
+        return RERUN_DEFAULT_MESSAGE_OPTION;
+    }
+}
+
+/** Persist the rerun message option so DetailHeader and the context menu share one choice. */
+export function savePersistedRerunMessageOption(option: RerunMessageOption): void {
+    try {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+        window.localStorage.setItem(RERUN_MESSAGE_OPTION_STORAGE_KEY, option);
+    } catch (err) {
+        // Best-effort persist; localStorage may throw in restricted contexts. Tracked, in-memory choice still applies.
+        useErrorStore.getState().trackWarning(err, {
+            source: 'usePromptTreePromptActions.savePersistedRerunMessageOption',
+            triggerAction: 'persist_rerun_message_option',
+        });
+    }
+}
+
+/** Load the persisted rerun count (defaults to RERUN_DEFAULT_COUNT, clamped to the picker range). */
+export function loadPersistedRerunCount(): number {
+    try {
+        if (typeof window === 'undefined' || !window.localStorage) {
+            return RERUN_DEFAULT_COUNT;
+        }
+        const raw = window.localStorage.getItem(RERUN_COUNT_STORAGE_KEY);
+        const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+        if (!Number.isFinite(parsed)) return RERUN_DEFAULT_COUNT;
+        return Math.min(RERUN_MAX_COUNT, Math.max(RERUN_MIN_COUNT, parsed));
+    } catch {
+        return RERUN_DEFAULT_COUNT;
+    }
+}
+
+/** Persist the rerun count so DetailHeader and the context menu share one choice. */
+export function savePersistedRerunCount(count: number): void {
+    try {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+        const clamped = Math.min(RERUN_MAX_COUNT, Math.max(RERUN_MIN_COUNT, count));
+        window.localStorage.setItem(RERUN_COUNT_STORAGE_KEY, String(clamped));
+    } catch (err) {
+        // Best-effort persist; localStorage may throw in restricted contexts. Tracked, in-memory state still applied.
+        useErrorStore.getState().trackWarning(err, {
+            source: 'usePromptTreePromptActions.savePersistedRerunCount',
+            triggerAction: 'persist_rerun_count',
+        });
+    }
+}
 
 /** Resolve the actual message text for one rerun dispatch. */
 export function resolveRerunMessage(option: RerunMessageOption): { message: string; pickedIndex: number | null } {
@@ -1323,8 +1399,8 @@ export async function handleRerunConversation(
         targetInstId,
         repoPath: targetRepoPath,
         convId: options.targetConvId ?? conv?.conversation_id,
-        count: options.count ?? RERUN_DEFAULT_COUNT,
-        messageOption: options.messageOption ?? 'is-it-done',
+        count: options.count ?? loadPersistedRerunCount(),
+        messageOption: options.messageOption ?? loadPersistedRerunMessageOption(),
         originalPrompt,
         source: options.source ?? 'handleRerunConversation',
         mediaPaths: convMedia,

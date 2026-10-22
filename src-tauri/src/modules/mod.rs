@@ -51,6 +51,7 @@ pub mod ssh_manager;
 pub mod supabase_client;
 pub mod supabase_command_queue;
 pub mod supabase_pruner;
+pub mod supabase_push;
 pub mod supabase_schema;
 pub mod supabase_sync;
 pub mod task_history_db;

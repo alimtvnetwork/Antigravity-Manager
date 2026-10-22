@@ -107,3 +107,6 @@ Author or update an automated end-to-end test script (e.g. in `scripts/test-inst
 - [ ] CI/CD pipeline builds pass completely green on GitHub Actions.
 /goal
 ```
+
+---
+Closure (2026-10-23, subtask 190-05): SUPERSEDED by plan 87 (instance-switch prompt continuity and auto-switch CLI scheduler), per plan 87's own text and research 01 audit of task 190. Filed to completed.

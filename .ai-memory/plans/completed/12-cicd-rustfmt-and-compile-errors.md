@@ -22,3 +22,6 @@ Format match arms in `iterative_codec.rs` with multi-line blocks, update `email_
 
 ## Status
 - [x] resolved
+
+---
+Closure (2026-10-23, subtask 190-05): DONE-IN-CODE per research 01 audit of task 190; CI/rustfmt fixes verified in the codebase and green pipelines. Filed to completed.

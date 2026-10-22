@@ -15,3 +15,10 @@ Task register: `.ai-memory/plans/readme.md` "Recent Completed Tasks Register"
 ## Done when
 
 - All four steps have a commit or a recorded decision, and `.ai-memory/plans/readme.md` moves this file to `completed/`.
+
+## Progress (2026-10-23, subtask 190-05)
+
+- Step 1 DONE: `pid_refresh_seconds` is now exposed in the Settings UI (AutoSwitcher → Polling Settings, "PID Refresh Interval (seconds)" slider, 180–1200s, default 600s, saved through the same config save path as the other auto-switcher controls) and as an AGM CLI flag (`agm auto-switch pid-refresh [N]`, clamped 180..=1200, shown in `agm auto-switch status`), giving GUI/CLI parity through `config::save_app_config`.
+- Step 2 DONE (check recorded): the `agy` CLI does support resuming a conversation — via `--conversation <conversation_id>` (`--resume` is rejected by agy). `spawn_prompt_via_agy` in `src-tauri/src/modules/repo_db/agy.rs` already passes it, deriving the conversation id from `prompt.session_id` (`agy_conversation_id`), and the resume file written by `dispatch_running_prompts` carries `session_id`/`conversation_id` (see spec 100, `02-spec/21-app/100-resume-same-conversation-and-pid-cache.md`). No code change was needed; no flag was invented.
+- Step 3 DEFERRED: the live sandbox account-switch E2E is executed in subtask 190-08's E2E phase (builds/runs are forbidden during the implementation phase of task 190).
+- Step 4 OPEN QUESTION FOR THE USER (not guessed): ambiguity `.ai-memory/ambiguous-questions/01-new-ambiguity/02-is-instance-running-saved-pid-fast-path.md` — should `is_instance_running` trust a matching saved PID without a process scan? Options: A) keep the scan on every call (guards against recycled PIDs, restores CPU cost); B) restore the trust-only fast path (matches the original directive, cheapest, small cross-instance false-positive risk); C) trust the saved PID only if its command line contains this instance's marker, falling back to the scan for the default instance (recommended in the ambiguity file). No code change until the user picks an option.

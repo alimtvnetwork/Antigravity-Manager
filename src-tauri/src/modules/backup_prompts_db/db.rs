@@ -19,24 +19,65 @@ pub fn get_backup_prompts_db_path(custom_file: Option<&str>) -> Result<PathBuf, 
         }
     }
 
-    // Check if local data/backup-prompts exists close to the CLI
-    let local_backup_dir = PathBuf::from("data").join("backup-prompts");
-    if local_backup_dir.exists() {
-        if local_backup_dir.join("SQL.db").exists() {
-            return Ok(local_backup_dir.join("SQL.db"));
-        }
-        return Ok(local_backup_dir.join("backup-prompts.db"));
-    }
-
+    // Single authoritative location (RC-8): the app-data dir, so the GUI and
+    // the CLI always open the same backup database. A legacy CWD-relative
+    // database is migrated/logged by `migrate_legacy_cwd_backup_db`.
     let data_dir = account::get_data_dir()?;
     let backup_dir = data_dir.join("backup-prompts");
     if let Err(e) = fs::create_dir_all(&backup_dir) {
         return Err(format!("Failed to create backup-prompts folder: {}", e));
     }
-    if backup_dir.join("SQL.db").exists() {
-        return Ok(backup_dir.join("SQL.db"));
+    let target = resolve_app_data_backup_db(&backup_dir);
+    migrate_legacy_cwd_backup_db(&target);
+    Ok(target)
+}
+
+/// Resolve the backup DB file inside the app-data backup dir, preferring an
+/// existing `SQL.db` over the default `backup-prompts.db` name.
+fn resolve_app_data_backup_db(backup_dir: &Path) -> PathBuf {
+    let sql_db = backup_dir.join("SQL.db");
+    if sql_db.exists() {
+        return sql_db;
     }
-    Ok(backup_dir.join("backup-prompts.db"))
+    backup_dir.join("backup-prompts.db")
+}
+
+/// Handle a legacy CWD-relative backup DB (`data/backup-prompts/...`) left
+/// by CLI runs started inside a project folder. The app-data DB is the single
+/// store: when it does not exist yet, the legacy file is migrated over; when
+/// it does exist, the legacy file is ignored. Either way the choice is logged
+/// via tracing so GUI/CLI divergence is never silent.
+fn migrate_legacy_cwd_backup_db(target: &Path) {
+    let legacy_dir = PathBuf::from("data").join("backup-prompts");
+    let legacy_path = ["SQL.db", "backup-prompts.db"]
+        .iter()
+        .map(|name| legacy_dir.join(name))
+        .find(|candidate| candidate.exists());
+    let Some(legacy_path) = legacy_path else {
+        return;
+    };
+    let is_target_existing = target.exists();
+    if is_target_existing {
+        tracing::info!(
+            "Legacy CWD-relative backup DB at {:?} ignored; using app-data backup DB at {:?}",
+            legacy_path,
+            target
+        );
+        return;
+    }
+    match fs::copy(&legacy_path, target) {
+        Ok(_) => tracing::info!(
+            "Migrated legacy CWD-relative backup DB from {:?} to app-data backup DB at {:?}",
+            legacy_path,
+            target
+        ),
+        Err(e) => tracing::warn!(
+            "Failed to migrate legacy CWD-relative backup DB {:?} to {:?}: {}; starting with a fresh app-data backup DB",
+            legacy_path,
+            target,
+            e
+        ),
+    }
 }
 
 /// Convenience alias for connecting to the default backup prompts database

@@ -212,6 +212,10 @@ pub(crate) fn setup_app(
     modules::auto_switcher::start_auto_switcher();
     info!("Auto profile switcher daemon initialized.");
 
+    // Re-arm any post-switch prompt resume persisted before an app restart (RC-7)
+    modules::instance::rearm_persisted_resumes();
+    info!("Persisted post-switch resume re-arm check completed.");
+
     // Start periodic conversation cleanup daemon (1-hour ticker)
     modules::agy_cleaner::start_cleanup_daemon();
     info!("Conversation cleanup daemon initialized.");

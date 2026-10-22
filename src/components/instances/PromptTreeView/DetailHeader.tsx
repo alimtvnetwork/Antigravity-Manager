@@ -6,7 +6,7 @@ import { formatRelativeRecency } from './formatters';
 import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { CopyFormat, type AgmConversationNode } from './types';
-import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_DEFAULT_COUNT, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
+import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
 import { isGhostConversation } from './conversationGuards';
 import { persistClientCrash } from '../../../lib/error-listener';
 import { useErrorStore } from '../../../stores/error-store';
@@ -241,8 +241,19 @@ export function DetailHeader(props: DetailHeaderProps) {
     }, [isMenuOpen, confirmationSuffix]);
 
     // RERUN SECTION (Task-04): state + dispatch handler for the rerun capsule.
-    const [rerunCount, setRerunCount] = useState<number>(RERUN_DEFAULT_COUNT);
-    const [rerunMessageOption, setRerunMessageOption] = useState<RerunMessageOption>('is-it-done');
+    // Option + count initialize from the persisted choice (default: randomized
+    // nudge) so the auto-picked selection survives remounts instead of
+    // resetting on every mount.
+    const [rerunCount, setRerunCount] = useState<number>(() => loadPersistedRerunCount());
+    const [rerunMessageOption, setRerunMessageOption] = useState<RerunMessageOption>(() => loadPersistedRerunMessageOption());
+
+    // Persist rerun picker choices; the conversation context menu reads the
+    // same persisted values for its rerun action.
+    useEffect(() => {
+        savePersistedRerunMessageOption(rerunMessageOption);
+        savePersistedRerunCount(rerunCount);
+    }, [rerunMessageOption, rerunCount]);
+
     const [isRerunning, setIsRerunning] = useState(false);
     const [rerunFlash, setRerunFlash] = useState<string | null>(null);
 

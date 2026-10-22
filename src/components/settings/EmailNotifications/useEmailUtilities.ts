@@ -120,8 +120,10 @@ export function useEmailUtilities(s: EmailNotificationsState) {
 
             try {
                 const summary = await importEmailData(importFormat, importPayload);
+                const skipped = summary.recipients_skipped_duplicates || 0;
                 showToast(
-                    `Imported ${summary.accounts_imported} mailboxes, ${summary.recipients_imported} recipients`,
+                    `Imported ${summary.accounts_imported} mailboxes, ${summary.recipients_imported} recipients` +
+                        (skipped > 0 ? ` (${skipped} already existed)` : ''),
                     'success'
                 );
                 setIsImportModalOpen(false);

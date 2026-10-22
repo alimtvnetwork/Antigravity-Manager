@@ -196,6 +196,22 @@ pub async fn switch_account_to_instance(
         }
     }
 
+    // RC-2 parity with the auto-rotation path: also re-attribute durable
+    // prompt_backups rows (unrestored only) so the target-scoped restore finds
+    // backups recorded under the source instance.
+    if source_instance_id != instance.id {
+        if let Ok(conn) = crate::modules::backup_prompts_db::connect_db() {
+            // Justification: prompt re-attribution to target instance during switch
+            crate::error::record_ignored(
+                conn.execute(
+                    "UPDATE prompt_backups SET instance_id = ?1 WHERE instance_id = ?2 AND is_restored = 0",
+                    rusqlite::params![&instance.id, &source_instance_id],
+                ),
+                "re-attribute prompt backups to target instance",
+            );
+        }
+    }
+
     let workspace_paths = get_instance_workspace_folders(&instance.id, &instance.data_dir);
     crate::modules::logger::log_info(&format!(
         "[INSTANCE_SWITCH:STAGE_1_SNAPSHOT] Backed up {} prompts from active source instance '{}' for target '{}'",
@@ -633,9 +649,14 @@ pub async fn switch_account_to_instance(
         ));
     }
 
+    // RC-3: the Stage-5 restore runs on the deferred post-switch timer, so at
+    // audit time its result does not exist yet. Report the real count at this
+    // point (nothing restored synchronously) instead of claiming every
+    // backed-up prompt was restored; the deferred restore unit reports its
+    // actual restored count via the prompts://restored event and its log line.
     let restore_step = crate::modules::task_history_db::SwitchRestoreStep {
         method: "resume_task_json + sync_agy_prompt_restore".to_string(),
-        restored_count: backed_up_count,
+        restored_count: 0,
         dispatched_count: 0,
         prompt_channel_waited: channel_wait,
         success: true,
@@ -767,7 +788,9 @@ pub async fn switch_account_to_instance(
                         is_auto: false,
                         backed_up_projects: unique_projs,
                         backed_up_prompts_count: Some(backed_up_count),
-                        restored_prompts_count: Some(backed_up_count),
+                        // RC-3: restore is deferred to the post-switch timer and
+                        // has not run yet — do not report backed_up_count as restored.
+                        restored_prompts_count: None,
                     },
                 )
                 .await,

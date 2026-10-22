@@ -18,6 +18,7 @@ export interface AutoProfileSwitcherConfig {
     auto_reopen_on_switch?: boolean; // [NEW] Auto reopen active workspace window on profile rotation
     watchdog_interval_seconds?: number;
     prompt_recency_threshold_seconds?: number;
+    pid_refresh_seconds?: number; // Full process-table rebuild interval (default 600, clamp 180..=1200)
     fast_forward_shortcut?: string;
     stale_binding_timeout_hours?: number;
     account_lockout_window_minutes?: number;

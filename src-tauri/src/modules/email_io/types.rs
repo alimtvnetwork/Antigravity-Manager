@@ -1,6 +1,6 @@
 use crate::modules::email_vault_db::{
-    self, EmailAccount, EmailAccountInput, EmailNotificationSettings, NotifyRecipient,
-    NotifyRecipientInput,
+    self, AddRecipientOutcome, EmailAccount, EmailAccountInput, EmailNotificationSettings,
+    NotifyRecipient, NotifyRecipientInput,
 };
 use serde::{Deserialize, Serialize};
 
@@ -32,6 +32,29 @@ pub struct EmailExportBundle {
 pub struct ImportSummary {
     pub accounts_imported: usize,
     pub recipients_imported: usize,
+    /// Recipients skipped because the normalized email already existed (plan 88).
+    #[serde(default)]
+    pub recipients_skipped_duplicates: usize,
+    /// Recipients that failed to import (plan 88).
+    #[serde(default)]
+    pub recipients_failed: usize,
     pub settings_updated: bool,
     pub errors: Vec<String>,
+}
+
+impl ImportSummary {
+    /// Fold one recipient add outcome into the summary counts (plan 88, subtask 002).
+    pub fn record_recipient_outcome(
+        &mut self,
+        outcome: &Result<AddRecipientOutcome, String>,
+    ) {
+        match outcome {
+            Ok(o) if o.is_added() => self.recipients_imported += 1,
+            Ok(_) => self.recipients_skipped_duplicates += 1,
+            Err(e) => {
+                self.recipients_failed += 1;
+                self.errors.push(format!("Failed to import recipient: {}", e));
+            }
+        }
+    }
 }

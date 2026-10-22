@@ -31,6 +31,7 @@ pub(crate) fn email_arm_help(args: &[String], is_json: bool, sub: &str) {
     println!(
         "                                            Import email config bundle or compact JSON"
     );
+    println!("  agm email dedupe [--apply] [--json]        Report duplicate recipients (dry run); --apply merges them after a DB backup");
     println!();
     println!("Inbound Email Remote Command Subject Syntax:");
     println!("  <VM_NAME_OR_*> | <INSTANCE_SEQ_OR_REPO> | <ACTION>");

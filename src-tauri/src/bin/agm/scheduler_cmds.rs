@@ -29,6 +29,7 @@ pub(crate) fn cmd_auto_switch(args: &[String]) {
         println!("  agm auto-switch run | trigger | eval");
         println!("  agm auto-switch threshold [N]    (Query or set low quota threshold %)");
         println!("  agm auto-switch interval [N]     (Query or set check interval in seconds)");
+        println!("  agm auto-switch pid-refresh [N]  (Query or set PID refresh interval in seconds, 180-1200)");
         println!("  agm auto-switch model [name]     (Query or set target model)");
         println!(
             "  agm auto-switch lockout [N]      (Query or set account lockout window in minutes)"
@@ -150,6 +151,30 @@ pub(crate) fn cmd_auto_switch(args: &[String]) {
                 );
             }
         }
+        Some("pid-refresh") | Some("pid_refresh") => {
+            if let Some(val_str) = non_flag_args.get(1) {
+                if let Ok(val) = val_str.parse::<u32>() {
+                    let clamped = val.clamp(180, 1200);
+                    app_cfg.auto_profile_switcher.pid_refresh_seconds = clamped;
+                    if let Err(e) = config::save_app_config(&app_cfg) {
+                        eprintln!("[ERROR] Failed to save config: {}", e);
+                        std::process::exit(1);
+                    }
+                    println!(
+                        "[SUCCESS] Auto-switch PID refresh interval set to {}s (default: 600s).",
+                        clamped
+                    );
+                } else {
+                    eprintln!("[ERROR] Invalid numeric PID refresh seconds: '{}'", val_str);
+                    std::process::exit(1);
+                }
+            } else {
+                println!(
+                    "Current auto-switch PID refresh interval: {}s",
+                    app_cfg.auto_profile_switcher.pid_refresh_seconds
+                );
+            }
+        }
         Some("model") => {
             if let Some(val_str) = non_flag_args.get(1) {
                 app_cfg.auto_profile_switcher.target_model = val_str.to_string();
@@ -247,6 +272,10 @@ pub(crate) fn cmd_auto_switch(args: &[String]) {
             println!(
                 "  Check Interval:      {}s",
                 app_cfg.auto_profile_switcher.check_interval_seconds
+            );
+            println!(
+                "  PID Refresh:         {}s",
+                app_cfg.auto_profile_switcher.pid_refresh_seconds
             );
             println!(
                 "  Lockout Window:      {}m",

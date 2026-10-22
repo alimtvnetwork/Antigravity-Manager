@@ -138,17 +138,45 @@ pub(crate) fn push_backed_up_prompts_after_channel(instance_id: &str) -> usize {
         "[INSTANCE_SWITCH:STAGE_5_RESTORE] Post-launch delay elapsed for instance '{instance_id}'"
     ));
     crate::modules::instance::wait_for_instance_prompt_channel(instance_id);
+    // RC-1: re-run the incomplete-prompt sweep for the target instance so
+    // prompts that never completed before the switch (any age) are in
+    // 'backed_up' before the restore + dispatch below reads them.
+    if let Err(err) =
+        crate::modules::repo_db::backup::sweep_incomplete_prompts_for_instance(instance_id)
+    {
+        crate::modules::logger::log_error(&format!(
+            "[INSTANCE_SWITCH:STAGE_5_RESTORE] Incomplete-prompt sweep failed for '{instance_id}': {err}"
+        ));
+    }
     let before = crate::modules::repo_db::count_backed_up_prompts(instance_id);
     // Rehydrate the snapshot first. A failed agy push leaves the row backed_up.
-    // Justification: backup rows are the snapshot; a failed read leaves the active_prompts row for dispatch
-    crate::error::record_ignored(
-        crate::modules::backup_prompts_db::restore_running_prompts_for_instance(
-            Some(instance_id),
-            false,
-            None,
-        ),
-        "restore running prompts from backup after relaunch",
-    );
+    // The outcome counts are real (RC-3): a failed restore or dispatch is
+    // logged with its counts here, never presented as success.
+    match crate::modules::backup_prompts_db::restore_running_prompts_for_instance_with_outcome(
+        Some(instance_id),
+        false,
+        None,
+    ) {
+        Ok((_records, outcome)) => {
+            crate::modules::logger::log_info(&format!(
+                "[INSTANCE_SWITCH:STAGE_5_RESTORE] Restore outcome for '{instance_id}': {} restored, {} dispatched, {} failed, {} skipped-live{}",
+                outcome.restored,
+                outcome.dispatched,
+                outcome.failed,
+                outcome.skipped_live,
+                outcome
+                    .last_error
+                    .as_deref()
+                    .map(|e| format!(" (last error: {e})"))
+                    .unwrap_or_default()
+            ));
+        }
+        Err(err) => {
+            crate::modules::logger::log_error(&format!(
+                "[INSTANCE_SWITCH:STAGE_5_RESTORE] Backup restore failed for '{instance_id}': {err}"
+            ));
+        }
+    }
     let dispatched = match crate::modules::repo_db::dispatch_running_prompts(instance_id) {
         Ok(count) => count,
         Err(err) => {
