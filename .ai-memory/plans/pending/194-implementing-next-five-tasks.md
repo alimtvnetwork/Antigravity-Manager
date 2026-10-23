@@ -1,9 +1,10 @@
 # Parent Plan — 194 Implementing Next Five Tasks
 
-Status: IN PROGRESS (TAKEN)
-Phase: 1 (claim committed & spec authored)
+Status: IN_PROGRESS (TAKEN)
+Phase: 1 (claimed & assigned to subagents)
 Owner: Agent-194-Lead
 Specs: `02-spec/21-app/194-implementing-next-five-tasks/spec.md`
+E2E Master Plan: `02-spec/21-app/194-implementing-next-five-tasks/e2e_master_plan.md`
 Subtasks: `.ai-memory/plans/subtasks/194-implementing-next-five-tasks/`
 Backlog Delta: 70 steps -> 65 steps remaining (-5 steps claimed)
 
@@ -11,13 +12,13 @@ Backlog Delta: 70 steps -> 65 steps remaining (-5 steps claimed)
 
 | Task # | Slug | Module Target | Status | Implementation Details |
 |---|---|---|---|---|
-| 01 | `fifo-queue-ordering` | `src-tauri/src/modules/release_gate/fifo_queue_ordering_guard.rs` | `IN PROGRESS (TAKEN)` | Enforce strict FIFO `ORDER BY created_at ASC, id ASC` across SQLite query dispatchers; reject LIFO ordering. |
-| 02 | `capsule-dropdown-styling` | `src-tauri/src/modules/release_gate/capsule_dropdown_styling_guard.rs` | `IN PROGRESS (TAKEN)` | Validate segmented capsule window controls and transparent borderless inline select dropdowns. |
-| 03 | `origin-tier-hierarchy` | `src-tauri/src/modules/release_gate/origin_tier_hierarchy_guard.rs` | `IN PROGRESS (TAKEN)` | Enforce 4 origin tiers (USER_PROMPT, SUBAGENT_INSTRUCTION, SYSTEM_MESSAGE, TOOL_OUTPUT) and branch glyph hierarchy. |
-| 04 | `truncation-callout-parser` | `src-tauri/src/modules/release_gate/truncation_callout_parser_guard.rs` | `IN PROGRESS (TAKEN)` | Transform raw `<truncated N bytes/lines>` markers into structured omission banners with expansion metadata. |
-| 05 | `no-silent-errors-linter` | `src-tauri/src/modules/release_gate/no_silent_errors_linter.rs` | `IN PROGRESS (TAKEN)` | Detect unrouted errors, bare `let _ =`, bare `.ok()`, and bare `catch {}`; enforce `record_ignored` justification comments. |
+| 01 | `fifo-queue-ordering` | `src-tauri/src/modules/release_gate/fifo_queue_ordering_guard.rs` | `IN_PROGRESS` | Enforce `ORDER BY created_at ASC, id ASC` across SQLite dispatch queries, strictly forbidding LIFO. |
+| 02 | `capsule-dropdown-styling` | `src-tauri/src/modules/release_gate/capsule_dropdown_styling_guard.rs` | `IN_PROGRESS` | Enforce contiguous `rounded-full` capsules and borderless inline `<select>` elements. |
+| 03 | `origin-tier-hierarchy` | `src-tauri/src/modules/release_gate/origin_tier_hierarchy_guard.rs` | `IN_PROGRESS` | Enforce 4-tier origin badges (`USER_PROMPT`, `SUBAGENT_INSTRUCTION`, `SYSTEM_MESSAGE`, `TOOL_OUTPUT`) and tree glyphs. |
+| 04 | `truncation-callout-parser` | `src-tauri/src/modules/release_gate/truncation_callout_parser_guard.rs` | `IN_PROGRESS` | Parse `<truncated N bytes>` and render interactive dark-glass omission banners. |
+| 05 | `no-silent-errors-linter` | `src-tauri/src/modules/release_gate/no_silent_errors_linter.rs` | `IN_PROGRESS` | Enforce error propagation, `record_ignored` + `// Justification:` comments, and TypeScript error store routing. |
 
-## 2. Invariants & Rules Upheld
-- **Zero-Build & Zero-Test Invariant**: Strictly preserved; zero compilers invoked.
-- **Repository-Relative Paths**: 100% compliant.
-- **Anti-Collision**: Initial `IN PROGRESS (TAKEN)` commitment registered and synchronized so parallel AI agents do not duplicate.
+## 2. Invariants & Rules
+- **Zero-Build & Zero-Test Invariant**: Strictly DO NOT build code or run tests during this phase.
+- **Repository-Relative Paths**: Exclusively relative paths.
+- **Anti-Collision Commit**: Committed immediately as taken to prevent multi-agent collisions.
