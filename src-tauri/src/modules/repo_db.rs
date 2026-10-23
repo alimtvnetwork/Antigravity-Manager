@@ -81,7 +81,9 @@ pub use backup::{
     resend_queued_prompts_for_instance, verify_prompts_running, ResendQueuedOutcome,
 };
 // ---- dispatch ----
-pub use dispatch::{dispatch_running_prompts, parse_flexible_timestamp};
+pub use dispatch::{
+    dispatch_running_prompts, dispatch_single_latest_prompt, parse_flexible_timestamp,
+};
 // ---- liveness ----
 pub use liveness::is_prompt_running_for_project;
 // ---- queue ----

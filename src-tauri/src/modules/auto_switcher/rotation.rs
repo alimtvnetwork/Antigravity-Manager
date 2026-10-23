@@ -539,17 +539,12 @@ pub async fn execute_profile_rotation_with_context(
         );
     }
 
-    // Auto-resume recent active prompts (<1h) if configured
-    if app_config.auto_profile_switcher.auto_resume_recent_prompts {
-        let threshold = app_config
-            .auto_profile_switcher
-            .prompt_recency_threshold_seconds as i64;
-        // Justification: best-effort call; failure logged without changing control flow
-        crate::error::record_ignored(
-            crate::modules::repo_db::auto_resume_recent_prompts(inst_id, threshold),
-            "auto_resume_recent_prompts",
-        );
-    }
+    // Post-switch prompt resume is intentionally NOT done inline here: the
+    // scheduled STAGE_5_RESTORE unit re-dispatches exactly one prompt (the
+    // most recently active backed-up one) once the prompt channel is up —
+    // see instance::workspace::push_backed_up_prompts_after_channel.
+    // repo_db::auto_resume_recent_prompts remains available on its manual
+    // command path (commands::instance) only.
 
     let now = chrono::Utc::now().timestamp();
     let mut state = RUNTIME_STATE.lock().unwrap();

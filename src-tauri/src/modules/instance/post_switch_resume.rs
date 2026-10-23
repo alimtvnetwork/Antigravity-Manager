@@ -1,7 +1,9 @@
 //! Post-switch prompt resume timer.
 //!
-//! After an auto-switch or account switch, the last running prompts are
-//! resumed on the new account once the IDE's prompt channel is up. The delay
+//! After an auto-switch or account switch, the most recently active
+//! running prompt is resumed on the new account once the IDE's prompt
+//! channel is up (single-prompt resume; every other backed-up prompt
+//! stays backed up). The delay
 //! is configurable (`post_switch_resume_delay_seconds`, default 10s) and the
 //! pending resume is cancellable: scheduling a newer resume for the same
 //! instance supersedes the old one, and user/manual activity can cancel it via

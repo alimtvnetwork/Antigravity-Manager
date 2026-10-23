@@ -190,17 +190,38 @@ pub(crate) fn push_backed_up_prompts_after_channel(instance_id: &str) -> usize {
             ));
         }
     }
-    let dispatched = match crate::modules::repo_db::dispatch_running_prompts(instance_id) {
-        Ok(count) => count,
+    // Single-prompt resume (user decision, 2026-10-24): after a switch or
+    // fast-forward, only the most recently active backed-up prompt is
+    // re-dispatched; every other backed-up prompt stays backed up.
+    // has_auto_resume=false suppresses the dispatch entirely — the restore
+    // bookkeeping above still runs so backups stay consistent.
+    let auto_resume_enabled = match crate::modules::config::load_app_config() {
+        Ok(cfg) => cfg.auto_profile_switcher.has_auto_resume,
         Err(err) => {
-            crate::modules::logger::log_error(&format!(
-                "[INSTANCE_SWITCH:STAGE_5_RESTORE] Dispatch failed for '{instance_id}': {err}"
+            crate::modules::logger::log_warn(&format!(
+                "[INSTANCE_SWITCH:STAGE_5_RESTORE] Could not load app config ({err}); assuming auto-resume enabled"
             ));
-            0
+            true
         }
     };
+    let dispatched = if auto_resume_enabled {
+        match crate::modules::repo_db::dispatch_single_latest_prompt(instance_id) {
+            Ok(count) => count,
+            Err(err) => {
+                crate::modules::logger::log_error(&format!(
+                    "[INSTANCE_SWITCH:STAGE_5_RESTORE] Single-prompt dispatch failed for '{instance_id}': {err}"
+                ));
+                0
+            }
+        }
+    } else {
+        crate::modules::logger::log_info(&format!(
+            "[INSTANCE_SWITCH:STAGE_5_RESTORE] Auto-resume disabled (has_auto_resume=false) for '{instance_id}'; leaving backed-up prompt(s) undispatched"
+        ));
+        0
+    };
     let after = crate::modules::repo_db::count_backed_up_prompts(instance_id);
-    let pushed = dispatched.max(before.saturating_sub(after));
+    let pushed = dispatched;
     crate::modules::logger::log_info(&format!(
         "[INSTANCE_SWITCH:STAGE_5_RESTORE] Re-pushed {pushed} prompt(s) for instance '{instance_id}' ({before} backed up before, {after} still backed up)"
     ));
