@@ -144,6 +144,10 @@ pub mod tests_deadlock_detector;
 pub mod tests_compile_options;
 #[cfg(test)]
 pub mod tests_vacuum_stepper;
+#[cfg(test)]
+pub mod tests_schema_integrity_gate;
+#[cfg(test)]
+pub mod tests_page_cache_manager;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;

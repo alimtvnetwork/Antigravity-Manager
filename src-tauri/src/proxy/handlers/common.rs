@@ -77,6 +77,10 @@ pub mod tests_stream_early_abort_sentinel;
 pub mod tests_sse_chunk_coalescer;
 #[cfg(test)]
 pub mod tests_sse_comment_filter;
+#[cfg(test)]
+pub mod tests_role_normalization_validator;
+#[cfg(test)]
+pub mod tests_request_content_encoding_negotiator;
 
 pub use abort_sentinel::*;
 pub use boundary_normalizer::StreamBoundaryNormalizer;
