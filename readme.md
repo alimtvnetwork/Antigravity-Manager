@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.253.2-3B82F6?style=flat-square" alt="Version v4.253.2">
+    <img src="https://img.shields.io/badge/Version-v4.253.3-3B82F6?style=flat-square" alt="Version v4.253.3">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.253.2)**
+**Bar 2: Version-Based Installation (v4.253.3)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -470,6 +470,11 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 ---
 
 ## 🔄 What's New
+
+- **v4.253.3** (2026-10-23):
+  - **Release Pipeline & CI Dynamic Polling Gate**: Fixed GitHub Actions release workflow (`.github/workflows/release.yml`) by implementing an asynchronous status polling loop (up to 45 minutes) that waits for in-progress CI runs instead of failing prematurely on concurrent tag pushes; added post-release asset count verification gate. (Thanks to @aukgit)
+  - **Atomic Version Manifest Synchronization**: Synchronized all 14 project manifest files (`package.json`, `package-lock.json`, `version.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.lock`, `Casks/antigravity-tools.rb`, `releases-manifest.json`, `hooks.nsh`, etc.) to eliminate version drift. (Thanks to @aukgit)
+  - **Prompt Restore & CLI Rerun Hardening**: Implemented prompt restore sweep engine, restored `in_progress` status handling on quota completion, and integrated diverse rerun anti-repeat buffer with top-level CLI command routing. (Thanks to @aukgit)
 
 - **v4.253.2** (2026-10-23):
   - **Streaming Thought Signature & Delimiter Validator**: Implemented `streaming_thought_signature_validator` ensuring balanced `<thought>` / `</thought>` tags, `thought: true` attributes, and delta buffer delimiters across streaming SSE frames without leaking internal markers; added `repair_truncated_thought_block` auto-closing truncated blocks. (Thanks to @aukgit)

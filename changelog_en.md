@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.253.3 (2026-10-23)**:
+        -   **[Release Pipeline & CI Dynamic Polling Gate, Atomic Version Sync, Prompt Restore & CLI Rerun Hardening] Fix release asset publication pipeline, synchronize all project manifests, harden prompt restore sweep on quota completion, and enable instant rerun randomizer (Thanks to @aukgit)**:
+            -   **Description**: Resolved GitHub Actions release pipeline failure where concurrent tag pushes caused premature release gate exits due to in-progress CI runs; implemented an asynchronous polling wait loop up to 45 minutes in `.github/workflows/release.yml` with post-release asset count verification; synchronized all 14 repository version manifests (`package.json`, `package-lock.json`, `version.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.lock`, `releases-manifest.json`, etc.) to eliminate version drift; and integrated prompt restore sweep engine with diverse rerun anti-repeat buffer and top-level CLI command routing. (Thanks to @aukgit)
+
     *   **v4.253.0 (2026-10-23)**:
         -   **[Streaming Thought Signature Validator, Segmented Capsule Styler, FIFO Queue Partition Allocator, Transient Sandbox Sentinel, Sole Contributor Attribution & Windows FFI Remediation] Complete implementation of final architectural components (Steps 296–300), stream delimiter validation, capsule styling rules, FIFO partition allocation, caller IDE preservation, and pure kernel32 vitality probes (Thanks to @aukgit)**:
             -   **Description**: Successfully finalized the 300-step architectural roadmap across reverse proxy streaming, UI design conventions, Split-DB queue allocations, process sandboxing, and release governance:

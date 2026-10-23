@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.253.0)
+> Professional AI Account Management & Protocol Proxy System (v4.253.3)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.253.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.253.3-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -505,6 +505,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.253.3**: Release Pipeline & CI Dynamic Polling Gate, Atomic Version Sync, Prompt Restore & CLI Rerun Hardening — Resolved GitHub Actions release pipeline failure where concurrent tag pushes caused premature release gate exits due to in-progress CI runs; implemented an asynchronous polling wait loop up to 45 minutes in `.github/workflows/release.yml` with post-release asset count verification; synchronized all 14 repository version manifests (`package.json`, `package-lock.json`, `version.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.lock`, `releases-manifest.json`, etc.) to eliminate version drift; and integrated prompt restore sweep engine with diverse rerun anti-repeat buffer and top-level CLI command routing. (Thanks to @aukgit)
 
 > Latest version **v4.253.0**: Streaming Thought Signature Validator, Segmented Capsule Styler, FIFO Queue Partition Allocator, Transient Sandbox Sentinel, Sole Contributor Attribution & Windows FFI Remediation — Implemented `streaming_thought_signature_validator` ensuring balanced `<thought>` / `</thought>` tags, `thought: true` attributes, and delta buffer delimiters across streaming SSE frames without leaking internal markers; added `repair_truncated_thought_block` auto-closing truncated blocks; implemented `segmented_capsule_toggle_switch_styler` and markup linter enforcing `rounded-full`, shared dark-glass container borders, subtle divider lines, and transparent borderless inline select dropdowns (`bg-transparent border-0 focus:ring-0 focus:outline-none`); implemented `fifo_prompt_queue_partition_allocator` allocating prompt partition buckets across SQLite databases with strict First-In-First-Out ordering using `ORDER BY created_at ASC, id ASC`, monotonic timestamp/id verification, and zero LIFO leaks; implemented `transient_sandbox_cleanup_sentinel` tracking test sandbox instances, protecting developer caller IDE sessions with exit code 2 fail-fast protection, and verifying zero-orphan remnant directory purging; implemented `sole_contributor_attribution_audit_guard` enforcing strict sole attribution to `@aukgit` (`(Thanks to @aukgit)`), rejecting unauthorized third-party handles, enforcing strictly relative paths, and auditing source code for the No Silent Errors house rule; repaired process vitality probes and child process termination to link directly against Windows `kernel32` (`OpenProcess`, `GetExitCodeProcess`, `TerminateProcess`, `CloseHandle`) without unlinked external dependencies; harmonized `smartRotateProfileAccount` with backend `fastForwardInstance` delegation; and expanded rerun nudge detection templates. (Thanks to @aukgit)
 
