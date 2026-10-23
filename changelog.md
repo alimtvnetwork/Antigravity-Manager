@@ -1,5 +1,17 @@
 # Changelog
 
+## [v4.255.0] - 2026-10-24
+
+### Changed
+- Complete American English language modernization across 352 Rust backend files, 76 TypeScript/React frontend files, and all architecture specifications (Thanks to @aukgit)
+
+### Fixed
+- Fixed minified React hook error #310 ("Rendered more hooks than during previous render") in Instances switch profile dialog and prompt export modal (Thanks to @aukgit)
+- Mounted universal RouteErrorBoundary on root browser routing in `src/App.tsx` and wrapped fleet tables and modals with defensive error boundaries (Thanks to @aukgit)
+- Fixed Windows autostart syntax error and error pattern matching in `src-tauri/src/commands/autostart.rs` (Thanks to @aukgit)
+
+---
+
 ## [v4.253.3] - 2026-10-23
 
 ### Fixed
