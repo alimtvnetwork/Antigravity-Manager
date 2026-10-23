@@ -11,7 +11,7 @@ import {
 import type { ProxyRequestLog } from './types';
 
 // ==========================================
-// 简要模式智能提取与映射算法
+// Brief pattern intelligent extraction and mapping algorithm
 // ==========================================
 export function extractConcisePayload(
     rawStr: string | undefined,
@@ -31,7 +31,7 @@ export function extractConcisePayload(
 
     const concise: any = {};
 
-    // 保留用于标识思考块/会话的单行标识 (支持 requestId, sessionId, trace_id 等)
+    // Reserve a single line identifier used to identify the think block/session (supports requestId, sessionId, trace_id, etc.)
     const candidateSessionId =
         obj.requestId ||
         obj.request?.sessionId ||
@@ -43,10 +43,10 @@ export function extractConcisePayload(
         concise._session_thinking_id = candidateSessionId;
     }
 
-    // 模型
+    // Model
     if (obj.model) concise.model = obj.model;
 
-    // 思考模型配置 (开启、预算、effort、summary)
+    // Think about model configuration (start, budget, effort, summary)
     if (obj.thinking !== undefined) concise.thinking = obj.thinking;
     if (obj.reasoning_effort !== undefined) concise.reasoning_effort = obj.reasoning_effort;
     if (obj.reasoning !== undefined) concise.reasoning = obj.reasoning;
@@ -57,47 +57,47 @@ export function extractConcisePayload(
         concise.thinkingConfig = obj.thinkingConfig;
     }
 
-    // 系统提示词
+    // System prompt word
     if (obj.system !== undefined) concise.system = obj.system;
     if (obj.systemInstruction !== undefined) concise.systemInstruction = simplifySystemInstruction(obj.systemInstruction);
 
-    // 对话主体 (OpenAI / Claude)
+    // Conversation Subject (OpenAI / Claude)
     if (obj.messages) {
         concise.messages = simplifyMessages(obj.messages);
     }
 
-    // 对话主体 (Gemini)
+    // Conversation subject (Gemini)
     if (obj.contents) {
         concise.contents = simplifyGeminiContents(obj.contents);
     }
 
-    // 工具声明
+    // Tool declaration
     if (obj.tools) {
         concise.tools = simplifyTools(obj.tools);
     }
 
-    // Antigravity 专用的 request 嵌套包装层 (核心：正确映射原中转报文的嵌套层级)
+    // Antigravity's dedicated request nesting packaging layer (core: correctly maps the nesting level of the original forwarded message)
     if (obj.request && typeof obj.request === 'object') {
         const innerReq: any = {};
 
-        // 单行会话标识
+        // Single line session ID
         if (obj.request.sessionId) {
             innerReq.sessionId = obj.request.sessionId;
         }
 
-        // 思考配置 (thinkingConfig / generationConfig)
+        // thinking configuration (thinkingConfig / generationConfig)
         if (obj.request.generationConfig?.thinkingConfig !== undefined) {
             innerReq.thinkingConfig = obj.request.generationConfig.thinkingConfig;
         } else if (obj.request.thinkingConfig !== undefined) {
             innerReq.thinkingConfig = obj.request.thinkingConfig;
         }
 
-        // 系统提示词
+        // System prompt word
         if (obj.request.systemInstruction !== undefined) {
             innerReq.systemInstruction = simplifySystemInstruction(obj.request.systemInstruction);
         }
 
-        // 对话主体与思考块 (Gemini contents 或 Claude messages)
+        // Conversation bodies and thought blocks (Gemini contents or Claude messages)
         if (obj.request.contents) {
             innerReq.contents = simplifyGeminiContents(obj.request.contents);
         }
@@ -105,7 +105,7 @@ export function extractConcisePayload(
             innerReq.messages = simplifyMessages(obj.request.messages);
         }
 
-        // 工具声明
+        // Tool declaration
         if (obj.request.tools) {
             innerReq.tools = simplifyTools(obj.request.tools);
         }
@@ -113,7 +113,7 @@ export function extractConcisePayload(
         concise.request = innerReq;
     }
 
-    // 响应：思考块与思考签名 (顶层响应或非流式)
+    // Responsive: Think Blocks vs. Think Signatures (top-level responsive or non-streaming)
     if (obj.thinking !== undefined) concise.thinking = obj.thinking;
     if (obj.thinking_signature !== undefined) concise.thinking_signature = obj.thinking_signature;
     if (obj.thought_signature !== undefined) concise.thought_signature = obj.thought_signature;
@@ -121,7 +121,7 @@ export function extractConcisePayload(
     if (obj.thoughtSignature !== undefined) concise.thoughtSignature = obj.thoughtSignature;
     if (obj._timing !== undefined) concise._timing = obj._timing;
 
-    // 🌟 响应报文规范化提取：若为 response，优先将 choices / candidates / content 数组扁平化提升为顶层统一结构
+    // 🌟 Standardized extraction of response messages: If it is response, priority is given to flattening the choices / candidates / content array into a top-level unified structure
     if (kind === 'response') {
         if (obj.choices && Array.isArray(obj.choices) && obj.choices.length > 0) {
             const first = obj.choices[0];
@@ -210,7 +210,7 @@ export function extractConcisePayload(
         }
     }
 
-    // 响应：Choices / Candidates / 聚合响应 (若为 request 或未扁平化提取的 response，保留 choices/candidates)
+    // Response: Choices / Candidates / Aggregated response (if it is a request or a response that is not flattened and extracted, keep choices/candidates)
     if (kind !== 'response' || (!concise.content && !concise.tool_calls && !concise.thinking)) {
         if (obj.choices && Array.isArray(obj.choices)) {
             concise.choices = obj.choices.map((c: any) => {
@@ -284,7 +284,7 @@ export function extractConcisePayload(
         }
     }
 
-    // 错误响应提纯：不阉割双层报错，完整呈现网关诊断与上游原始错误
+    // Error response purification: Do not castrate double-layer error reporting, fully present gateway diagnosis and upstream original errors
     if (obj.type !== undefined && !obj.messages && !obj.choices) concise.type = obj.type;
     if (obj.code !== undefined && !obj.messages && !obj.choices) concise.code = obj.code;
     if (obj.status !== undefined && !obj.messages && !obj.choices) concise.status = obj.status;
@@ -298,7 +298,7 @@ export function extractConcisePayload(
         concise.upstream_error = deepUnescapeJsonValue(obj.upstream_error);
     }
 
-    // 用量与缓存
+    // Usage and cache
     const usage = simplifyUsage(obj.usage || obj.usageMetadata);
     if (usage) {
         concise.usage = usage;

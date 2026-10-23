@@ -11,7 +11,7 @@ pub(crate) fn phase_thinking(
     should_inject: bool,
 ) {
     // [FIX Issue #1355] Gemini Flash thinking budget capping
-    // [CONFIGURABLE] 现在改为遵循全局 Thinking Budget 配置
+    // [CONFIGURABLE] Now respects the global Thinking Budget configuration instead
     // [FIX #1557] Also apply to Pro/Thinking models to ensure budget processing
     // [FIX #1557] Auto-inject thinkingConfig if missing for these models
     if force_server_thinking
@@ -53,8 +53,8 @@ pub(crate) fn phase_thinking(
             let is_explicit_tier =
                 crate::proxy::model_specs::is_explicit_heuristic_tier_model(final_model_name);
 
-            // [ANTI-POLLUTION] 对齐 Anthropic 与 OpenAI：对于未设置思考配置或显式档位模型，设定权威 default_budget；对于裸模型保留客户端配置供后续 resolve_authoritative_thinking_budget 仲裁
-            // 客户端直接控制模式下，严禁篡改覆盖客户端的思考意图
+            // [ANTI-POLLUTION] Align Anthropic with OpenAI: For models with no thinking configuration or explicit bracket set, set authoritative default_budget; for bare models, retain client configuration for subsequent resolve_authoritative_thinking_budget arbitration
+            // In the client's direct control mode, it is strictly prohibited to tamper with the client's thinking intention.
             let should_override_budget = !is_client_control && (!has_thinking || is_explicit_tier);
 
             if should_override_budget {
@@ -123,7 +123,7 @@ pub(crate) fn phase_thinking(
             );
         }
 
-        // [AUTHORITATIVE RESOLUTION] 全协议统一由进站流水线节点解析思考预算
+        // [AUTHORITATIVE RESOLUTION] The whole protocol is unified and analyzed by the inbound pipeline node to think about the budget
         let has_thinking_config = gen_config.contains_key("thinkingConfig");
         let client_level = gen_config
             .get("thinkingConfig")

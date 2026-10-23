@@ -95,7 +95,7 @@ export const LogDetailPanel: React.FC<LogDetailPanelProps> = ({
                             <span className="font-mono font-bold text-gray-900 dark:text-white text-sm shrink-0">{log.method}</span>
                             <span className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate max-w-lg hidden sm:inline" title={log.url}>{log.url}</span>
                         </div>
-                        <button onClick={onClose} className="btn btn-ghost btn-sm btn-circle text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-base-200" aria-label="关闭"><X size={18} /></button>
+                        <button onClick={onClose} className="btn btn-ghost btn-sm btn-circle text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-base-200" aria-label="closure"><X size={18} /></button>
                     </div>
 
                     {/* Modal Content */}
@@ -183,7 +183,7 @@ export const LogDetailPanel: React.FC<LogDetailPanelProps> = ({
                                         }`}
                                     >
                                         <Sparkles size={13} className={payloadViewMode === 'concise' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'} />
-                                        <span>{t('monitor.details.concise_mode', '简要模式')}</span>
+                                        <span>{t('monitor.details.concise_mode', 'brief mode')}</span>
                                     </button>
                                     <button
                                         type="button"
@@ -195,13 +195,13 @@ export const LogDetailPanel: React.FC<LogDetailPanelProps> = ({
                                         }`}
                                     >
                                         <FileCode2 size={13} className={payloadViewMode === 'full' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400'} />
-                                        <span>{t('monitor.details.full_mode', '完整模式')}</span>
+                                        <span>{t('monitor.details.full_mode', 'full mode')}</span>
                                     </button>
                                 </div>
                                 <span className="hidden sm:inline-block text-[11px] text-gray-500 dark:text-gray-400">
                                     {payloadViewMode === 'concise'
-                                        ? t('monitor.details.concise_desc', '已为您精简工具参数与冗余字段，突出思考块、用量与对话主体')
-                                        : '显示原始完整未修剪报文'}
+                                        ? t('monitor.details.concise_desc', 'Tool parameters and redundant fields have been streamlined for you, highlighting thinking blocks, usage and conversation subjects.')
+                                        : 'Display the original complete untrimmed packet'}
                                 </span>
                             </div>
 
@@ -210,10 +210,10 @@ export const LogDetailPanel: React.FC<LogDetailPanelProps> = ({
                                     type="button"
                                     onClick={onToggleMetadata}
                                     className="btn btn-xs btn-ghost text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-base-200 gap-1 text-[11px]"
-                                    title={showMetadata ? '折叠元数据以增大报文视野' : '展开元数据信息'}
+                                    title={showMetadata ? 'Collapse metadata to increase message visibility' : 'Expand metadata information'}
                                 >
                                     {showMetadata ? <EyeOff size={13} /> : <Eye size={13} />}
-                                    <span>{showMetadata ? '收起元数据' : '展开元数据'}</span>
+                                    <span>{showMetadata ? 'Collapse metadata' : 'Expand metadata'}</span>
                                 </button>
                             </div>
                         </div>
@@ -222,14 +222,14 @@ export const LogDetailPanel: React.FC<LogDetailPanelProps> = ({
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 flex-1 min-h-0 overflow-hidden">
                             <VirtualizedPayloadViewer
                                 cardId="req"
-                                title={t('monitor.details.request_payload', '请求报文 (Request)')}
+                                title={t('monitor.details.request_payload', 'Request message (Request)')}
                                 badge="REQUEST"
                                 badgeStyle="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800/60"
                                 rawPayload={log.request_body}
                                 concisePayload={conciseRequestBody}
                                 headersJson={log.request_headers}
                                 viewMode={payloadViewMode}
-                                emptyPlaceholder={t('monitor.details.payload_empty', '无请求报文')}
+                                emptyPlaceholder={t('monitor.details.payload_empty', 'No request message')}
                                 onCopy={async (text) => {
                                     const success = await copyToClipboard(text);
                                     if (success) {
@@ -241,14 +241,14 @@ export const LogDetailPanel: React.FC<LogDetailPanelProps> = ({
                             />
                             <VirtualizedPayloadViewer
                                 cardId="upstream"
-                                title={t('monitor.details.upstream_request_payload', '中转报文 (Forwarded)')}
+                                title={t('monitor.details.upstream_request_payload', 'Forwarded message (Forwarded)')}
                                 badge="FORWARDED"
                                 badgeStyle="bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border-amber-200 dark:border-amber-800/60"
                                 rawPayload={log.upstream_request_body}
                                 concisePayload={conciseUpstreamBody}
                                 headersJson={log.upstream_request_headers}
                                 viewMode={payloadViewMode}
-                                emptyPlaceholder={t('monitor.details.no_upstream_payload', '无中转报文 (直接转发或未记录)')}
+                                emptyPlaceholder={t('monitor.details.no_upstream_payload', 'No relay message (directly forwarded or not recorded)')}
                                 onCopy={async (text) => {
                                     const success = await copyToClipboard(text);
                                     if (success) {
@@ -260,14 +260,14 @@ export const LogDetailPanel: React.FC<LogDetailPanelProps> = ({
                             />
                             <VirtualizedPayloadViewer
                                 cardId="resp"
-                                title={t('monitor.details.response_payload', '响应报文 (Response)')}
+                                title={t('monitor.details.response_payload', 'Response message (Response)')}
                                 badge="RESPONSE"
                                 badgeStyle="bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60"
                                 rawPayload={log.response_body}
                                 concisePayload={conciseResponseBody}
                                 headersJson={log.response_headers}
                                 viewMode={payloadViewMode}
-                                emptyPlaceholder={t('monitor.details.payload_empty', '无响应报文')}
+                                emptyPlaceholder={t('monitor.details.payload_empty', 'No response message')}
                                 duration={log.duration}
                                 timingNode={timingNode}
                                 onCopy={async (text) => {

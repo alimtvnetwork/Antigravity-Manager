@@ -9,7 +9,7 @@ fn test_thinking_block_not_prepend_when_disabled() {
     let _lock = crate::proxy::config::TEST_CONFIG_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
-    // 验证当 thinking 未启用且模型非思考模型时,不会补全 thinking 块
+    // Verify that thinking blocks are not completed when thinking is not enabled and the model is not a thinking model
     let req = ClaudeRequest {
         model: "non-reasoning-model".to_string(),
         messages: vec![
@@ -31,7 +31,7 @@ fn test_thinking_block_not_prepend_when_disabled() {
         temperature: None,
         top_p: None,
         top_k: None,
-        thinking: None, // 未启用 thinking
+        thinking: None, // thinking is not enabled
         metadata: None,
         output_config: None,
         size: None,
@@ -59,22 +59,22 @@ fn test_thinking_block_not_prepend_when_disabled() {
 
     let parts = last_model_msg["parts"].as_array().unwrap();
 
-    // 验证没有补全 thinking 块
+    // Verify that thinking block is not completed
     assert_eq!(parts.len(), 1, "Should only have the original text block");
     assert_eq!(parts[0]["text"], "Response");
 }
 
 #[test]
 fn test_thinking_block_empty_content_fix() {
-    // [场景] 客户端发送了一个内容为空的 thinking 块
-    // 期望: 自动填充 "..."
+    // [Scenario] The client sends a thinking block with empty content
+    // Expect: Autofill "..."
     let req = ClaudeRequest {
         model: "claude-sonnet-4-6".to_string(),
         messages: vec![Message {
             role: "assistant".to_string(),
             content: MessageContent::Array(vec![
                 ContentBlock::Thinking {
-                    thinking: "".to_string(), // 空内容
+                    thinking: "".to_string(), // Empty content
                     signature: Some("sig".to_string()),
                     cache_control: None,
                 },
@@ -108,7 +108,7 @@ fn test_thinking_block_empty_content_fix() {
     let contents = body["request"]["contents"].as_array().unwrap();
     let parts = contents[0]["parts"].as_array().unwrap();
 
-    // 验证空 thinking 块被降级为包含 "..." 的非 thought 文本部分（并与后续文本紧凑合并）
+    // Verify that empty thinking blocks are demoted to non-thought text portions containing "..." (and compactly merged with subsequent text)
     let downgraded_part = parts.iter().find(|p| {
         p.get("text")
             .and_then(|t| t.as_str())
@@ -124,8 +124,8 @@ fn test_thinking_block_empty_content_fix() {
 
 #[test]
 fn test_redacted_thinking_degradation() {
-    // [场景] 客户端包含 RedactedThinking
-    // 期望: 降级为普通文本，不带 thought: true
+    // [Scenario] Client contains RedactedThinking
+    // expect: downgrade to normal text without thought: true
     let req = ClaudeRequest {
         model: "claude-sonnet-4-6".to_string(),
         messages: vec![Message {
@@ -159,7 +159,7 @@ fn test_redacted_thinking_degradation() {
     let body = result.unwrap();
     let parts = body["request"]["contents"][0]["parts"].as_array().unwrap();
 
-    // 验证 RedactedThinking -> Text 存在且不带 thought: true
+    // Verify that RedactedThinking -> Text exists without thought: true
     let redacted_part = parts
         .iter()
         .find(|p| {

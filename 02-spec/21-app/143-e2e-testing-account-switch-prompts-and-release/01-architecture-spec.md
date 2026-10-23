@@ -202,7 +202,7 @@ When executing a minor release from `4.160.0` to `4.161.0`:
 
 ### 8.1 Non-Negotiable Release Invariants
 1. **Attribution Invariant**: Attribution must strictly credit `@aukgit` (`(Thanks to @aukgit)`). No other `@` user handles may appear in release changelogs or notes.
-2. **Dual README Synchronization**: Stable minor releases MUST update release summaries in both `README.md` (`## 📝 更新日志`) and `README_EN.md` (`## 📝 Changelog`). Updating changelogs alone is strictly forbidden.
+2. **Dual README Synchronization**: Stable minor releases MUST update release summaries in both `README.md` (`## 📝 Update log`) and `README_EN.md` (`## 📝 Changelog`). Updating changelogs alone is strictly forbidden.
 3. **Atomic 15-Target Synchronization**: All 15 configuration targets must be synchronized via `scripts/bump-version.mjs` (`npm run bump minor`):
 
 | # | Target File | Path | Key Synchronized |

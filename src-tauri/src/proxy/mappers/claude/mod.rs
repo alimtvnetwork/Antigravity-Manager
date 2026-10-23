@@ -1,5 +1,5 @@
-// Claude mapper 模块
-// 负责 Claude ↔ Gemini 协议转换
+// Claude mapper module
+// Responsible for Claude ↔ Gemini protocol conversion
 
 pub mod collector;
 pub mod models;

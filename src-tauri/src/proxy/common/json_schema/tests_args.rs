@@ -56,13 +56,13 @@ fn test_fix_tool_call_args_protection() {
 
     fix_tool_call_args(&mut args, &schema);
 
-    // 应保留字符串以防破坏语义
+    // Strings should be preserved to avoid breaking semantics
     assert_eq!(args["version"], "01.0");
     assert_eq!(args["code"], "007");
 }
 
 fn test_nested_defs_flattening() {
-    // MCP 工具常常将 $defs 嵌套在 properties 内部，而非根层级
+    // MCP tools often nest $defs inside properties rather than at the root level
     let mut schema = json!({
         "type": "object",
         "properties": {
@@ -87,7 +87,7 @@ fn test_nested_defs_flattening() {
 
     clean_json_schema(&mut schema);
 
-    // 验证嵌套的 $ref 被正确解析
+    // Verify that nested $refs are parsed correctly
     let home = &schema["properties"]["config"]["properties"]["home"];
     assert_eq!(
         home["type"], "object",
@@ -98,13 +98,13 @@ fn test_nested_defs_flattening() {
         "home.properties.city should exist from resolved Address"
     );
 
-    // 验证没有残留的 $ref
+    // Verify there are no leftover $refs
     assert!(
         home.get("$ref").is_none(),
         "home should not have orphan $ref"
     );
 
-    // 验证 work 也被正确解析
+    // Verify that work is also parsed correctly
     let work = &schema["properties"]["config"]["properties"]["work"];
     assert_eq!(work["type"], "object");
     assert!(work.get("$ref").is_none());
@@ -121,7 +121,7 @@ fn test_unresolved_ref_fallback() {
 
     clean_json_schema(&mut schema);
 
-    // 验证外部引用被降级为 string 类型
+    // Verify that external references are downgraded to type string
     let external = &schema["properties"]["external"];
     assert_eq!(
         external["type"], "string",
@@ -135,7 +135,7 @@ fn test_unresolved_ref_fallback() {
         "description should contain unresolved $ref hint"
     );
 
-    // 验证内部缺失引用也被降级
+    // Validate internal missing references are also downgraded
     let missing = &schema["properties"]["missing"];
     assert_eq!(missing["type"], "string");
     assert!(missing["description"]
@@ -177,7 +177,7 @@ fn test_deeply_nested_multi_level_defs() {
 
     let level2_props = &schema["properties"]["level1"]["properties"]["level2"]["properties"];
 
-    // 验证所有层级的 $defs 都被正确解析
+    // Verify that $defs at all levels are parsed correctly
     assert_eq!(
         level2_props["useRoot"]["type"], "integer",
         "RootDef should resolve"
@@ -191,7 +191,7 @@ fn test_deeply_nested_multi_level_defs() {
         "Level2Def should resolve"
     );
 
-    // 验证没有残留 $ref
+    // Verify there is no residual $ref
     assert!(level2_props["useRoot"].get("$ref").is_none());
     assert!(level2_props["useLevel1"].get("$ref").is_none());
     assert!(level2_props["useLevel2"].get("$ref").is_none());
@@ -208,7 +208,7 @@ fn test_non_standard_field_cleaning_and_healing() {
 
     clean_json_schema(&mut schema);
 
-    // 验证 items 中的非标准字段被移动到了 properties 内部，并增加了 type: object
+    // Verify that the non-standard fields in items have been moved to properties and type: object has been added
     let items = &schema["items"];
     assert_eq!(
         items["type"], "object",
@@ -221,7 +221,7 @@ fn test_non_standard_field_cleaning_and_healing() {
     assert_eq!(items["properties"]["cornerRadius"]["type"], "number");
     assert_eq!(items["properties"]["fillColor"]["type"], "string");
 
-    // 验证原始字段已从 items 顶层移除（白名单过滤）
+    // Verify that the original field has been removed from the items top level (whitelist filtering)
     assert!(items.get("cornerRadius").is_none());
     assert!(items.get("fillColor").is_none());
 }
@@ -239,10 +239,10 @@ fn test_implicit_type_injection() {
 
     clean_json_schema(&mut schema);
 
-    // 验证 values 被注入了 type: array
+    // Verify that values are injected with type: array
     assert_eq!(schema["properties"]["values"]["type"], "array");
 
-    // 验证 items 被启发式修复为 type: object 并包含 properties
+    // Verify that items is heuristically fixed to type: object and contains properties
     let items = &schema["properties"]["values"]["items"];
     assert_eq!(items["type"], "object");
     assert!(items["properties"].get("cornerRadius").is_some());
@@ -271,15 +271,15 @@ fn test_gemini_strict_validation_injection() {
 
     clean_json_schema(&mut schema);
 
-    // 验证 enum 自动补全了 type: string
+    // Verify that enum automatically completes type: string
     let type_node = &schema["properties"]["patterns"]["items"]["properties"]["type"];
     assert_eq!(type_node["type"], "string");
     assert!(type_node.get("enum").is_some());
 
-    // 验证 嵌套 properties 自动补全了 type: object
+    // Verify that nested properties automatically complete type: object
     assert_eq!(schema["properties"]["nested_props"]["type"], "object");
 
-    // 验证 patterns 自动补全了 type: array
+    // Verify that patterns automatically complete type: array
     assert_eq!(schema["properties"]["patterns"]["type"], "array");
 }
 
@@ -299,7 +299,7 @@ fn test_malformed_items_as_properties() {
 
     clean_json_schema(&mut schema);
 
-    // 验证 items 被移除并转换为 properties
+    // Verify items are removed and converted to properties
     let config = &schema["properties"]["config"];
     assert!(config.get("items").is_none());
     assert_eq!(config["properties"]["color"]["type"], "string");
@@ -308,7 +308,7 @@ fn test_malformed_items_as_properties() {
 }
 
 fn test_circular_ref_flattening() {
-    // 模拟循环引用：A -> B, B -> A
+    // Simulate circular reference: A -> B, B -> A
     let mut schema = json!({
         "$defs": {
             "A": {
@@ -329,11 +329,11 @@ fn test_circular_ref_flattening() {
         }
     });
 
-    // 如果没有深度限制，这里会发生栈溢出
-    // 有了深度限制，它应该能正常返回（尽管展开是不完整的）
+    // If there is no depth limit, a stack overflow will occur here
+    // With the depth limit, it should return normally (although the expansion is incomplete)
     clean_json_schema(&mut schema);
 
-    // 验证基本结构保留，没有崩溃
+    // Verify that the basic structure is preserved and there are no crashes
     assert_eq!(schema["properties"]["start"]["type"], "object");
     assert!(schema["properties"]["start"]["properties"]
         .get("toB")
@@ -351,14 +351,14 @@ fn test_any_of_best_branch_selection() {
 
     clean_json_schema(&mut schema);
 
-    // 验证选择了分数最高的 Object 分支
+    // Verify that the Object branch with the highest score is selected
     assert_eq!(schema["type"], "object");
     assert!(schema.get("properties").is_some());
     assert_eq!(schema["properties"]["foo"]["type"], "string");
 }
 
 fn test_issue_3327_const_normalization() {
-    // 场景 1: 基础 const 转换
+    // Scenario 1: Basic const conversion
     let mut schema1 = json!({
         "type": "object",
         "properties": {
@@ -391,7 +391,7 @@ fn test_issue_3327_const_normalization() {
     assert_eq!(schema1["properties"]["enabled"]["enum"], json!(["true"]));
     assert!(schema1["properties"]["enabled"].get("const").is_none());
 
-    // 场景 2: ZCode Computer Use MCP 的 anyOf 联合嵌套包含 const
+    // Scenario 2: AnyOf union nesting of ZCode Computer Use MCP contains const
     let mut schema2 = json!({
         "type": "object",
         "properties": {
@@ -442,7 +442,7 @@ fn test_issue_3327_const_normalization() {
     assert_eq!(target_props["type"]["enum"], json!(["element"]));
     assert!(target_props["type"].get("const").is_none());
 
-    // 验证没有非合法的 Schema 结构 (如 properties 嵌套了 "element" 标量字符串)
+    // Verify that there are no illegal Schema structures (such as properties nested with "element" scalar strings)
     assert!(target_props["type"].get("properties").is_none());
 }
 

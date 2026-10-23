@@ -59,7 +59,7 @@ export function OpenClawSyncModal({ apiKey, getFormattedProxyUrl, onClose, onSyn
             setActivateProvider(current.isActive);
             setDefaultModel(current.defaultModel || current.configuredModels[0] || '');
 
-            // 优先采用配置中已同步的版本；若无则采用探测到的版本，默认 v2
+            // The synchronized version in the configuration will be used first; if not, the detected version will be used. The default is v2.
             if (current.syncedVersion) {
                 setTargetVersion(current.syncedVersion);
             } else if (current.detectedVersionTarget) {
@@ -127,19 +127,19 @@ export function OpenClawSyncModal({ apiKey, getFormattedProxyUrl, onClose, onSyn
 
     const executeSyncWithVersion = async (version: 'v1' | 'v2') => {
         if (!effectiveProxyUrl) {
-            showToast(t('proxy.openclaw_sync.url_required', { defaultValue: '请输入 OpenClaw 连接地址' }), 'error');
+            showToast(t('proxy.openclaw_sync.url_required', { defaultValue: 'Please enter the OpenClaw connection address' }), 'error');
             return;
         }
         if (!apiKey) {
-            showToast(t('proxy.cli_sync.toast.config_missing', { defaultValue: '请先生成 API Key 并启动服务' }), 'error');
+            showToast(t('proxy.cli_sync.toast.config_missing', { defaultValue: 'Please generate API Key first and start the service' }), 'error');
             return;
         }
         if (limitModels && selectedModels.size === 0) {
-            showToast(t('proxy.openclaw_sync.models_required', { defaultValue: '请至少选择一个模型' }), 'error');
+            showToast(t('proxy.openclaw_sync.models_required', { defaultValue: 'Please select at least one model' }), 'error');
             return;
         }
         if (activateProvider && !defaultModel) {
-            showToast(t('proxy.openclaw_sync.default_model_required', { defaultValue: '请选择默认模型' }), 'error');
+            showToast(t('proxy.openclaw_sync.default_model_required', { defaultValue: 'Please select default model' }), 'error');
             return;
         }
 
@@ -159,7 +159,7 @@ export function OpenClawSyncModal({ apiKey, getFormattedProxyUrl, onClose, onSyn
             });
             showToast(t('proxy.openclaw_sync.toast.sync_success', {
                 version: version === 'v2' ? 'v2.0 (≥ 2026.8.1)' : 'v1.0 (< 2026.8.1)',
-                defaultValue: `OpenClaw (${version === 'v2' ? '≥2026.8.1' : '<2026.8.1'}) 配置同步成功`
+                defaultValue: `OpenClaw (${version === 'v2' ? '≥2026.8.1' : '<2026.8.1'}) configuration synchronized successfully`
             }), 'success');
             onSyncDone();
             onClose();
@@ -173,7 +173,7 @@ export function OpenClawSyncModal({ apiKey, getFormattedProxyUrl, onClose, onSyn
     return (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white dark:bg-base-100 rounded-2xl shadow-2xl border border-gray-200 dark:border-base-300 w-full max-w-2xl max-h-[88vh] overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
-                {/* 顶栏 */}
+                {/* top bar */}
                 <div className="px-5 pt-4 pb-3 shrink-0 border-b border-gray-100 dark:border-base-200">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
@@ -182,7 +182,7 @@ export function OpenClawSyncModal({ apiKey, getFormattedProxyUrl, onClose, onSyn
                             </div>
                             <div>
                                 <h3 className="text-sm font-bold text-gray-900 dark:text-base-content flex items-center gap-2">
-                                    {t('proxy.openclaw_sync.modal_title', { defaultValue: '在 OpenClaw 中配置 Antigravity Manager' })}
+                                    {t('proxy.openclaw_sync.modal_title', { defaultValue: 'Configure Antigravity Manager in OpenClaw' })}
                                     {status?.version && (
                                         <span className="text-[10px] px-1.5 py-0.2 rounded bg-red-500/10 text-red-500 border border-red-500/20 font-mono">
                                             v{status.version}
@@ -198,7 +198,7 @@ export function OpenClawSyncModal({ apiKey, getFormattedProxyUrl, onClose, onSyn
                     </div>
                 </div>
 
-                {/* 内容区 */}
+                {/* content area */}
                 <div className="px-5 py-4 space-y-4 overflow-auto">
                     {loading ? (
                         <div className="flex items-center gap-2 text-xs text-gray-400 py-8 justify-center">
@@ -207,19 +207,19 @@ export function OpenClawSyncModal({ apiKey, getFormattedProxyUrl, onClose, onSyn
                         </div>
                     ) : (
                         <>
-                            {/* 1. 版本规范选择 */}
+                            {/* 1. Version specification selection */}
                             <section className="space-y-2">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                                         <Layers size={13} />
-                                        {t('proxy.openclaw_sync.version_title', { defaultValue: 'OpenClaw SDK 版本规范' })}
+                                        {t('proxy.openclaw_sync.version_title', { defaultValue: 'OpenClaw SDK Version Specifications' })}
                                     </div>
                                     {status?.detectedVersionTarget && (
                                         <span className="text-[9px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-md font-medium">
                                             {t('proxy.openclaw_sync.detected_hint', {
                                                 version: status.version || '',
                                                 target: status.detectedVersionTarget === 'v2' ? '≥ 2026.8.1 (v2.0)' : '< 2026.8.1 (v1.0)',
-                                                defaultValue: `环境已检测: ${status.detectedVersionTarget === 'v2' ? '≥ 2026.8.1' : '< 2026.8.1'}`
+                                                defaultValue: `Environment detected: ${status.detectedVersionTarget === 'v2' ? '≥ 2026.8.1' : '< 2026.8.1'}`
                                             })}
                                         </span>
                                     )}
@@ -244,12 +244,12 @@ export function OpenClawSyncModal({ apiKey, getFormattedProxyUrl, onClose, onSyn
                                         <span className="min-w-0 flex-1">
                                             <span className="flex items-center gap-1.5">
                                                 <span className="text-xs font-bold text-gray-900 dark:text-gray-100">
-                                                    {t('proxy.openclaw_sync.v2_label', { defaultValue: '≥ 2026.8.1 (v2.0 规范)' })}
+                                                    {t('proxy.openclaw_sync.v2_label', { defaultValue: '≥ 2026.8.1 (v2.0 specification)' })}
                                                 </span>
-                                                <span className="text-[9px] px-1 rounded bg-red-500/10 text-red-500 font-bold uppercase">最新</span>
+                                                <span className="text-[9px] px-1 rounded bg-red-500/10 text-red-500 font-bold uppercase">up to date</span>
                                             </span>
                                             <span className="block text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-normal">
-                                                {t('proxy.openclaw_sync.v2_desc', { defaultValue: '采用 modelPolicy.allow 白名单规范与 entries 架构，原生支持图像/工具多模态' })}
+                                                {t('proxy.openclaw_sync.v2_desc', { defaultValue: 'Adopt modelPolicy.allow whitelist specification and entries architecture, natively support image/tool ​​multi-modality' })}
                                             </span>
                                         </span>
                                     </label>
@@ -273,37 +273,37 @@ export function OpenClawSyncModal({ apiKey, getFormattedProxyUrl, onClose, onSyn
                                         <span className="min-w-0 flex-1">
                                             <span className="flex items-center gap-1.5">
                                                 <span className="text-xs font-bold text-gray-900 dark:text-gray-100">
-                                                    {t('proxy.openclaw_sync.v1_label', { defaultValue: '< 2026.8.1 (v1.0 规范)' })}
+                                                    {t('proxy.openclaw_sync.v1_label', { defaultValue: '< 2026.8.1 (v1.0 specification)' })}
                                                 </span>
-                                                <span className="text-[9px] px-1 rounded bg-gray-100 dark:bg-base-300 text-gray-500 font-medium">经典</span>
+                                                <span className="text-[9px] px-1 rounded bg-gray-100 dark:bg-base-300 text-gray-500 font-medium">classic</span>
                                             </span>
                                             <span className="block text-[10px] text-gray-500 dark:text-gray-400 mt-1 leading-normal">
-                                                {t('proxy.openclaw_sync.v1_desc', { defaultValue: '采用 agents.defaults.models 显式模型字典注册，全面兼容 2026.7 及更早 SDK' })}
+                                                {t('proxy.openclaw_sync.v1_desc', { defaultValue: 'Use agents.defaults.models for explicit model dictionary registration, fully compatible with 2026.7 and earlier SDKs' })}
                                             </span>
                                         </span>
                                     </label>
                                 </div>
                             </section>
 
-                            {/* 2. 连接地址 */}
+                            {/* 2. Connection address */}
                             <section className="space-y-2">
                                 <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                                     <Globe2 size={13} />
-                                    {t('proxy.openclaw_sync.endpoint_title', { defaultValue: '连接地址 (Base URL)' })}
+                                    {t('proxy.openclaw_sync.endpoint_title', { defaultValue: 'Connection address (Base URL)' })}
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <label className={cn("flex items-start gap-2 p-3 rounded-xl border cursor-pointer transition-all", !useCustomUrl ? "border-red-500/70 bg-red-500/[0.04] dark:bg-red-500/[0.08]" : "border-gray-200 dark:border-base-300")}>
                                         <input type="radio" checked={!useCustomUrl} onChange={() => setUseCustomUrl(false)} className="radio radio-xs radio-error mt-0.5" />
                                         <span className="min-w-0">
-                                            <span className="block text-xs font-bold">{t('proxy.openclaw_sync.local_endpoint', { defaultValue: '本地代理' })}</span>
+                                            <span className="block text-xs font-bold">{t('proxy.openclaw_sync.local_endpoint', { defaultValue: 'local agent' })}</span>
                                             <span className="block text-[10px] font-mono text-gray-400 truncate mt-0.5">{localProxyUrl}</span>
                                         </span>
                                     </label>
                                     <label className={cn("flex items-start gap-2 p-3 rounded-xl border cursor-pointer transition-all", useCustomUrl ? "border-red-500/70 bg-red-500/[0.04] dark:bg-red-500/[0.08]" : "border-gray-200 dark:border-base-300")}>
                                         <input type="radio" checked={useCustomUrl} onChange={() => setUseCustomUrl(true)} className="radio radio-xs radio-error mt-0.5" />
                                         <span>
-                                            <span className="block text-xs font-bold">{t('proxy.openclaw_sync.custom_endpoint', { defaultValue: '自定义地址' })}</span>
-                                            <span className="block text-[10px] text-gray-400 mt-0.5">{t('proxy.openclaw_sync.custom_endpoint_desc', { defaultValue: 'Docker、局域网或反向代理' })}</span>
+                                            <span className="block text-xs font-bold">{t('proxy.openclaw_sync.custom_endpoint', { defaultValue: 'Custom address' })}</span>
+                                            <span className="block text-[10px] text-gray-400 mt-0.5">{t('proxy.openclaw_sync.custom_endpoint_desc', { defaultValue: 'Docker, LAN or reverse proxy' })}</span>
                                         </span>
                                     </label>
                                 </div>
@@ -318,24 +318,24 @@ export function OpenClawSyncModal({ apiKey, getFormattedProxyUrl, onClose, onSyn
                                 )}
                             </section>
 
-                            {/* 3. 模型选择 */}
+                            {/* 3. Model selection */}
                             <section className="space-y-2">
                                 <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                                     <ListChecks size={13} />
-                                    {t('proxy.openclaw_sync.models_title', { defaultValue: '同步到 OpenClaw 的模型' })}
+                                    {t('proxy.openclaw_sync.models_title', { defaultValue: 'Model synchronized to OpenClaw' })}
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <label className={cn("flex items-start gap-2 p-3 rounded-xl border cursor-pointer transition-all", !limitModels ? "border-red-500/70 bg-red-500/[0.04] dark:bg-red-500/[0.08]" : "border-gray-200 dark:border-base-300")}>
                                         <input type="radio" checked={!limitModels} onChange={() => setLimitModels(false)} className="radio radio-xs radio-error mt-0.5" />
                                         <span>
-                                            <span className="block text-xs font-bold">{t('proxy.openclaw_sync.all_models', { defaultValue: '全部同步' })}</span>
-                                            <span className="block text-[10px] text-gray-400 mt-0.5">{t('proxy.openclaw_sync.all_models_desc', { count: antigravityModels.length, defaultValue: `同步当前全部 ${antigravityModels.length} 个可用模型` })}</span>
+                                            <span className="block text-xs font-bold">{t('proxy.openclaw_sync.all_models', { defaultValue: 'sync all' })}</span>
+                                            <span className="block text-[10px] text-gray-400 mt-0.5">{t('proxy.openclaw_sync.all_models_desc', { count: antigravityModels.length, defaultValue: `Sync all  available models` })}</span>
                                         </span>
                                     </label>
                                     <label className={cn("flex items-start gap-2 p-3 rounded-xl border cursor-pointer transition-all", limitModels ? "border-red-500/70 bg-red-500/[0.04] dark:bg-red-500/[0.08]" : "border-gray-200 dark:border-base-300")}>
                                         <input type="radio" checked={limitModels} onChange={() => setLimitModels(true)} className="radio radio-xs radio-error mt-0.5" />
                                         <span>
-                                            <span className="block text-xs font-bold">{t('proxy.openclaw_sync.selected_models', { defaultValue: '部分挑选' })}</span>
+                                            <span className="block text-xs font-bold">{t('proxy.openclaw_sync.selected_models', { defaultValue: 'partial selection' })}</span>
                                             <span className="block text-[10px] text-gray-400 mt-0.5">{selectedModels.size}/{antigravityModels.length}</span>
                                         </span>
                                     </label>
@@ -344,7 +344,7 @@ export function OpenClawSyncModal({ apiKey, getFormattedProxyUrl, onClose, onSyn
                                     <div className="p-3 rounded-xl border border-gray-200 dark:border-base-300 space-y-3 max-h-[26vh] overflow-auto">
                                         <div className="flex justify-end">
                                             <button type="button" onClick={toggleAll} className="text-[10px] text-red-500 hover:text-red-600 font-medium">
-                                                {allSelected ? t('common.deselect_all', { defaultValue: '取消全选' }) : t('common.select_all', { defaultValue: '全选' })}
+                                                {allSelected ? t('common.deselect_all', { defaultValue: 'Deselect all' }) : t('common.select_all', { defaultValue: 'Select all' })}
                                             </button>
                                         </div>
                                         {groups.map(group => (
@@ -376,58 +376,58 @@ export function OpenClawSyncModal({ apiKey, getFormattedProxyUrl, onClose, onSyn
                                 )}
                             </section>
 
-                            {/* 4. 默认主模型 */}
+                            {/* 4. Default main model */}
                             <section className="space-y-2">
                                 <label className={cn("flex items-start gap-2 p-3 rounded-xl border cursor-pointer transition-all", activateProvider ? "border-red-500/70 bg-red-500/[0.04] dark:bg-red-500/[0.08]" : "border-gray-200 dark:border-base-300")}>
                                     <input type="checkbox" checked={activateProvider} onChange={e => setActivateProvider(e.target.checked)} className="checkbox checkbox-xs checkbox-error mt-0.5" />
                                     <span>
-                                        <span className="block text-xs font-bold">{t('proxy.openclaw_sync.activate_provider', { defaultValue: '设为 OpenClaw 默认主要模型 (Primary)' })}</span>
-                                        <span className="block text-[10px] text-gray-400 mt-0.5">{t('proxy.openclaw_sync.activate_provider_desc', { defaultValue: '勾选后将自动更新 agents.defaults.model.primary' })}</span>
+                                        <span className="block text-xs font-bold">{t('proxy.openclaw_sync.activate_provider', { defaultValue: 'Set as OpenClaw default primary model (Primary)' })}</span>
+                                        <span className="block text-[10px] text-gray-400 mt-0.5">{t('proxy.openclaw_sync.activate_provider_desc', { defaultValue: 'After checking, agents.defaults.model.primary will be updated automatically.' })}</span>
                                     </span>
                                 </label>
                                 {activateProvider && (
                                     <div>
-                                        <label className="block text-[9px] text-gray-400 uppercase font-bold tracking-wider mb-1">{t('proxy.openclaw_sync.default_model', { defaultValue: '默认模型' })}</label>
+                                        <label className="block text-[9px] text-gray-400 uppercase font-bold tracking-wider mb-1">{t('proxy.openclaw_sync.default_model', { defaultValue: 'Default model' })}</label>
                                         <select
                                             value={defaultModel}
                                             onChange={e => setDefaultModel(e.target.value)}
                                             className="select select-bordered select-sm w-full text-xs"
                                         >
-                                            <option value="" disabled>{t('proxy.openclaw_sync.select_default_model', { defaultValue: '选择模型' })}</option>
+                                            <option value="" disabled>{t('proxy.openclaw_sync.select_default_model', { defaultValue: 'Select model' })}</option>
                                             {availableDefaultModels.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
                                         </select>
                                     </div>
                                 )}
                             </section>
 
-                            {/* 状态徽标栏 */}
+                            {/* status logo bar */}
                             <div className="flex items-start gap-2 p-3 bg-gray-50/80 dark:bg-gray-900/40 rounded-xl border border-dashed border-gray-200 dark:border-white/10 text-[11px] text-gray-500 dark:text-gray-400">
                                 {status?.isSynced ? <CheckCircle2 size={14} className="text-green-500 shrink-0 mt-0.5" /> : <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />}
                                 <div>
                                     <div className="flex items-center gap-1.5">
-                                        <span>{status?.isSynced ? t('proxy.cli_sync.status.synced', { defaultValue: '已同步' }) : t('proxy.cli_sync.status.not_synced', { defaultValue: '未同步' })}</span>
+                                        <span>{status?.isSynced ? t('proxy.cli_sync.status.synced', { defaultValue: 'Synced' }) : t('proxy.cli_sync.status.not_synced', { defaultValue: 'Not synced' })}</span>
                                         {status?.syncedVersion && (
                                             <span className="text-[9px] font-mono px-1 rounded bg-red-500/10 text-red-500 font-bold">
-                                                {status.syncedVersion === 'v2' ? 'v2.0 规范' : 'v1.0 规范'}
+                                                {status.syncedVersion === 'v2' ? 'v2.0 specification' : 'v1.0 specification'}
                                             </span>
                                         )}
                                     </div>
                                     {status?.currentBaseUrl && <div className="font-mono text-[10px] mt-0.5 break-all">{status.currentBaseUrl}</div>}
-                                    {status?.isActive && <div className="text-red-500 mt-0.5">{t('proxy.openclaw_sync.currently_active', { defaultValue: '当前已激活为主模型' })}{status.defaultModel ? ` — ${status.defaultModel}` : ''}</div>}
+                                    {status?.isActive && <div className="text-red-500 mt-0.5">{t('proxy.openclaw_sync.currently_active', { defaultValue: 'Currently activated as the main model' })}{status.defaultModel ? ` — ${status.defaultModel}` : ''}</div>}
                                 </div>
                             </div>
                         </>
                     )}
                 </div>
 
-                {/* 底部按钮栏：双版本专属同步按钮 */}
+                {/* Bottom button bar: Exclusive synchronization button for dual versions */}
                 <div className="px-5 py-3 border-t border-gray-100 dark:border-base-200 flex items-center justify-between gap-2 shrink-0 bg-gray-50/40 dark:bg-base-200/20">
                     <button type="button" className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-base-300 transition-colors" onClick={onClose}>
-                        {t('common.cancel', { defaultValue: '取消' })}
+                        {t('common.cancel', { defaultValue: 'Cancel' })}
                     </button>
 
                     <div className="flex items-center gap-2">
-                        {/* 按钮 1: < 2026.8.1 (v1.0) 同步 */}
+                        {/* Button 1: < 2026.8.1 (v1.0) Sync */}
                         <button
                             type="button"
                             className={cn(
@@ -438,13 +438,13 @@ export function OpenClawSyncModal({ apiKey, getFormattedProxyUrl, onClose, onSyn
                             )}
                             disabled={loading || !!syncingVersion || !status}
                             onClick={() => executeSyncWithVersion('v1')}
-                            title="适用于 2026.7 及更早历史版本的 OpenClaw SDK (采用 agents.defaults.models 字典注册)"
+                            title="OpenClaw SDK for 2026.7 and earlier historical versions (registered with agents.defaults.models dictionary)"
                         >
                             <RefreshCw size={11} className={syncingVersion === 'v1' ? 'animate-spin' : ''} />
-                            {t('proxy.openclaw_sync.btn_sync_v1', { defaultValue: '同步 (< 2026.8.1 v1.0)' })}
+                            {t('proxy.openclaw_sync.btn_sync_v1', { defaultValue: 'Sync (< 2026.8.1 v1.0)' })}
                         </button>
 
-                        {/* 按钮 2: ≥ 2026.8.1 (v2.0) 同步 */}
+                        {/* Button 2: ≥ 2026.8.1 (v2.0) Sync */}
                         <button
                             type="button"
                             className={cn(
@@ -455,10 +455,10 @@ export function OpenClawSyncModal({ apiKey, getFormattedProxyUrl, onClose, onSyn
                             )}
                             disabled={loading || !!syncingVersion || !status}
                             onClick={() => executeSyncWithVersion('v2')}
-                            title="适用于 2026.8.1 及以后的最新 OpenClaw 2.0 SDK (采用 modelPolicy.allow 白名单规范)"
+                            title="Applicable to the latest OpenClaw 2.0 SDK 2026.8.1 and later (using modelPolicy.allow whitelist specification)"
                         >
                             <RefreshCw size={11} className={syncingVersion === 'v2' ? 'animate-spin' : ''} />
-                            {t('proxy.openclaw_sync.btn_sync_v2', { defaultValue: '同步 (≥ 2026.8.1 v2.0)' })}
+                            {t('proxy.openclaw_sync.btn_sync_v2', { defaultValue: 'Sync (≥ 2026.8.1 v2.0)' })}
                         </button>
                     </div>
                 </div>

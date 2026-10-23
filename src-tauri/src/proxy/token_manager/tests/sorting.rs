@@ -36,7 +36,7 @@ fn test_sorting_tier_priority() {
 
 #[test]
 fn test_sorting_health_score_priority() {
-    // 同等级下，健康分高的优先
+    // At the same level, those with higher health scores will be given priority.
     let high_health = create_test_token("high@test.com", Some("PRO"), 1.0, None, Some(50));
     let low_health = create_test_token("low@test.com", Some("PRO"), 0.5, None, Some(50));
 
@@ -48,21 +48,21 @@ fn test_sorting_health_score_priority() {
 fn test_sorting_reset_time_priority() {
     let now = chrono::Utc::now().timestamp();
 
-    // 刷新时间更近（30分钟后）的优先于更远（5小时后）的
+    // The refresh time is closer (30 minutes later) than the refresh time is farther (5 hours later)
     let soon_reset = create_test_token(
         "soon@test.com",
         Some("PRO"),
         1.0,
         Some(now + 1800),
         Some(50),
-    ); // 30分钟后
+    ); // 30 minutes later
     let late_reset = create_test_token(
         "late@test.com",
         Some("PRO"),
         1.0,
         Some(now + 18000),
         Some(50),
-    ); // 5小时后
+    ); // 5 hours later
 
     assert_eq!(compare_tokens(&soon_reset, &late_reset), Ordering::Less);
     assert_eq!(compare_tokens(&late_reset, &soon_reset), Ordering::Greater);
@@ -72,11 +72,11 @@ fn test_sorting_reset_time_priority() {
 fn test_sorting_reset_time_threshold() {
     let now = chrono::Utc::now().timestamp();
 
-    // 差异小于10分钟（600秒）视为相同优先级，此时按配额排序
-    let reset_a = create_test_token("a@test.com", Some("PRO"), 1.0, Some(now + 1800), Some(80)); // 30分钟后, 80%配额
-    let reset_b = create_test_token("b@test.com", Some("PRO"), 1.0, Some(now + 2100), Some(50)); // 35分钟后, 50%配额
+    // If the difference is less than 10 minutes (600 seconds), it will be regarded as the same priority, and it will be sorted by quota.
+    let reset_a = create_test_token("a@test.com", Some("PRO"), 1.0, Some(now + 1800), Some(80)); // After 30 minutes, 80% quota
+    let reset_b = create_test_token("b@test.com", Some("PRO"), 1.0, Some(now + 2100), Some(50)); // After 35 minutes, 50% quota
 
-    // 差5分钟 < 10分钟阈值，视为相同，按配额排序（80% > 50%）
+    // If the difference is 5 minutes < 10 minutes threshold, it is considered to be the same and sorted by quota (80% > 50%)
     assert_eq!(compare_tokens(&reset_a, &reset_b), Ordering::Less);
 }
 
@@ -84,23 +84,23 @@ fn test_sorting_reset_time_threshold() {
 fn test_sorting_reset_time_beyond_threshold() {
     let now = chrono::Utc::now().timestamp();
 
-    // 差异超过10分钟，按刷新时间排序（忽略配额）
+    // Differences greater than 10 minutes, sorted by refresh time (ignoring quota)
     let soon_low_quota = create_test_token(
         "soon@test.com",
         Some("PRO"),
         1.0,
         Some(now + 1800),
         Some(20),
-    ); // 30分钟后, 20%
+    ); // After 30 minutes, 20%
     let late_high_quota = create_test_token(
         "late@test.com",
         Some("PRO"),
         1.0,
         Some(now + 18000),
         Some(90),
-    ); // 5小时后, 90%
+    ); // After 5 hours, 90%
 
-    // 差4.5小时 > 10分钟，刷新时间优先，30分钟 < 5小时
+    // Difference 4.5 hours > 10 minutes, refresh time takes priority, 30 minutes < 5 hours
     assert_eq!(
         compare_tokens(&soon_low_quota, &late_high_quota),
         Ordering::Less
@@ -109,7 +109,7 @@ fn test_sorting_reset_time_beyond_threshold() {
 
 #[test]
 fn test_sorting_quota_fallback() {
-    // 其他条件相同时，配额高的优先
+    // When other conditions are equal, the one with the highest quota will be given priority.
     let high_quota = create_test_token("high@test.com", Some("PRO"), 1.0, None, Some(80));
     let low_quota = create_test_token("low@test.com", Some("PRO"), 1.0, None, Some(20));
 
@@ -121,7 +121,7 @@ fn test_sorting_quota_fallback() {
 fn test_sorting_missing_reset_time() {
     let now = chrono::Utc::now().timestamp();
 
-    // 没有 reset_time 的账号应该排在有 reset_time 的后面
+    // Accounts without reset_time should be ranked behind those with reset_time
     let with_reset = create_test_token(
         "with@test.com",
         Some("PRO"),
@@ -159,14 +159,14 @@ fn test_full_sorting_integration() {
             1.0,
             Some(now + 1800),
             Some(50),
-        ), // 30分钟后
+        ), // 30 minutes later
         create_test_token(
             "pro_late@test.com",
             Some("PRO"),
             1.0,
             Some(now + 18000),
             Some(90),
-        ), // 5小时后
+        ), // 5 hours later
         create_test_token(
             "ultra@test.com",
             Some("ULTRA"),
@@ -178,12 +178,12 @@ fn test_full_sorting_integration() {
 
     tokens.sort_by(compare_tokens);
 
-    // 预期顺序:
-    // 1. ULTRA (最高等级，即使刷新时间最远)
-    // 2. PRO + 高健康分 + 30分钟后刷新
-    // 3. PRO + 高健康分 + 5小时后刷新
-    // 4. PRO + 低健康分
-    // 5. FREE (最低等级，即使配额最高)
+    // Expected order:
+    // 1. ULTRA (the highest level, even if the refresh time is the furthest)
+    // 2. PRO + high health score + refresh after 30 minutes
+    // 3. PRO + high health score + refresh after 5 hours
+    // 4. PRO + low health score
+    // 5. FREE (lowest level, even with the highest quota)
     assert_eq!(tokens[0].email, "ultra@test.com");
     assert_eq!(tokens[1].email, "pro_soon@test.com");
     assert_eq!(tokens[2].email, "pro_late@test.com");
@@ -193,10 +193,10 @@ fn test_full_sorting_integration() {
 
 #[test]
 fn test_realistic_scenario() {
-    // 模拟用户描述的场景:
-    // a 账号 claude 4h55m 后刷新
-    // b 账号 claude 31m 后刷新
-    // 应该优先使用 b（31分钟后刷新）
+    // Simulate the scenario described by the user:
+    // a account claude refreshed after 4h55m
+    // b Account claude Refresh after 31m
+    // b should be used first (refreshed after 31 minutes)
     let now = chrono::Utc::now().timestamp();
 
     let account_a = create_test_token(
@@ -214,7 +214,7 @@ fn test_realistic_scenario() {
         Some(30),
     ); // 31m
 
-    // b 应该排在 a 前面（刷新时间更近）
+    // b should be ranked before a (refresh time is closer)
     assert_eq!(compare_tokens(&account_b, &account_a), Ordering::Less);
 
     let mut tokens = vec![account_a.clone(), account_b.clone()];
@@ -228,7 +228,7 @@ fn test_realistic_scenario() {
 fn test_extract_earliest_reset_time() {
     let manager = TokenManager::new(PathBuf::from("/tmp/test"));
 
-    // 测试包含 claude 模型的 reset_time 提取
+    // Test contains reset_time extraction of claude model
     let account_with_claude = serde_json::json!({
         "quota": {
             "models": [
@@ -241,7 +241,7 @@ fn test_extract_earliest_reset_time() {
 
     let result = manager.extract_earliest_reset_time(&account_with_claude);
     assert!(result.is_some());
-    // 应该返回 claude 的时间（08:00）而不是 gemini 的（10:00）
+    // should return claude's time (08:00) instead of gemini's (10:00)
     let expected_ts = chrono::DateTime::parse_from_rfc3339("2025-01-31T08:00:00Z")
         .unwrap()
         .timestamp();
@@ -252,7 +252,7 @@ fn test_extract_earliest_reset_time() {
 fn test_extract_reset_time_no_claude() {
     let manager = TokenManager::new(PathBuf::from("/tmp/test"));
 
-    // 没有 claude 模型时，应该取任意模型的最近时间
+    // When there is no claude model, the latest time of any model should be taken
     let account_no_claude = serde_json::json!({
         "quota": {
             "models": [
@@ -274,7 +274,7 @@ fn test_extract_reset_time_no_claude() {
 fn test_extract_reset_time_missing_quota() {
     let manager = TokenManager::new(PathBuf::from("/tmp/test"));
 
-    // 没有 quota 字段时应返回 None
+    // Should return None when there is no quota field
     let account_no_quota = serde_json::json!({
         "email": "test@test.com"
     });
@@ -284,4 +284,4 @@ fn test_extract_reset_time_missing_quota() {
         .is_none());
 }
 
-// ===== P2C 算法测试 =====
+// ===== P2C Algorithm Test =====

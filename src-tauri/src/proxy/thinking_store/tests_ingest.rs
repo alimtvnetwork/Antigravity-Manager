@@ -227,8 +227,8 @@ fn signed_function_call_is_not_mistaken_for_thinking_block() {
     })];
     finalize_gemini_contents_thinking(&mut contents, true);
     let parts = contents[0]["parts"].as_array().unwrap();
-    // 【2026-09-27】无思考文本时不再注入 "..." 占位思考块（官方标准形态：
-    // 「无思考块 + 锚点带签名」，9/24 轮）。签名落锚点 fc。
+    // 【2026-09-27】No longer inject "..." placeholder thinking block when there is no thinking text (official standard form:
+    // "No thinking block + anchor with signature", round 9/24). Signature drop anchor fc.
     assert_eq!(
         parts.len(),
         1,

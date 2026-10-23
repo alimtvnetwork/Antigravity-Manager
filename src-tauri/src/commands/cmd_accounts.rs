@@ -51,14 +51,14 @@ pub async fn add_account(
 
     let mut account = service.add_account(&refresh_token).await?;
 
-    // 自动刷新配额
+    // Automatically refresh quotas
     // Justification: quota auto-refresh after account add is opportunistic; the account was already added
     crate::error::record_ignored(
         internal_refresh_account_quota(&app, &mut account).await,
         "auto-refresh quota after account add",
     );
 
-    // 重载账号池
+    // Reload account pool
     // Justification: proxy pool reload after account add is best-effort sync; the account was already added
     crate::error::record_ignored(
         crate::commands::proxy::reload_proxy_accounts(
@@ -71,8 +71,8 @@ pub async fn add_account(
     Ok(account)
 }
 
-/// 删除账号
-/// 删除账号
+/// Delete account
+/// Delete account
 #[tauri::command]
 pub async fn delete_account(
     app: tauri::AppHandle,
@@ -94,7 +94,7 @@ pub async fn delete_account(
     Ok(())
 }
 
-/// 批量删除账号
+/// Delete accounts in batches
 #[tauri::command]
 pub async fn delete_accounts(
     app: tauri::AppHandle,
@@ -102,15 +102,15 @@ pub async fn delete_accounts(
     account_ids: Vec<String>,
 ) -> Result<(), String> {
     modules::logger::log_info(&format!(
-        "收到批量删除请求，共 {} 个账号",
+        "Received batch deletion request for {} accounts in total",
         account_ids.len()
     ));
     modules::account::delete_accounts(&account_ids).map_err(|e| {
-        modules::logger::log_error(&format!("批量删除失败: {}", e));
+        modules::logger::log_error(&format!("Batch deletion failed: {}", e));
         e
     })?;
 
-    // 强制同步托盘
+    // Force sync tray
     crate::modules::tray::update_tray_menus(&app);
 
     // Reload token pool
@@ -123,19 +123,19 @@ pub async fn delete_accounts(
     Ok(())
 }
 
-/// 重新排序账号列表
-/// 根据传入的账号ID数组顺序更新账号排列
+/// Reorder account list
+/// Update the account arrangement according to the order of the incoming account ID array
 #[tauri::command]
 pub async fn reorder_accounts(
     proxy_state: tauri::State<'_, crate::commands::proxy::ProxyServiceState>,
     account_ids: Vec<String>,
 ) -> Result<(), String> {
     modules::logger::log_info(&format!(
-        "收到账号重排序请求，共 {} 个账号",
+        "Account reordering request received, total {} accounts",
         account_ids.len()
     ));
     modules::account::reorder_accounts(&account_ids).map_err(|e| {
-        modules::logger::log_error(&format!("账号重排序失败: {}", e));
+        modules::logger::log_error(&format!("Account reordering failed: {}", e));
         e
     })?;
 
@@ -148,7 +148,7 @@ pub async fn reorder_accounts(
     Ok(())
 }
 
-/// 切换账号
+/// Switch account
 #[tauri::command]
 pub async fn switch_account(
     app: tauri::AppHandle,
@@ -204,7 +204,7 @@ pub async fn switch_account(
         }
     }
 
-    // 同步托盘
+    // sync tray
     crate::modules::tray::update_tray_menus(&app);
 
     // [FIX #820] Notify proxy to clear stale session bindings and reload accounts
@@ -236,7 +236,7 @@ pub async fn switch_account(
     Ok(())
 }
 
-/// 获取当前账号
+/// Get current account
 #[tauri::command]
 pub async fn get_current_account() -> Result<Option<Account>, String> {
     // println!("🚀 Backend Command: get_current_account called"); // Commented out to reduce noise for frequent calls, relies on frontend log for frequency
@@ -286,7 +286,7 @@ pub async fn get_current_account() -> Result<Option<Account>, String> {
     Ok(None)
 }
 
-/// 导出账号（包含 refresh_token）
+/// Export account (including refresh_token)
 use crate::models::AccountExportResponse;
 
 #[tauri::command]
@@ -296,7 +296,7 @@ pub async fn export_accounts(account_ids: Vec<String>) -> Result<AccountExportRe
         .unwrap_or_else(|_| Err("Task panicked".to_string()))
 }
 
-/// 内部辅助功能：在添加或导入账号后自动刷新一次额度
+/// Internal auxiliary function: automatically refresh the quota after adding or importing an account
 #[tauri::command]
 pub async fn toggle_proxy_status(
     app: tauri::AppHandle,
@@ -306,25 +306,25 @@ pub async fn toggle_proxy_status(
     reason: Option<String>,
 ) -> Result<(), String> {
     modules::logger::log_info(&format!(
-        "切换账号反代状态: {} -> {}",
+        "Switch account reverse status: {} -> {}",
         account_id,
-        if enable { "启用" } else { "禁用" }
+        if enable { "enable" } else { "Disable" }
     ));
 
-    // 1-3. 更新账号文件并同步更新 index.json
+    // 1-3. Update the account file and update index.json simultaneously
     modules::account::toggle_proxy_status(&account_id, enable, reason.as_deref())?;
 
     modules::logger::log_info(&format!(
-        "账号反代状态已更新: {} ({})",
+        "Account reverse status has been updated: {} ( {} )",
         account_id,
-        if enable { "已启用" } else { "已禁用" }
+        if enable { "Enabled" } else { "Disabled" }
     ));
 
-    // 4. 如果反代服务正在运行,立刻同步到内存池（避免禁用后仍被选中）
+    // 4. If the anti-generation service is running, synchronize it to the memory pool immediately (to avoid being selected after being disabled)
     {
         let instance_lock = proxy_state.instance.read().await;
         if let Some(instance) = instance_lock.as_ref() {
-            // 如果禁用的是当前固定账号，则自动关闭固定模式（内存 + 配置持久化）
+            // If the current fixed account is disabled, the fixed mode (memory + configuration persistence) will be automatically turned off.
             if !enable {
                 let pref_id = instance.token_manager.get_preferred_account().await;
                 if pref_id.as_deref() == Some(&account_id) {
@@ -347,23 +347,23 @@ pub async fn toggle_proxy_status(
                 .token_manager
                 .reload_account(&account_id)
                 .await
-                .map_err(|e| format!("同步账号失败: {}", e))?;
+                .map_err(|e| format!("Account synchronization failed: {}", e))?;
         }
     }
 
-    // 5. 更新托盘菜单
+    // 5. Update tray menu
     crate::modules::tray::update_tray_menus(&app);
 
     Ok(())
 }
 
-/// 预热所有可用账号
+/// Warm up all available accounts
 #[tauri::command]
 pub async fn warm_up_all_accounts() -> Result<String, String> {
     modules::quota::warm_up_all_accounts().await
 }
 
-/// 预热指定账号
+/// Warm up designated account
 #[tauri::command]
 pub async fn warm_up_account(account_id: String) -> Result<String, String> {
     modules::quota::warm_up_account(&account_id).await
@@ -385,53 +385,54 @@ pub async fn update_account_priority(
     Ok(())
 }
 
-/// 更新账号自定义标签
+/// Update account custom label
 #[tauri::command]
 pub async fn update_account_label(account_id: String, label: String) -> Result<(), String> {
-    // 验证标签长度（按字符数计算，支持中文）
+    // Verify label length (calculated by number of characters, supports Chinese)
     if label.chars().count() > 15 {
-        return Err("标签长度不能超过15个字符".to_string());
+        return Err("Tag length cannot exceed 15 characters".to_string());
     }
 
     modules::logger::log_info(&format!(
-        "更新账号标签: {} -> {:?}",
+        "Update account label: {} -> {:?}",
         account_id,
-        if label.is_empty() { "无" } else { &label }
+        if label.is_empty() { "None" } else { &label }
     ));
 
-    // 1. 读取账号文件
+    // 1. Read the account file
     let data_dir = modules::account::get_data_dir()?;
     let account_path = data_dir
         .join("accounts")
         .join(format!("{}.json", account_id));
 
     if !account_path.exists() {
-        return Err(format!("账号文件不存在: {}", account_id));
+        return Err(format!("Account file does not exist: {}", account_id));
     }
 
-    let content =
-        std::fs::read_to_string(&account_path).map_err(|e| format!("读取账号文件失败: {}", e))?;
+    let content = std::fs::read_to_string(&account_path)
+        .map_err(|e| format!("Failed to read account file: {}", e))?;
 
-    let mut account_json: serde_json::Value =
-        serde_json::from_str(&content).map_err(|e| format!("解析账号文件失败: {}", e))?;
+    let mut account_json: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse account file: {}", e))?;
 
-    // 2. 更新 custom_label 字段
+    // 2. Update custom_label field
     if label.is_empty() {
         account_json["custom_label"] = serde_json::Value::Null;
     } else {
         account_json["custom_label"] = serde_json::Value::String(label.clone());
     }
 
-    // 3. 保存到磁盘
+    // 3. Save to disk
     let json_str = serde_json::to_string_pretty(&account_json)
-        .map_err(|e| format!("序列化账号数据失败: {}", e))?;
-    std::fs::write(&account_path, json_str).map_err(|e| format!("写入账号文件失败: {}", e))?;
+        .map_err(|e| format!("Failed to serialize account data: {}", e))?;
+    std::fs::write(&account_path, json_str)
+        .map_err(|e| format!("Failed to write account file: {}", e))?;
 
     modules::logger::log_info(&format!(
-        "账号标签已更新: {} ({})",
+        "Account label updated: {} ( {} )",
         account_id,
         if label.is_empty() {
-            "已清除".to_string()
+            "cleared".to_string()
         } else {
             label
         }

@@ -41,7 +41,7 @@ export function CloudflaredSection({
         handleCfCopyUrl,
     } = cloudflared;
 
-    // 公网访问 (Cloudflared) - 仅在桌面端显示
+    // Public access (Cloudflared) - only shown on desktop
     if (!isTauri()) return null;
 
     return (
@@ -66,7 +66,7 @@ export function CloudflaredSection({
             }
         >
             <div className="space-y-4">
-                {/* 安装状态 */}
+                {/* Installation status */}
                 {!cfStatus.installed ? (
                     <div className="flex items-center justify-between p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-200 dark:border-yellow-800">
                         <div className="space-y-1">
@@ -88,13 +88,13 @@ export function CloudflaredSection({
                     </div>
                 ) : (
                     <>
-                        {/* 版本信息 */}
+                        {/* Version information */}
                         <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                             <CheckCircle size={14} className="text-green-500" />
                             {t('proxy.cloudflared.installed', { defaultValue: 'Installed' })}: {cfStatus.version || 'Unknown'}
                         </div>
 
-                        {/* 隧道模式选择 */}
+                        {/* Tunnel mode selection */}
                         <div className="grid grid-cols-2 gap-3">
                             <button
                                 onClick={() => {
@@ -146,7 +146,7 @@ export function CloudflaredSection({
                             </button>
                         </div>
 
-                        {/* Token输入 (仅auth模式) */}
+                        {/* Token input (only in auth mode) */}
                         {cfMode === 'auth' && (
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -169,7 +169,7 @@ export function CloudflaredSection({
                             </div>
                         )}
 
-                        {/* HTTP2选项 */}
+                        {/* HTTP2 options */}
                         <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-base-200 rounded-lg">
                             <div className="space-y-0.5">
                                 <span className="text-sm font-medium text-gray-900 dark:text-base-content">
@@ -199,7 +199,7 @@ export function CloudflaredSection({
                             />
                         </div>
 
-                        {/* 运行状态和URL */}
+                        {/* Running status and URL */}
                         {cfStatus.running && (
                             <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800">
                                 <div className="flex items-center gap-2 mb-2">
@@ -224,7 +224,7 @@ export function CloudflaredSection({
                             </div>
                         )}
 
-                        {/* 错误信息 */}
+                        {/* error message */}
                         {cfStatus.error && (
                             <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300">
                                 {cfStatus.error}

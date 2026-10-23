@@ -3,10 +3,10 @@ use rusqlite::{params, Connection};
 use super::*;
 
 // ============================================================================
-// 白名单操作
+// Whitelist operation
 // ============================================================================
 
-/// 添加 IP 到白名单
+/// Add IP to whitelist
 pub fn add_to_whitelist(
     ip_pattern: &str,
     description: Option<&str>,
@@ -31,7 +31,7 @@ pub fn add_to_whitelist(
     })
 }
 
-/// 从白名单移除
+/// Remove from whitelist
 pub fn remove_from_whitelist(id: &str) -> Result<(), String> {
     let conn = connect_db()?;
 
@@ -41,7 +41,7 @@ pub fn remove_from_whitelist(id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 获取白名单列表
+/// Get whitelist list
 pub fn get_whitelist() -> Result<Vec<IpWhitelistEntry>, String> {
     let conn = connect_db()?;
 
@@ -71,11 +71,11 @@ pub fn get_whitelist() -> Result<Vec<IpWhitelistEntry>, String> {
     Ok(entries)
 }
 
-/// 检查 IP 是否在白名单中
+/// Check if the IP is in the whitelist
 pub fn is_ip_in_whitelist(ip: &str) -> Result<bool, String> {
     let conn = connect_db()?;
 
-    // 精确匹配
+    // exact match
     let count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM ip_whitelist WHERE ip_pattern = ?1",
@@ -88,7 +88,7 @@ pub fn is_ip_in_whitelist(ip: &str) -> Result<bool, String> {
         return Ok(true);
     }
 
-    // CIDR 匹配与 IP 等价匹配
+    // CIDR matching and IP equivalence matching
     let entries = get_whitelist()?;
     for entry in entries {
         if entry.ip_pattern.contains('/') {

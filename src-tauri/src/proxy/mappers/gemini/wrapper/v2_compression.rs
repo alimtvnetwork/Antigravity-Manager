@@ -120,8 +120,8 @@ pub(crate) fn phase_compression(
             let account_id: Option<&str> = None;
             let acc_clone = account_id.unwrap_or_default().to_string();
 
-            // 两个依赖缺一不可：token_manager 取凭据，upstream 选对代理
-            // （否则账号绑定专属代理时摘要会从真实 IP 出去）。
+            // Two dependencies are indispensable: token_manager to obtain credentials, upstream to select the right agent
+            // (Otherwise, the summary will be sent out from the real IP when the account is bound to a dedicated proxy).
             if let (Some(tm_arc), Some(upstream_arc)) = (tm_opt, upstream_opt) {
                 tokio::spawn(async move {
                     match try_compress_gemini_with_summary(

@@ -17,8 +17,8 @@ pub fn wrap_request(
         account_id,
         session_id,
         token,
-        None, // token_manager：不带 → Layer-3 本就不会触发
-        None, // upstream：同上，无需客户端
+        None, // token_manager: without → Layer-3 will not be triggered.
+        None, // upstream: Same as above, no client required
     )
 }
 

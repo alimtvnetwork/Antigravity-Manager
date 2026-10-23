@@ -15,12 +15,12 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
 
     match value {
         Value::Object(map) => {
-            // 0. [NEW] 合并 allOf
+            // 0. [NEW] Merge allOf
             merge_all_of(map);
 
-            // 0.1 [NEW #3327] 规范化 const 关键字 (转换为 enum 与对应 type)
-            // Gemini/Vertex 的 Schema proto 不支持 const，直接传入会导致 400 INVALID_ARGUMENT
-            // 例如 {"const": "element"} -> {"type": "string", "enum": ["element"]}
+            // 0.1 [NEW #3327] Normalize const keywords (convert to enum and corresponding type)
+            // The Schema proto of Gemini/Vertex does not support const, and passing it in directly will result in 400 INVALID_ARGUMENT.
+            // For example {"const": "element"} -> {"type": "string", "enum": ["element"]}
             if let Some(const_val) = map.remove("const") {
                 if !map.contains_key("type") {
                     let inferred_type = match &const_val {
@@ -51,10 +51,10 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
                 }
             }
 
-            // 0.5 [NEW] 结构归一化 (Normalization)
-            // 针对某些 MCP 工具（如 pencil）误用 items 定义对象属性的情况进行修复。
-            // 如果 type=object 或包含 properties，但又定义了 items，Gemini 会因为 items 只能出现在 array 中而报错。
-            // 我们将 items 的内容“对齐”到 properties 中。
+            // 0.5 [NEW] Structural normalization (Normalization)
+            // Fix for some MCP tools (such as pencil) incorrectly using items to define object properties.
+            // If type=object or contains properties but items is defined, Gemini will report an error because items can only appear in array.
+            // We "align" the contents of items into properties.
             if map.get("type").and_then(|t| t.as_str()) == Some("object")
                 || map.contains_key("properties")
             {
@@ -73,8 +73,8 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
                 }
             }
 
-            // 1. [CRITICAL] 深度递归处理子项
-            // 处理 properties (对象)
+            // 1. [CRITICAL] Deep recursive processing of sub-items
+            // Handle properties (object)
             if let Some(Value::Object(props)) = map.get_mut("properties") {
                 // [FIX] Drop boolean / non-object sub-schemas. JSON Schema allows
                 // `prop: true|false`, but Gemini's Schema proto requires every property
@@ -91,7 +91,7 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
 
                 let mut nullable_keys = std::collections::HashSet::new();
                 for (k, v) in props.iter_mut() {
-                    // properties 的每一个值都必须是一个独立的 Schema 节点
+                    // Each value of properties must be an independent Schema node
                     if clean_json_schema_recursive(v, true, depth + 1) {
                         nullable_keys.insert(k.clone());
                     }
@@ -113,23 +113,23 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
                     }
                 }
 
-                // [NEW] 隐式类型注入：如果有 properties 但没 type，补全为 object
+                // [NEW] Implicit type injection: if there are properties but no type, the completion is object
                 if !map.contains_key("type") {
                     map.insert("type".to_string(), Value::String("object".to_string()));
                 }
             }
 
-            // 处理 items (数组)
+            // Process items (array)
             // [FIX] items must be a Schema object; drop bare boolean / invalid items
             // (JSON Schema allows boolean `items`, Gemini's Schema proto rejects it).
             if map.get("items").map(|i| !i.is_object()).unwrap_or(false) {
                 map.remove("items");
             }
             if let Some(items) = map.get_mut("items") {
-                // items 的内容必须是一个独立的 Schema 节点
+                // The content of items must be an independent Schema node
                 clean_json_schema_recursive(items, true, depth + 1);
 
-                // [NEW] 隐式类型注入：如果有 items 但没 type，补全为 array
+                // [NEW] Implicit type injection: if there are items but no type, completion is array
                 if !map.contains_key("type") {
                     map.insert("type".to_string(), Value::String("array".to_string()));
                 }
@@ -149,18 +149,18 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
                 map.insert("items".to_string(), json!({ "type": "string" }));
             }
 
-            // Fallback: 对既没有 properties 也没有 items 的常规对象进行清理
+            // Fallback: Cleanup of regular objects with neither properties nor items
             if !map.contains_key("properties") && !map.contains_key("items") {
                 for (k, v) in map.iter_mut() {
-                    // 排除掉关键字
+                    // exclude keywords
                     if k != "anyOf" && k != "oneOf" && k != "allOf" && k != "enum" && k != "type" {
                         clean_json_schema_recursive(v, false, depth + 1);
                     }
                 }
             }
 
-            // 1.5. [FIX] 递归清理 anyOf/oneOf 数组中的每个分支
-            // 必须在合并逻辑之前执行，确保合并的分支已经被清洗
+            // 1.5. [FIX] Recursively clean every branch in anyOf/oneOf array
+            // Must be executed before merging logic to ensure that the merged branch has been cleaned
             if let Some(Value::Array(any_of)) = map.get_mut("anyOf") {
                 for branch in any_of.iter_mut() {
                     clean_json_schema_recursive(branch, true, depth + 1);
@@ -172,7 +172,7 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
                 }
             }
 
-            // 2. [FIX #815] 处理 anyOf/oneOf 联合类型: 合并属性或择优选择分支
+            // 2. [FIX #815] Handling anyOf/oneOf union types: merge attributes or cherry-pick branches
             let mut union_to_merge = None;
             if let Some(Value::Array(any_of)) = map.get("anyOf") {
                 union_to_merge = Some(any_of.clone());
@@ -183,7 +183,7 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
             if let Some(union_array) = union_to_merge {
                 if let Some(best_branch) = extract_best_schema_from_union(&union_array) {
                     if let Value::Object(branch_obj) = best_branch {
-                        // 合并分支属性到当前 map
+                        // Merge branch attributes into the current map
                         for (k, v) in branch_obj {
                             if k == "properties" {
                                 if let Some(target_props) = map
@@ -221,9 +221,9 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
                 }
             }
 
-            // 3. [SAFETY] 检查当前对象是否为 JSON Schema 节点
-            // 只有当对象看起来像 Schema (包含 type, properties, items, enum, anyOf 等) 时，才执行白名单过滤。
-            // 否则，如果它是一个普通的 Value (如 request.rs 中的 functionCall 对象)，直接应用激进过滤会破坏结构。
+            // 3. [SAFETY] Check whether the current object is a JSON Schema node
+            // Whitelist filtering is performed only if the object looks like the Schema (contains type, properties, items, enum, anyOf, etc.).
+            // Otherwise, if it is a normal Value (such as a functionCall object in request.rs), applying aggressive filtering directly would break the structure.
             let allowed_fields = [
                 "type",
                 "description",
@@ -236,9 +236,9 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
 
             let has_standard_keyword = map.keys().any(|k| allowed_fields.contains(&k.as_str()));
 
-            // [NEW] 启发式修复：如果明确是 Schema 节点，但没有标准关键字，却有其他 Key
-            // 我们推测这是一个“简写”的对象定义，尝试将其内部 Key 移动到 properties 中。
-            // 补充：必须确保它不是工具调用或结果 (含有 functionCall/functionResponse/args 等)，防止运行时参数结构被破坏。
+            // [NEW] Heuristic fix: If it is clearly a Schema node, but there is no standard key, there is other Key
+            // We speculate that this is a "shorthand" object definition and try to move its internal Key into properties.
+            // Supplement: You must ensure that it is not a tool call or result (containing functionCall/functionResponse/args, etc.) to prevent the runtime parameter structure from being destroyed.
             let is_not_schema_payload = map.contains_key("functionCall")
                 || map.contains_key("functionResponse")
                 || map.contains_key("args")
@@ -256,7 +256,7 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
                 map.insert("type".to_string(), Value::String("object".to_string()));
                 map.insert("properties".to_string(), Value::Object(properties));
 
-                // 递归清理刚刚移动进去的属性
+                // Recursively clean up the properties just moved in
                 if let Some(Value::Object(props_map)) = map.get_mut("properties") {
                     for v in props_map.values_mut() {
                         clean_json_schema_recursive(v, true, depth + 1);
@@ -267,7 +267,7 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
             let looks_like_schema = is_schema_node && !is_not_schema_payload;
 
             if looks_like_schema {
-                // 4. [CRITICAL] 白名单过滤：彻底物理移除 Gemini 不支持的内容，防止 400 错误
+                // 4. [CRITICAL] Whitelist filtering: completely physically remove content not supported by Gemini to prevent 400 errors
                 let keys_to_remove: Vec<String> = map
                     .keys()
                     .filter(|k| !allowed_fields.contains(&k.as_str()))
@@ -277,13 +277,13 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
                     map.remove(&k);
                 }
 
-                // 5. 保持客户端原始 description 文本，不折叠换行，不截断内容，保证完全保真透传
+                // 5. Keep the client’s original description text, without folding or line breaks, or truncating the content, ensuring complete fidelity and transparent transmission.
 
-                // 6. [SAFETY] 处理空 Object
-                // [FIX] 移除 reason 字段注入逻辑
-                // 之前的实现会为空 Object 注入 reason 字段，导致 Gemini CLI 等工具报 "malformed function call"
-                // 因为模型会生成包含 reason 参数的调用，但工具定义中并没有这个参数
-                // 现在改为：空 Object 保持空的 properties，让 Gemini 模型自行决定是否需要参数
+                // 6. [SAFETY] Handling empty Object
+                // [FIX] Remove reason field injection logic
+                // The previous implementation would inject the reason field into an empty Object, causing tools such as Gemini CLI to report "malformed function call"
+                // Because the model will generate a call containing the reason parameter, but this parameter is not included in the tool definition.
+                // Now change to: Empty Object Keep empty properties and let the Gemini model decide whether it needs parameters.
                 let is_object_type = map
                     .get("type")
                     .and_then(|t| t.as_str())
@@ -295,7 +295,7 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
                     }
                 }
 
-                // 7. [SAFETY] Required 字段对齐
+                // 7. [SAFETY] Required field alignment
                 let valid_prop_keys: Option<std::collections::HashSet<String>> = map
                     .get("properties")
                     .and_then(|p| p.as_object())
@@ -322,7 +322,7 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
                     }
                 }
 
-                // [IMPROVED] 提前计算回退类型以避免借用冲突
+                // [IMPROVED] Calculate fallback types ahead of time to avoid borrow conflicts
                 let fallback = if map.contains_key("properties") {
                     "object"
                 } else if map.contains_key("items") {
@@ -331,7 +331,7 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
                     "string"
                 };
 
-                // 8. 处理 type 字段
+                // 8. Process the type field
                 if let Some(type_val) = map.get_mut("type") {
                     let mut selected_type = None;
                     match type_val {
@@ -376,7 +376,7 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
                     }
                 }
 
-                // 9. Enum 值强制转字符串
+                // 9. Enum value forced conversion to string
                 if let Some(Value::Array(arr)) = map.get_mut("enum") {
                     for item in arr {
                         if !item.is_string() {
@@ -391,8 +391,8 @@ pub fn clean_json_schema_recursive(value: &mut Value, is_schema_node: bool, dept
             }
         }
         Value::Array(arr) => {
-            // [FIX] 递归清理数组中的每个元素
-            // 这确保了所有数组类型的值（包括但不限于 anyOf、oneOf、items、enum 等）都会被递归处理
+            // [FIX] Clean each element in an array recursively
+            // This ensures that all array type values (including but not limited to anyOf, oneOf, items, enum, etc.) will be processed recursively
             for item in arr.iter_mut() {
                 clean_json_schema_recursive(item, is_schema_node, depth + 1);
             }

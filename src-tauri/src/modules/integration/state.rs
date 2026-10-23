@@ -19,7 +19,7 @@ pub fn take_prompt_reinjected() -> bool {
         .unwrap_or(false)
 }
 
-/// 根据目标参数、进程运行态及可执行文件存在性决策最终切换环境
+/// The final decision is made to switch the environment based on the target parameters, process running status and executable file existence.
 pub fn resolve_effective_target(
     target_ide: Option<&str>,
     classic_running: bool,
@@ -37,19 +37,19 @@ pub fn resolve_effective_target(
         return (false, Some("classic"));
     }
 
-    // target_ide 为 None 或未指定时进行智能环境探查（经典版桌面端优先，严禁仅凭静态 IDE 数据库文件劫持经典版目标）
+    // Intelligent environment detection is performed when target_ide is None or not specified (the classic version desktop version is preferred, and it is strictly prohibited to hijack the classic version target with only static IDE database files)
     let mut is_ide = false;
     if classic_running {
-        // 原生经典版正在运行，确定目标为经典版
+        // The native classic version is running, and the target is determined to be the classic version.
         is_ide = false;
     } else if ide_running {
-        // 经典版未运行，但 IDE 正在运行，推导为 IDE
+        // Classic version is not running, but the IDE is running, inferred as IDE
         is_ide = true;
     } else if has_classic_exe {
-        // 原生经典版可执行文件存在，优先保持经典版
+        // The native classic version executable file exists, priority is given to keeping the classic version
         is_ide = false;
     } else if let Some(exe_str) = ide_exe_path {
-        // 原生经典版不存在，检查是否存在 IDE 可执行文件
+        // The native classic version does not exist, check whether the IDE executable file exists
         let path_lower = exe_str.to_lowercase();
         if path_lower.contains("antigravity ide") || path_lower.contains("antigravity-ide") {
             is_ide = true;

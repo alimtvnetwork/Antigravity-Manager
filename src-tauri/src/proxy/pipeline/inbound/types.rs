@@ -1,30 +1,30 @@
 use super::*;
 
-/// 客户端思考控制开关（三态枚举）
-/// 遵循最高指令：思考开关（一票否决权） > 思考等级 > 思考预算
+/// Client thinking control switch (three-state enumeration)
+/// Follow the Prime Directive: Think Switch (veto power) > Think Level > Think Budget
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ClientThinkingSwitch {
-    /// 显式关闭（最高准则，一票否决：disabled / 0 / none / off）
+    /// Explicit shutdown (highest guideline, one vote veto: disabled / 0 / none / off)
     Disabled,
-    /// 显式开启（enabled / on / 具体档位 / 具体预算）
+    /// Explicitly turned on (enabled / on / specific gear / specific budget)
     Enabled,
-    /// 缺省（未传任何思考参数，或值为 default；业务铁律：缺省就是默认开）
+    /// Default (no thinking parameter is passed, or the value is default; iron rule of business: the default is to enable it by default)
     Default,
 }
 
 impl ClientThinkingSwitch {
-    /// 是否允许开启思考（缺省即开，关则一票否决）
+    /// Whether to allow thinking (default is on, off means veto)
     pub fn is_allowed(self) -> bool {
         matches!(self, Self::Enabled | Self::Default)
     }
 
-    /// 是否显式关闭
+    /// Whether to explicitly close
     pub fn is_disabled(self) -> bool {
         matches!(self, Self::Disabled)
     }
 }
 
-/// 统一归一化提取客户端思考开关状态（适用于 OpenAI / Claude / Gemini / Codex 等所有协议）
+/// Unified and normalized extraction of client thinking switch status (applicable to all protocols such as OpenAI / Claude / Gemini / Codex)
 pub fn extract_client_thinking_switch(
     thinking_type: Option<&str>,
     budget: Option<u64>,
@@ -33,7 +33,7 @@ pub fn extract_client_thinking_switch(
     let t_type = thinking_type.map(|s| s.trim().to_lowercase());
     let eff = effort.map(|s| s.trim().to_lowercase());
 
-    // 1. 显式关闭判定（最高优先级，一票否决）
+    // 1. Explicitly close the judgment (highest priority, one vote veto)
     if matches!(
         t_type.as_deref(),
         Some("disabled") | Some("off") | Some("false") | Some("0")
@@ -46,7 +46,7 @@ pub fn extract_client_thinking_switch(
         return ClientThinkingSwitch::Disabled;
     }
 
-    // 2. 显式开启判定（只要客户端带了有效开启标记、具体预算，或任何非空/非关闭的思考等级）
+    // 2. Explicit opening determination (as long as the client has a valid opening tag, a specific budget, or any non-empty/non-closed thinking level)
     if matches!(
         t_type.as_deref(),
         Some("enabled") | Some("on") | Some("true")
@@ -64,14 +64,14 @@ pub fn extract_client_thinking_switch(
         return ClientThinkingSwitch::Enabled;
     }
 
-    // 3. 缺省（全未传，或仅为 "default"；铁律：缺省就是默认开）
+    // 3. Default (not transmitted at all, or only "default"; iron rule: the default is to enable it by default)
     ClientThinkingSwitch::Default
 }
 
-/// 统一进站思考管线（InboundThinkingPipeline）
-/// 接收任何协议转译成的 Google contents 统一报文，单向流转执行：
-/// 1. 协议策略签名清洗 (Chat 协议丢弃客户端签名，其他协议验签)
-/// 2. 思考块首位强制排序与占位符规范化
-/// 3. 状态机历史思维链无损复活 (Hydration)
-/// 4. 终审脱敏与前缀缓存格式规范化 (Finalize)
+/// Unified InboundThinkingPipeline
+/// Receive unified messages from Google contents translated by any protocol, and perform one-way transfer:
+/// 1. Protocol policy signature cleaning (Chat protocol discards client signatures, other protocols verify signatures)
+/// 2. Think about forced sorting at the top of blocks and placeholder normalization
+/// 3. Lossless resurrection of the state machine’s historical thinking chain (Hydration)
+/// 4. Final desensitization and prefix cache format standardization (Finalize)
 pub struct InboundThinkingPipeline;

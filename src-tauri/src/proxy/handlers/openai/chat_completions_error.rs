@@ -56,7 +56,7 @@ pub(crate) async fn chat_completions_error(
         project_id,
         ..
     } = send;
-    // 处理特定错误并重试
+    // Handle specific errors and try again
     failure_statuses.record(status);
     let status_code = status.as_u16();
     let retry_after = response
@@ -70,7 +70,7 @@ pub(crate) async fn chat_completions_error(
         .unwrap_or_else(|_| format!("HTTP {}", status_code));
     *last_error = format!("HTTP {}: {}", status_code, error_text);
 
-    // [New] 打印错误报文日志
+    // [New] Print error message log
     tracing::error!(
         "[OpenAI-Upstream] Error Response {}: {}",
         status_code,
@@ -106,7 +106,7 @@ pub(crate) async fn chat_completions_error(
         crate::proxy::sticky_config::SchedulingMode::PerformanceFirst => false,
     };
 
-    // 确定重试策略：传入当前 attempt 与 pool_size，执行智能自适应裁决
+    // Determine the retry strategy: pass in the current attempt and pool_size, and perform intelligent adaptive decision-making
     let strategy = retry_state.determine_strategy_adaptive(
         &account_id,
         status_code,
@@ -116,7 +116,7 @@ pub(crate) async fn chat_completions_error(
         attempt,
         pool_size,
     );
-    // 统一流水线决策判定：协议无关的限流与错误判定
+    // Unified pipeline decision-making: protocol-independent current limiting and error determination
     let classification = crate::proxy::pipeline::UpstreamClassification::classify(
         status_code,
         &error_text,
@@ -154,12 +154,12 @@ pub(crate) async fn chat_completions_error(
                     "[{}] Pipeline: Thinking signature error detected on upstream (HTTP {}). Surgically purging corrupted signatures and retrying on same account.",
                     trace_id, status_code
                 );
-            // 1. 精准定向净化 ThinkingStore 中的异构污染签名（保留思考文本与健康签名）
+            // 1. Precisely targeted purification of heterogeneous pollution signatures in ThinkingStore (retaining thinking text and healthy signatures)
             crate::proxy::thinking_store::ThinkingStore::global()
                 .purge_corrupted_signatures(&session_id, &mapped_model);
-            // 2. 清理当前 session 的 SignatureCache
+            // 2. Clear the SignatureCache of the current session
             crate::proxy::SignatureCache::global().delete_session_signature(&client_session_id);
-            // 3. 保持同一账号原地重试
+            // 3. Keep the same account and try again.
             *force_rotate = false;
             return Ok(ChatAttemptOutcome::Continue);
         } else {
@@ -193,7 +193,7 @@ pub(crate) async fn chat_completions_error(
             .await;
     }
 
-    // 3. 标记限流状态(用于 UI 显示)
+    // 3. Mark the current limiting status (for UI display)
     if config.request_type != "image_gen" && should_mark_limited {
         // [FIX] Use async version with model parameter for fine-grained rate limiting
         token_manager
@@ -213,7 +213,7 @@ pub(crate) async fn chat_completions_error(
             .await;
     }
 
-    // [FIX] 403 时优先检测 VALIDATION_REQUIRED 并设置 is_forbidden / validation_block 状态，确保及时提取 URL 与更新 UI
+    // [FIX] When 403 is detected, VALIDATION_REQUIRED is detected first and the is_forbidden / validation_block status is set to ensure timely extraction of URLs and UI updates.
     if status_code == 403 {
         if let Some(acc_id) = token_manager.get_account_id_by_email(&email) {
             if error_text.contains("VALIDATION_REQUIRED")
@@ -236,14 +236,14 @@ pub(crate) async fn chat_completions_error(
                 }
             }
 
-            // 设置 is_forbidden 状态并持久化
+            // Set is_forbidden state and persist it
             if let Err(e) = token_manager.set_forbidden(&acc_id, &error_text).await {
                 tracing::error!("Failed to set forbidden status: {}", e);
             }
         }
     }
 
-    // 执行退避
+    // Perform backoff
     if apply_retry_strategy(
         strategy.clone(),
         attempt,
@@ -273,7 +273,7 @@ pub(crate) async fn chat_completions_error(
             }
         }
 
-        // 判断是否需要轮换账号
+        // Determine whether accounts need to be rotated
         if !should_rotate_account(status_code, Some(&strategy)) {
             debug!(
                 "[{}] Keeping same account for status {} (Grace Retry or Server Issue)",
@@ -294,9 +294,9 @@ pub(crate) async fn chat_completions_error(
         return Ok(ChatAttemptOutcome::Continue);
     }
 
-    // [FIX session-1M] 上游按 sessionId 在服务端累计会话输入,长工具循环会把累计推过 1M,
-    // 之后该 sessionId 的所有请求都 400 "input token count exceeds ... 1048576"。
-    // 给 (账号, 对话) 的 sessionId 升代并立即重试:新 sessionId = 上游全新会话,对话无感恢复。
+    // [FIX session-1M] The upstream accumulates session input on the server side by sessionId. A long tool loop will push the accumulation past 1M.
+    // All subsequent requests for this sessionId are 400 "input token count exceeds ... 1048576".
+    // Upgrade the sessionId of (account, conversation) and try again immediately: new sessionId = new upstream session, conversation will be restored without any sense.
     if status_code == 400 && error_text.contains("exceeds the maximum number of tokens") {
         let fingerprint = SessionManager::extract_openai_session_id(openai_req);
         let generation = crate::proxy::common::session::bump_session(&account_id, &fingerprint);
@@ -304,10 +304,10 @@ pub(crate) async fn chat_completions_error(
                 "[OpenAI] Upstream session token accumulation exceeded 1M on account {}. sessionId bumped to generation {}, retrying with a fresh upstream session.",
                 email, generation
             );
-        return Ok(ChatAttemptOutcome::Continue); // 重试:下一轮 transform 时读取新代数,派生全新 sessionId
+        return Ok(ChatAttemptOutcome::Continue); // Retry: Read the new algebra in the next round of transform and derive a new sessionId
     }
 
-    // 404 等由于模型配置或路径错误的 HTTP 异常，直接报错返回双轨制友好报文，不进行无效轮换
+    // For HTTP exceptions such as 404 due to incorrect model configuration or path, an error will be reported directly and a dual-track friendly message will be returned without invalid rotation.
     error!(
         "OpenAI Upstream non-retryable error {} on account {}: {}",
         status_code, email, error_text

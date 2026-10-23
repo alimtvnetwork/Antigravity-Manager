@@ -172,20 +172,20 @@ fn test_sqlite_l2_penetration_by_signature_and_tool() {
 
 #[test]
 fn test_is_likely_gemini_signature_validation() {
-    // 1. 官方哨兵
+    // 1. Official Sentinel
     assert!(is_likely_gemini_signature(SENTINEL_SIGNATURE));
 
-    // 2. 真实 Gemini 原生签名 (首字节 0x12, 以 'E' 开头)
+    // 2. Real Gemini native signature (first byte 0x12, starting with 'E')
     let gemini_sig = "Ep4KCpsKAWkUfRMa5ZYMDdlPjxrQTLzVZ6MZeopI88888888888888888888888888888888";
     assert!(is_likely_gemini_signature(gemini_sig));
 
-    // 3. Google Vertex AI 双层 Base64 包装 (以 'R' 开头, 解开是 'E...' 且首字节 0x12)
+    // 3. Google Vertex AI double-layer Base64 packaging (starting with 'R', unpacking is 'E...' and the first byte is 0x12)
     use base64::Engine;
     let vertex_wrapped = base64::engine::general_purpose::STANDARD.encode(gemini_sig.as_bytes());
     assert!(vertex_wrapped.starts_with('R'));
     assert!(is_likely_gemini_signature(&vertex_wrapped));
 
-    // 4. 异构外部 Claude 签名 (以 '3', 'l', 'A', 'R' 开头, 解码后非 0x12)
+    // 4. Heterogeneous external Claude signature (starting with '3', 'l', 'A', 'R', not 0x12 after decoding)
     let claude_sig_1 = "3mgp11XmVXq9InniGA4VAKd7c97NqFw+dWZt79Uz/w9znho88gSM76jv2bZmir7wI86Ixpha7eWdGuznAot4PNbe3+V9bgMTIEyUarn4MLAiiFVb830ZlM+H5ukQwXdD2Zv8nUSmmZTYinpLPGha8TORZAfpU1FJEvwyECel5+W7kc9kpTWrd8DqRNBTOz5EDtvoatiZgKv5SqInhGXK74SJ+PRIC6fNXvYG082HR6TsVxvVYaerz8A40rloIVTxRNK43h3Ecs1boxY4PZqBT8Yhl2qn/iZ+4Xt7FNkI0DAuS9iK0HYKMC4yw0OqKx/LeU+WFZlyc6hGm1BkzLY6yG97MH7kmJ0OPlBWgWFaTeL/uXuGJX6QkKObXN+phoq+kkF2vdFt/mdJMbdgfmSCVQ9037hGBhOHm0zN50KLkp1SxuAY1oWc+lDcI4ufWoyn";
     let claude_sig_2 = "ls29VsBy+VBvzrVBmB2gNmOCoaeJkn19qz8jP8jExGpDc0IxRaV1V9/+cQ4O00000000000000000000000000000000";
     let claude_sig_3 = "A1nvLg9Twun3bBCb1BKLmSNA6MRxaLE2GdEocv6bwuhNKfUmBB2YMvvmaVyO00000000000000000000000000000000";
@@ -193,29 +193,29 @@ fn test_is_likely_gemini_signature_validation() {
     assert!(!is_likely_gemini_signature(claude_sig_2));
     assert!(!is_likely_gemini_signature(claude_sig_3));
 
-    // 5. 过短签名
+    // 5. Signature too short
     assert!(!is_likely_gemini_signature("short_sig"));
 }
 
 #[test]
 fn test_is_claude_signature_validation() {
     use base64::Engine;
-    // 1. 构建合法的原始 Claude 签名（单层 Base64 解码后包含 b"claude"）
+    // 1. Construct a legal original Claude signature (contains b"claude" after single-layer Base64 decoding)
     let inner_claude_payload =
         b"\x12\xb2\x02\n\x92\x01\x08\x12\x10\x02\x18\x02*@claude-opus-4-6-signature-data";
     let raw_claude_sig = base64::engine::general_purpose::STANDARD.encode(inner_claude_payload);
     assert!(is_claude_signature(&raw_claude_sig));
 
-    // 2. 构建 Google Vertex AI 双层包装后的 Claude 签名
+    // 2. Construct Google Vertex AI double-packaged Claude signature
     let wrapped_claude_sig =
         base64::engine::general_purpose::STANDARD.encode(raw_claude_sig.as_bytes());
     assert!(is_claude_signature(&wrapped_claude_sig));
 
-    // 3. Gemini 签名绝不是 Claude 签名
+    // 3. A Gemini signature is never a Claude signature
     let gemini_sig = "Ep4KCpsKAWkUfRMa5ZYMDdlPjxrQTLzVZ6MZeopI88888888888888888888888888888888";
     assert!(!is_claude_signature(gemini_sig));
 
-    // 4. 空与哨兵
+    // 4. Sky and Sentinel
     assert!(!is_claude_signature(""));
     assert!(!is_claude_signature(SENTINEL_SIGNATURE));
 }
@@ -223,21 +223,21 @@ fn test_is_claude_signature_validation() {
 #[test]
 fn test_ensure_google_claude_thought_signature_does_not_inflate() {
     use base64::Engine;
-    // 原始 Claude 签名：包装一次
+    // Original Claude Signature: Packed Once
     let inner_claude_payload =
         b"\x12\xb2\x02\n\x92\x01\x08\x12\x10\x02\x18\x02*@claude-opus-4-6-signature-data";
     let raw_claude_sig = base64::engine::general_purpose::STANDARD.encode(inner_claude_payload);
     let wrapped_once = ensure_google_claude_thought_signature(&raw_claude_sig);
     assert_ne!(wrapped_once, raw_claude_sig);
 
-    // 已包装的 Claude 签名：幂等，绝对不再包装！
+    // Wrapped Claude signature: idempotent, definitely no longer wrapped!
     let wrapped_twice = ensure_google_claude_thought_signature(&wrapped_once);
     assert_eq!(
         wrapped_once, wrapped_twice,
         "Claude signature must be idempotent, no double wrapping"
     );
 
-    // 非 Claude 签名 (Gemini 签名)：绝不能包装！彻底杜绝几何级膨胀
+    // Non-Claude Signature (Gemini Signature): MUST NOT be packaged! Completely eliminate geometric expansion
     let gemini_sig = "Ep4KCpsKAWkUfRMa5ZYMDdlPjxrQTLzVZ6MZeopI88888888888888888888888888888888";
     let gemini_out = ensure_google_claude_thought_signature(gemini_sig);
     assert_eq!(

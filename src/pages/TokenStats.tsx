@@ -30,7 +30,7 @@ const TokenStats: React.FC = () => {
                 <div className="flex items-center justify-between">
                     <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
                         <Zap className="w-6 h-6 text-blue-500" />
-                        {t('token_stats.title', 'Token 消费统计')}
+                        {t('token_stats.title', 'Token consumption statistics')}
                     </h1>
                     <div className="flex items-center gap-2">
                         <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
@@ -42,7 +42,7 @@ const TokenStats: React.FC = () => {
                                     }`}
                             >
                                 <Clock className="w-4 h-4" />
-                                {t('token_stats.hourly', '小时')}
+                                {t('token_stats.hourly', 'Hour')}
                             </button>
                             <button
                                 onClick={() => setTimeRange('daily')}
@@ -52,7 +52,7 @@ const TokenStats: React.FC = () => {
                                     }`}
                             >
                                 <Calendar className="w-4 h-4" />
-                                {t('token_stats.daily', '日')}
+                                {t('token_stats.daily', 'day')}
                             </button>
                             <button
                                 onClick={() => setTimeRange('weekly')}
@@ -62,7 +62,7 @@ const TokenStats: React.FC = () => {
                                     }`}
                             >
                                 <CalendarDays className="w-4 h-4" />
-                                {t('token_stats.weekly', '周')}
+                                {t('token_stats.weekly', 'week')}
                             </button>
                         </div>
                         <button
@@ -82,7 +82,7 @@ const TokenStats: React.FC = () => {
                                 <div className="p-1.5 rounded-lg bg-gray-100 dark:bg-gray-700">
                                     <Zap className="w-4 h-4 text-gray-600 dark:text-gray-300" />
                                 </div>
-                                {t('token_stats.total_tokens', '总 Token')}
+                                {t('token_stats.total_tokens', 'Total Tokens')}
                             </div>
                             <div className="text-2xl font-bold text-gray-800 dark:text-white">
                                 {formatNumber(summary.total_tokens)}
@@ -93,7 +93,7 @@ const TokenStats: React.FC = () => {
                                 <div className="p-1.5 rounded-lg bg-blue-100/50 dark:bg-blue-900/30">
                                     <TrendingUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                                 </div>
-                                {t('token_stats.input_tokens', '输入 Token')}
+                                {t('token_stats.input_tokens', 'Enter Token')}
                             </div>
                             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                                 {formatNumber(summary.total_input_tokens)}
@@ -104,7 +104,7 @@ const TokenStats: React.FC = () => {
                                 <div className="p-1.5 rounded-lg bg-purple-100/50 dark:bg-purple-900/30">
                                     <TrendingUp className="w-4 h-4 rotate-180 text-purple-600 dark:text-purple-400" />
                                 </div>
-                                {t('token_stats.output_tokens', '输出 Token')}
+                                {t('token_stats.output_tokens', 'Output Token')}
                             </div>
                             <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                                 {formatNumber(summary.total_output_tokens)}
@@ -115,7 +115,7 @@ const TokenStats: React.FC = () => {
                                 <div className="p-1.5 rounded-lg bg-sky-100/50 dark:bg-sky-900/30">
                                     <Zap className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                                 </div>
-                                {t('token_stats.cached_token', '缓存命中')}
+                                {t('token_stats.cached_token', 'cache hit')}
                             </div>
                             <div className="text-2xl font-bold text-sky-600 dark:text-sky-400">
                                 {formatNumber(summary.total_cached_tokens)}
@@ -126,7 +126,7 @@ const TokenStats: React.FC = () => {
                                 <div className="p-1.5 rounded-lg bg-green-100/50 dark:bg-green-900/30">
                                     <Users className="w-4 h-4 text-green-600 dark:text-green-400" />
                                 </div>
-                                {t('token_stats.accounts_used', '活跃账号')}
+                                {t('token_stats.accounts_used', 'Active account')}
                             </div>
                             <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                                 {summary.unique_accounts}
@@ -137,7 +137,7 @@ const TokenStats: React.FC = () => {
                                 <div className="p-1.5 rounded-lg bg-orange-100/50 dark:bg-orange-900/30">
                                     <Cpu className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                                 </div>
-                                {t('token_stats.models_used', '使用模型')}
+                                {t('token_stats.models_used', 'Use model')}
                             </div>
                             <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                                 {modelData.length}

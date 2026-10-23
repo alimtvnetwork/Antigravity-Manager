@@ -123,8 +123,8 @@ export function StatsCharts(props: StatsChartsProps) {
                             <Users className="w-5 h-5 text-green-500" />
                         )}
                         {viewMode === 'model'
-                            ? t('token_stats.model_trend', '分模型使用趋势')
-                            : t('token_stats.account_trend', '分账号使用趋势')
+                            ? t('token_stats.model_trend', 'Model usage trends')
+                            : t('token_stats.account_trend', 'Trends in usage of separate accounts')
                         }
                     </h2>
                     <div className="flex bg-gray-100/80 dark:bg-gray-700/50 rounded-lg p-1">
@@ -135,7 +135,7 @@ export function StatsCharts(props: StatsChartsProps) {
                                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                                 }`}
                         >
-                            {t('token_stats.by_model', '按模型')}
+                            {t('token_stats.by_model', 'by model')}
                         </button>
                         <button
                             onClick={() => setViewMode('account')}
@@ -144,7 +144,7 @@ export function StatsCharts(props: StatsChartsProps) {
                                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                                 }`}
                         >
-                            {t('token_stats.by_account_view', '按账号')}
+                            {t('token_stats.by_account_view', 'By account')}
                         </button>
                     </div>
                 </div>
@@ -207,7 +207,7 @@ export function StatsCharts(props: StatsChartsProps) {
                         </ResponsiveContainer>
                     ) : (
                         <div className="h-full flex items-center justify-center text-gray-400">
-                            {loading ? t('common.loading', '加载中...') : t('token_stats.no_data', '暂无数据')}
+                            {loading ? t('common.loading', 'loading...') : t('token_stats.no_data', 'No data yet')}
                         </div>
                     )}
                 </div>
@@ -216,7 +216,7 @@ export function StatsCharts(props: StatsChartsProps) {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col">
                     <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-                        {t('token_stats.usage_trend', 'Token 使用趋势')}
+                        {t('token_stats.usage_trend', 'Token usage trends')}
                     </h2>
                     <div className="flex-1 min-h-[16rem]">
                         {chartData.length > 0 ? (
@@ -247,14 +247,14 @@ export function StatsCharts(props: StatsChartsProps) {
                                         allowEscapeViewBox={{ x: true, y: true }}
                                         wrapperStyle={{ zIndex: 100 }}
                                     />
-                                    <Bar dataKey="total_cached_tokens" name={t('token_stats.cached_token', '缓存命中')} stackId="input" fill="#93c5fd" radius={[0, 0, 4, 4]} maxBarSize={50} />
-                                    <Bar dataKey="uncached_input_tokens" name={t('token_stats.input', '输入')} stackId="input" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50} />
-                                    <Bar dataKey="total_output_tokens" name={t('token_stats.output', '输出')} fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                                    <Bar dataKey="total_cached_tokens" name={t('token_stats.cached_token', 'cache hit')} stackId="input" fill="#93c5fd" radius={[0, 0, 4, 4]} maxBarSize={50} />
+                                    <Bar dataKey="uncached_input_tokens" name={t('token_stats.input', 'enter')} stackId="input" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                                    <Bar dataKey="total_output_tokens" name={t('token_stats.output', 'output')} fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={50} />
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (
                             <div className="h-full flex items-center justify-center text-gray-400">
-                                {loading ? t('common.loading', '加载中...') : t('token_stats.no_data', '暂无数据')}
+                                {loading ? t('common.loading', 'loading...') : t('token_stats.no_data', 'No data yet')}
                             </div>
                         )}
                     </div>
@@ -262,7 +262,7 @@ export function StatsCharts(props: StatsChartsProps) {
 
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
                     <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-                        {t('token_stats.by_account', '分账号统计')}
+                        {t('token_stats.by_account', 'Statistics by account')}
                     </h2>
                     <div className="h-48" ref={pieChartContainerRef}>
                         {pieData.length > 0 ? (
@@ -294,7 +294,7 @@ export function StatsCharts(props: StatsChartsProps) {
                             </ResponsiveContainer>
                         ) : (
                             <div className="h-full flex items-center justify-center text-gray-400">
-                                {loading ? t('common.loading', '加载中...') : t('token_stats.no_data', '暂无数据')}
+                                {loading ? t('common.loading', 'loading...') : t('token_stats.no_data', 'No data yet')}
                             </div>
                         )}
                     </div>
@@ -325,32 +325,32 @@ export function StatsCharts(props: StatsChartsProps) {
                     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
                         <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
                             <Cpu className="w-5 h-5 text-blue-500" />
-                            {t('token_stats.model_details', '分模型详细统计')}
+                            {t('token_stats.model_details', 'Detailed statistics by model')}
                         </h2>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b border-gray-200 dark:border-gray-700">
                                         <th className="text-left py-3 px-4 font-medium text-gray-500 dark:text-gray-400">
-                                            {t('token_stats.model', '模型')}
+                                            {t('token_stats.model', 'Model')}
                                         </th>
                                         <th className="text-right py-3 px-4 font-medium text-gray-500 dark:text-gray-400">
-                                            {t('token_stats.requests', '请求数')}
+                                            {t('token_stats.requests', 'Number of requests')}
                                         </th>
                                         <th className="text-right py-3 px-4 font-medium text-gray-500 dark:text-gray-400">
-                                            {t('token_stats.input', '输入')}
+                                            {t('token_stats.input', 'enter')}
                                         </th>
                                         <th className="text-right py-3 px-4 font-medium text-gray-500 dark:text-gray-400">
-                                            {t('token_stats.output', '输出')}
+                                            {t('token_stats.output', 'output')}
                                         </th>
                                         <th className="text-right py-3 px-4 font-medium text-gray-500 dark:text-gray-400">
-                                            {t('token_stats.cached_token', '缓存命中')}
+                                            {t('token_stats.cached_token', 'cache hit')}
                                         </th>
                                         <th className="text-right py-3 px-4 font-medium text-gray-500 dark:text-gray-400">
-                                            {t('token_stats.total', '合计')}
+                                            {t('token_stats.total', 'total')}
                                         </th>
                                         <th className="text-right py-3 px-4 font-medium text-gray-500 dark:text-gray-400">
-                                            {t('token_stats.percentage', '占比')}
+                                            {t('token_stats.percentage', 'Proportion')}
                                         </th>
                                     </tr>
                                 </thead>
@@ -420,29 +420,29 @@ export function StatsCharts(props: StatsChartsProps) {
                 accountData.length > 0 && viewMode === 'account' && (
                     <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
                         <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-                            {t('token_stats.account_details', '账号详细统计')}
+                            {t('token_stats.account_details', 'Account detailed statistics')}
                         </h2>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b border-gray-200 dark:border-gray-700">
                                         <th className="text-left py-3 px-4 font-medium text-gray-500 dark:text-gray-400">
-                                            {t('token_stats.account', '账号')}
+                                            {t('token_stats.account', 'account')}
                                         </th>
                                         <th className="text-right py-3 px-4 font-medium text-gray-500 dark:text-gray-400">
-                                            {t('token_stats.requests', '请求数')}
+                                            {t('token_stats.requests', 'Number of requests')}
                                         </th>
                                         <th className="text-right py-3 px-4 font-medium text-gray-500 dark:text-gray-400">
-                                            {t('token_stats.input', '输入')}
+                                            {t('token_stats.input', 'enter')}
                                         </th>
                                         <th className="text-right py-3 px-4 font-medium text-gray-500 dark:text-gray-400">
-                                            {t('token_stats.output', '输出')}
+                                            {t('token_stats.output', 'output')}
                                         </th>
                                         <th className="text-right py-3 px-4 font-medium text-gray-500 dark:text-gray-400">
-                                            {t('token_stats.cached_token', '缓存命中')}
+                                            {t('token_stats.cached_token', 'cache hit')}
                                         </th>
                                         <th className="text-right py-3 px-4 font-medium text-gray-500 dark:text-gray-400">
-                                            {t('token_stats.total', '合计')}
+                                            {t('token_stats.total', 'total')}
                                         </th>
                                     </tr>
                                 </thead>

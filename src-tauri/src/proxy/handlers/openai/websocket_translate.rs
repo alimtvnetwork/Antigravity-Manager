@@ -192,7 +192,7 @@ pub(crate) async fn translate_openai_chunk_to_ws(
                                 ),
                             );
                             if !tc_name.is_empty() {
-                                // 临时插入一个包含 name 的 Value，最终会被 finalize_ws_events 里的完整 Value 覆盖
+                                // Temporarily insert a Value containing name, which will eventually be overwritten by the complete Value in finalize_ws_events
                                 insert_cached_tool_call(call_id, json!({ "name": tc_name }));
                             }
                         }

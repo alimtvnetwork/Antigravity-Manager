@@ -103,12 +103,12 @@ export const MonitorToolbar: React.FC<MonitorToolbarProps> = ({
                             ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30'
                             : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200'
                     }`}
-                    title={t('common.settings', { defaultValue: '设置' })}
-                    aria-label={t('common.settings', { defaultValue: '设置' })}
+                    title={t('common.settings', { defaultValue: 'set up' })}
+                    aria-label={t('common.settings', { defaultValue: 'set up' })}
                 >
                     <Settings size={16} />
                 </button>
-                <button onClick={onClearLogs} className="btn btn-sm btn-ghost text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title={t('monitor.actions.clear_all_requests', { defaultValue: '清空请求日志' })}>
+                <button onClick={onClearLogs} className="btn btn-sm btn-ghost text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title={t('monitor.actions.clear_all_requests', { defaultValue: 'Clear request log' })}>
                     <Trash2 size={16} />
                 </button>
             </div>
@@ -135,10 +135,10 @@ export const MonitorToolbar: React.FC<MonitorToolbarProps> = ({
                             ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
                             : 'bg-white dark:bg-base-200 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-base-300 hover:bg-gray-100 dark:hover:bg-base-300/80 hover:text-gray-900 dark:hover:text-white shadow-2xs'
                     }`}
-                    title={t('monitor.filters.capture_health_tip', { defaultValue: '默认关闭：过滤全部 GET 成功请求（含 /v1/models 模型列表轮询与 /health 探针）且不入库；失败请求始终记录；开启后才全部记录并落库' })}
+                    title={t('monitor.filters.capture_health_tip', { defaultValue: 'Off by default: all successful GET requests (including /v1/models model list polling and /health probes) are filtered and not stored in the database; failed requests are always recorded; all records are recorded and stored after being enabled.' })}
                 >
                     <span className={`w-1.5 h-1.5 rounded-full ${captureHealthLogs ? 'bg-white animate-pulse' : 'bg-gray-400 dark:bg-gray-500'}`} />
-                    {t('monitor.filters.capture_health', { defaultValue: '捕获健康检查' })}
+                    {t('monitor.filters.capture_health', { defaultValue: 'Capture health checks' })}
                 </button>
                 {(filter || accountFilter) && (
                     <button

@@ -122,10 +122,10 @@ pub fn simplify_payload_json(value: &Value) -> Value {
         concise.insert("systemInstruction".into(), sys.clone());
     }
 
-    // 5.5 OpenAI Responses 协议：instructions（系统指令）与 input（对话上下文）
-    //     这两个是 Responses / Codex 的核心载荷，且不是 messages 的别名 —— 不保留会让
-    //     日志里"系统提示词块与上下文块整段消失"（客户端原文看不到，而中转报文是 Gemini
-    //     格式故看起来完整）。
+    // 5.5 OpenAI Responses protocol: instructions (system instructions) and input (dialogue context)
+    //     These two are the core payloads of Responses / Codex and are not aliases of messages - not retaining them will make
+    //     In the log, "The system prompts that the entire word block and context block disappear" (the client cannot see the original text, but the relay message is Gemini
+    //     format so it looks complete).
     if let Some(instructions) = inner
         .get("instructions")
         .or_else(|| value.get("instructions"))
@@ -213,7 +213,7 @@ pub fn simplify_payload_json(value: &Value) -> Value {
         concise.insert("usageMetadata".into(), usage.clone());
     }
 
-    // 9.5 耗时诊断指标 (_timing)
+    // 9.5 Time-consuming diagnostic indicator (_timing)
     if let Some(timing) = inner.get("_timing").or_else(|| value.get("_timing")) {
         concise.insert("_timing".into(), timing.clone());
     }
@@ -275,7 +275,7 @@ pub fn simplify_payload_json(value: &Value) -> Value {
         return simplify_unknown(value);
     }
 
-    // 按关注度重排字段：核心信息前置；未列入 CORE_FIELD_ORDER 的字段保持原相对顺序追加
+    // Rearrange fields by attention: core information comes first; fields not included in CORE_FIELD_ORDER remain in their original relative order and are appended
     reorder_payload_fields(&Value::Object(concise))
 }
 

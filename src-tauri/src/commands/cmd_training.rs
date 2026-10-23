@@ -18,4 +18,4 @@ pub async fn get_training_telemetry() -> Result<serde_json::Value, String> {
     serde_json::to_value(t).map_err(|e| e.to_string())
 }
 
-// --- OAuth 命令 ---
+// --- OAuth commands ---

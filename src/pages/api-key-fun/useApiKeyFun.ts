@@ -147,7 +147,7 @@ export function useApiKeyFun(): UseApiKeyFunResult {
                 } else if (Array.isArray(modelsData)) {
                     fetchedModels = normalizeModelIds(modelsData);
                 } else {
-                    setModelsError(t('apiKeyFun.errors.parseFormat', { defaultValue: '解析格式异常: {{err}}', err: Object.keys(modelsData ?? {}).join(',') }));
+                    setModelsError(t('apiKeyFun.errors.parseFormat', { defaultValue: 'Parsing format exception: {{err}}', err: Object.keys(modelsData ?? {}).join(',') }));
                 }
             } catch (err) {
                 if (seq !== querySeqRef.current) return;
@@ -155,7 +155,7 @@ export function useApiKeyFun(): UseApiKeyFunResult {
                     source: 'ApiKeyFun.models',
                     triggerAction: CMD_QUERY_TRANSIT_INFO,
                 });
-                setModelsError(t('apiKeyFun.errors.fetchFailed', { defaultValue: '获取失败: {{err}}', err: err instanceof Error ? err.message : String(err) }));
+                setModelsError(t('apiKeyFun.errors.fetchFailed', { defaultValue: 'Failed to get: {{err}}', err: err instanceof Error ? err.message : String(err) }));
             }
             if (seq !== querySeqRef.current) return;
             setModels(fetchedModels);
@@ -264,7 +264,7 @@ export function useApiKeyFun(): UseApiKeyFunResult {
                     }
                 });
             } else {
-                throw new Error(t('apiKeyFun.errors.queryFailed', { defaultValue: '无法获取有效的额度数据或模型列表，请确认 API Key 是否有效，以及接口地址是否正确。' }));
+                throw new Error(t('apiKeyFun.errors.queryFailed', { defaultValue: 'Unable to obtain valid quota data or model list, please confirm whether the API Key is valid and the interface address is correct.' }));
             }
 
         } catch (error) {

@@ -1,6 +1,6 @@
 /**
  * useInstanceStore — facade
- * 实际实现拆分至 ./useInstanceStore/ slices，此处组合以保持导入路径不变。
+ * The actual implementation is split into ./useInstanceStore/ slices and combined here to keep the import path unchanged.
  */
 import { create } from 'zustand';
 import type { InstanceState } from './useInstanceStore/types';

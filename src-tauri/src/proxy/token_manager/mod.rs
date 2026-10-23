@@ -1,6 +1,6 @@
-//! TokenManager 模块：账号 Token 池管理、调度、限流与配额保护。
+//! TokenManager module: account token pool management, scheduling, current limiting and quota protection.
 //!
-//! 由 `token_manager.rs` 单文件拆分而来；对外 API 保持不变。
+//! Split from `token_manager.rs` single file; external API remains unchanged.
 
 mod account_load;
 mod account_parse;

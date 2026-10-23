@@ -201,7 +201,7 @@ pub(crate) async fn completions_success_stream(
             converted_meta,
         );
 
-        // 仅当转换器产生 response.completed 时保存本轮增量及必要输出。
+        // Only save this round of increments and necessary output when the converter produces response.completed.
         if let Some(completion_rx) = session_completion_rx {
             let save_parent = session_parent.take();
             let save_input = std::mem::take(session_save_input);

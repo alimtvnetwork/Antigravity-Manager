@@ -3,7 +3,7 @@ use std::fs;
 
 use super::*;
 
-/// 辅助方法：同步写入指定目录下的本地文件凭据 (<base_home>/.gemini/oauth_creds.json, google_accounts.json, jetski-standalone-oauth-token)
+/// Auxiliary method: synchronously write local file credentials in the specified directory (<base_home>/.gemini/oauth_creds.json, google_accounts.json, jetski-standalone-oauth-token)
 pub fn write_to_file_credentials_at(
     base_home: &std::path::Path,
     account: &crate::models::Account,
@@ -267,8 +267,8 @@ pub fn write_to_file_credentials_at(
     Ok(())
 }
 
-/// 辅助方法：同步写入本地文件凭据 (~/.gemini/oauth_creds.json, ~/.gemini/google_accounts.json, 以及 ~/.gemini/jetski-standalone-oauth-token)
-/// 用于在 SSH 会话、容器环境或无系统 Keyring / D-Bus 的场景下保障 CLI/工具/Worker 的凭据兼容性
+/// Helper method: Synchronously writing local file credentials (~/.gemini/oauth_creds.json, ~/.gemini/google_accounts.json, and ~/.gemini/jetski-standalone-oauth-token)
+/// Used to ensure CLI/tool/Worker credential compatibility in SSH sessions, container environments, or systemless Keyring / D-Bus scenarios
 pub fn write_to_file_credentials(account: &crate::models::Account) -> Result<(), String> {
     let home = match dirs::home_dir() {
         Some(h) => h,
@@ -277,7 +277,7 @@ pub fn write_to_file_credentials(account: &crate::models::Account) -> Result<(),
     write_to_file_credentials_at(&home, account)
 }
 
-/// 辅助方法：从本地文件凭据 (~/.gemini/oauth_creds.json) 读取 Token 作为跨平台回退
+/// Helper method: Read Token from local file credentials (~/.gemini/oauth_creds.json) as a cross-platform fallback
 pub(crate) fn read_from_file_credentials(
 ) -> Result<crate::modules::migration::ImportedOAuthState, String> {
     let home =

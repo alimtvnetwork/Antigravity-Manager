@@ -33,7 +33,7 @@ pub(crate) async fn handle_upstream_error(
         ..
     } = call;
     let session_id = Some(session_id_str.as_str());
-    // 1. 立即提取状态码和 st.headers（防止 response 被 move）
+    // 1. Extract status code and st.headers immediately (prevent response from being moved)
     let status_code = status.as_u16();
     st.last_status = status;
     let retry_after = response
@@ -42,7 +42,7 @@ pub(crate) async fn handle_upstream_error(
         .and_then(|h| h.to_str().ok())
         .map(|s| s.to_string());
 
-    // 2. 获取错误文本并转移 Response 所有权
+    // 2. Get the error text and transfer ownership of the Response
     let error_text = response
         .text()
         .await
@@ -72,7 +72,7 @@ pub(crate) async fn handle_upstream_error(
         .await;
     }
 
-    // 3. 统一流水线决策判定（协议无关的唯一真理）
+    // 3. Unified pipeline decision-making (the only truth independent of the protocol)
     let classification = crate::proxy::pipeline::UpstreamClassification::classify(
         status_code,
         &error_text,
@@ -125,7 +125,7 @@ pub(crate) async fn handle_upstream_error(
         }
     }
 
-    // 4. 处理 400 错误 (Thinking 签名失效 或 块顺序错误)
+    // 4. Handle 400 errors (Invalid Thinking signature or wrong block order)
     // [FIX 2026-08-28] Use case-insensitive matching and cover Google's exact phrasing:
     // "Invalid thought signature." / "thoughtSignature" / "thought_signature"
     let lower_err = error_text.to_lowercase();
@@ -151,19 +151,19 @@ pub(crate) async fn handle_upstream_error(
         // Existing logic for thinking signature.
         st.retried_without_thinking = true;
 
-        // 使用 WARN 级别,因为这不应该经常发生(已经主动过滤过)
+        // Use WARN level as this shouldn't happen often (already actively filtered)
         tracing::warn!(
             "[{}] Unexpected thinking signature error (should have been filtered). \
          Retrying with all thinking blocks removed.",
             st.trace_id
         );
 
-        // [IMPROVED] 不再禁用 Thinking 模式！
-        // 既然我们已经将历史 Thinking Block 转换为 Text，那么当前请求可以视为一个新的 Thinking 会话
-        // 保持 thinking 配置开启，让模型重新生成思维，避免退化为简单的 "OK" 回复
+        // [IMPROVED] Thinking mode is no longer disabled!
+        // Now that we have converted the historical Thinking Block to Text, the current request can be treated as a new Thinking session
+        // Keep the thinking configuration turned on to let the model regenerate thinking and avoid degenerating into a simple "OK" reply
         // st.request_for_body.thinking = None;
 
-        // 清理历史消息中的所有 Thinking Block，将其转换为 Text 以保留上下文
+        // Clean all Thinking Blocks from history messages, converting them to Text to preserve context
         for msg in st.request_for_body.messages.iter_mut() {
             if let crate::proxy::mappers::claude::models::MessageContent::Array(blocks) =
                 &mut msg.content
@@ -175,7 +175,7 @@ pub(crate) async fn handle_upstream_error(
                             thinking,
                             ..
                         } => {
-                            // 降级为 text
+                            // downgrade to text
                             if !thinking.is_empty() {
                                 tracing::debug!(
                                     "[Fallback] Converting thinking block to text (len={})",
@@ -191,7 +191,7 @@ pub(crate) async fn handle_upstream_error(
                         crate::proxy::mappers::claude::models::ContentBlock::RedactedThinking {
                             ..
                         } => {
-                            // Redacted thinking 没什么用，直接丢弃
+                            // Redacted thinking is of no use, just throw it away
                         }
                         _ => new_blocks.push(block),
                     }
@@ -209,7 +209,7 @@ pub(crate) async fn handle_upstream_error(
         // [FIX Prompt-Cache] Strictly avoid injecting synthetic messages (close_tool_loop_for_thinking) in retry path!
         // Maintain pure historical messages, delegated to InboundThinkingPipeline and finalize_gemini_contents_thinking.
 
-        // 清理模型名中的 -thinking 后缀
+        // Clean up the -thinking suffix in model names
         if st.request_for_body.model.contains("claude-") {
             let mut m = st.request_for_body.model.clone();
             m = m.replace("-thinking", "");
@@ -225,8 +225,8 @@ pub(crate) async fn handle_upstream_error(
             st.request_for_body.model = m;
         }
 
-        // [FIX] 强制重试：因为我们已经清理了 thinking block，所以这是一个新的、可以重试的请求
-        // 不要使用 determine_retry_strategy，因为它会因为 st.retried_without_thinking=true 而返回 NoRetry
+        // [FIX] Forced retry: Because we have cleared the thinking block, this is a new, retryable request
+        // Don't use determine_retry_strategy as it will return NoRetry because st.retried_without_thinking=true
         if apply_retry_strategy(
             RetryStrategy::FixedDelay(Duration::from_millis(200)),
             attempt,
@@ -240,11 +240,11 @@ pub(crate) async fn handle_upstream_error(
         }
     }
 
-    // 5. 统一处理所有可重试错误
-    // [REMOVED] 不再特殊处理 QUOTA_EXHAUSTED,允许账号轮换
-    // 原逻辑会在第一个账号配额耗尽时直接返回,导致"平衡"模式无法切换账号
+    // 5. Handle all retryable errors uniformly
+    // [REMOVED] No special treatment QUOTA_EXHAUSTED, account rotation is allowed
+    // The original logic will return directly when the quota of the first account is exhausted, causing the "balanced" mode to be unable to switch accounts.
 
-    // [FIX] 403 时设置 is_forbidden 状态，避免账号被重复选中
+    // [FIX] Set is_forbidden status when 403 occurs to prevent accounts from being selected repeatedly
     if status_code == 403 {
         // Check for VALIDATION_REQUIRED error - temporarily block account
         if error_text.contains("VALIDATION_REQUIRED")
@@ -266,7 +266,7 @@ pub(crate) async fn handle_upstream_error(
             }
         }
 
-        // 设置 is_forbidden 状态
+        // Set is_forbidden status
         if let Err(e) = st
             .token_manager
             .set_forbidden(&account_id, &error_text)
@@ -298,7 +298,7 @@ pub(crate) async fn handle_upstream_error(
         crate::proxy::sticky_config::SchedulingMode::PerformanceFirst => false,
     };
 
-    // 确定重试策略：传入当前 attempt 与 st.pool_size，执行智能自适应裁决
+    // Determine the retry strategy: pass in the current attempt and st.pool_size, and perform intelligent adaptive decision-making
     let retry_strategy = crate::proxy::handlers::common::determine_retry_strategy_adaptive(
         status_code,
         &error_text,
@@ -309,7 +309,7 @@ pub(crate) async fn handle_upstream_error(
         st.pool_size,
     );
 
-    // 执行退避
+    // Perform backoff
     if apply_retry_strategy(
         retry_strategy.clone(),
         attempt,
@@ -319,7 +319,7 @@ pub(crate) async fn handle_upstream_error(
     )
     .await
     {
-        // 判断是否需要轮换账号
+        // Determine whether accounts need to be rotated
         if !should_rotate_account(status_code, Some(&retry_strategy)) {
             debug!(
                 "[{}] Keeping same account for status {} (Grace Retry or Server Issue)",
@@ -331,7 +331,7 @@ pub(crate) async fn handle_upstream_error(
         }
         return ErrorOutcome::Retry;
     } else {
-        // 不可重试的错误，直接返回双轨制友好报文
+        // Non-retryable errors will directly return dual-track friendly messages.
         error!(
             "[{}] Non-retryable error {}: {}",
             st.trace_id, status_code, error_text
@@ -385,7 +385,7 @@ pub(crate) fn build_exhaustion_error(
             _ => "api_error",
         };
 
-        // [FIX] 403 时返回 503，避免 Claude Code 客户端退出到登录页
+        // [FIX] Return 503 on 403 to prevent Claude Code client from exiting to the login page
         let response_status = if last_status.as_u16() == 403 {
             StatusCode::SERVICE_UNAVAILABLE
         } else {
@@ -432,7 +432,7 @@ pub(crate) fn build_exhaustion_error(
             _ => "api_error",
         };
 
-        // [FIX] 403 时返回 503，避免 Claude Code 客户端退出到登录页
+        // [FIX] Return 503 on 403 to prevent Claude Code client from exiting to the login page
         let response_status = if last_status.as_u16() == 403 {
             StatusCode::SERVICE_UNAVAILABLE
         } else {

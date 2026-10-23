@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use super::*;
 
-/// 创建新令牌
+/// Create new token
 pub fn create_token(
     username: String,
     expires_type: String,
@@ -12,7 +12,7 @@ pub fn create_token(
     max_ips: i32,
     curfew_start: Option<String>,
     curfew_end: Option<String>,
-    custom_expires_at: Option<i64>, // 自定义过期时间戳 (秒)
+    custom_expires_at: Option<i64>, // Custom expiration timestamp (seconds)
 ) -> Result<UserToken, String> {
     let conn = connect_db()?;
     let id = Uuid::new_v4().to_string();
@@ -38,7 +38,7 @@ pub fn create_token(
                 .unwrap()
                 .timestamp(),
         ),
-        "custom" => custom_expires_at, // 使用自定义时间戳
+        "custom" => custom_expires_at, // Use custom timestamp
         _ => None,                     // "never" or other
     };
 
@@ -88,7 +88,7 @@ pub fn create_token(
     Ok(user_token)
 }
 
-/// 列出所有令牌
+/// List all tokens
 pub fn list_tokens() -> Result<Vec<UserToken>, String> {
     let conn = connect_db()?;
     let mut stmt = conn
@@ -102,8 +102,8 @@ pub fn list_tokens() -> Result<Vec<UserToken>, String> {
                 token: row.get("token")?,
                 username: row.get("username")?,
                 description: row.get("description")?,
-                enabled: row.get("enabled").unwrap_or(true), // 防御性默认值
-                expires_type: row.get("expires_type").unwrap_or("never".to_string()), // 防御性默认值
+                enabled: row.get("enabled").unwrap_or(true), // defensive defaults
+                expires_type: row.get("expires_type").unwrap_or("never".to_string()), // defensive defaults
                 expires_at: row.get("expires_at").unwrap_or(None),
                 max_ips: row.get("max_ips").unwrap_or(0),
                 curfew_start: row.get("curfew_start").unwrap_or(None),
@@ -125,7 +125,7 @@ pub fn list_tokens() -> Result<Vec<UserToken>, String> {
     Ok(tokens)
 }
 
-/// 获取单个令牌信息
+/// Get individual token information
 pub fn get_token_by_id(id: &str) -> Result<Option<UserToken>, String> {
     let conn = connect_db()?;
     let mut stmt = conn
@@ -158,7 +158,7 @@ pub fn get_token_by_id(id: &str) -> Result<Option<UserToken>, String> {
     Ok(token)
 }
 
-/// 根据 Token 值获取令牌信息
+/// Get token information based on Token value
 pub fn get_token_by_value(token: &str) -> Result<Option<UserToken>, String> {
     let conn = connect_db()?;
     let mut stmt = conn
@@ -191,7 +191,7 @@ pub fn get_token_by_value(token: &str) -> Result<Option<UserToken>, String> {
     Ok(token)
 }
 
-/// 更新令牌状态/备注等
+/// Update token status/remarks, etc.
 pub fn update_token(
     id: &str,
     username: Option<String>,
@@ -247,7 +247,7 @@ pub fn update_token(
     query.push_str(&format!(" WHERE id = ?{}", param_idx));
     params_vec.push(Box::new(id.to_string()));
 
-    // 将 Vec<Box<dyn ToSql>> 转换为 &[&dyn ToSql]
+    // Convert Vec<Box<dyn ToSql>> to &[&dyn ToSql]
     let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
 
     conn.execute(&query, params_refs.as_slice())
@@ -256,7 +256,7 @@ pub fn update_token(
     Ok(())
 }
 
-/// 续期令牌
+/// Renew token
 pub fn renew_token(id: &str, expires_type: &str) -> Result<(), String> {
     let conn = connect_db()?;
     let now = Utc::now().timestamp();
@@ -291,7 +291,7 @@ pub fn renew_token(id: &str, expires_type: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 删除令牌
+/// delete token
 pub fn delete_token(id: &str) -> Result<(), String> {
     let conn = connect_db()?;
     conn.execute("DELETE FROM user_tokens WHERE id = ?1", params![id])

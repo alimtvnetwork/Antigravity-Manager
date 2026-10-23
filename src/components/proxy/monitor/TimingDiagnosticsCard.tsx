@@ -19,40 +19,40 @@ export const TimingDiagnosticsCard: React.FC<TimingDiagnosticsCardProps> = ({ ti
     const stages = useMemo(() => [
         {
             key: 'clean',
-            label: t('monitor.timing.clean', '会话清洗 (Clean)'),
-            desc: t('monitor.timing.clean_desc', '清理缓存控制 / 合并同角色 / 历史提纯'),
+            label: t('monitor.timing.clean', 'Session Cleaning (Clean)'),
+            desc: t('monitor.timing.clean_desc', 'Clean cache control/merge same role/history purification'),
             sec: timing.cleanSec,
             color: 'bg-indigo-500',
             textColor: 'text-indigo-600 dark:text-indigo-400',
         },
         {
             key: 'norm',
-            label: t('monitor.timing.norm', '中转归一 (Normalize)'),
-            desc: t('monitor.timing.norm_desc', '模型映射 / 账号调度 / 跨协议转换'),
+            label: t('monitor.timing.norm', 'Normalize'),
+            desc: t('monitor.timing.norm_desc', 'Model mapping/account scheduling/cross-protocol conversion'),
             sec: timing.normSec,
             color: 'bg-purple-500',
             textColor: 'text-purple-600 dark:text-purple-400',
         },
         {
             key: 'thinking',
-            label: t('monitor.timing.thinking', '思维块回填 (ThinkingStore)'),
-            desc: t('monitor.timing.thinking_desc', '持久化思维链及补齐商业Agent历史签名'),
+            label: t('monitor.timing.thinking', 'ThinkingStore'),
+            desc: t('monitor.timing.thinking_desc', 'Persistent thought chain and complete business agent historical signature'),
             sec: timing.thinkingSec,
             color: 'bg-amber-500',
             textColor: 'text-amber-600 dark:text-amber-400',
         },
         {
             key: 'ttft',
-            label: t('monitor.timing.ttft', '等待首包 (TTFT)'),
-            desc: t('monitor.timing.ttft_desc', '网关上送至接收首个数据包 (含首Token/思考块)'),
+            label: t('monitor.timing.ttft', 'Waiting for first packet (TTFT)'),
+            desc: t('monitor.timing.ttft_desc', 'The gateway is sent to receive the first data packet (including the first Token/thinking block)'),
             sec: timing.ttftSec,
             color: 'bg-emerald-500',
             textColor: 'text-emerald-600 dark:text-emerald-400',
         },
         {
             key: 'stream',
-            label: t('monitor.timing.stream', '流式传输 (Stream)'),
-            desc: t('monitor.timing.stream_desc', '首个数据块到达至整条流式响应完成'),
+            label: t('monitor.timing.stream', 'Streaming'),
+            desc: t('monitor.timing.stream_desc', 'The first data block arrives until the entire streaming response is completed'),
             sec: timing.streamSec,
             color: 'bg-sky-500',
             textColor: 'text-sky-600 dark:text-sky-400',
@@ -62,12 +62,12 @@ export const TimingDiagnosticsCard: React.FC<TimingDiagnosticsCardProps> = ({ ti
     const handleCopy = (e: React.MouseEvent) => {
         e.stopPropagation();
         const lines: string[] = [];
-        if (timing.cleanSec !== undefined) lines.push(`会话清洗 (Clean)：${formatSeconds(timing.cleanSec)}`);
-        if (timing.normSec !== undefined) lines.push(`中转归一 (Normalize)：${formatSeconds(timing.normSec)}`);
-        if (timing.thinkingSec !== undefined) lines.push(`思维块回填 (ThinkingStore)：${formatSeconds(timing.thinkingSec)}`);
-        if (timing.ttftSec !== undefined) lines.push(`等待首包 (TTFT)：${formatSeconds(timing.ttftSec)}`);
-        if (timing.streamSec !== undefined) lines.push(`流式传输 (Stream)：${formatSeconds(timing.streamSec)}`);
-        lines.push(`总耗时：${formatSeconds(timing.totalSec)}`);
+        if (timing.cleanSec !== undefined) lines.push(`Session Clean: ${formatSeconds(timing.cleanSec)}`);
+        if (timing.normSec !== undefined) lines.push(`Relay Normalize: ${formatSeconds(timing.normSec)}`);
+        if (timing.thinkingSec !== undefined) lines.push(`Thinking Store Backfill: ${formatSeconds(timing.thinkingSec)}`);
+        if (timing.ttftSec !== undefined) lines.push(`Wait for First Token (TTFT): ${formatSeconds(timing.ttftSec)}`);
+        if (timing.streamSec !== undefined) lines.push(`Stream Transmission: ${formatSeconds(timing.streamSec)}`);
+        lines.push(`Total Duration: ${formatSeconds(timing.totalSec)}`);
 
         onCopyText(lines.join('\n'));
         setIsCopied(true);
@@ -81,10 +81,10 @@ export const TimingDiagnosticsCard: React.FC<TimingDiagnosticsCardProps> = ({ ti
                     <div className="flex items-center gap-2">
                         <Clock size={13} className="text-gray-500 dark:text-gray-400 shrink-0" />
                         <span className="text-xs font-bold tracking-wider text-gray-700 dark:text-gray-200 shrink-0 whitespace-nowrap">
-                            {t('monitor.timing.title', '耗时诊断')}
+                            {t('monitor.timing.title', 'Time-consuming diagnosis')}
                         </span>
                         <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
-                            {t('monitor.timing.total', '总耗时')}: {formatSeconds(timing.totalSec)}
+                            {t('monitor.timing.total', 'Total time spent')}: {formatSeconds(timing.totalSec)}
                         </span>
                     </div>
                 </div>
@@ -104,11 +104,11 @@ export const TimingDiagnosticsCard: React.FC<TimingDiagnosticsCardProps> = ({ ti
                 <div className="flex items-center gap-2 min-w-0">
                     <Clock size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
                     <span className="text-xs font-bold tracking-wider text-emerald-950 dark:text-emerald-100 shrink-0 whitespace-nowrap">
-                        {t('monitor.timing.title', '耗时诊断')}
+                        {t('monitor.timing.title', 'Time-consuming diagnosis')}
                     </span>
                     {!isExpanded && totalSec > 0 && (
                         <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
-                            {t('monitor.timing.total', '总耗时')}: {formatSeconds(timing.totalSec)}
+                            {t('monitor.timing.total', 'Total time spent')}: {formatSeconds(timing.totalSec)}
                         </span>
                     )}
                 </div>
@@ -118,16 +118,16 @@ export const TimingDiagnosticsCard: React.FC<TimingDiagnosticsCardProps> = ({ ti
                         type="button"
                         onClick={handleCopy}
                         className="btn btn-ghost btn-xs h-6 px-2 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-500/15 text-[11px] font-semibold gap-1"
-                        title={isCopied ? t('common.copied', '已复制') : t('common.copy', '复制')}
+                        title={isCopied ? t('common.copied', 'Copied') : t('common.copy', 'copy')}
                     >
                         {isCopied ? <CheckCircle size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                        <span>{isCopied ? t('common.copied', '已复制') : t('common.copy', '复制')}</span>
+                        <span>{isCopied ? t('common.copied', 'Copied') : t('common.copy', 'copy')}</span>
                     </button>
                     <button
                         type="button"
                         onClick={() => setIsExpanded((prev) => !prev)}
                         className="btn btn-ghost btn-xs p-1 h-6 min-h-0 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/15"
-                        title={isExpanded ? '收起耗时诊断' : '展开耗时诊断'}
+                        title={isExpanded ? 'Close time-consuming diagnosis' : 'Expand time-consuming diagnosis'}
                     >
                         <ChevronDown size={14} className={`transition-transform duration-200 ${isExpanded ? '' : '-rotate-90'}`} />
                     </button>
@@ -198,7 +198,7 @@ export const TimingDiagnosticsCard: React.FC<TimingDiagnosticsCardProps> = ({ ti
                             <div className="flex items-center gap-2 min-w-0">
                                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
                                 <span className="text-emerald-950 dark:text-emerald-100 text-xs font-bold">
-                                    {t('monitor.timing.total', '总耗时')}
+                                    {t('monitor.timing.total', 'Total time spent')}
                                 </span>
                             </div>
                             <div className="flex items-baseline gap-2 shrink-0 text-right font-mono">

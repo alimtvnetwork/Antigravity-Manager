@@ -3,7 +3,7 @@ use std::process::Command;
 
 use super::*;
 
-/// 辅助方法：从宿主操作系统的 Keychain/Credentials Manager 读取 Token
+/// Helper method: Read Token from the Keychain/Credentials Manager of the host operating system
 pub fn read_from_system_keyring() -> Result<crate::modules::migration::ImportedOAuthState, String> {
     #[cfg(target_os = "macos")]
     {
@@ -119,14 +119,12 @@ pub fn read_from_system_keyring() -> Result<crate::modules::migration::ImportedO
                     return Ok(file_state);
                 }
                 if e.kind() == std::io::ErrorKind::NotFound {
-                    return Err(
-                        "Linux Secret Service utility 'secret-tool' not found (未检测到 secret-tool 工具)。\n\
+                    return Err("Linux Secret Service utility 'secret-tool' not found.\n\
                          Please install libsecret-tools to enable Keyring storage:\n\
                          • Ubuntu / Debian: sudo apt install -y libsecret-tools\n\
                          • Fedora / RHEL: sudo dnf install -y libsecret\n\
                          • Arch Linux: sudo pacman -S libsecret"
-                            .to_string(),
-                    );
+                        .to_string());
                 }
                 return Err(format!("Failed to execute secret-tool: {}", e));
             }

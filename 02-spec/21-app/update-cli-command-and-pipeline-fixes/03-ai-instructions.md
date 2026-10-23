@@ -370,5 +370,5 @@ Upon successful pre-flight gate completion, the release ceremony proceeds via:
    *(Verifies bump from `v4.185.0` to `v4.186.0` across all 14 manifests).*
 2. **Documentation & Changelog Synchronization**:
    - Update `changelog.md` and `changelog_en.md` under `## [v4.186.0]`.
-   - Update `README.md` ("## 📝 更新日志") and `README_EN.md` ("## 📝 Changelog").
+   - Update `README.md` ("## 📝 Changelog") and `README_EN.md` ("## 📝 Changelog").
    - Strict Attribution: Maintainer attribution is exclusively `@aukgit` (`(Thanks to @aukgit)`).

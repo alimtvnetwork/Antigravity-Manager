@@ -53,7 +53,7 @@ pub(crate) fn completions_prep_codex(
     // Handle "instructions" + "input" (Codex style) -> system + user messages
     // This is critical because `transform_openai_request` expects `messages` to be populated.
 
-    // [FIX] 检查是否已经有 messages (被第一次标准化处理过)
+    // [FIX] Check if there are already messages (processed by first normalization)
     let has_codex_fields = body.get("instructions").is_some() || body.get("input").is_some();
     let already_normalized = body
         .get("messages")
@@ -61,7 +61,7 @@ pub(crate) fn completions_prep_codex(
         .map(|arr| !arr.is_empty())
         .unwrap_or(false);
 
-    // 只有在未标准化时才进行简单转换
+    // Simple conversion only if not normalized
     if has_codex_fields && !already_normalized {
         tracing::debug!("[Codex] Performing simple normalization (messages not yet populated)");
 
@@ -77,7 +77,7 @@ pub(crate) fn completions_prep_codex(
             }
         }
 
-        // input -> user message (支持对象数组形式的对话历史)
+        // input -> user message (supports conversation history in the form of object array)
         if let Some(input) = body.get("input") {
             if let Some(s) = input.as_str() {
                 messages.push(json!({
@@ -85,7 +85,7 @@ pub(crate) fn completions_prep_codex(
                     "content": s
                 }));
             } else if let Some(arr) = input.as_array() {
-                // 判断是消息对象数组还是简单的内容块/字符串数组
+                // Determine whether it is an array of message objects or a simple content block/string array
                 let is_message_array = arr
                     .first()
                     .and_then(|v| v.as_object())
@@ -93,7 +93,7 @@ pub(crate) fn completions_prep_codex(
                     .unwrap_or(false);
 
                 if is_message_array {
-                    // 深度识别：像处理 messages 一样处理 input 数组，并自动映射 Responses API 的工具流
+                    // Deep recognition: handle input arrays like messages and automatically map the tool flow of Responses API
                     for item in arr {
                         if let Some(obj) = item.as_object() {
                             let item_type = responses_input_item_type(item);
@@ -171,7 +171,7 @@ pub(crate) fn completions_prep_codex(
                         messages.push(item.clone());
                     }
                 } else {
-                    // 降级处理：传统的字符串或混合内容拼接
+                    // Downgrade processing: traditional string or mixed content concatenation
                     let content = arr
                         .iter()
                         .map(|v| {
@@ -233,8 +233,8 @@ pub(crate) fn completions_prep_codex(
             }
         }
     }
-    // [FIX] 在 openai_req 反序列化之前，从 body 中捕获原始 input 和 instructions
-    // 用于后续 session 保存时，保留完整的工具调用历史（而非从 openai_req.messages 重建丢失信息）
+    // [FIX] Capture raw input and instructions from body before openai_req deserialization
+    // For subsequent session saves, retain the complete history of tool calls (instead of reconstructing lost information from openai_req.messages)
     let normalized_interaction_ledger = body
         .get("_interaction_ledger")
         .cloned()

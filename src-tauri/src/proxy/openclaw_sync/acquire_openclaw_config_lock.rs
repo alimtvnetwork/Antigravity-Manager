@@ -152,8 +152,8 @@ pub(crate) fn is_valid_version(value: &str) -> bool {
         && value.chars().all(|c| c.is_ascii_digit() || c == '.')
 }
 
-/// 判断版本是否 >= 2026.8.1 (v2.0)
-/// 例如: 2026.8.1 -> v2, 2026.9.2 -> v2, 2.0.0 -> v2
+/// Determine whether the version is >= 2026.8.1 (v2.0)
+/// For example: 2026.8.1 -> v2, 2026.9.2 -> v2, 2.0.0 -> v2
 /// 2026.7.749 -> v1, 1.0.0 -> v1
 pub fn classify_openclaw_version(version_str: &str) -> &'static str {
     let nums: Vec<u64> = version_str
@@ -162,15 +162,15 @@ pub fn classify_openclaw_version(version_str: &str) -> &'static str {
         .collect();
 
     if nums.is_empty() {
-        return "v2"; // 缺省使用最新 2.0
+        return "v2"; // By default, the latest version 2.0 is used
     }
 
-    // 经典 SemVer: 2.x.x
+    // Classic SemVer: 2.x.x
     if nums[0] >= 2 && nums[0] < 1000 {
         return "v2";
     }
 
-    // 日期版本号: 2026.8.1 边界判断
+    // Date version number: 2026.8.1 Boundary judgment
     if nums[0] > 2026 {
         return "v2";
     }
@@ -335,10 +335,10 @@ pub(crate) fn redact_json_value(val: &mut Value) {
     }
 }
 
-/// 根据模型名称动态推导精确的上下文窗口 (contextWindow)、最大输出 (maxTokens)、思考开关及输入模态
-/// 用户特别强调：
-/// - Gemini 3 及以上：上下文 1024000 (1024K)，输出 65536
-/// - Claude 系列：上下文基本都是 256K (256000)，输出 65536
+/// Dynamically derive accurate context window (contextWindow), maximum output (maxTokens), thinking switch and input mode based on the model name
+/// Users particularly emphasized:
+/// - Gemini 3 and above: context 1024000 (1024K), output 65536
+/// - Claude series: The context is basically 256K (256000), and the output is 65536
 pub fn resolve_model_specs(model_id: &str) -> (u64, u64, bool, Vec<&'static str>) {
     let lower = model_id.to_lowercase();
 
@@ -356,12 +356,12 @@ pub fn resolve_model_specs(model_id: &str) -> (u64, u64, bool, Vec<&'static str>
     let inputs = vec!["text", "image"];
 
     if is_gemini {
-        // 用户指定: Gemini 3 及以上上下文 1024000，输出 65536
+        // User specified: Gemini 3 and above context 1024000, output 65536
         let context_window = 1024000;
         let max_tokens = 65536;
         (context_window, max_tokens, is_reasoning, inputs)
     } else if is_claude {
-        // 用户指定: Claude 系列上下文基本都是 256K (256000)，输出 65536
+        // User specified: Claude series context is basically 256K (256000), output 65536
         let context_window = 256000;
         let max_tokens = 65536;
         (context_window, max_tokens, is_reasoning, inputs)
@@ -378,7 +378,7 @@ pub fn resolve_model_specs(model_id: &str) -> (u64, u64, bool, Vec<&'static str>
         let max_tokens = if is_reasoning { 65536 } else { 8192 };
         (context_window, max_tokens, is_reasoning, vec!["text"])
     } else {
-        // 缺省通用配置
+        // Default common configuration
         let context_window = 128000;
         let max_tokens = 16384;
         (context_window, max_tokens, is_reasoning, inputs)

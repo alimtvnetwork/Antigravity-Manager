@@ -1,182 +1,182 @@
-# 专业版模型 1.5/2.5 Pro 自动对齐与分流测试 (v4.2.4)
+# Professional version model 1.5/2.5 Pro automatic alignment and shunt test (v4.2.4)
 
-## 测试目标
+## Test target
 
-验证三层渐进式上下文压缩功能的正确性、稳定性和成本优化效果。
+Verify the correctness, stability, and cost optimization of the three-layer progressive context compression function.
 
-## 前置准备
+## Preparation
 
-1. **启动应用**：
+1. **Start the application**:
    ```bash
    cd /Users/lbjlaq/Desktop/xin
    npm run tauri dev
    ```
 
-2. **启用调试日志**：
+2. **Enable debug logs**:
    ```bash
    export RUST_LOG=debug
    ```
 
-3. **准备测试账号**：
-   - 至少 1 个 Google 账号（用于 Gemini API）
-   - 确保账号有足够配额
+3. **Prepare test account**:
+   - At least 1 Google account (for Gemini API)
+   - Make sure the account has enough quota
 
-## 测试场景
+## Test scenario
 
-### 场景 1：Layer 1 工具消息裁剪 (60% 压力)
+### Scenario 1: Layer 1 tool message clipping (60% pressure)
 
-**目标**：验证工具消息智能裁剪功能
+**Goal**: Verify tool message intelligent cropping function
 
-**步骤**：
-1. 使用 Claude Code CLI 或 Cherry Studio
-2. 发起一个需要多次工具调用的任务（如代码搜索、文件读取）
-3. 持续对话直到触发 60% 上下文压力
+**Steps**:
+1. Use Claude Code CLI or Cherry Studio
+2. Initiate a task that requires multiple tool calls (such as code search, file reading)
+3. Continue the conversation until 60% contextual pressure is triggered
 
-**预期结果**：
-- 日志中出现 `[Layer-1] Tool trimming triggered`
-- 保留最近 5 轮工具交互
-- 删除更早的工具消息
-- **无 400 错误**
-- **响应速度正常**
+**Expected results**:
+- `[Layer-1] Tool trimming triggered` appears in the log
+- Keep the last 5 rounds of tool interactions
+- Delete older tool messages
+- **No 400 errors**
+- **Response speed is normal**
 
-**验证命令**：
+**Verification command**:
 ```bash
-# 查看日志
+# View log
 tail -f ~/Library/Application\ Support/com.antigravity.tools/logs/antigravity.log | grep "Layer-1"
 ```
 
 ---
 
-### 场景 2：Layer 2 Thinking 压缩 (75% 压力)
+### Scenario 2: Layer 2 Thinking Compression (75% pressure)
 
-**目标**：验证 Thinking 内容压缩 + 签名保留
+**Goal**: Verify Thinking content compression + signature preservation
 
-**步骤**：
-1. 使用 Claude 4.5 Opus/Sonnet Thinking 模型
-2. 发起复杂推理任务（如代码重构、算法设计）
-3. 持续对话直到触发 75% 上下文压力
+**Steps**:
+1. Using the Claude 4.5 Opus/Sonnet Thinking model
+2. Initiate complex reasoning tasks (such as code reconstruction, algorithm design)
+3. Continue the conversation until 75% contextual pressure is triggered
 
-**预期结果**：
-- 日志中出现 `[Layer-2] Thinking compression triggered`
-- Thinking 块文本被压缩为 "..."
-- **`signature` 字段完整保留**
-- 最近 4 条消息不被压缩
-- **无 400 签名错误**
+**Expected results**:
+- `[Layer-2] Thinking compression triggered` appears in the log
+- Thinking block text is compressed to "..."
+- **`signature` field remains intact**
+- The last 4 messages are not compressed
+- **NO 400 SIGNATURE ERROR**
 
-**验证命令**：
+**Verification command**:
 ```bash
-# 查看签名保留情况
+# Check the signature retention status
 tail -f ~/Library/Application\ Support/com.antigravity.tools/logs/antigravity.log | grep -E "(Layer-2|signature)"
 ```
 
 ---
 
-### 场景 3：Layer 3 Fork 会话 + XML 摘要 (90% 压力)
+### Scenario 3: Layer 3 Fork Session + XML Digest (90% Stress)
 
-**目标**：验证 XML 摘要生成和会话 Fork
+**Goal**: Validate XML digest generation and session fork
 
-**步骤**：
-1. 使用任意模型进行超长对话
-2. 持续对话直到触发 90% 上下文压力
+**Steps**:
+1. Use any model for very long conversations
+2. Continue the conversation until 90% contextual pressure is triggered
 
-**预期结果**：
-- 日志中出现 `[Layer-3] Critical context pressure`
-- 调用 `gemini-2.5-flash-lite` 生成 XML 摘要
-- 创建新的消息序列：`[User: XML摘要] + [Assistant: 确认] + [用户最新消息]`
-- **压缩率 86-97%**
-- **无 Prompt Cache 破坏**
-- **签名链完整**
+**Expected results**:
+- `[Layer-3] Critical context pressure` appears in the log
+- Call `gemini-2.5-flash-lite` to generate XML digest
+- Create a new message sequence: `[User: XML summary] + [Assistant: Confirmation] + [User's latest message]`
+- **Compression rate 86-97%**
+- **No Prompt Cache corruption**
+- **Signature chain complete**
 
-**验证命令**：
+**Verification command**:
 ```bash
-# 查看 Layer 3 触发和摘要生成
+# View Layer 3 triggering and summary generation
 tail -f ~/Library/Application\ Support/com.antigravity.tools/logs/antigravity.log | grep -E "(Layer-3|XML summary|Fork)"
 ```
 
 ---
 
-### 场景 4：渐进式触发测试
+### Scenario 4: Progressive Trigger Test
 
-**目标**：验证三层压缩的渐进式触发机制
+**Goal**: Verify the progressive triggering mechanism of three-layer compression
 
-**步骤**：
-1. 从空对话开始
-2. 持续对话，观察压缩层级的触发顺序
+**Steps**:
+1. Start with an empty conversation
+2. Continue the conversation and observe the triggering sequence of the compression levels.
 
-**预期结果**：
-- 触发顺序：Layer 1 (60%) → Layer 2 (75%) → Layer 3 (90%)
-- 每次压缩后重新估算 Token 用量
-- 日志中清晰记录每层的触发和效果
+**Expected results**:
+- Trigger sequence: Layer 1 (60%) → Layer 2 (75%) → Layer 3 (90%)
+- Re-estimate Token usage after each compression
+- The triggers and effects of each layer are clearly recorded in the log
 
-**验证命令**：
+**Verification command**:
 ```bash
-# 查看所有层级的触发
+# View triggers at all levels
 tail -f ~/Library/Application\ Support/com.antigravity.tools/logs/antigravity.log | grep -E "Layer-[123]"
 ```
 
 ---
 
-### 场景 5：错误处理测试
+### Scenario 5: Error handling test
 
-**目标**：验证 Layer 3 失败时的容错机制
+**Goal**: Verify fault tolerance when Layer 3 fails
 
-**步骤**：
-1. 临时禁用 Gemini 账号或网络
-2. 触发 Layer 3 压缩
+**Steps**:
+1. Temporarily disable Gemini account or network
+2. Trigger Layer 3 compression
 
-**预期结果**：
-- Layer 3 失败时返回 `BAD_REQUEST` 错误
-- 错误消息友好：`Context too long and automatic compression failed`
-- 提示用户使用 `/compact` 或切换模型
+**Expected results**:
+- Return `BAD_REQUEST` error on Layer 3 failure
+- Friendly error message: `Context too long and automatic compression failed`
+- Prompt user to use `/compact` or switch models
 
-**验证命令**：
+**Verification command**:
 ```bash
-# 查看错误处理
+# View error handling
 tail -f ~/Library/Application\ Support/com.antigravity.tools/logs/antigravity.log | grep -E "(Layer-3.*failed|BAD_REQUEST)"
 ```
 
 ---
 
-## 性能验证
+## Performance verification
 
-### Token 成本节省
+### Token cost savings
 
-**测试方法**：
-1. 记录压缩前的 Token 用量（从日志中提取）
-2. 记录压缩后的 Token 用量
-3. 计算节省比例
+**Test method**:
+1. Record the Token usage before compression (extracted from the log)
+2. Record the compressed Token usage
+3. Calculate savings ratio
 
-**预期结果**：
-- Layer 1: 60-90% 节省
-- Layer 2: 70-95% 节省
-- Layer 3: 86-97% 节省
+**Expected results**:
+- Layer 1: 60-90% savings
+- Layer 2: 70-95% savings
+- Layer 3: 86-97% savings
 
-### 响应速度
+### Response speed
 
-**测试方法**：
-1. 使用 `time` 命令测量响应时间
-2. 对比压缩前后的响应速度
+**Test method**:
+1. Use the `time` command to measure response time
+2. Compare the response speed before and after compression
 
-**预期结果**：
-- Layer 1/2: 响应速度无明显变化
-- Layer 3: 首次摘要生成可能增加 2-5 秒，后续请求正常
+**Expected results**:
+- Layer 1/2: No significant change in response speed
+- Layer 3: The first digest generation may take 2-5 seconds, subsequent requests will be normal
 
 ---
 
-## 兼容性测试
+## Compatibility testing
 
-### 客户端兼容性
+### Client Compatibility
 
-测试以下客户端：
+Test the following clients:
 - ✅ Claude Code CLI
 - ✅ Cherry Studio
 - ✅ Cursor
 - ✅ Python OpenAI SDK
 - ✅ Kilo Code
 
-### 模型兼容性
+### Model Compatibility
 
-测试以下模型：
+Test the following models:
 - ✅ Gemini 3 Flash
 - ✅ Gemini 3 Pro High
 - ✅ Claude 4.5 Sonnet
@@ -184,161 +184,161 @@ tail -f ~/Library/Application\ Support/com.antigravity.tools/logs/antigravity.lo
 
 ---
 
-## 回归测试
+## Regression testing
 
-### 签名链完整性
+### Signature chain integrity
 
-**验证点**：
-- Layer 2 压缩后签名不丢失
-- Layer 3 Fork 后签名正确恢复
-- 无 400 签名错误
+**Verification Point**:
+- Signature is not lost after Layer 2 compression
+- Signatures are restored correctly after Layer 3 Fork
+- No 400 signature errors
 
-### 工具调用链
+### Tool call chain
 
-**验证点**：
-- 工具调用在压缩后仍能正常工作
-- 工具结果正确传递
-- 无工具调用中断
+**Verification Point**:
+- Tool calls still work properly after compression
+- Tool results are passed correctly
+- No tool call interruption
 
 ---
 
-## 日志分析
+## Log analysis
 
-### 关键日志模式
+### Key log mode
 
 ```bash
-# Layer 1 触发
+# Layer 1 trigger
 grep "Layer-1.*Tool trimming" antigravity.log
 
-# Layer 2 触发
+# Layer 2 trigger
 grep "Layer-2.*Thinking compression" antigravity.log
 
-# Layer 3 触发
+# Layer 3 trigger
 grep "Layer-3.*Fork successful" antigravity.log
 
-# Token 节省统计
+# Token save statistics
 grep "Compression result.*saved" antigravity.log
 ```
 
 ---
 
-## 测试报告模板
+## Test report template
 
 ```markdown
-## 测试结果
+## Test results
 
-### 场景 1: Layer 1 工具消息裁剪
-- [ ] 触发成功
-- [ ] 保留最近 5 轮
-- [ ] 无 400 错误
-- [ ] 响应速度正常
+### Scenario 1: Layer 1 tool message clipping
+- [ ] Triggered successfully
+- [ ] keep the last 5 rounds
+- [ ] No 400 errors
+- [ ] Response speed is normal
 
-### 场景 2: Layer 2 Thinking 压缩
-- [ ] 触发成功
-- [ ] 签名完整保留
-- [ ] 无签名错误
-- [ ] 压缩率达标
+### Scenario 2: Layer 2 Thinking Compression
+- [ ] Triggered successfully
+- [ ] Signature kept intact
+- [ ] No signature error
+- [ ] Compression rate meets standard
 
-### 场景 3: Layer 3 Fork 会话
-- [ ] 触发成功
-- [ ] XML 摘要生成
-- [ ] 压缩率 86-97%
-- [ ] 无 Cache 破坏
+### Scenario 3: Layer 3 Fork session
+- [ ] Triggered successfully
+- [ ] XML digest generation
+- [ ] Compression rate 86-97%
+- [ ] No Cache corruption
 
-### 场景 4: 渐进式触发
-- [ ] 顺序正确 (1→2→3)
-- [ ] Token 重新估算
-- [ ] 日志清晰
+### Scenario 4: Progressive triggering
+- [ ] in correct order (1→2→3)
+- [ ] Token revaluation
+- [ ] clear log
 
-### 场景 5: 错误处理
-- [ ] 失败时友好提示
-- [ ] 无崩溃
-- [ ] 建议明确
+### Scenario 5: Error handling
+- [ ] Friendly prompts when failure occurs
+- [ ] No crashes
+- [ ] Recommendations are clear
 
-### 性能验证
-- Token 节省: ____%
-- 响应速度: 正常/慢 (___ms)
+### Performance verification
+- Token savings: ____%
+- Response speed: normal/slow (___ms)
 
-### 兼容性
+### Compatibility
 - Claude Code: ✅/❌
 - Cherry Studio: ✅/❌
 - Cursor: ✅/❌
 - Python SDK: ✅/❌
 
-### 回归测试
-- 签名链完整: ✅/❌
-- 工具调用正常: ✅/❌
+### Regression testing
+- Complete signature chain: ✅/❌
+- Tool calling is normal: ✅/❌
 
-## 问题记录
+## Problem record
 
-(记录测试中发现的问题)
+(Record problems found during testing)
 
-## 结论
+## Conclusion
 
-(总体评价和建议)
+(Overall comments and suggestions)
 ```
 
 ---
 
-## 快速测试脚本
+## Quick test script
 
 ```bash
 #!/bin/bash
-# 快速测试三层压缩
+# Quickly test three-layer compression
 
-echo "=== 测试 Layer 1 (工具裁剪) ==="
-# 使用 Claude Code 执行多次文件搜索
-claude "请搜索项目中所有 .rs 文件，然后读取其中 5 个文件的内容"
+echo "=== Test Layer 1 (Tool Cropping) ==="
+# Use Claude Code to perform multiple file searches
+claude "Please search all .rs files in the project and read the contents of 5 of them"
 
-echo "=== 测试 Layer 2 (Thinking 压缩) ==="
-# 使用 Thinking 模型进行复杂推理
-claude --model claude-opus-4-5-thinking "请详细分析这段代码的性能瓶颈并提出优化方案"
+echo "=== Test Layer 2 (Thinking compression) ==="
+#Use Thinking model for complex reasoning
+claude --model claude-opus-4-5-thinking "Please analyze the performance bottleneck of this code in detail and propose an optimization plan"
 
-echo "=== 测试 Layer 3 (Fork 会话) ==="
-# 超长对话触发 Fork
+echo "=== Test Layer 3 (Fork session) ==="
+# Extra long dialogue triggers Fork
 for i in {1..20}; do
-  claude "继续上一个话题，请提供更多细节 (第 $i 轮)"
+  claude "Continue the previous topic, please provide more details (round $i)"
 done
 
-echo "=== 查看日志 ==="
+echo "=== View log ==="
 tail -100 ~/Library/Application\ Support/com.antigravity.tools/logs/antigravity.log | grep -E "Layer-[123]"
 ```
 
 ---
 
-## 注意事项
+## Notes
 
-1. **测试环境**：确保在干净的环境中测试，避免其他因素干扰
-2. **日志级别**：必须设置 `RUST_LOG=debug` 才能看到详细日志
-3. **账号配额**：测试前确保账号有足够配额
-4. **备份数据**：测试前备份重要数据
-5. **版本确认**：确认运行的是 v4.2.4 版本
-
----
-
-## 问题排查
-
-### 问题 1：Layer 1 未触发
-- 检查对话是否达到 60% 压力
-- 查看 Token 估算是否准确
-
-### 问题 2：Layer 2 签名丢失
-- 检查 `compress_thinking_preserve_signature` 函数
-- 验证签名提取逻辑
-
-### 问题 3：Layer 3 摘要失败
-- 检查 Gemini 账号是否可用
-- 验证 `call_gemini_sync` 函数
-- 查看上游 API 错误
-
-### 问题 4：400 错误
-- 检查签名链是否完整
-- 验证工具调用参数
-- 查看上游 API 响应
+1. **Test environment**: Make sure to test in a clean environment to avoid interference from other factors
+2. **Log level**: `RUST_LOG=debug` must be set to see detailed logs
+3. **Account Quota**: Make sure the account has sufficient quota before testing
+4. **Backup data**: Back up important data before testing
+5. **Version Confirmation**: Confirm that you are running version v4.2.4
 
 ---
 
-## 联系方式
+## Troubleshooting
 
-如有问题，请在 GitHub 提 Issue：
+### Problem 1: Layer 1 is not triggered
+- Check if dialogue reaches 60% stress
+- Check whether the Token estimate is accurate
+
+### Problem 2: Layer 2 signature is lost
+- Check the `compress_thinking_preserve_signature` function
+- Verify signature extraction logic
+
+### Issue 3: Layer 3 digest failed
+- Check if Gemini account is available
+- Verify `call_gemini_sync` function
+- View upstream API errors
+
+### Question 4: 400 error
+- Check whether the signature chain is complete
+- Verify tool call parameters
+- View upstream API responses
+
+---
+
+## Contact information
+
+If you have any questions, please raise an issue on GitHub:
 https://github.com/lbjlaq/Antigravity-Manager/issues

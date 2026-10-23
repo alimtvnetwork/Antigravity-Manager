@@ -9,7 +9,7 @@ pub(crate) const QUOTA_API_ENDPOINTS: [&str; 3] = [
 ];
 
 // Quota Summary API endpoints (weekly + 5h grouped quota, fallback order: Daily → Sandbox → Prod)
-// 顺序理由同上：优先与官方客户端一致的 Daily 端点。
+// The order reason is the same as above: give priority to the Daily endpoint that is consistent with the official client.
 pub(crate) const QUOTA_SUMMARY_ENDPOINTS: [&str; 3] = [
     "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary",
     "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:retrieveUserQuotaSummary",
@@ -175,8 +175,8 @@ async fn create_long_standard_client(account_id: Option<&str>) -> rquest::Client
     }
 }
 
-// 项目 / 档位解析端点（fallback order: Daily → Sandbox → Prod）
-// [FIX Issue #3525] 与官方 Antigravity language_server 的出站端点保持一致，理由见上文 QUOTA_API_ENDPOINTS。
+// Project/Scale parsing endpoint (fallback order: Daily → Sandbox → Prod)
+// [FIX Issue #3525] Align with the official Antigravity language_server's outbound endpoints for the reason QUOTA_API_ENDPOINTS above.
 pub(crate) const CLOUD_CODE_LOAD_PROJECT_ENDPOINTS: [&str; 3] = [
     "https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
     "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:loadCodeAssist",

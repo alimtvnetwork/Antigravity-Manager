@@ -18,7 +18,7 @@ pub fn get_upstream_proxy_url() -> Option<String> {
         }
     }
 
-    // 兜底：若未显式配置上游代理，尝试从系统环境变量获取代理 (HTTPS_PROXY / HTTP_PROXY / ALL_PROXY)
+    // Tip: If the upstream proxy is not explicitly configured, try to get the proxy from the system environment variable (HTTPS_PROXY / HTTP_PROXY / ALL_PROXY)
     for env_var in &[
         "HTTPS_PROXY",
         "https_proxy",

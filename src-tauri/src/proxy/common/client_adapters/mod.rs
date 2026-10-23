@@ -1,5 +1,5 @@
-// Client Adapters 模块
-// 存放各种客户端的适配器实现
+// Client Adapters module
+// Stores adapter implementations for various clients
 
 pub mod opencode;
 

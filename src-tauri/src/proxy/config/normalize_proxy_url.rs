@@ -1,10 +1,10 @@
 use super::*;
 
 // ============================================================================
-// 辅助工具函数
+// Helper functions
 // ============================================================================
 
-/// 标准化代理 URL，如果缺失协议则默认补全 http://
+/// Standardized proxy URL, default completion if protocol is missing http://
 pub fn normalize_proxy_url(url: &str) -> String {
     let url = url.trim();
     if url.is_empty() {
@@ -18,8 +18,8 @@ pub fn normalize_proxy_url(url: &str) -> String {
 }
 
 // ============================================================================
-// 全局 Thinking Budget 配置存储
-// 用于在 request transform 函数中访问配置（无需修改函数签名）
+// Global Thinking Budget configuration storage
+// Used to access the configuration in the request transform function (without modifying the function signature)
 // ============================================================================
 #[cfg(test)]
 pub static TEST_CONFIG_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -37,7 +37,7 @@ static GLOBAL_THINKING_BUDGET_CONFIG: OnceLock<RwLock<ThinkingBudgetConfig>> = O
 #[cfg(test)]
 pub static TEST_THINKING_BUDGET_MUTEX: &std::sync::Mutex<()> = &TEST_CONFIG_LOCK;
 
-/// 获取当前 Thinking Budget 配置
+/// Get the current Thinking Budget configuration
 pub fn get_thinking_budget_config() -> ThinkingBudgetConfig {
     GLOBAL_THINKING_BUDGET_CONFIG
         .get()
@@ -46,7 +46,7 @@ pub fn get_thinking_budget_config() -> ThinkingBudgetConfig {
         .unwrap_or_default()
 }
 
-/// 更新全局 Thinking Budget 配置
+/// Update global Thinking Budget configuration
 pub fn update_thinking_budget_config(config: ThinkingBudgetConfig) {
     if let Some(lock) = GLOBAL_THINKING_BUDGET_CONFIG.get() {
         if let Ok(mut cfg) = lock.write() {
@@ -92,12 +92,12 @@ pub fn update_thinking_budget_config(config: ThinkingBudgetConfig) {
 }
 
 // ============================================================================
-// 全局系统提示词配置存储
-// 用户可在设置中配置一段全局提示词，自动注入到所有请求的 systemInstruction 中
+// Global system prompt word configuration storage
+// Users can configure a global prompt word in the settings, which will be automatically injected into the systemInstruction of all requests.
 // ============================================================================
 static GLOBAL_SYSTEM_PROMPT_CONFIG: OnceLock<RwLock<GlobalSystemPromptConfig>> = OnceLock::new();
 
-/// 获取当前全局系统提示词配置
+/// Get the current global system prompt word configuration
 pub fn get_global_system_prompt() -> GlobalSystemPromptConfig {
     GLOBAL_SYSTEM_PROMPT_CONFIG
         .get()
@@ -106,7 +106,7 @@ pub fn get_global_system_prompt() -> GlobalSystemPromptConfig {
         .unwrap_or_default()
 }
 
-/// 更新全局系统提示词配置
+/// Update global system prompt word configuration
 pub fn update_global_system_prompt_config(config: GlobalSystemPromptConfig) {
     if let Some(lock) = GLOBAL_SYSTEM_PROMPT_CONFIG.get() {
         if let Ok(mut cfg) = lock.write() {
@@ -118,7 +118,7 @@ pub fn update_global_system_prompt_config(config: GlobalSystemPromptConfig) {
             );
         }
     } else {
-        // 首次初始化
+        // First initialization
         // Justification: OnceLock::set fails only if already initialized; double-init is a benign no-op by design.
         let _ = GLOBAL_SYSTEM_PROMPT_CONFIG.set(RwLock::new(config.clone()));
         tracing::info!(
@@ -130,7 +130,7 @@ pub fn update_global_system_prompt_config(config: GlobalSystemPromptConfig) {
 }
 
 // ============================================================================
-// 全局图像思维模式配置存储
+// Global image thinking mode configuration storage
 // ============================================================================
 static GLOBAL_IMAGE_THINKING_MODE: OnceLock<RwLock<String>> = OnceLock::new();
 
@@ -158,7 +158,7 @@ pub fn update_image_thinking_mode(mode: Option<String>) {
 }
 
 // ============================================================================
-// 全局压缩等级配置存储
+// Global compression level configuration storage
 // ============================================================================
 static GLOBAL_COMPRESSION_LEVEL: OnceLock<RwLock<String>> = OnceLock::new();
 
@@ -364,13 +364,13 @@ pub fn update_global_thresholds(l1: f32, l2: f32, l3: f32) {
     }
 }
 
-/// 全局系统提示词配置
+/// Global system prompt word configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GlobalSystemPromptConfig {
-    /// 是否启用全局系统提示词
+    /// Whether to enable global system prompt words
     #[serde(default)]
     pub enabled: bool,
-    /// 系统提示词内容
+    /// System prompt word content
     #[serde(default)]
     pub content: String,
 }

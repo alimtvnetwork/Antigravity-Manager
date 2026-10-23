@@ -54,7 +54,7 @@ pub(crate) async fn process_collected_stream(
             }
         }
 
-        // [Timing Diagnostics] 注入耗时诊断元数据 (秒)
+        // [Timing Diagnostics] Inject time-consuming diagnostic metadata (seconds)
         let mut timing_obj = serde_json::Map::new();
         if let Some(clean) = headers_map
             .get("x-timing-clean-ms")
@@ -88,7 +88,7 @@ pub(crate) async fn process_collected_stream(
         );
         timing_obj.insert("total_s".to_string(), serde_json::json!(total_ms / 1000.0));
 
-        // 优先从 tail 兜底提取 token（若当前尚无 token 数据）
+        // Prioritize extracting token from tail (if there is no token data currently)
         if log.input_tokens.is_none() && log.output_tokens.is_none() {
             if let Ok(full_tail) = std::str::from_utf8(&last_few_bytes) {
                 for line in full_tail.lines().rev() {
@@ -163,7 +163,7 @@ pub(crate) async fn process_collected_stream(
             }
         }
 
-        // 🌟 构建统一的满血简要版响应报文 (包含网关权威签名回填与确定性 Tool ID)
+        // 🌟 Construct a unified full health simplified version of the response message (including gateway authoritative signature backfill and deterministic Tool ID)
         let consolidated = build_canonical_consolidated_response(
             acc.thinking_content,
             acc.thinking_signature,

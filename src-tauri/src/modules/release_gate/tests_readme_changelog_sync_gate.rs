@@ -125,7 +125,7 @@ mod tests {
         let target_version = "v4.251.0-beta.1";
         let changelog_summary = "### [v4.251.0-beta.1]\n- Beta preview notes";
         // Both README files still have older stable release notes
-        let readme_zh = "## 📝 更新日志\n### v4.250.0\n- Previous stable";
+        let readme_zh = "## 📝 Update log\n### v4.250.0\n- Previous stable";
         let readme_en = "## 📝 Changelog\n### v4.250.0\n- Previous stable";
 
         let report = verify_readme_changelog_synchronization(
@@ -226,7 +226,7 @@ mod tests {
         assert!(version_matches("v4.251.0", "v4.251.0"));
         assert!(!version_matches("v4.251.0", "v4.250.0"));
 
-        let sample = "## 📝 更新日志\n### 4.251.0 (2026-10-23)";
+        let sample = "## 📝 Update log\n### 4.251.0 (2026-10-23)";
         assert!(contains_version(sample, "v4.251.0"));
         assert!(contains_version(sample, "4.251.0"));
 
@@ -268,7 +268,7 @@ Section Content Line 2
 ## Next Section
 Other Content
 ";
-        let section = extract_section(content, "## 📝 更新日志");
+        let section = extract_section(content, "## 📝 Update log");
         assert!(section.is_some());
         let text = section.unwrap();
         assert!(text.contains("Section Content Line 1"));
@@ -280,7 +280,7 @@ Other Content
         let v1 = ReadmeSyncViolation::MissingChineseReadmeChangelogSection;
         assert_eq!(
             v1.to_string(),
-            "Missing Chinese changelog section '## 📝 更新日志' in README.md"
+            "Missing Chinese changelog section '## 📝 changelog' in README.md"
         );
 
         let v2 = ReadmeSyncViolation::MissingEnglishReadmeChangelogSection;

@@ -76,9 +76,9 @@ mod tests {
 
     #[test]
     fn test_simplify_responses_payload_keeps_instructions_and_input() {
-        // 回归：Responses / Codex 协议的系统提示词在 `instructions`、上下文在 `input`。
-        // 这两个键一度不在白名单里 → simple 模式下整段消失（客户端原文看不到系统提示词与
-        // 上下文，而中转报文是 Gemini 格式故看起来完整）。
+        // Regression: The system prompt word of the Responses / Codex protocol is in `instructions` and the context is in `input`.
+        // These two keys were once not in the whitelist → the entire section disappears in simple mode (the client cannot see the system prompt words and
+        // context, and the relay message is in Gemini format so it looks complete).
         let req = json!({
             "model": "gemini-2.5-pro",
             "instructions": "You are Codex, a coding agent.",
@@ -93,11 +93,11 @@ mod tests {
 
         assert_eq!(
             simplified["instructions"], "You are Codex, a coding agent.",
-            "instructions 必须保留: {simplified}"
+            "instructions must be retained: {simplified}"
         );
         assert!(
             simplified["input"].is_array(),
-            "input 必须保留为数组: {simplified}"
+            "input must be kept as an array: {simplified}"
         );
         assert_eq!(simplified["input"][0]["role"], "user");
         assert_eq!(simplified["input"][1]["type"], "function_call_output");

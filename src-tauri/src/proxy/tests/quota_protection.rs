@@ -1,6 +1,6 @@
 // ==================================================================================
-// 配额保护功能完整测试
-// 验证从账号创建到配额保护策略执行的完整流程
+// Complete test of quota protection function
+// Verify the complete process from account creation to quota protection policy execution
 // ==================================================================================
 
 #[cfg(test)]

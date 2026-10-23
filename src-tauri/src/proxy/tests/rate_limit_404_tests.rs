@@ -1,6 +1,6 @@
-//! 测试 RateLimitTracker 对 404 / 500 / 503 与 429 的处理基准：
-//! - 404 (模型不存在) 与 500/503 (服务端异常) 绝对不打入账号冷却池 (返回 None)
-//! - 真正的 429 (限流) 准确打入冷却池，且提供 model 时严格进行模型级隔离，禁止连坐全账号
+//! Test RateLimitTracker's processing benchmark for 404 / 500 / 503 and 429:
+//! - 404 (model does not exist) and 500/503 (server-side exception) will never be entered into the account cooling pool (return None)
+//! - The real 429 (current limit) is accurately entered into the cooling pool, and model-level isolation is strictly carried out when providing models, and it is forbidden to use all accounts together.
 
 use crate::proxy::rate_limit::RateLimitTracker;
 
@@ -9,7 +9,7 @@ fn test_404_and_5xx_never_lock_account() {
     let tracker = RateLimitTracker::new();
     let backoff_steps = vec![60, 300, 1800, 7200];
 
-    // 404 模型不存在：绝对禁止打入冷却池
+    // 404 Model does not exist: It is absolutely forbidden to enter the cooling pool
     let info_404 = tracker.parse_from_error(
         "acc_test",
         404,
@@ -25,7 +25,7 @@ fn test_404_and_5xx_never_lock_account() {
     assert!(!tracker.is_rate_limited("acc_test", Some("nonexistent")));
     assert!(!tracker.is_rate_limited("acc_test", None));
 
-    // 500 服务器内部错误：服务故障，绝不作为账号限流
+    // 500 Server internal error: service failure, never used as account flow limit
     let info_500 = tracker.parse_from_error(
         "acc_test",
         500,
@@ -37,7 +37,7 @@ fn test_404_and_5xx_never_lock_account() {
     assert!(info_500.is_none(), "500 must return None");
     assert!(!tracker.is_rate_limited("acc_test", Some("gemini-2.5-pro")));
 
-    // 503 服务不可用：瞬时故障，绝不作为账号限流
+    // 503 Service Unavailable: Momentary failure, never used as account current limit
     let info_503 = tracker.parse_from_error(
         "acc_test",
         503,
@@ -55,7 +55,7 @@ fn test_rate_limit_with_model_isolates_fine_grained() {
     let tracker = RateLimitTracker::new();
     let backoff_steps = vec![60, 300, 1800, 7200];
 
-    // 429 速率限制触发（带具体 model）
+    // 429 rate limit trigger (with specific model)
     let info_429 = tracker.parse_from_error(
         "acc_isolated",
         429,
@@ -66,10 +66,10 @@ fn test_rate_limit_with_model_isolates_fine_grained() {
     );
     assert!(info_429.is_some(), "429 should return Some");
 
-    // 该账号针对 claude-test-model 处于限流
+    // This account is currently restricted for claude-test-model
     assert!(tracker.is_rate_limited("acc_isolated", Some("claude-test-model")));
 
-    // 关键验证：该账号针对其他正常模型（如 gemini-2.5-flash / claude-sonnet-4-6）绝对不被连坐！
+    // Key verification: This account will definitely not be linked to other normal models (such as gemini-2.5-flash / claude-sonnet-4-6)!
     assert!(
         !tracker.is_rate_limited("acc_isolated", Some("gemini-2.5-flash")),
         "Other models must NOT be locked when rate limit specifies a model"

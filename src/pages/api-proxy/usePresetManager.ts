@@ -21,7 +21,7 @@ export function usePresetManager({ appConfig, setAppConfig, loadConfig }: UsePre
     const [isPresetManagerOpen, setIsPresetManagerOpen] = useState(false);
     const [newPresetName, setNewPresetName] = useState('');
 
-    // 定义多个预设方案
+    // Define multiple default scenarios
     const defaultPresets = useMemo((): CustomPreset[] => [
         {
             id: 'default',
@@ -162,40 +162,40 @@ export function usePresetManager({ appConfig, setAppConfig, loadConfig }: UsePre
         setSelectedPreset((prev) => prev === id ? DEFAULT_PRESET_ID : prev);
     }, [customPresets, saveCustomPresetsToStorage]);
 
-    // 应用预设映射 (通配符)
+    // Apply default mapping (wildcard)
     const handleApplyPresets = useCallback(async () => {
         if (!appConfig) return;
 
         const selectedPresetData = presetOptions.find(p => p.id === selectedPreset);
         if (!selectedPresetData) return;
 
-        // 构造新配置
+        // Construct new configuration
         const newConfig = {
             ...appConfig.proxy,
-            // 策略:覆盖同名 key,保留其他自定义 key
+            // Strategy: Overwrite the key with the same name and retain other custom keys
             // [FIX #1738] Type assertion to ensure Record<string, string> compatibility
             custom_mapping: { ...appConfig.proxy.custom_mapping, ...selectedPresetData.mappings } as Record<string, string>
         };
 
-        // 备份旧配置用于回滚
+        // Back up old configuration for rollback
         const oldConfig = { ...appConfig };
 
         try {
-            // 1. 乐观更新：立即更新 UI
+            // 1. Optimistic updates: update the UI immediately
             setAppConfig({ ...appConfig, proxy: newConfig });
             showToast(t('proxy.router.presets_applied') + ` (${selectedPresetData.name})`, 'success');
 
-            // 2. 后台异步保存
+            // 2. Background asynchronous saving
             await invoke('update_model_mapping', { config: newConfig });
 
-            // 3. 重新加载配置以确保一致性
+            // 3. Reload configuration to ensure consistency
             await loadConfig();
         } catch (error) {
             useErrorStore.getState().trackWarning(error, {
                 source: 'usePresetManager.handleApplyPresets',
                 triggerAction: 'update_model_mapping',
             });
-            // 3. 失败回滚
+            // 3. Rollback on failure
             setAppConfig(oldConfig);
             showToast(`${t('common.error')}: ${error}`, 'error');
         }

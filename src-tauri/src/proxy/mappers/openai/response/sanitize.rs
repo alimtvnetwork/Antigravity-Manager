@@ -15,6 +15,6 @@ pub fn resolve_shell_tool_name(
     model_tool_name: &str,
     _client_tool_names: &std::collections::HashSet<String>,
 ) -> String {
-    // 纯透传工具名称，不进行任何改写
+    // Pure transparent transmission tool name without any rewriting
     model_tool_name.to_string()
 }

@@ -66,7 +66,7 @@ pub(crate) async fn completions_handle_success(
         upstream_req_start,
         gemini_body_for_debug,
     } = send;
-    // [智能限流] 请求成功，重置该账号的连续失败计数
+    // [Intelligent current limit] If the request is successful, the account’s consecutive failure count will be reset.
     token_manager.mark_account_success(&email);
 
     if list_response {

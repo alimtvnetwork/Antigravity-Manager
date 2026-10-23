@@ -1,16 +1,16 @@
 // ==========================================
-// 简要模式载荷简化器 (Payload Simplifiers)
-// 按载荷关注点拆分的纯函数：工具声明 / 工具调用 / 消息内容 / 消息列表 /
-// Gemini 轮次 / 系统提示词 / 用量信息 / 深度反转义。无副作用，可独立测试。
+// Payload Simplifiers
+// Pure functions split by payload concerns: tool declaration / tool call / message content / message list /
+// Gemini rounds / system prompt words / usage information / deep anti-escaping. No side effects and can be independently tested.
 // ==========================================
 
-// 工具声明 (完整保留 Schema，方便开发者查看工具拼接与入参定义)
+// Tool declaration (the Schema is retained completely to facilitate developers to view tool splicing and input parameter definitions)
 export const simplifyTools = (tools: any): any => {
     if (!Array.isArray(tools)) return undefined;
     return tools;
 };
 
-// 简化工具调用 (统一规范为: id, type: 'function', function: { name, arguments })
+// Simplify tool calls (unified specification: id, type: 'function', function: { name, arguments })
 export const simplifyToolCalls = (toolCalls: any): any => {
     if (!Array.isArray(toolCalls)) return undefined;
     return toolCalls.map((tc: any) => {
@@ -35,14 +35,14 @@ export const simplifyToolCalls = (toolCalls: any): any => {
     });
 };
 
-// 简化消息内容 (Claude / OpenAI parts)
+// Simplify message content (Claude / OpenAI parts)
 export const simplifyContent = (content: any): any => {
     if (typeof content === 'string') return content;
     if (Array.isArray(content)) {
         return content.map((item: any) => {
             if (typeof item === 'string') return item;
             if (!item || typeof item !== 'object') return item;
-            // Claude tool_use 块
+            // Claude tool_use block
             if (item.type === 'tool_use') {
                 return {
                     type: 'tool_use',
@@ -51,7 +51,7 @@ export const simplifyContent = (content: any): any => {
                     input: item.input !== undefined ? item.input : {}
                 };
             }
-            // Claude tool_result 块
+            // Claude tool_result block
             if (item.type === 'tool_result') {
                 return {
                     type: 'tool_result',
@@ -60,7 +60,7 @@ export const simplifyContent = (content: any): any => {
                     ...(item.is_error !== undefined ? { is_error: item.is_error } : {})
                 };
             }
-            // Claude thinking 块与签名
+            // Claude thinking blocks and signatures
             if (item.type === 'thinking') {
                 return {
                     type: 'thinking',
@@ -71,14 +71,14 @@ export const simplifyContent = (content: any): any => {
                     ...(item.thinking_signature !== undefined ? { thinking_signature: item.thinking_signature } : {})
                 };
             }
-            // Claude redacted_thinking 块
+            // Claude redacted_thinking block
             if (item.type === 'redacted_thinking') {
                 return {
                     type: 'redacted_thinking',
                     data: item.data
                 };
             }
-            // 文本块
+            // text block
             if (item.type === 'text') {
                 return item;
             }
@@ -88,7 +88,7 @@ export const simplifyContent = (content: any): any => {
     return content;
 };
 
-// 简化消息列表
+// Simplified message list
 export const simplifyMessages = (messages: any): any => {
     if (!Array.isArray(messages)) return undefined;
     return messages.map((m: any) => {
@@ -125,7 +125,7 @@ export const simplifyMessages = (messages: any): any => {
     });
 };
 
-// 简化 Gemini 轮次 (contents)
+// Simplifying Gemini rounds (contents)
 export const simplifyGeminiContents = (contents: any): any => {
     if (!Array.isArray(contents)) return undefined;
     return contents.map((c: any) => {
@@ -135,7 +135,7 @@ export const simplifyGeminiContents = (contents: any): any => {
             res.parts = c.parts.map((p: any) => {
                 if (!p || typeof p !== 'object') return p;
 
-                // 1. 优先识别工具调用 (functionCall) 并保留其名称、ID、参数与携带的加密思考签名
+                // 1. Prioritize the identification of tool calls (functionCall) and retain their names, IDs, parameters and encrypted thinking signatures
                 if (p.functionCall) {
                     const fcPart: any = {
                         functionCall: {
@@ -151,7 +151,7 @@ export const simplifyGeminiContents = (contents: any): any => {
                     return fcPart;
                 }
 
-                // 2. 优先识别工具响应 (functionResponse) 并保留其名称、ID、返回值与携带的签名
+                // 2. Prioritize the tool response (functionResponse) and retain its name, ID, return value and carried signature
                 if (p.functionResponse) {
                     const frPart: any = {
                         functionResponse: {
@@ -167,7 +167,7 @@ export const simplifyGeminiContents = (contents: any): any => {
                     return frPart;
                 }
 
-                // 3. 独立思考块 (纯思考过程，不带工具调用)
+                // 3. Independent thinking block (pure thinking process, without tool invocation)
                 if (p.thought !== undefined || p.thought_signature !== undefined || p.thoughtSignature !== undefined || p.signature !== undefined) {
                     const tPart: any = {};
                     if (p.thought !== undefined) tPart.thought = p.thought;
@@ -178,7 +178,7 @@ export const simplifyGeminiContents = (contents: any): any => {
                     return tPart;
                 }
 
-                // 4. 普通文本块
+                // 4. Ordinary text block
                 if (p.text !== undefined) {
                     return { text: p.text };
                 }
@@ -190,7 +190,7 @@ export const simplifyGeminiContents = (contents: any): any => {
     });
 };
 
-// 简化系统提示词 (Gemini / Anthropic)
+// Simplified system prompt words (Gemini / Anthropic)
 export const simplifySystemInstruction = (sys: any): any => {
     if (!sys || typeof sys !== 'object') return sys;
     if (Array.isArray(sys.parts)) {
@@ -205,7 +205,7 @@ export const simplifySystemInstruction = (sys: any): any => {
     return sys;
 };
 
-// 提取用量与缓存命中率
+// Fetch usage and cache hit rate
 export const simplifyUsage = (usage: any): any => {
     if (!usage || typeof usage !== 'object') return undefined;
     const res: any = {};
@@ -220,9 +220,9 @@ export const simplifyUsage = (usage: any): any => {
         cached = usage.input_tokens_details.cached_tokens;
     }
 
-    // 计算全量上下文输入 Token (Total Context Input)
-    // 1. Anthropic 官方协议: input_tokens 仅代表未缓存增量，总上下文 = input_tokens + cache_read_input_tokens
-    // 2. 兼容历史日志: 若 cached > rawInput，说明 rawInput 存的是未缓存差值，做自愈加和
+    // Calculate the total context input Token (Total Context Input)
+    // 1. Anthropic official protocol: input_tokens only represents uncached increments, total context = input_tokens + cache_read_input_tokens
+    // 2. Compatible with historical logs: If cached > rawInput, it means that rawInput stores uncached differences, and performs self-healing and summing
     let totalInput = rawInput != null ? Number(rawInput) : undefined;
     if (cached != null && totalInput != null && cached > totalInput) {
         totalInput = totalInput + Number(cached);
@@ -255,8 +255,8 @@ export const simplifyUsage = (usage: any): any => {
 };
 
 /**
- * 递归深度反转义并反序列化嵌套在 JSON 字符串属性中的 JSON 内容
- * 例如将 "response": "{\"error\":{\"code\":400...}}" 自动展开为真实的嵌套对象
+ * Recursively deeply unescape and deserialize JSON content nested within JSON string properties
+ * For example, "response": "{\"error\":{\"code\":400...}}" will automatically expand into a real nested object
  */
 export const deepUnescapeJsonValue = (val: any): any => {
     if (typeof val === 'string') {

@@ -12,8 +12,8 @@ pub(crate) fn phase_finalize(
     project_id: &str,
     is_under_v3: bool,
 ) -> serde_json::Value {
-    // [NEW] 按模型对 maxOutputTokens 进行三层限额 (Dynamic > Static Default > 65535)
-    // 修复: gemini-cli 等客户端发送的 131072 超过部分模型支持的上限，导致 v1internal 返回 400 INVALID_ARGUMENT
+    // [NEW] Three-tier limit on maxOutputTokens by model (Dynamic > Static Default > 65535)
+    // Fix: 131072 sent by clients such as gemini-cli exceeds the upper limit supported by some models, causing v1internal to return 400 INVALID_ARGUMENT
     {
         let final_cap = crate::proxy::model_specs::get_max_output_tokens(final_model_name, token);
         let gen_config = inner_request
@@ -42,7 +42,7 @@ pub(crate) fn phase_finalize(
     // This caused upstream to return empty/invalid responses, leading to 'NoneType' object has no attribute 'strip' in Python clients.
     // relying on upstream defaults or user provided values is safer.
 
-    // 提取 tools 列表以进行联网探测 (Gemini 风格可能是嵌套的)
+    // Extract tools list for network probing (Gemini style may be nested)
     let tools_val: Option<Vec<Value>> = inner_request
         .get("tools")
         .and_then(|t| t.as_array())
@@ -70,11 +70,11 @@ pub(crate) fn phase_finalize(
             for tool in tools_arr {
                 if let Some(decls) = tool.get_mut("functionDeclarations") {
                     if let Some(decls_arr) = decls.as_array_mut() {
-                        // 清洗 Schema: 如果存在 parametersJsonSchema，将其标准化为 parameters
+                        // Clean Schema: If parametersJsonSchema exists, normalize it to parameters
                         for decl in decls_arr.iter_mut() {
-                            // 检测并转换字段名
+                            // Detect and convert field names
                             if let Some(decl_obj) = decl.as_object_mut() {
-                                // 如果存在 parametersJsonSchema，将其重命名为 parameters
+                                // If parametersJsonSchema exists, rename it to parameters
                                 if let Some(params_json_schema) =
                                     decl_obj.remove("parametersJsonSchema")
                                 {
@@ -87,7 +87,7 @@ pub(crate) fn phase_finalize(
                                     );
                                     decl_obj.insert("parameters".to_string(), params);
                                 } else if let Some(params) = decl_obj.get_mut("parameters") {
-                                    // 标准 parameters 字段
+                                    // Standard parameters field
                                     crate::proxy::common::json_schema::clean_json_schema(params);
                                     crate::proxy::mappers::openai::request::enforce_uppercase_types(
                                         params,
@@ -95,7 +95,7 @@ pub(crate) fn phase_finalize(
                                 }
                             }
                         }
-                        // [CACHE] 按 function name 稳定字典序排序，确保全协议 tool schema 字节完全一致
+                        // [CACHE] Stable lexicographic sorting by function name to ensure complete protocol tool schema byte consistency
                         decls_arr.sort_by(|a, b| {
                             let name_a = a.get("name").and_then(|v| v.as_str()).unwrap_or("");
                             let name_b = b.get("name").and_then(|v| v.as_str()).unwrap_or("");
@@ -128,7 +128,7 @@ pub(crate) fn phase_finalize(
                         })
                     });
                     if !has_functions {
-                        // 清理已存在的 googleSearch
+                        // Clean up existing googleSearch
                         tools_arr.retain(|t| {
                             if let Some(o) = t.as_object() {
                                 !(o.contains_key("googleSearch")
@@ -181,7 +181,7 @@ pub(crate) fn phase_finalize(
             // 3. Clean generationConfig (remove responseMimeType, responseModalities etc.)
             let gen_config = obj.entry("generationConfig").or_insert_with(|| json!({}));
             if let Some(gen_obj) = gen_config.as_object_mut() {
-                // [NEW] 根据全局配置决定是否保留 thinkingConfig
+                // [NEW] Determine whether to retain thinkingConfig based on global configuration
                 let image_thinking_mode = crate::proxy::config::get_image_thinking_mode();
                 tracing::debug!("[Gemini-Wrap] Image thinking mode: {}", image_thinking_mode);
 
@@ -205,13 +205,13 @@ pub(crate) fn phase_finalize(
             }
         }
     } else {
-        // [FIX] 彻底移除 web_search 等任何预置搜索 Bot 提示词注入，保持客户端原始 prompt 完全纯净透传。
-        // 仅在配置了用户自定义全局系统提示词时进行追加注入。
+        // [FIX] Completely remove any preset search Bot prompt word injection such as web_search, and keep the client's original prompt completely pure and transparent.
+        // Additional injection is only performed when a user-defined global system prompt word is configured.
         let global_prompt_config = crate::proxy::config::get_global_system_prompt();
 
-        // 检查是否已有 systemInstruction
+        // Check if systemInstruction already exists
         if let Some(system_instruction) = inner_request.get_mut("systemInstruction") {
-            // 补全 role: user
+            // Completion role: user
             if let Some(obj) = system_instruction.as_object_mut() {
                 if !obj.contains_key("role") {
                     obj.insert("role".to_string(), json!("user"));
@@ -220,7 +220,7 @@ pub(crate) fn phase_finalize(
 
             if let Some(parts) = system_instruction.get_mut("parts") {
                 if let Some(parts_array) = parts.as_array_mut() {
-                    // 注入全局系统提示词（去重 + 换行隔离，不夹官方身份）
+                    // Inject global system prompt words (remove duplication + line break isolation, do not include official identity)
                     if global_prompt_config.enabled
                         && !global_prompt_config.content.trim().is_empty()
                     {
@@ -240,7 +240,7 @@ pub(crate) fn phase_finalize(
                 }
             }
         } else {
-            // 没有 systemInstruction，仅在启用全局提示词时创建
+            // No systemInstruction, only created when global prompt words are enabled
             if global_prompt_config.enabled && !global_prompt_config.content.trim().is_empty() {
                 inner_request["systemInstruction"] = json!({
                     "role": "user",
@@ -250,11 +250,11 @@ pub(crate) fn phase_finalize(
         }
     }
 
-    // [REMOVED v4.8.2] toolConfig / tool_config 双写已移除：官方 Antigravity 报文不带该字段，
-    // 且 camelCase 与 snake_case 双份会写出一对矛盾配置 (VALIDATED)。已在协议无关节点统一移除。
+    // [REMOVED v4.8.2] toolConfig / tool_config double writing has been removed: the official Antigravity message does not carry this field,
+    // And the double copy of camelCase and snake_case will write a pair of contradictory configurations (VALIDATED). Has been uniformly removed from protocol-independent nodes.
 
-    // [ADDED v4.1.24] 注入基于账号的稳定 sessionId
-    // [FIX session-1M] 混入对话指纹与代数,不同对话隔离服务端会话,1M 累计报错后 bump 自愈
+    // [ADDED v4.1.24] Inject stable sessionId based on account
+    // [FIX session-1M] Mix conversation fingerprints and algebra, isolate server sessions from different conversations, bump self-healing after 1M accumulated errors
     if let Some(account_id_str) = account_id {
         let fingerprint = session_id.unwrap_or("default");
         let generation = crate::proxy::common::session::current_bump(account_id_str, fingerprint);
@@ -267,8 +267,8 @@ pub(crate) fn phase_finalize(
 
     let sid = session_id.unwrap_or("default");
 
-    // [NEW] 1. requestId：官方 5 段形态，三适配器共用。
-    // 含 unixMs 保证幂等隔离（避免重试命中上一次的 429 / 旧缓存），形态也与其他入口一致。
+    // [NEW] 1. requestId: Official 5-segment form, shared by three adapters.
+    // Contains unixMs to ensure idempotent isolation (avoiding retry hitting the last 429 / old cache), and the shape is consistent with other entries.
     let step = inner_request
         .get("contents")
         .and_then(|c| c.as_array())
@@ -277,13 +277,13 @@ pub(crate) fn phase_finalize(
     let official_request_id =
         crate::proxy::mappers::common_utils::build_official_request_id(sid, step);
 
-    // [NEW] 2. 动态 userAgent 仿真 (支持 jetski)
-    // 企业 / GCP 账号（非 gmail 邮箱）在官方 Go Worker 中使用 jetski 指纹。
-    // 判定由 common_utils 统一提供 —— 三适配器必须共用，否则同一账号指纹漂移。
+    // [NEW] 2. Dynamic userAgent simulation (supports jetski)
+    // Enterprise/GCP accounts (non-gmail emails) use jetski fingerprints in the official Go Worker.
+    // The judgment is provided by common_utils - the three adapters must be shared, otherwise the fingerprint of the same account will drift.
     let (official_user_agent, official_ide_type) =
         crate::proxy::mappers::common_utils::resolve_official_fingerprint(token);
 
-    // [NEW] 如果是 loadCodeAssist 请求，注入 metadata 字段对齐官方
+    // [NEW] If it is a loadCodeAssist request, inject the metadata field to align with the official
     if final_model_name == "loadCodeAssist" || inner_request.get("metadata").is_some() {
         let metadata = inner_request
             .as_object_mut()
@@ -297,9 +297,9 @@ pub(crate) fn phase_finalize(
         }
     }
 
-    // [NEW] 3. 动态判断是否需要 agent requestType 与 enabledCreditTypes
-    // 对齐官方语言服务原生设计：只有存在工具定义 (tools) 或包含工具调用上下文时才进入 agent 模式。
-    // 普通问答、纯文本补全不注入 requestType: "agent"，避开 Google 后端针对 Agent 资源池的过载限流。
+    // [NEW] 3. Dynamically determine whether agent requestType and enabledCreditTypes are needed
+    // Align with the native design of the official language service: enter agent mode only when tool definitions (tools) exist or contain tool calling context.
+    // Ordinary Q&A and plain text completion do not inject requestType: "agent" to avoid the overload current limit of the Agent resource pool in Google's backend.
     let has_tools = inner_request
         .get("tools")
         .and_then(|t| t.as_array())
@@ -313,7 +313,7 @@ pub(crate) fn phase_finalize(
     let is_agent_request =
         config.request_type != "image_gen" && (has_tools || has_tool_interactions);
 
-    // [CACHE] 统一委托进站流水线进行前缀拓扑规范化与对齐（Pipeline First 核心归一）
+    // [CACHE] Unified entrust the inbound pipeline to perform prefix topology standardization and alignment (Pipeline First core normalization)
     crate::proxy::pipeline::InboundThinkingPipeline::align_google_request_prefix_topology(
         &mut inner_request,
     );
@@ -324,7 +324,7 @@ pub(crate) fn phase_finalize(
         "request": reordered_inner,
         "model": config.final_model,
         "userAgent": official_user_agent,
-        // [CACHE] requestId 移到末尾避免动态值破坏前缀字节一致性
+        // [CACHE] requestId is moved to the end to avoid dynamic values breaking prefix byte consistency
         "requestId": official_request_id,
     });
 
@@ -333,7 +333,7 @@ pub(crate) fn phase_finalize(
     } else if is_agent_request {
         final_request_obj["requestType"] = json!("agent");
         if let Some(obj) = final_request_obj.as_object_mut() {
-            // 强制注入 Google One AI 信用额度支持标号
+            // Force injection of Google One AI credit limit support label
             obj.insert("enabledCreditTypes".to_string(), json!(["GOOGLE_ONE_AI"]));
         }
     }

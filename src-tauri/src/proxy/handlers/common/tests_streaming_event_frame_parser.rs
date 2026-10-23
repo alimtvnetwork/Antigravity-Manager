@@ -229,10 +229,10 @@ mod tests {
     #[test]
     fn test_utf8_multibyte_characters() {
         let mut parser = StreamingFrameParser::new();
-        let payload = "data: 🚀 Gemini 闪电推理模型\n\n".as_bytes();
+        let payload = "data: 🚀 Gemini lightning inference model\n\n".as_bytes();
 
         let frames = parser.push_chunk(payload);
         assert_eq!(frames.len(), 1);
-        assert_eq!(frames[0].data, "🚀 Gemini 闪电推理模型");
+        assert_eq!(frames[0].data, "🚀 Gemini lightning inference model");
     }
 }

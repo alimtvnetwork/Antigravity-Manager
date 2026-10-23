@@ -69,10 +69,10 @@ export function UsageTrendTooltip({ active, payload, label }: UsageTrendTooltipP
     if (!active || !payload || !payload.length) return null;
     const row = payload[0]?.payload || {};
     const items = [
-        { label: t('token_stats.total', '合计'), value: row.total_tokens || 0, color: '#111827' },
-        { label: t('token_stats.input', '输入'), value: row.total_input_tokens || 0, color: '#3b82f6' },
-        { label: t('token_stats.cached_token', '缓存命中'), value: row.total_cached_tokens || 0, color: '#93c5fd' },
-        { label: t('token_stats.output', '输出'), value: row.total_output_tokens || 0, color: '#8b5cf6' },
+        { label: t('token_stats.total', 'total'), value: row.total_tokens || 0, color: '#111827' },
+        { label: t('token_stats.input', 'enter'), value: row.total_input_tokens || 0, color: '#3b82f6' },
+        { label: t('token_stats.cached_token', 'cache hit'), value: row.total_cached_tokens || 0, color: '#93c5fd' },
+        { label: t('token_stats.output', 'output'), value: row.total_output_tokens || 0, color: '#8b5cf6' },
     ];
     return (
         <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm p-2.5 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 text-xs z-[100] pointer-events-none min-w-[170px]">
@@ -93,7 +93,7 @@ export function UsageTrendTooltip({ active, payload, label }: UsageTrendTooltipP
                 ))}
                 <div className="flex items-center justify-between gap-4 pt-1 border-t border-gray-100 dark:border-gray-700">
                     <span className="text-gray-500 dark:text-gray-400">
-                        {t('token_stats.requests', '请求数')}:
+                        {t('token_stats.requests', 'Number of requests')}:
                     </span>
                     <span className="font-mono font-medium text-gray-700 dark:text-gray-200">
                         {(row.request_count || 0).toLocaleString()}

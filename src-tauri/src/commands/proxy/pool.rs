@@ -1,6 +1,6 @@
 use super::*;
 
-/// 获取当前内存中的代理池状态
+/// Get the current in-memory proxy pool status
 #[tauri::command]
 pub async fn get_proxy_pool_config(
     state: State<'_, ProxyServiceState>,

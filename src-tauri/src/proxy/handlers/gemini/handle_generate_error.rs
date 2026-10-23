@@ -70,7 +70,7 @@ pub(crate) async fn handle_generate_error(
         .await;
     }
 
-    // [FIX] 403 时优先检测 VALIDATION_REQUIRED 并设置 is_forbidden / validation_block 状态，确保及时提取 URL 与更新 UI
+    // [FIX] When 403 is detected, VALIDATION_REQUIRED is detected first and the is_forbidden / validation_block status is set to ensure timely extraction of URLs and UI updates.
     if status_code == 403 {
         if let Some(acc_id) = token_manager.get_account_id_by_email(email) {
             if error_text.contains("VALIDATION_REQUIRED")
@@ -93,14 +93,14 @@ pub(crate) async fn handle_generate_error(
                 }
             }
 
-            // 设置 is_forbidden 状态并持久化
+            // Set is_forbidden state and persist it
             if let Err(e) = token_manager.set_forbidden(&acc_id, &error_text).await {
                 tracing::error!("Failed to set forbidden status: {}", e);
             }
         }
     }
 
-    // [FIX] 429 时立即解绑当前会话，确保换号重试与后续请求不会死锁在受限账号上
+    // [FIX] Immediately unbind the current session when 429 occurs to ensure that retrying the number and subsequent requests will not be deadlocked on the restricted account.
     if status_code == 429 || status_code == 529 {
         token_manager.clear_session_binding(session_id);
         tracing::debug!(
@@ -215,7 +215,7 @@ pub(crate) async fn handle_generate_error(
     }
     let trace_id = format!("gemini_{}", session_id);
 
-    // 执行退避
+    // Perform backoff
     if apply_retry_strategy(
         strategy.clone(),
         attempt,
@@ -245,7 +245,7 @@ pub(crate) async fn handle_generate_error(
             }
         }
 
-        // 判断是否需要轮换账号
+        // Determine whether accounts need to be rotated
         if !should_rotate_account(status_code, Some(&strategy)) {
             debug!(
                 "[{}] Keeping same account for status {} (Gemini server-side issue or Grace Retry)",
@@ -259,7 +259,7 @@ pub(crate) async fn handle_generate_error(
         return Ok(ErrorOutcome::Continue);
     }
 
-    // 404 等由于模型配置或路径错误的 HTTP 异常，直接报错，不进行无效轮换
+    // 404 and other HTTP exceptions due to incorrect model configuration or path will be reported directly without invalid rotation.
     error!(
         "Gemini Upstream non-retryable error {}: {}",
         status_code, error_text

@@ -342,7 +342,7 @@ Following successful E2E test verification and code audit, the release author mu
 
 ### 5.3 Documentation & README Synchronization
 - **Mandatory Update**: For stable releases, the release author **MUST** update the release summary in both:
-  1. `README.md` (under `## 📝 更新日志`)
+  1. `README.md` (under `## 📝 Update Log`)
   2. `README_EN.md` (under `## 📝 Changelog`)
 - Leaving `README.md` / `README_EN.md` with outdated release notes while updating `CHANGELOG.md` is strictly forbidden.
 

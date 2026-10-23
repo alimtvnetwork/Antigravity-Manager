@@ -248,7 +248,7 @@ fn test_complex_tool_result() {
 
 #[test]
 fn test_cache_control_cleanup() {
-    // 模拟 VS Code 插件发送的包含 cache_control 的历史消息
+    // Simulate historical messages containing cache_control sent by the VS Code plug-in
     let req = ClaudeRequest {
         model: "claude-sonnet-4-6".to_string(),
         messages: vec![
@@ -262,7 +262,7 @@ fn test_cache_control_cleanup() {
                     ContentBlock::Thinking {
                         thinking: "Let me think...".to_string(),
                         signature: Some("sig123".to_string()),
-                        cache_control: Some(json!({"type": "ephemeral"})), // 这个应该被清理
+                        cache_control: Some(json!({"type": "ephemeral"})), // This should be cleaned up
                     },
                     ContentBlock::Text {
                         text: "Here is my response".to_string(),
@@ -277,7 +277,7 @@ fn test_cache_control_cleanup() {
                         media_type: Some("image/png".to_string()),
                         data: Some("iVBORw0KGgo=".to_string()),
                     },
-                    cache_control: Some(json!({"type": "ephemeral"})), // 这个也应该被清理
+                    cache_control: Some(json!({"type": "ephemeral"})), // This should be cleaned up too
                 }]),
             },
         ],
@@ -299,19 +299,19 @@ fn test_cache_control_cleanup() {
         transform_claude_request_in(&req, "test-project", false, None, "test_session", None);
     assert!(result.is_ok());
 
-    // 验证请求成功转换
+    // Verify that the request was successfully converted
     let body = result.unwrap();
     assert_eq!(body["project"], "test-project");
 
-    // 注意: cache_control 的清理发生在内部,我们无法直接从 JSON 输出验证
-    // 但如果没有清理,后续发送到 Anthropic API 时会报错
-    // 这个测试主要确保清理逻辑不会导致转换失败
+    // NOTE: The cleanup of cache_control happens internally and we cannot verify it directly from the JSON output
+    // But if it is not cleaned, an error will be reported when sending it to the Anthropic API later.
+    // This test mainly ensures that the cleanup logic does not cause the conversion to fail
 }
 
 #[test]
 fn test_thinking_mode_auto_disable_on_tool_use_history() {
-    // [场景] 历史消息中有一个工具调用链，且 Assistant 消息没有 Thinking 块
-    // 期望: 系统不再盲目降级禁用思考，而是保留 thinkingConfig 并补齐保底思考块
+    // [Scenario] There is a tool call chain in the historical message, and the Assistant message does not have a Thinking block
+    // Expectation: The system no longer blindly downgrades and disables thinking, but retains thinkingConfig and completes the guaranteed thinking block.
     let req = ClaudeRequest {
         model: "claude-sonnet-4-6".to_string(),
         messages: vec![
@@ -319,7 +319,7 @@ fn test_thinking_mode_auto_disable_on_tool_use_history() {
                 role: "user".to_string(),
                 content: MessageContent::String("Check files".to_string()),
             },
-            // Assistant 使用工具，但在非 Thinking 模式下
+            // Assistant uses tools, but in non-Thinking mode
             Message {
                 role: "assistant".to_string(),
                 content: MessageContent::Array(vec![
@@ -335,7 +335,7 @@ fn test_thinking_mode_auto_disable_on_tool_use_history() {
                     },
                 ]),
             },
-            // 用户返回工具结果
+            // User returns tool results
             Message {
                 role: "user".to_string(),
                 content: MessageContent::Array(vec![ContentBlock::ToolResult {
@@ -375,7 +375,7 @@ fn test_thinking_mode_auto_disable_on_tool_use_history() {
     let body = result.unwrap();
     let request = &body["request"];
 
-    // 验证: generationConfig 中必须保留 thinkingConfig (不再因历史消息无签名或无思考块而被降级移除)
+    // Verification: thinkingConfig must be retained in generationConfig (no longer demoted and removed due to unsigned historical messages or no thinking block)
     let gen_config = request
         .get("generationConfig")
         .expect("Should have generationConfig");
@@ -384,7 +384,7 @@ fn test_thinking_mode_auto_disable_on_tool_use_history() {
         "thinkingConfig must be preserved per server-side thinking persistence policy"
     );
 
-    // 验证: 历史 Assistant 消息中补齐了思考块，避免上游 400
+    // Verification: The thinking block is completed in the historical Assistant message to avoid upstream 400
     let contents = request["contents"].as_array().expect("Contents array");
     let assistant_msg = &contents[1];
     let parts = assistant_msg["parts"].as_array().expect("Parts array");

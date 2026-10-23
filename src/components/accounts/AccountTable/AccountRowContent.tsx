@@ -20,8 +20,8 @@ import { useAccountRowState } from './useAccountRowState';
 import { ActionsCell } from './cells/ActionsCell';
 
 /**
- * 账号行内容组件
- * 渲染邮箱、配额、最后使用时间和操作按钮等列
+ * Account row content component
+ * Render columns such as mailbox, quota, last used, and action buttons
  */
 export function AccountRowContent(props: AccountRowContentProps) {
     const {
@@ -127,9 +127,9 @@ export function AccountRowContent(props: AccountRowContentProps) {
                             </span>
                         ) : null}
 
-                        {/* 订阅类型徽章 */}
+                        {/* Subscription type badge */}
                         <TierBadge tier={account.quota?.subscription_tier} size="xs" />
-                        {/* 绑定实例徽章 */}
+                        {/* Bind instance badge */}
                         {boundInstance && (
                             <span
                                 className="flex items-center gap-1 px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-950 border-indigo-300 font-black dark:bg-indigo-950 dark:text-indigo-200 dark:border-indigo-500 text-[9px] shadow-xs border cursor-default"
@@ -142,7 +142,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                                 <span>{boundInstance.config.name}</span>
                             </span>
                         )}
-                        {/* 优先级徽章 */}
+                        {/* Priority badge */}
                         {showPriority && (
                             <PriorityBadge
                                 priority={account.priority}
@@ -153,7 +153,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                                 size="xs"
                             />
                         )}
-                        {/* 远程节点租赁徽章 */}
+                        {/* Remote node rental badge */}
                         {leaseInfo && (
                             <span
                                 className="flex items-center gap-1 px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-[9px] font-bold shadow-xs border border-purple-200/50 dark:border-purple-800/50 cursor-default"
@@ -163,7 +163,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                                 <span>{leaseInfo.node_alias}</span>
                             </span>
                         )}
-                        {/* 自定义标签 */}
+                        {/* Custom labels */}
                         {account.custom_label ? (
                             isEditingLabel ? null : (
                                 <span className="flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 text-[9px] font-bold shadow-xs border border-orange-200/50 dark:border-orange-800/50">
@@ -172,7 +172,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                                 </span>
                             )
                         ) : null}
-                        {/* 标签编辑输入框 */}
+                        {/* Tag editing input box */}
                         {isEditingLabel && (
                             <div className="flex items-center gap-1">
                                 <input

@@ -1,6 +1,6 @@
 // Content building (split from request.rs).
-// Claude 请求转换 (Claude → Gemini v1internal)
-// 对应 transformClaudeRequestIn
+// Claude requested conversion (Claude → Gemini v1internal)
+// Corresponds to transformClaudeRequestIn
 
 use super::super::models::*;
 use crate::proxy::mappers::common_utils::request::is_model_compatible;
@@ -15,7 +15,7 @@ use super::build_parts::{
 use crate::modules::proxy_db::signatures::SENTINEL_SIGNATURE;
 use crate::proxy::mappers::claude::thinking_utils::MIN_SIGNATURE_LENGTH;
 
-/// 构建 Contents (Messages)
+/// Build Contents (Messages)
 pub(crate) fn build_contents(
     content: &MessageContent,
     is_assistant: bool,
@@ -94,8 +94,8 @@ pub(crate) fn build_contents(
                 match item {
                     ContentBlock::Text { text } => {
                         if text != "(no content)" && !text.trim().is_empty() {
-                            // [NEW] 任务去重逻辑: 如果当前是 User 消息，且紧跟在 ToolResult 之后，
-                            // 检查该文本是否与上一轮任务描述完全一致。
+                            // [NEW] Task deduplication logic: If the current message is a User message and it immediately follows the ToolResult,
+                            // Check that the text is exactly the same as the previous round's task description.
                             if !is_assistant && *previous_was_tool_result {
                                 if let Some(last_task) = last_user_task_text_normalized {
                                     let current_normalized =
@@ -116,7 +116,7 @@ pub(crate) fn build_contents(
                             );
                             saw_non_thinking = true;
 
-                            // 记录最近一次 User 任务文本用于后续比对
+                            // Record the latest User task text for subsequent comparison
                             if !is_assistant {
                                 *last_user_task_text_normalized =
                                     Some(text.replace(|c: char| c.is_whitespace(), ""));
@@ -134,11 +134,11 @@ pub(crate) fn build_contents(
                             signature
                         );
 
-                        // [2026-09-27] 占位/空思考块直接丢弃（不写思考块、不降级为文本）。
-                        // 官方样本（baogao.txt）9/24 轮是「无思考块 + 锚点带签名」，
-                        // 空 / "." / "..." / 空格 / "·" 等占位思考无信息量；签名归位
-                        // 由流水线终审 place_turn_signature 按锚点规则处理（ inbound 已
-                        // 把占位块的签名转移给首个非思考 part）。
+                        // [2026-09-27] Placeholder/empty thinking blocks are discarded directly (thinking blocks are not written, and are not downgraded to text).
+                        // The official sample (baogao.txt) on round 9/24 is "no thinking block + anchor with signature",
+                        // Empty / "." / "..." / Space / "·" and other placeholder thinking have no information; return the signature
+                        // The final place_turn_signature of the pipeline is processed according to anchor rules (inbound has
+                        // Transfer the signature of the placeholder block to the first non-thinking part).
                         let is_placeholder =
                             crate::proxy::thinking_store::is_placeholder_thought(thinking);
                         if is_placeholder || thinking.trim().is_empty() {
@@ -229,11 +229,11 @@ pub(crate) fn build_contents(
                             effective_sig = turn_signature.clone();
                         }
 
-                        // 3. 无合法签名时**绝不发明哨兵**。
-                        //    依据（3 份官方报文 / 23 处签名）：哨兵在官方流量里出现 0/23 次，
-                        //    它不属于 Antigravity 协议；且「跳过校验」不等于恢复推理连续性。
-                        //    签名缺失是被上游容忍的（官方"在飞轮"即缺席），
-                        //    归位统一交给流水线终审 `place_turn_signature`。
+                        // 3. **Never create a sentinel** without a legal signature.
+                        //    Basis (3 official messages / 23 signatures): Sentinel appears 0/23 times in official traffic,
+                        //    It does not belong to the Antigravity protocol; and "skipping verification" does not mean restoring reasoning continuity.
+                        //    Lack of signatures is tolerated by upstream (official "on flywheel" means absent),
+                        //    The return is uniformly handed over to the assembly line for final review `place_turn_signature`.
                         if let Some(sig) = effective_sig {
                             *last_thought_signature = Some(sig.clone());
                             let part = json!({
@@ -243,9 +243,9 @@ pub(crate) fn build_contents(
                             });
                             parts.push(part);
                         } else {
-                            // 无签名：保留思考块结构（`thought: true`），但**不携带签名字段**。
-                            // Gemini 目标的思考块本就不应带签名（铁律 I4：
-                            // 官方报文里 `thought:true` 的 part 没有 thoughtSignature）。
+                            // No signature: Keep the thought block structure (`thought: true`), but **do not carry the signature field**.
+                            // Think blocks for Gemini targets should not be signed (iron rule I4:
+                            // There is no thoughtSignature in the part of `thought:true` in the official message).
                             tracing::debug!(
                                 "[Thinking-Signature] No signature for thought block (model: {}). Keeping thought block without signature.",
                                 mapped_model
@@ -257,7 +257,7 @@ pub(crate) fn build_contents(
                         }
                     }
                     ContentBlock::RedactedThinking { data } => {
-                        // [FIX] 将 RedactedThinking 作为普通文本处理，保留上下文
+                        // [FIX] Handle RedactedThinking as normal text, preserving context
                         tracing::debug!("[Claude-Request] Degrade RedactedThinking to text");
                         parts.push(json!({
                             "text": format!("[Redacted Thinking: {}]", data)
@@ -298,7 +298,7 @@ pub(crate) fn build_contents(
                     } => {
                         let mut final_input = input.clone();
 
-                        // [New] 利用通用引擎修正参数类型 (替代以前硬编码的 shell 工具修复逻辑)
+                        // [New] Utilize universal engine to correct parameter types (replacing the previous hard-coded shell tool repair logic)
                         if let Some(original_schema) = tool_name_to_schema.get(name) {
                             crate::proxy::common::json_schema::fix_tool_call_args(
                                 &mut final_input,
@@ -320,7 +320,7 @@ pub(crate) fn build_contents(
                             pending_tool_use_ids.push(id.clone());
                         }
 
-                        // 记录 id -> name 映射与签名上下文
+                        // Record id -> name mapping and signing context
                         tool_id_to_name.insert(id.clone(), name.clone());
                         let final_sig = signature
                             .as_ref()
@@ -340,13 +340,13 @@ pub(crate) fn build_contents(
 
                         let is_claude_model = mapped_model.to_lowercase().contains("claude");
                         if is_claude_model {
-                            // Claude 模型：Anthropic 官方验签引擎要求签名必须在思考块上，工具调用绝不携带签名，更不塞假哨兵
+                            // Claude model: Anthropic's official signature verification engine requires that the signature must be on the thinking block, and tool calls will never carry signatures, let alone fake sentinels.
                             if let Some(obj) = part.as_object_mut() {
                                 obj.remove("thoughtSignature");
                                 obj.remove("thought_signature");
                             }
                         } else {
-                            // 纯净线缆透传：客户端若自带签名则保持，未带则留空，全权委托进站流水线统一对齐与回填
+                            // Pure cable transparent transmission: if the client has its own signature, keep it, if not, leave it blank. Fully authorized inbound pipeline unified alignment and backfilling
                             if let Some(ref sig) = final_sig {
                                 part["thoughtSignature"] = json!(sig);
                             }
@@ -361,7 +361,7 @@ pub(crate) fn build_contents(
                     } => {
                         // Mark this tool ID as resolved in this turn
                         current_turn_tool_result_ids.insert(tool_use_id.clone());
-                        // 优先使用之前记录的 name，否则用 tool_use_id
+                        // Priority is given to using the previously recorded name, otherwise tool_use_id is used.
                         let func_name = tool_id_to_name
                             .get(tool_use_id)
                             .cloned()
@@ -422,7 +422,7 @@ pub(crate) fn build_contents(
                             merged_content = truncated;
                         }
 
-                        // [优化] 如果结果为空，注入显式确认信号，防止模型幻觉
+                        // [Optimization] If the result is empty, inject an explicit confirmation signal to prevent model hallucinations
                         merged_content = empty_tool_result_fallback(&merged_content, *is_error);
 
                         let part = json!({
@@ -433,21 +433,21 @@ pub(crate) fn build_contents(
                             }
                         });
 
-                        // 危险测试分支法则：ToolResult (functionResponse) 绝不携带签名
+                        // Dangerous test branch rule: ToolResult (functionResponse) never carries a signature
                         parts.push(part);
 
-                        // 追加图片 parts
+                        // Add image parts
                         for extra in extra_parts {
                             parts.push(extra);
                         }
 
-                        // 标记状态，用于下一条 User 消息的去重判断
+                        // Mark status, used for deduplication judgment of the next User message
                         *previous_was_tool_result = true;
                     }
                     // ContentBlock::RedactedThinking handled above at line 583
                     ContentBlock::ServerToolUse { .. }
                     | ContentBlock::WebSearchToolResult { .. } => {
-                        // 搜索结果 block 不应由客户端发回给上游 (已由 tool_result 替代)
+                        // Search result blocks should not be sent back to upstream by the client (replaced by tool_result)
                         continue;
                     }
                 }
@@ -482,8 +482,8 @@ pub(crate) fn build_contents(
                 parts.insert(0, thought_part);
             }
             None => {
-                // 纯净线缆原则：客户端若原本无思考块，适配器严禁凭空伪造 "..." 占位块！
-                // 缺失思考块的判定与状态机复活统一委托给进站流水线（InboundThinkingPipeline）
+                // Pure cable principle: If the client does not originally have a thinking block, the adapter is strictly prohibited from forging "..." placeholder blocks out of thin air!
+                // The determination of missing thinking blocks and state machine resurrection are collectively entrusted to the InboundThinkingPipeline.
             }
         }
     }

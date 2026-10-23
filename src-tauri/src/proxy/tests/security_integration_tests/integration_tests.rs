@@ -4,7 +4,7 @@ use crate::modules::security_db::{
 };
 use std::time::Duration;
 
-/// 辅助函数：初始化测试并加锁隔离
+/// Auxiliary function: initialize test and lock isolation
 fn setup_test() -> (
     std::sync::MutexGuard<'static, ()>,
     std::sync::MutexGuard<'static, ()>,
@@ -21,7 +21,7 @@ fn setup_test() -> (
     (env_lock, lock)
 }
 
-/// 辅助函数：清理测试环境
+/// Auxiliary function: clean up the test environment
 fn cleanup_test_data() {
     if let Ok(entries) = get_blacklist() {
         for entry in entries {
@@ -38,20 +38,20 @@ fn cleanup_test_data() {
 }
 
 // ============================================================================
-// 集成测试场景 1：黑名单阻止请求
+// Integration test scenario 1: Blacklist blocking request
 // ============================================================================
 
-/// 测试场景：当 IP 在黑名单中时，请求应该被拒绝
+/// Test scenario: When the IP is in the blacklist, the request should be rejected
 ///
-/// 预期行为：
-/// 1. 添加 IP 到黑名单
-/// 2. 该 IP 发起的请求返回 403 Forbidden
-/// 3. 响应体包含封禁原因
+/// Expected behavior:
+/// 1. Add IP to blacklist
+/// 2. Requests initiated by this IP return 403 Forbidden
+/// 3. The response body contains the reason for the ban
 #[test]
 fn test_scenario_blacklist_blocks_request() {
     let _lock = setup_test();
 
-    // 添加测试 IP 到黑名单
+    // Add test IP to blacklist
     let entry = add_to_blacklist(
         "192.168.100.100",
         Some("Integration test - malicious activity"),
@@ -60,13 +60,13 @@ fn test_scenario_blacklist_blocks_request() {
     );
     assert!(entry.is_ok(), "Should add IP to blacklist");
 
-    // 验证黑名单条目存在
+    // Verify blacklist entry exists
     let blacklist = get_blacklist().unwrap();
     let found = blacklist.iter().any(|e| e.ip_pattern == "192.168.100.100");
     assert!(found, "IP should be in blacklist");
 
-    // 实际的 HTTP 请求测试需要启动服务器
-    // 这里验证数据层正确性
+    // Actual HTTP request testing requires starting the server
+    // Verify the correctness of the data layer here
     let is_blocked = security_db::is_ip_in_blacklist("192.168.100.100").unwrap();
     assert!(is_blocked, "IP should be blocked");
 
@@ -74,20 +74,20 @@ fn test_scenario_blacklist_blocks_request() {
 }
 
 // ============================================================================
-// 集成测试场景 2：白名单优先模式
+// Integration test scenario 2: Whitelist priority mode
 // ============================================================================
 
-/// 测试场景：白名单优先模式下，白名单 IP 跳过黑名单检查
+/// Test scenario: In whitelist priority mode, whitelist IP skips blacklist check
 ///
-/// 预期行为：
-/// 1. IP 同时存在于黑名单和白名单
-/// 2. 启用 whitelist_priority 模式
-/// 3. 请求应该被允许（白名单优先）
+/// Expected behavior:
+/// 1. IP exists in both blacklist and whitelist
+/// 2. Enable whitelist_priority mode
+/// 3. Requests should be allowed (whitelist first)
 #[test]
 fn test_scenario_whitelist_priority() {
     let _lock = setup_test();
 
-    // 添加 IP 到黑名单
+    // Add IP to blacklist
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(
         add_to_blacklist(
@@ -99,57 +99,57 @@ fn test_scenario_whitelist_priority() {
         "add_to_blacklist",
     );
 
-    // 添加相同 IP 到白名单
+    // Add same IP to whitelist
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(
         add_to_whitelist("10.0.0.50", Some("Trusted - override blacklist")),
         "add_to_whitelist",
     );
 
-    // 验证两个列表都包含该 IP
+    // Verify that both lists contain the IP
     assert!(security_db::is_ip_in_blacklist("10.0.0.50").unwrap());
     assert!(security_db::is_ip_in_whitelist("10.0.0.50").unwrap());
 
-    // 在实际中间件中，whitelist_priority=true 时，会先检查白名单
-    // 如果在白名单中，则跳过黑名单检查
-    // 这里只验证数据正确性，中间件逻辑由 ip_filter.rs 保证
+    // In the actual middleware, when whitelist_priority=true, the whitelist will be checked first
+    // If in whitelist, skip blacklist check
+    // Only the data correctness is verified here, and the middleware logic is guaranteed by ip_filter.rs
 
     cleanup_test_data();
 }
 
 // ============================================================================
-// 集成测试场景 3：临时封禁与过期
+// Integration test scenario 3: Temporary ban and expiration
 // ============================================================================
 
-/// 测试场景：临时封禁在过期后自动解除
+/// Test scenario: Temporary ban is automatically lifted after expiration
 ///
-/// 预期行为：
-/// 1. 添加临时封禁（已过期）
-/// 2. 查询时自动清理过期条目
-/// 3. 请求应该被允许
+/// Expected behavior:
+/// 1. Add temporary ban (expired)
+/// 2. Automatically clean up expired entries when querying
+/// 3. The request should be allowed
 #[test]
 fn test_scenario_temporary_ban_expiration() {
     let _lock = setup_test();
 
-    // 获取当前时间戳
+    // Get current timestamp
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_secs() as i64;
 
-    // 添加已过期的临时封禁
+    // Add expired temporary ban
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(
         add_to_blacklist(
             "expired.ban.test",
             Some("Temporary ban - should be expired"),
-            Some(now - 60), // 1分钟前过期
+            Some(now - 60), // Expired 1 minute ago
             "test",
         ),
         "add_to_blacklist",
     );
 
-    // 查询时应该触发过期清理
+    // Expiration cleanup should be triggered when querying
     let is_blocked = security_db::is_ip_in_blacklist("expired.ban.test").unwrap();
     assert!(!is_blocked, "Expired ban should not block");
 
@@ -157,20 +157,20 @@ fn test_scenario_temporary_ban_expiration() {
 }
 
 // ============================================================================
-// 集成测试场景 4：CIDR 范围封禁
+// Integration test scenario 4: CIDR range ban
 // ============================================================================
 
-/// 测试场景：CIDR 范围封禁覆盖整个子网
+/// Test scenario: CIDR range ban covers the entire subnet
 ///
-/// 预期行为：
-/// 1. 封禁 192.168.1.0/24
-/// 2. 192.168.1.x 的所有请求被拒绝
-/// 3. 192.168.2.x 的请求正常通过
+/// Expected behavior:
+/// 1. Ban 192.168.1.0/24
+/// 2. All requests to 192.168.1.x are denied
+/// 3. The request for 192.168.2.x passes normally.
 #[test]
 fn test_scenario_cidr_subnet_blocking() {
     let _lock = setup_test();
 
-    // 封禁整个子网
+    // Block entire subnet
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(
         add_to_blacklist(
@@ -182,14 +182,14 @@ fn test_scenario_cidr_subnet_blocking() {
         "add_to_blacklist",
     );
 
-    // 验证子网内的 IP 被阻止
+    // Verify that the IP within the subnet is blocked
     for last_octet in [1, 50, 100, 200, 254] {
         let ip = format!("192.168.1.{}", last_octet);
         let is_blocked = security_db::is_ip_in_blacklist(&ip).unwrap();
         assert!(is_blocked, "IP {} should be blocked by CIDR", ip);
     }
 
-    // 验证子网外的 IP 不被阻止
+    // Verify that IPs outside the subnet are not blocked
     for last_octet in [1, 50, 100] {
         let ip = format!("192.168.2.{}", last_octet);
         let is_blocked = security_db::is_ip_in_blacklist(&ip).unwrap();
@@ -200,17 +200,17 @@ fn test_scenario_cidr_subnet_blocking() {
 }
 
 // ============================================================================
-// 集成测试场景 5：封禁消息详情
+// Integration test scenario 5: Ban message details
 // ============================================================================
 
-/// 测试场景：封禁响应包含详细信息
+/// Test scenario: Ban response contains detailed information
 ///
-/// 预期行为：
-/// 1. 添加带原因的封禁
-/// 2. 请求被拒绝时，响应包含：
-///    - 封禁原因
-///    - 是否为临时/永久封禁
-///    - 剩余封禁时间（如果是临时）
+/// Expected behavior:
+/// 1. Add ban with reason
+/// 2. When the request is rejected, the response contains:
+///    - Reason for ban
+///    - Whether it is a temporary/permanent ban
+///    - Remaining ban time (if temporary)
 #[test]
 fn test_scenario_ban_message_details() {
     let _lock = setup_test();
@@ -220,19 +220,19 @@ fn test_scenario_ban_message_details() {
         .unwrap()
         .as_secs() as i64;
 
-    // 添加临时封禁（2小时后过期）
+    // Add temporary ban (expires in 2 hours)
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(
         add_to_blacklist(
             "temp.ban.message",
             Some("Rate limit exceeded"),
-            Some(now + 7200), // 2小时后
+            Some(now + 7200), // 2 hours later
             "rate_limiter",
         ),
         "add_to_blacklist",
     );
 
-    // 获取封禁详情
+    // Get ban details
     let entry = security_db::get_blacklist_entry_for_ip("temp.ban.message")
         .unwrap()
         .unwrap();
@@ -250,20 +250,20 @@ fn test_scenario_ban_message_details() {
 }
 
 // ============================================================================
-// 集成测试场景 6：访问日志记录
+// Integration Test Scenario 6: Access Logging
 // ============================================================================
 
-/// 测试场景：被阻止的请求记录到日志
+/// Test scenario: blocked requests logged
 ///
-/// 预期行为：
-/// 1. 黑名单 IP 发起请求
-/// 2. 请求被拒绝
-/// 3. 访问日志记录：IP、时间、状态(403)、封禁原因
+/// Expected behavior:
+/// 1. Blacklist IP initiates request
+/// 2. Request rejected
+/// 3. Access log records: IP, time, status (403), ban reason
 #[test]
 fn test_scenario_blocked_request_logging() {
     let _lock = setup_test();
 
-    // 模拟保存被阻止的访问日志
+    // Simulate saving blocked access logs
     let log = security_db::IpAccessLog {
         id: uuid::Uuid::new_v4().to_string(),
         client_ip: "blocked.request.test".to_string(),
@@ -285,7 +285,7 @@ fn test_scenario_blocked_request_logging() {
     let save_result = security_db::save_ip_access_log(&log);
     assert!(save_result.is_ok());
 
-    // 验证日志可以检索
+    // Verification logs can be retrieved
     let logs = security_db::get_ip_access_logs(10, 0, None, true).unwrap();
     let found = logs.iter().any(|l| l.client_ip == "blocked.request.test");
     assert!(found, "Blocked request should be logged");
@@ -295,19 +295,19 @@ fn test_scenario_blocked_request_logging() {
 }
 
 // ============================================================================
-// 集成测试场景 7：不影响正常请求性能
+// Integration test scenario 7: Does not affect normal request performance
 // ============================================================================
 
-/// 测试场景：安全检查不显著影响正常请求性能
+/// Test scenario: Security check does not significantly affect normal request performance
 ///
-/// 预期行为：
-/// 1. 黑名单/白名单检查时间 < 5ms
-/// 2. 与没有安全检查的基线相比，延迟增加 < 10ms
+/// Expected behavior:
+/// 1. Blacklist/whitelist check time < 5ms
+/// 2. Latency increase < 10ms compared to baseline without security checks
 #[test]
 fn test_scenario_performance_impact() {
     let _lock = setup_test();
 
-    // 添加一些黑名单条目
+    // Add some blacklist entries
     for i in 0..50 {
         // Justification: best-effort call; failure logged without changing control flow
         crate::error::record_ignored(
@@ -316,7 +316,7 @@ fn test_scenario_performance_impact() {
         );
     }
 
-    // 添加一些 CIDR 规则
+    // Add some CIDR rules
     for i in 0..10 {
         // Justification: best-effort call; failure logged without changing control flow
         crate::error::record_ignored(
@@ -325,12 +325,12 @@ fn test_scenario_performance_impact() {
         );
     }
 
-    // 测试查找性能
+    // Test lookup performance
     let start = std::time::Instant::now();
     let iterations = 100;
 
     for _ in 0..iterations {
-        // 模拟正常请求的安全检查
+        // Security checks that simulate normal requests
         // Justification: best-effort call; failure logged without changing control flow
         crate::error::record_ignored(
             security_db::is_ip_in_whitelist("10.0.0.1"),
@@ -348,7 +348,7 @@ fn test_scenario_performance_impact() {
 
     println!("Average security check time: {:?}", avg_per_check);
 
-    // 断言：平均每次检查应该在合理时间内
+    // Assertion: On average each check should be within a reasonable time
     assert!(
         avg_per_check < Duration::from_millis(100),
         "Security check should be fast"
@@ -358,19 +358,19 @@ fn test_scenario_performance_impact() {
 }
 
 // ============================================================================
-// 集成测试场景 8：数据持久化
+// Integration test scenario 8: Data persistence
 // ============================================================================
 
-/// 测试场景：黑名单/白名单数据持久化
+/// Test scenario: blacklist/whitelist data persistence
 ///
-/// 预期行为：
-/// 1. 添加数据后重新初始化数据库连接
-/// 2. 数据仍然存在
+/// Expected behavior:
+/// 1. Reinitialize the database connection after adding data
+/// 2. The data still exists
 #[test]
 fn test_scenario_data_persistence() {
     let _lock = setup_test();
 
-    // 添加数据
+    // Add data
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(
         add_to_blacklist("persist.test.ip", Some("Persistence test"), None, "test"),
@@ -382,11 +382,11 @@ fn test_scenario_data_persistence() {
         "add_to_whitelist",
     );
 
-    // 重新初始化（实际上只是验证数据仍然可读）
+    // Re-initialize (actually just verify the data is still readable)
     // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
     crate::error::record_ignored(init_db(), "init_db");
 
-    // 验证数据仍然存在
+    // Verification data still exists
     assert!(security_db::is_ip_in_blacklist("persist.test.ip").unwrap());
     assert!(security_db::is_ip_in_whitelist("persist.white.ip").unwrap());
 

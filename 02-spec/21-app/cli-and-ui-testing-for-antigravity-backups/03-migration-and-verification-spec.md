@@ -287,7 +287,7 @@ This updates 14 project manifests including `package.json`, `src-tauri/Cargo.tom
 ### 7.3 Release Documentation & Attribution Rules
 - **Strict Attribution**: Attribution in `changelog.md` and `changelog_en.md` must attribute strictly `@aukgit` (`(Thanks to @aukgit)`). No other user handles may appear.
 - **Dual README Synchronization**:
-  - `README.md` under `## 📝 更新日志`.
+  - `README.md` under `## 📝 Update Log`.
   - `README_EN.md` under `## 📝 Changelog`.
 - **Path Invariant**: Only relative Git paths (e.g., `02-spec/...`, `src/...`) are permitted in release documentation. Absolute paths are forbidden.
 

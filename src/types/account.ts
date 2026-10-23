@@ -17,7 +17,7 @@ export interface Account {
     proxy_disabled_at?: number;
     protected_models?: string[];
     live_limited_models?: Record<string, LiveLimitStatus>;
-    custom_label?: string;  // 用户自定义标签
+    custom_label?: string;  // User-defined labels
     validation_blocked?: boolean;
     validation_blocked_until?: number;
     validation_blocked_reason?: string;
@@ -49,9 +49,9 @@ export interface QuotaData {
     last_updated: number;
     is_forbidden?: boolean;
     forbidden_reason?: string;
-    subscription_tier?: string;  // 订阅类型: FREE/PRO/ULTRA
-    model_forwarding_rules?: Record<string, string>; // 废弃模型转发表
-    quota_groups?: QuotaGroup[]; // 按模型组的配额摘要 (weekly + 5h 双窗口)
+    subscription_tier?: string;  // Subscription type: FREE/PRO/ULTRA
+    model_forwarding_rules?: Record<string, string>; // Abandoned model forwarding table
+    quota_groups?: QuotaGroup[]; // Quota summary by model group (weekly + 5h dual window)
 }
 
 export interface ModelQuota {
@@ -68,18 +68,18 @@ export interface ModelQuota {
     supported_mime_types?: Record<string, boolean>;
 }
 
-/** 单个配额桶 (weekly / 5h) */
+/** Individual quota bucket (weekly / 5h) */
 export interface QuotaBucket {
     bucket_id: string;
     window: string;  // "weekly" | "5h"
     remaining_fraction: number;
     reset_time: string;
-    cycle_tokens?: number; // 本实例在该周配额周期记录的 input + output Token
+    cycle_tokens?: number; // The input + output Token recorded by this instance during the quota period of the week
     display_name?: string;
     description?: string;
 }
 
-/** 模型组配额 (如 Gemini Models / Claude and GPT models) */
+/** Model group quota (e.g. Gemini Models / Claude and GPT models) */
 export interface QuotaGroup {
     display_name: string;
     description?: string;

@@ -1,9 +1,9 @@
 use super::*;
 
 impl CacheManager {
-    /// 查找前缀跟踪条目中的 cache_name
+    /// Find cache_name in prefix tracking entry
     ///
-    /// 返回 Some(cache_name) 如果存在有效缓存，否则 None
+    /// Returns Some(cache_name) if a valid cache exists, otherwise None
     pub fn lookup_prefix(&self, hash: &str) -> Option<String> {
         if let Ok(mut stats) = self.prefix_stats.write() {
             stats.0 += 1;
@@ -59,10 +59,10 @@ impl CacheManager {
         None
     }
 
-    /// 插入或更新 Layer 3 条目
+    /// Insert or update Layer 3 entries
     ///
-    /// cache_name: Gemini 返回的缓存资源名。目前使用 hash 本身作为 fallback。
-    /// si_hash / tools_hash: 关联的 Layer 1/2 key，用于追踪
+    /// cache_name: cache resource name returned by Gemini. Currently the hash itself is used as fallback.
+    /// si_hash / tools_hash: associated Layer 1/2 key, used for tracking
     pub fn insert_prefix(
         &self,
         hash: String,
@@ -107,7 +107,7 @@ impl CacheManager {
         }
     }
 
-    /// 记录一次隐式缓存命中（来自响应的 cachedContentTokenCount > 0）
+    /// Log an implicit cache hit (cachedContentTokenCount > 0 from response)
     pub fn record_implicit_hit(&self, hash: &str) {
         if let Some(mut entry) = self.prefix_tracker.get_mut(hash) {
             entry.implicit_hit_count += 1;
@@ -119,7 +119,7 @@ impl CacheManager {
         }
     }
 
-    /// 记录一次显式缓存命中
+    /// Log an explicit cache hit
     pub fn record_explicit_hit(&self, hash: &str) {
         if let Some(mut entry) = self.prefix_tracker.get_mut(hash) {
             entry.explicit_hit_count += 1;

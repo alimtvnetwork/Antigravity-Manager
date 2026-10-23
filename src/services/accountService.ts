@@ -9,9 +9,9 @@ export async function updateAccountPriority(accountId: string, priority: number)
     await invoke('update_account_priority', { accountId, priority });
 }
 
-// 检查环境 (可选)
+// Check environment (optional)
 function ensureTauriEnvironment() {
-    // Web 模式下 request 也是一个 function，所以这里不应抛错
+    // In Web mode, request is also a function, so no error should be thrown here.
     if (typeof invoke !== 'function') {
         throw new Error(i18n.t('common.tauri_api_not_loaded'));
     }
@@ -19,11 +19,11 @@ function ensureTauriEnvironment() {
 
 export async function listAccounts(): Promise<Account[]> {
     const response = await invoke<any>('list_accounts');
-    // 如果返回的是对象格式 { accounts: [...] }, 则取其 accounts 属性
+    // If the returned object format is { accounts: [...] }, then take its accounts attribute
     if (response && typeof response === 'object' && Array.isArray(response.accounts)) {
         return response.accounts;
     }
-    // 否则直接返回响应内容（假设为数组）
+    // Otherwise, return the response content directly (assumed to be an array)
     return response || [];
 }
 
@@ -69,13 +69,13 @@ export async function startOAuthLogin(oauthClientKey?: string): Promise<Account>
     try {
         return await invoke('start_oauth_login', oauthClientKey ? { oauthClientKey } : undefined);
     } catch (error) {
-        // 增强错误信息
+        // Enhanced error messages
         if (typeof error === 'string') {
-            // 如果是 refresh_token 缺失错误,保持原样(已包含详细说明)
+            // If it is a refresh_token missing error, leave it as is (detailed instructions included)
             if (error.includes('Refresh Token') || error.includes('refresh_token')) {
                 throw error;
             }
-            // 其他错误添加上下文
+            // Other errors add context
             throw i18n.t('accounts.add.oauth_error', { error });
         }
         throw error;
@@ -126,7 +126,7 @@ export async function setActiveOAuthClient(clientKey: string): Promise<void> {
     return await invoke('set_active_oauth_client', { clientKey });
 }
 
-// 导入
+// import
 export async function importV1Accounts(): Promise<Account[]> {
     return await invoke('import_v1_accounts');
 }
@@ -150,14 +150,14 @@ export async function toggleProxyStatus(accountId: string, enable: boolean, reas
 }
 
 /**
- * 重新排序账号列表
- * @param accountIds 按新顺序排列的账号ID数组
+ * Reorder account list
+ * @param accountIds Array of account IDs in new order
  */
 export async function reorderAccounts(accountIds: string[]): Promise<void> {
     return await invoke('reorder_accounts', { accountIds });
 }
 
-// 设备指纹相关
+// Device fingerprint related
 export interface DeviceProfilesResponse {
     current_storage?: DeviceProfile;
     history?: DeviceProfileVersion[];
@@ -200,7 +200,7 @@ export async function bindDeviceProfileWithProfile(accountId: string, profile: D
     return await invoke('bind_device_profile_with_profile', { accountId, profile });
 }
 
-// 预热相关
+// Preheating related
 export async function warmUpAllAccounts(): Promise<string> {
     return await invoke('warm_up_all_accounts');
 }
@@ -209,7 +209,7 @@ export async function warmUpAccount(accountId: string): Promise<string> {
     return await invoke('warm_up_account', { accountId });
 }
 
-// 导出账号相关
+// Export account related
 export interface ExportAccountItem {
     email: string;
     refresh_token: string;
@@ -223,7 +223,7 @@ export async function exportAccounts(accountIds: string[]): Promise<ExportAccoun
     return await invoke('export_accounts', { accountIds });
 }
 
-// 自定义标签相关
+// Custom label related
 export async function updateAccountLabel(accountId: string, label: string): Promise<void> {
     return await invoke('update_account_label', { accountId, label });
 }

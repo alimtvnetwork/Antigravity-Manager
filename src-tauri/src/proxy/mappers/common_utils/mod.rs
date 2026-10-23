@@ -89,9 +89,9 @@ pub fn resolve_request_config(
         };
     }
 
-    // 检测是否有联网工具定义 (内置功能调用)
+    // Check whether there is a networking tool definition (built-in function call)
     let has_networking_tool = detects_networking_tool(tools);
-    // 检测是否包含非联网工具 (如 MCP 本地工具)
+    // Check for non-networked tools (such as MCP local tools)
     let _has_non_networking = contains_non_networking_tool(tools);
 
     // Strip -online suffix from original model if present (to detect networking intent)
@@ -118,8 +118,8 @@ pub fn resolve_request_config(
         || crate::proxy::model_specs::is_gemini_v3_or_above(mapped_model);
 
     // Determine if we should enable networking
-    // [FIX] 禁用基于模型的自动联网逻辑，防止图像请求被联网搜索结果覆盖。
-    // 仅在用户显式请求联网时启用：1) -online 后缀 2) 携带联网工具定义
+    // [FIX] Disable automatic model-based networking logic to prevent image requests from being overridden by networking search results.
+    // Only enabled when the user explicitly requests networking: 1) -online suffix 2) Carrying networking tool definition
     let enable_networking = is_online_suffix || has_networking_tool;
 
     // The final model to send upstream should be the MAPPED model,
@@ -136,7 +136,7 @@ pub fn resolve_request_config(
         _ => final_model,
     };
 
-    // [FIX] 不再强行将模型降级为 gemini-2.5-flash，彻底杜绝静默降级
+    // [FIX] No longer forcibly downgrade models to gemini-2.5-flash, and completely eliminate silent downgrades
     if enable_networking && !_is_high_quality_model {
         tracing::debug!(
             "[Common-Utils] Request enables web search for model {}",

@@ -1,7 +1,7 @@
 use super::*;
 
-/// 处理 generateContent 和 streamGenerateContent
-/// 路径参数: model_name, method (e.g. "gemini-pro", "generateContent")
+/// Handling generateContent and streamGenerateContent
+/// Path parameters: model_name, method (e.g. "gemini-pro", "generateContent")
 pub async fn handle_generate(
     State(state): State<AppState>,
     Path(model_action): Path<String>,
@@ -9,11 +9,11 @@ pub async fn handle_generate(
     upstream_recorder: Option<
         axum::extract::Extension<crate::proxy::monitor::UpstreamRequestBodyHolder>,
     >,
-    Json(mut body): Json<Value>, // 改为 mut 以支持修复提示词注入
+    Json(mut body): Json<Value>, // Changed to mut to support fix prompt injection
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let clean_start = std::time::Instant::now();
 
-    // 解析 model:method
+    // Parsing model:method
     let (model_name, method) = if let Some((m, action)) = model_action.rsplit_once(':') {
         (m.to_string(), action.to_string())
     } else {
@@ -48,8 +48,8 @@ pub async fn handle_generate(
     let mut think_fill_ms: f64 = 0.0;
     let mut ttft_ms: f64 = 0.0;
 
-    // 1. 验证方法
-    // [NEW] :countTokens 冒号语法，直接代理到上游 v1internal:countTokens
+    // 1. Verification method
+    // [NEW] :countTokens colon syntax, directly proxy to the upstream v1internal:countTokens
     if method == "countTokens" {
         return Ok(execute_count_tokens(state, model_name, body).await);
     }
@@ -78,7 +78,7 @@ pub async fn handle_generate(
         .await;
     }
     let client_wants_stream = method == "streamGenerateContent";
-    // [AUTO-CONVERSION] 强制内部流式化
+    // [AUTO-CONVERSION] Force internal streaming
     let force_stream_internally = !client_wants_stream;
     let is_stream = client_wants_stream || force_stream_internally;
 
@@ -86,13 +86,13 @@ pub async fn handle_generate(
         // debug!("[AutoConverter] Converting non-stream request to stream");
     }
 
-    // 2. 获取 UpstreamClient 和 TokenManager
+    // 2. Get UpstreamClient and TokenManager
     let upstream = state.upstream.clone();
     let image_scheduler = state.image_scheduler.clone();
     let request_timeout = state.request_timeout;
     let token_manager = state.token_manager;
     let pool_size = token_manager.len();
-    // [FIX #3485] 自适应多账号池与单账号退避最大重试次数 (单账号3次，多账号整池两轮)
+    // [FIX #3485] Maximum number of retries for adaptive multi-account pool and single-account backoff (3 times for a single account, two rounds for the entire pool with multiple accounts)
     let max_attempts = crate::proxy::handlers::common::calculate_max_retry_attempts(pool_size);
 
     let mut last_error = String::new();
@@ -118,9 +118,9 @@ pub async fn handle_generate(
         // [Stage Timing] Normalization start time
         let norm_start = std::time::Instant::now();
 
-        // 3. 模型路由解析
+        // 3. Model routing analysis
         let mapped_model = initial_mapped_model.clone();
-        // 提取 tools 列表以进行联网探测 (Gemini 风格可能是嵌套的)
+        // Extract tools list for network probing (Gemini style may be nested)
         let tools_val: Option<Vec<Value>> =
             body.get("tools").and_then(|t| t.as_array()).map(|arr| {
                 let mut flattened = Vec::new();
@@ -147,8 +147,8 @@ pub async fn handle_generate(
             Some(&body), // [NEW] Pass request body for imageConfig parsing
         );
 
-        // 4. 获取 Token (使用准确的 request_type)
-        // 提取 SessionId (粘性指纹，优先以显式会话头对齐跨协议 store_key)
+        // 4. Get Token (use accurate request_type)
+        // Extract SessionId (sticky fingerprint, preferentially align cross-protocol store_key with explicit session header)
         let explicit_sid = headers
             .get("x-session-id")
             .or_else(|| headers.get("x-jeikcode-session-id"))
@@ -168,7 +168,7 @@ pub async fn handle_generate(
         let session_id = session_scope.store_key.clone();
         let client_session_id = session_scope.client_id.clone();
 
-        // 关键：根据 force_rotate 标志决定是否轮换账号（支持 Grace Retry 原地重试）
+        // Key: Determine whether to rotate the account based on the force_rotate flag (supports Grace Retry to retry in place)
         let (access_token, project_id, email, account_id, _wait_ms) =
             if let Some(credentials) = retry_credentials.take() {
                 credentials
@@ -228,9 +228,9 @@ pub async fn handle_generate(
         last_email = Some(email.clone());
         info!("✓ Using account: {} (type: {})", email, config.request_type);
 
-        // 5. 包装请求 (project injection)
+        // 5. Packaging request (project injection)
         // [FIX #765] Pass session_id to wrap_request for signature injection
-        // [NEW] 获取完整 Token 对象以注入动态规格 (dynamic > static default > 65535)
+        // [NEW] Get the full Token object to inject dynamic specifications (dynamic > static default > 65535)
         let token_obj = token_manager.get_token_by_id(&account_id);
         let tf_start = std::time::Instant::now();
         let mut wrapped_body = wrap_request_v2(
@@ -279,7 +279,7 @@ pub async fn handle_generate(
             .await;
         }
 
-        // 5. 上游调用
+        // 5. Upstream call
         let query_string = if is_stream { Some("alt=sse") } else { None };
         let upstream_method = if is_stream {
             "streamGenerateContent"
@@ -333,7 +333,7 @@ pub async fn handle_generate(
             }
         };
 
-        // [NEW] 记录端点降级日志到 debug 文件
+        // [NEW] Record endpoint downgrade log to debug file
         if !call_result.fallback_attempts.is_empty() && debug_logger::is_enabled(&debug_cfg) {
             let fallback_entries: Vec<serde_json::Value> = call_result
                 .fallback_attempts
@@ -366,11 +366,11 @@ pub async fn handle_generate(
         }
 
         let response = call_result.response;
-        // [NEW] 提取实际请求的上游端点 URL，用于日志记录和排查
+        // [NEW] Extract the actual requested upstream endpoint URL for logging and troubleshooting purposes
         let upstream_url = response.url().to_string();
         let status = response.status();
 
-        // [NEW] 提取官方 TraceID
+        // [NEW] Extract official TraceID
         let cloud_code_trace_id = response
             .headers()
             .get("x-cloudaicompanion-trace-id")
@@ -414,7 +414,7 @@ pub async fn handle_generate(
             }
         }
 
-        // 处理错误并重试
+        // Handle the error and try again
         match handle_generate_error(
             status,
             response,
@@ -454,7 +454,7 @@ pub async fn handle_generate(
         }
     }
 
-    // 所有尝试均失败：仅当全部结构化失败状态均为 429 时返回 429
+    // All attempts failed: Return 429 only if all structured failure statuses are 429
     let final_status = failure_statuses.final_status();
     let headers = build_token_error_headers(
         Some(initial_mapped_model.as_str()),

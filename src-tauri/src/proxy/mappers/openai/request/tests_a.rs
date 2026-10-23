@@ -4,7 +4,7 @@ use super::*;
 
 #[test]
 fn test_openai_aliases_max_completion_tokens_and_reasoning_max_tokens() {
-    // 1. max_completion_tokens 及 max_output_tokens 别名支持
+    // 1. max_completion_tokens and max_output_tokens alias support
     let req1: OpenAIRequest = serde_json::from_value(json!({
         "model": "o3-mini",
         "messages": [{"role": "user", "content": "hello"}],
@@ -21,7 +21,7 @@ fn test_openai_aliases_max_completion_tokens_and_reasoning_max_tokens() {
     .unwrap();
     assert_eq!(req1_resp.max_tokens, Some(128000));
 
-    // 2. reasoning.max_tokens 与 reasoning.effort 支持
+    // 2. reasoning.max_tokens and reasoning.effort support
     let req2: OpenAIRequest = serde_json::from_value(json!({
         "model": "o3-mini",
         "messages": [{"role": "user", "content": "hello"}],
@@ -40,7 +40,7 @@ fn test_openai_aliases_max_completion_tokens_and_reasoning_max_tokens() {
         Some(8000)
     );
 
-    // 3. thinking.max_tokens 别名支持
+    // 3. thinking.max_tokens alias support
     let req3: OpenAIRequest = serde_json::from_value(json!({
         "model": "o3-mini",
         "messages": [{"role": "user", "content": "hello"}],
@@ -55,7 +55,7 @@ fn test_openai_aliases_max_completion_tokens_and_reasoning_max_tokens() {
         Some(10240)
     );
 
-    // 4. 客户端控制模式下从 reasoning.max_tokens 提取 client_budget
+    // 4. Extract client_budget from reasoning.max_tokens in client control mode
     crate::proxy::config::update_thinking_budget_config(
         crate::proxy::config::ThinkingBudgetConfig {
             control_source: crate::proxy::config::ThinkingControlSource::Client,
@@ -74,9 +74,9 @@ fn test_openai_aliases_max_completion_tokens_and_reasoning_max_tokens() {
 
 #[test]
 fn prompt_log_identity_cleanup_only_changes_system_instructions() {
-    // 身份声明归一化由协议无关的流水线节点承担（`PromptSanitizer::sanitize_gemini_payload`），
-    // 适配层只产出原样系统提示词。本用例校验「适配层产出 → 流水线清洗」的真实链路：
-    // 系统提示词块内的身份声明被统一归一化为中性身份，user / tool 文本逐字保留。
+    // Identity claim normalization is undertaken by a protocol-independent pipeline node (`PromptSanitizer::sanitize_gemini_payload`),
+    // The adaptation layer only produces the original system prompt words. This use case verifies the real link of "Adaptation layer output → Pipeline cleaning":
+    // The system prompts that the identity statements within the word block are unified and normalized to a neutral identity, and the user / tool text is retained verbatim.
     for old in [
         "You are Codex, an agent based on GPT-5.",
         "You are Codex, a coding agent based on GPT-5.",
@@ -96,7 +96,7 @@ fn prompt_log_identity_cleanup_only_changes_system_instructions() {
         .unwrap();
         let (mut body, _, _, _) = transform_openai_request(&req, "test-project", &req.model, None);
 
-        // 适配层保持纯透传：身份声明在流水线节点介入前原样保留
+        // The adaptation layer remains purely transparent: the identity statement remains intact before the pipeline node intervenes.
         assert!(body["request"]["systemInstruction"]
             .to_string()
             .contains(old));
@@ -110,7 +110,7 @@ fn prompt_log_identity_cleanup_only_changes_system_instructions() {
         assert!(system.contains("Top-level: You are an AI Agent."));
         assert!(system.contains("System: You are an AI Agent."));
         assert!(system.contains("<model_switch>You are an AI Agent.</model_switch>"));
-        // 用户提问与工具消息（含管道自身提示词）零改动
+        // No changes to user questions and tool messages (including the pipeline’s own prompt words)
         let contents = body["request"]["contents"].to_string();
         assert_eq!(contents.matches(old).count(), 2);
     }
@@ -175,7 +175,7 @@ fn test_openai_reasoning_effort_authority_resolution() {
     let _lock = crate::proxy::config::TEST_CONFIG_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
-    // 1. 启发式模型忽略客户端 reasoning_effort
+    // 1. Heuristic model ignores client reasoning_effort
     let req_high: OpenAIRequest = serde_json::from_value(json!({
         "model": "gemini-3.7-flash-high",
         "messages": [{"role": "user", "content": "hi"}],
@@ -189,7 +189,7 @@ fn test_openai_reasoning_effort_authority_resolution() {
         16384
     );
 
-    // 2. 裸模型 Flash 接管客户端 reasoning_effort
+    // 2. Naked model Flash takes over client reasoning_effort
     let req_flash_high: OpenAIRequest = serde_json::from_value(json!({
         "model": "gemini-3-flash",
         "messages": [{"role": "user", "content": "hi"}],
@@ -216,7 +216,7 @@ fn test_openai_reasoning_effort_authority_resolution() {
         1024
     );
 
-    // 3. 裸模型 Flash 客户端未填或试图关闭：绝不关闭思考，强制回填 -medium (4096)
+    // 3. Naked model Flash client not filled in or trying to close: never close thinking, force backfill -medium (4096)
     let req_flash_none: OpenAIRequest = serde_json::from_value(json!({
         "model": "gemini-3-flash",
         "messages": [{"role": "user", "content": "hi"}]
@@ -242,7 +242,7 @@ fn test_openai_reasoning_effort_authority_resolution() {
         4096
     );
 
-    // 4. 裸模型 Flash 客户端传入自定义 budget_tokens：彻底被忽略，由服务端权威等级回填
+    // 4. Naked model Flash client passes in custom budget_tokens: completely ignored and backfilled by the server authority level
     let req_flash_custom_budget: OpenAIRequest = serde_json::from_value(json!({
         "model": "gemini-3-flash",
         "messages": [{"role": "user", "content": "hi"}],

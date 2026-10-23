@@ -3,14 +3,14 @@ use std::path::PathBuf;
 
 use super::*;
 
-/// 获取数据库路径
+/// Get database path
 pub fn get_db_path() -> Result<PathBuf, String> {
     let mut path = crate::modules::account::get_data_dir()?;
     path.push("user_tokens.db");
     Ok(path)
 }
 
-/// 连接数据库
+/// Connect to database
 pub fn connect_db() -> Result<Connection, String> {
     let path = get_db_path()?;
     let conn = Connection::open(&path).map_err(|e| format!("Failed to open database: {}", e))?;
@@ -32,11 +32,11 @@ pub fn connect_db() -> Result<Connection, String> {
     Ok(conn)
 }
 
-/// 初始化数据库
+/// Initialize database
 pub fn init_db() -> Result<(), String> {
     let conn = connect_db()?;
 
-    // 创建 user_tokens 表
+    // Create user_tokens table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS user_tokens (
             id TEXT PRIMARY KEY,
@@ -59,7 +59,7 @@ pub fn init_db() -> Result<(), String> {
     )
     .map_err(|e| format!("Failed to create user_tokens table: {}", e))?;
 
-    // 尝试添加新列 (用于旧数据库迁移，忽略已存在的错误)
+    // Try adding new columns (for old database migrations, ignore existing errors)
     // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
     crate::error::record_ignored(
         conn.execute("ALTER TABLE user_tokens ADD COLUMN expires_type TEXT", []),
@@ -113,7 +113,7 @@ pub fn init_db() -> Result<(), String> {
         "db execute",
     );
 
-    // 创建 token_ip_bindings 表
+    // Create token_ip_bindings table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS token_ip_bindings (
             id TEXT PRIMARY KEY,
@@ -130,7 +130,7 @@ pub fn init_db() -> Result<(), String> {
     )
     .map_err(|e| format!("Failed to create token_ip_bindings table: {}", e))?;
 
-    // 创建 token_usage_logs 表
+    // Create token_usage_logs table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS token_usage_logs (
             id TEXT PRIMARY KEY,
@@ -147,7 +147,7 @@ pub fn init_db() -> Result<(), String> {
     )
     .map_err(|e| format!("Failed to create token_usage_logs table: {}", e))?;
 
-    // 创建索引
+    // Create index
     // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
     crate::error::record_ignored(conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_token_usage_logs_token_id ON token_usage_logs(token_id)",
@@ -158,8 +158,8 @@ pub fn init_db() -> Result<(), String> {
     // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
     crate::error::record_ignored(conn.execute("CREATE INDEX IF NOT EXISTS idx_token_usage_logs_token_time ON token_usage_logs(token_id, request_time DESC)", []), "db execute");
 
-    // [FIX Issue #1719] 数据清洗：修复旧版本升级导致的 NULL 字段
-    // 这些字段在旧版本中可能不存在，ALTER TABLE 添加后默认为 NULL，导致反序列化失败
+    // [FIX Issue #1719] Data cleaning: fix NULL fields caused by old version upgrade
+    // These fields may not exist in old versions and default to NULL after ALTER TABLE is added, causing deserialization to fail.
     // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
     crate::error::record_ignored(conn.execute("UPDATE user_tokens SET expires_type = 'never' WHERE expires_type IS NULL OR expires_type = ''", []), "db execute");
     // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged

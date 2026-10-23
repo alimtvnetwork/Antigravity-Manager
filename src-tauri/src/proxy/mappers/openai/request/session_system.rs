@@ -1,5 +1,5 @@
 // System instructions phase (split from request.rs).
-// OpenAI → Gemini 请求转换
+// OpenAI → Gemini request conversion
 use super::super::models::*;
 use crate::proxy::model_specs;
 use crate::proxy::token_manager::ProxyToken;
@@ -17,11 +17,11 @@ pub(crate) struct SystemState {
 pub(crate) fn phase_system(request: &super::super::models::OpenAIRequest) -> SystemState {
     let mut system_instructions: Vec<String> = collect_system_instruction_blocks(request);
 
-    // 遵循纯透传原则：不替换日期、路径、UUID 等任何动态字段，完整保留客户端与 Agent 的真实环境感知。
-    // 身份声明归一化（Codex `based on GPT-x` / 厂商 `created by …` / Claude Agent SDK 等）已**统一收敛**
-    // 到协议无关的提示词清洗流水线节点：`PromptSanitizer::normalize_system_identity`，在系统提示词头部
-    // 窗口内做广谱匹配。依据 AGENTS.md「Pipeline First / Fix Strategy」——适配层只做参数归一化与协议转换，
-    // 清洗一律由流水线统一处理，避免同一类 WAF 风险在四个协议里各写一份特例。
+    // Follow the principle of pure transparent transmission: do not replace any dynamic fields such as date, path, UUID, etc., and completely retain the real environment perception of the client and Agent.
+    // Identity claim normalization (Codex `based on GPT-x` / vendor `created by …` / Claude Agent SDK, etc.) has been **unified and converged**
+    // Go to the protocol-independent prompt word cleaning pipeline node: `PromptSanitizer::normalize_system_identity`, in the system prompt word header
+    // Do broad spectrum matching within the window. According to AGENTS.md "Pipeline First / Fix Strategy" - the adaptation layer only performs parameter normalization and protocol conversion.
+    // Cleaning will be handled uniformly by the pipeline to avoid writing a special case in each of the four protocols for the same type of WAF risks.
     let mut seen_system_instruction_keys = std::collections::HashSet::new();
     system_instructions.retain(|inst| {
         let key = inst.trim();
@@ -50,7 +50,7 @@ pub(crate) fn phase_system(request: &super::super::models::OpenAIRequest) -> Sys
         }
     }
 
-    // [New] 预先构建工具名称到原始 Schema 的映射，用于后续参数类型修正
+    // [New] Pre-built mapping of tool names to original Schema for subsequent parameter type correction
     let mut tool_name_to_schema = std::collections::HashMap::new();
     if let Some(tools) = &request.tools {
         let flat_tools = flatten_tools(tools);

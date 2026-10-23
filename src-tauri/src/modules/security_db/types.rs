@@ -5,7 +5,7 @@ use super::*;
 #[cfg(test)]
 pub static TEST_SECURITY_DB_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-/// IP 访问日志
+/// IP access log
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IpAccessLog {
     pub id: String,
@@ -23,7 +23,7 @@ pub struct IpAccessLog {
     pub username: Option<String>,
 }
 
-/// IP 黑名单条目
+/// IP blacklist entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IpBlacklistEntry {
     pub id: String,
@@ -35,7 +35,7 @@ pub struct IpBlacklistEntry {
     pub hit_count: i64,
 }
 
-/// IP 白名单条目
+/// IP whitelist entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IpWhitelistEntry {
     pub id: String,
@@ -44,7 +44,7 @@ pub struct IpWhitelistEntry {
     pub created_at: i64,
 }
 
-/// IP 统计概览
+/// IP Statistics Overview
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IpStats {
     pub total_requests: u64,
@@ -55,7 +55,7 @@ pub struct IpStats {
     pub whitelist_count: u64,
 }
 
-/// IP 访问排行
+/// IP access ranking
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IpRanking {
     pub client_ip: String,

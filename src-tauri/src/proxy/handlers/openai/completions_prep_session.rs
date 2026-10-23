@@ -30,9 +30,9 @@ pub(crate) async fn completions_prep_session(
     store_response: bool,
 ) -> Result<CompletionsSessionPrep, Response> {
     let mut body = body;
-    // [MULTI-TURN] 支持 previous_response_id 链式历史恢复
-    // 当客户端通过 HTTP POST /v1/responses 传入 previous_response_id 时，
-    // 从服务器端 session store 取出上一轮的历史，合并到本轮的 input 中
+    // [MULTI-TURN] Support previous_response_id chained history recovery
+    // When the client passes in previous_response_id via HTTP POST /v1/responses,
+    // Get the history of the previous round from the server-side session store and merge it into the input of this round.
     let previous_response_id = body
         .get("previous_response_id")
         .and_then(|v| v.as_str())
@@ -65,7 +65,7 @@ pub(crate) async fn completions_prep_session(
                 _ => None,
             })
             .unwrap_or_default();
-        // 完整回放先裁掉最新用户轮次之前的内联媒体，再执行硬限制校验。
+        // Full playback first trims inline media before the latest user turn, and then performs hard limit verification.
         omit_media_before_latest_user_turn(&mut existing_input);
 
         let merged = if let Some(ref prev_id) = previous_response_id {

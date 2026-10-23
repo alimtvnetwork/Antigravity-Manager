@@ -14,7 +14,7 @@ pub async fn show_main_window(window: tauri::WebviewWindow) -> Result<(), String
     Ok(())
 }
 
-/// 设置窗口主题（用于同步 Windows 标题栏按钮颜色）
+/// Set window theme (used to synchronize Windows title bar button colors)
 #[tauri::command]
 pub async fn set_window_theme(window: tauri::Window, theme: String) -> Result<(), String> {
     use tauri::Theme;
@@ -28,19 +28,19 @@ pub async fn set_window_theme(window: tauri::Window, theme: String) -> Result<()
     window.set_theme(tauri_theme).map_err(|e| e.to_string())
 }
 
-/// 最小化窗口
+/// Minimize window
 #[tauri::command]
 pub async fn minimize_window(window: tauri::Window) -> Result<(), String> {
     window.minimize().map_err(|e| e.to_string())
 }
 
-/// 最大化窗口
+/// maximize window
 #[tauri::command]
 pub async fn maximize_window(window: tauri::Window) -> Result<(), String> {
     window.maximize().map_err(|e| e.to_string())
 }
 
-/// 切换最大化/还原窗口
+/// Toggle maximize/restore window
 #[tauri::command]
 pub async fn toggle_maximize_window(window: tauri::Window) -> Result<bool, String> {
     let is_max = window.is_maximized().map_err(|e| e.to_string())?;
@@ -53,13 +53,13 @@ pub async fn toggle_maximize_window(window: tauri::Window) -> Result<bool, Strin
     }
 }
 
-/// 关闭窗口并完全退出应用
+/// Close the window and exit the app completely
 #[tauri::command]
 pub fn close_window(window: tauri::Window) -> Result<(), String> {
     crate::modules::process::exit_app_fully(&window.app_handle());
 }
 
-/// 查询窗口是否处于最大化状态
+/// Query whether the window is maximized
 #[tauri::command]
 pub async fn is_window_maximized(window: tauri::Window) -> Result<bool, String> {
     window.is_maximized().map_err(|e| e.to_string())

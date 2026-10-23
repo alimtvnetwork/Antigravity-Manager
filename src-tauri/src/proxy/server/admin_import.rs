@@ -162,7 +162,7 @@ pub(crate) async fn admin_sync_account_from_db(
         Ok(acc) => acc,
         Err(e) => {
             crate::modules::logger::log_info(&format!(
-                "HTTP API 自动同步跳过 (本地账号导入失败): {}",
+                "HTTP API automatic synchronization skipped (local account import failed): {}",
                 e
             ));
             return Ok(Json(None));

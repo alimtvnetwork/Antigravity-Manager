@@ -16,19 +16,19 @@ export function ClearConfirmModal(props: BudgetSectionProps) {
                                 <div className="space-y-2 min-w-0">
                                     <h3 className="text-sm font-bold text-gray-900 dark:text-white">
                                         {t("proxy.config.thinking_budget.clear_modal_title", {
-                                            defaultValue: "确认清空思考块存储？",
+                                            defaultValue: "Confirm to clear thinking block storage?",
                                         })}
                                     </h3>
                                     <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">
                                         {t("proxy.config.thinking_budget.clear_modal_desc", {
                                             defaultValue:
-                                                "此操作将彻底清空内存常驻轮次 (RAM) 与本地 SQLite 数据库中所有的历史思维链和工具签名记录。\n\n⚠️ 注意：此操作仅清理思考块数据，绝不删除任何反向代理请求日志。",
+                                                "This operation will completely clear all historical thought chains and tool signature records in the resident memory (RAM) and local SQLite database. \n\n⚠️ Note: This operation only cleans the thinking block data and will never delete any reverse proxy request logs.",
                                         })}
                                     </p>
                                     <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed">
                                         {t("proxy.config.thinking_budget.clear_modal_warning", {
                                             defaultValue:
-                                                "建议仅在出现缓存命中异常、版本升级或开发者明确要求时执行。清空后新请求将重新建立干净的前缀索引。",
+                                                "It is recommended that this be executed only when a cache hit exception occurs, when a version upgrade occurs, or when explicitly requested by the developer. New requests after clearing will re-establish a clean prefix index.",
                                         })}
                                     </div>
                                 </div>
@@ -41,7 +41,7 @@ export function ClearConfirmModal(props: BudgetSectionProps) {
                                     onClick={() => setShowClearThinkingConfirm(false)}
                                     disabled={isClearingThinking}
                                 >
-                                    {t("common.cancel", { defaultValue: "取消" })}
+                                    {t("common.cancel", { defaultValue: "Cancel" })}
                                 </button>
                                 <button
                                     type="button"
@@ -55,7 +55,7 @@ export function ClearConfirmModal(props: BudgetSectionProps) {
                                         <Trash2 size={13} />
                                     )}
                                     {t("proxy.config.thinking_budget.clear_confirm_btn", {
-                                        defaultValue: "确认清空",
+                                        defaultValue: "Confirm clearing",
                                     })}
                                 </button>
                             </div>

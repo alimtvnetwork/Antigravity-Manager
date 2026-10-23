@@ -126,8 +126,6 @@ export function PromptTreeExportModal({
         return { projectCount: 1, conversationCount: 1, promptCount: 1 };
     }, [targetType, treeData, activeProject, activeConversation]);
 
-    if (!isOpen) return null;
-
     useEffect(() => {
         if (!isOpen) return;
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -140,6 +138,8 @@ export function PromptTreeExportModal({
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isOpen, onClose]);
+
+    if (!isOpen) return null;
 
     const handleExport = async () => {
         setIsExporting(true);

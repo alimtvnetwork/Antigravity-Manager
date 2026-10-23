@@ -1,20 +1,20 @@
 // Patch recovery (split from apply_patch_preflight.rs).
 use super::repair::resolve_path;
-// apply_patch **pre-flight 自动修复**:在把 V4A patch 发给 Codex apply 之前,读目标文件比对,
-// 自动对齐**安全**的上下文失配(尾随空格 / 首尾空白差异),消灭 V4A 头号失败
+// apply_patch **pre-flight automatic repair**: Before sending the V4A patch to Codex apply, read the target file for comparison.
+// Automatically align **safe** context mismatch (trailing spaces / leading and trailing whitespace differences), eliminating the number one failure of V4A
 // `apply_patch verification failed: Failed to find expected lines`。
 //
-// ## 为什么需要
-// 弱一点的 chat 模型(非 OpenAI)在大文件上常无法逐字节复刻 `Update File` 的 context/删除行
-// (尾随空格、缩进、记忆偏差)→ Codex 找不到锚点 → apply 失败 → 模型整文件重写,浪费时间和 token。
-// 实测真机报错(rollout 地面真相)正是这类。
+// ## Why is it needed?
+// Weaker chat models (non-OpenAI) are often unable to reproduce the context/delete lines of `Update File` byte-by-byte on large files.
+// (Trailing spaces, indentation, memory deviation) → Codex cannot find the anchor point → apply fails → the entire model file is rewritten, wasting time and tokens.
+// The error reported by the actual machine (rollout ground truth) is exactly this type.
 //
-// ## 安全边界(绝不损坏文件 —— 对齐用户「不做破坏性降级」硬规则)
-// - **只动锚点**:`Update File` 里的 context(空格前缀)/ 删除(`-`)行。`+新增` 行**绝不改动**。
-// - **只在唯一匹配时修**:锚点块在文件里按「忽略尾随空格 / 首尾空白」找候选,**恰好一个**位置才对齐;
-//   0 个(模型真改错内容)或 ≥2 个(歧义)一律**原样放行**,交给 Codex parse_patch 暴露真坏,绝不靠猜。
-// - **Add File / Delete File 不碰**(无锚点,不涉及匹配)。读不到文件 / 无 cwd → 原样放行。
-// - 每条修复 / 放行都记进 apply-patch 诊断页,可审计。
+// ## Safety boundary (never damage files - align users with the hard rule of "no destructive downgrades")
+// - **Move anchor point only**: context(space prefix)/ delete (`-`) line in `Update File`. `+New` lines **never change**.
+// - **Only fix when there is a unique match**: The anchor block is found in the file by "Ignore trailing spaces/leading and trailing blanks" to find candidates, and **exactly one** position will be aligned;
+//   0 (the model is really wrong) or ≥2 (ambiguous) will be **released as is** and handed over to Codex parse_patch to expose the real bad, never rely on guessing.
+// - **Add File / Delete File does not touch** (no anchor, no matching involved). Unable to read file / no cwd → release as is.
+// - Each repair/release is recorded in the apply-patch diagnostic page and can be audited.
 
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
@@ -23,13 +23,13 @@ use std::sync::{Mutex, OnceLock};
 use crate::proxy::adapters::apply_patch_preflight::Repair;
 use serde_json::Value;
 
-/// 一条 pre-flight 处理记录(给诊断页 / 日志)。
+/// A record of pre-flight processing (for diagnostic pages/logs).
 
-/// **规则:`Update File` 目标是空文件 → `Delete File + Add File`**(prompt gotcha #3,无损)。
-/// `*** Update File:` 无法作用于空文件(Codex 报 `cannot operate on a completely empty file`)。
-/// 当目标文件存在且**为空**(真正 0 字节,非纯空白)、且 Update body 是**纯 `+` 行**(纯写内容,无 `-`/context 可
-/// 匹配)时,转成 `*** Delete File: X` + `*** Add File: X` + 原 `+` body(空文件无内容可丢 → 无损)。
-/// body 含 `-`/context(模型在空文件上写了匹配行,本就矛盾)/ 含 Move(交给 empty-move 规则)→ 不动。需 `cwd`。
+/// **Rule: `Update File` target is an empty file → `Delete File + Add File`** (prompt gotcha #3, lossless).
+/// `*** Update File:` cannot operate on an empty file (Codex reports `cannot operate on a completely empty file`).
+/// When the target file exists and is empty (really 0 bytes, not pure blank), and the Update body is a pure `+` line** (plain writing content, no `-`/context is available
+/// When matching), it is converted into `*** Delete File: X` + `*** Add File:
+/// body contains `-`/context (the model writes matching lines on an empty file, which is inherently contradictory)/ contains Move (leave it to the empty-move rule) → does not move. Requires `cwd`.
 pub(crate) fn recover_update_empty_file(v4a: &str, cwd: Option<&str>) -> (String, Vec<Repair>) {
     let Some(cwd) = cwd else {
         return (v4a.to_owned(), Vec::new());
@@ -44,9 +44,9 @@ pub(crate) fn recover_update_empty_file(v4a: &str, cwd: Option<&str>) -> (String
     while i < lines.len() {
         if let Some(path) = lines[i].strip_prefix("*** Update File: ") {
             let p = path.trim();
-            // 只认**真正 0 字节**(Codex 仅对 `completely empty file` 报错;纯空白文件仍是可读内容、
-            // 能正常 Update)。用 `c.trim().is_empty()` 会把纯空白文件也转 Delete+Add → 丢掉那些
-            // 空白字节(破坏性,codex-connector #435 P2)。
+            // Only recognize **real 0 bytes** (Codex only reports an error for `completely empty file`; pure blank files are still readable content,
+            // can update normally). Using `c.trim().is_empty()` will also convert pure blank files Delete+Add → throw away those
+            // Blank bytes (destructive, codex-connector #435 P2).
             let is_empty = std::fs::read_to_string(resolve_path(p, cwd))
                 .map(|c| c.is_empty())
                 .unwrap_or(false);
@@ -77,7 +77,8 @@ pub(crate) fn recover_update_empty_file(v4a: &str, cwd: Option<&str>) -> (String
                     repairs.push(Repair {
                         file: p.to_owned(),
                         kind: "repaired".to_owned(),
-                        detail: "Update 空文件 → Delete+Add 写入(prompt gotcha #3)".to_owned(),
+                        detail: "Update empty file → Delete+Add write (prompt gotcha #3)"
+                            .to_owned(),
                     });
                     i = j;
                     continue;
@@ -94,10 +95,10 @@ pub(crate) fn recover_update_empty_file(v4a: &str, cwd: Option<&str>) -> (String
     (joined, repairs)
 }
 
-/// **规则:空 `Update File + Move to`(rename-only)→ `Delete File + Add File`**(prompt gotcha #7)。
-/// 模型想纯重命名却写 `*** Update File: X` + `*** Move to: Y` 且**无 hunk** → Codex 报
-/// `Update file hunk for path 'X' is empty`。按 prompt **自身建议**恢复:读 X 原内容,转成
-/// `*** Delete File: X` + `*** Add File: Y` + 逐行 `+` 复制(空行为裸 `+`)。读不到 X → 原样放行。
+/// **Rule: Empty `Update File + Move to`(rename-only)→ `Delete File + Add File`**(prompt gotcha #7).
+/// I want to simply rename the model but write `*** Update File: X` + `*** Move to: Y` and **no hunk** → Codex report
+/// `Update file hunk for path 'X' is empty`. Press prompt **My own suggestion** to restore: Read X original content, convert to
+/// `*** Delete File: Unable to read X → Leave as is.
 pub(crate) fn recover_empty_move(v4a: &str, cwd: Option<&str>) -> (String, Vec<Repair>) {
     let Some(cwd) = cwd else {
         return (v4a.to_owned(), Vec::new());
@@ -110,14 +111,14 @@ pub(crate) fn recover_empty_move(v4a: &str, cwd: Option<&str>) -> (String, Vec<R
     let mut repairs = Vec::new();
     let mut i = 0;
     while i < lines.len() {
-        // 匹配 `*** Update File: X` 紧跟 `*** Move to: Y`,且 Move 后到下一个 `*** ` 控制行之间无 hunk 行。
+        // Matches `*** Update File: X` immediately followed by `*** Move to: Y`, and there is no hunk line between the Move and the next `*** ` control line.
         if let Some(old) = lines[i].strip_prefix("*** Update File: ") {
             if i + 1 < lines.len() {
                 if let Some(new) = lines[i + 1].strip_prefix("*** Move to: ") {
-                    // 看 Move 之后、下一个**文件操作**控制行之前有没有 hunk 内容行。
-                    // 注:`*** End of File` 是文档化的 **hunk 内标记**(prompt RENAME/MOVE 段),不是
-                    // section 边界 —— 不能停在它(否则 rename+EOF 追加会被误判成空 rename、转成丢内容的
-                    // Delete+Add,codex-connector #435 P1)。它本身即表示「有 hunk」,继续往后扫。
+                    // See if there is a hunk content line after Move and before the next **file operation** control line.
+                    // Note: `*** End of File` is a documented **hunk internal mark** (prompt RENAME/MOVE section), not
+                    // Section boundary - cannot stop at it (otherwise rename+EOF append will be misjudged as empty rename and converted into missing content)
+                    // Delete+Add,codex-connector #435 P1). It itself means "there is hunk", keep scanning back.
                     let mut j = i + 2;
                     let mut has_hunk = false;
                     while j < lines.len() {
@@ -128,7 +129,7 @@ pub(crate) fn recover_empty_move(v4a: &str, cwd: Option<&str>) -> (String, Vec<R
                             continue;
                         }
                         if t.starts_with("*** ") {
-                            break; // 真正的下一个文件操作 / End Patch 边界
+                            break; // True next file operation/End Patch boundary
                         }
                         if t.starts_with('+')
                             || t.starts_with('-')
@@ -140,8 +141,8 @@ pub(crate) fn recover_empty_move(v4a: &str, cwd: Option<&str>) -> (String, Vec<R
                         j += 1;
                     }
                     if !has_hunk {
-                        // 空 rename-only → 读原文件转 Delete+Add。读不到 / 内容为空 → 不转(空 Add File
-                        // 体可能被 Codex 拒)→ 原样放行交 Codex 处理。
+                        // Empty rename-only → read the original file and transfer to Delete+Add. Unable to read/The content is empty → Do not transfer (empty Add File
+                        // The body may be rejected by Codex)→ Release it as is and hand it over to Codex for processing.
                         let abs = resolve_path(old.trim(), cwd);
                         match std::fs::read_to_string(&abs) {
                             Ok(content) if !content.is_empty() => {
@@ -154,18 +155,18 @@ pub(crate) fn recover_empty_move(v4a: &str, cwd: Option<&str>) -> (String, Vec<R
                                     file: old.trim().to_owned(),
                                     kind: "repaired".to_owned(),
                                     detail: format!(
-                                        "空 Update+Move(rename-only)→ Delete+Add 复制原内容 → {}(prompt gotcha #7)",
+                                        "Empty Update+Move(rename-only)→ Delete+Add Copy original content → {} (prompt gotcha #7)",
                                         new.trim()
                                     ),
                                 });
-                                i = j; // 跳过原 Update/Move(+空体)
+                                i = j; // Skip the original Update/Move(+empty body)
                                 continue;
                             }
                             _ => {
                                 repairs.push(Repair {
                                     file: old.trim().to_owned(),
                                     kind: "skipped:unreadable_or_empty".to_owned(),
-                                    detail: "空 Update+Move 但原文件读不到 / 为空 → 原样放行"
+                                    detail: "Empty Update+Move but the original file cannot be read / is empty → release as is"
                                         .to_owned(),
                                 });
                             }
@@ -184,11 +185,11 @@ pub(crate) fn recover_empty_move(v4a: &str, cwd: Option<&str>) -> (String, Vec<R
     (joined, repairs)
 }
 
-/// 末个 patch 操作是否为「`*** Add File:` + 代码/结构化配置文件目标」。用于 [`ensure_v4a_envelope`] 判定
-/// 末行 `+*** End Patch` 可否安全剥成终止符:**仅 Add File**(新建文件,裸 `*** End Patch` 不可能是合法
-/// 源码的**末行** → 必是误前缀终止符)才剥;`*** Update File:` 的 `+*** End Patch` 是**新增行**(可能往
-/// 字符串 / fixture 里加这串字),剥了=丢新增 → 不剥(chatgpt-codex-connector review:限定 Add File)。
-/// 文档 / 文本 / 未知扩展也不剥(可能是正文,留 incomplete 不猜)。allowlist 保守。MOC-268。
+/// Whether the last patch operation is "`*** Add File:` + code/structured configuration file target". Used for [`ensure_v4a_envelope`] determination
+/// Can the last line `+*** End Patch` be safely stripped into a terminator: **Only Add File** (new file, bare `*** End Patch` cannot be legal
+/// The **last line** of the source code → must be an incorrect prefix terminator) before stripping; the `+*** End Patch` of `*** Update File:` is a **new line** (maybe to
+/// Add this string of words to string / fixture), stripped = lost and added → not stripped (chatgpt-codex-connector review: limited to Add File).
+/// Document/text/Unknown extensions will not be stripped (it may be the main text, leave incomplete and do not guess). allowlist is conservative. MOC-268.
 pub(crate) fn last_op_is_add_file_code(body: &str) -> bool {
     let last_op = body.lines().rev().find(|l| {
         let t = l.trim_end();
@@ -197,7 +198,7 @@ pub(crate) fn last_op_is_add_file_code(body: &str) -> bool {
             || t.starts_with("*** Delete File: ")
     });
     let Some(path) = last_op.and_then(|l| l.trim_end().strip_prefix("*** Add File: ")) else {
-        return false; // 无操作,或末操作是 Update/Delete(非 Add File)→ 不剥
+        return false; // No operation, or the last operation is Update/Delete (not Add File) → No stripping
     };
     let ext = std::path::Path::new(path.trim())
         .extension()

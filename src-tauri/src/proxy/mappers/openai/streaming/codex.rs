@@ -1,7 +1,7 @@
 // Codex SSE stream (split from streaming.rs).
 // NOTE: create_codex_sse_stream (627 lines) uses yield inside async_stream! macro;
 // it cannot be safely decomposed via pure code moves. Reported as exception.
-// OpenAI 流式转换
+// OpenAI streaming
 use super::openai::{extract_usage_metadata, store_thought_signature};
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use std::pin::Pin;
 use uuid::Uuid;
 
-/// 保存 thoughtSignature 到会话缓存
+/// Save thoughtSignature to session cache
 
 fn split_namespace_tool_name(qualified_name: &str) -> (String, Option<String>) {
     let name = qualified_name.trim();
@@ -282,7 +282,7 @@ where
                                                                         let name = func_call.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
                                                                         let mut args = func_call.get("args").unwrap_or(&json!({})).clone();
 
-                                                                        // [FIX #1575 & #3430] 标准化并清洗 shell / PowerShell 等工具参数名称与必填字段
+                                                                        // [FIX #1575 & #3430] Standardize and clean tool parameter names and required fields for shell / PowerShell and other tools
                                                                         super::super::response::normalize_and_sanitize_tool_args(name, &mut args);
 
                                                                         let args_str = serde_json::to_string(&args).unwrap_or_default();
@@ -393,13 +393,13 @@ where
                                                             }
                                                         }
 
-                                                        // 处理 groundingMetadata (搜索引文)
+                                                        // Processing groundingMetadata (search for citations)
                                                         if let Some(grounding) = candidate.get("groundingMetadata") {
                                                             let mut grounding_text = String::new();
                                                             if let Some(queries) = grounding.get("webSearchQueries").and_then(|q| q.as_array()) {
                                                                 let query_list: Vec<&str> = queries.iter().filter_map(|v| v.as_str()).collect();
                                                                 if !query_list.is_empty() {
-                                                                    grounding_text.push_str("\n\n---\n**🔍 已为您搜索：** ");
+                                                                    grounding_text.push_str("\n\n---\n**🔍 Searched for you:**");
                                                                     grounding_text.push_str(&query_list.join(", "));
                                                                 }
                                                             }
@@ -407,13 +407,13 @@ where
                                                                 let mut links = Vec::new();
                                                                 for (i, chunk) in chunks.iter().enumerate() {
                                                                     if let Some(web) = chunk.get("web") {
-                                                                        let title = web.get("title").and_then(|v| v.as_str()).unwrap_or("网页来源");
+                                                                        let title = web.get("title").and_then(|v| v.as_str()).unwrap_or("Web source");
                                                                         let uri = web.get("uri").and_then(|v| v.as_str()).unwrap_or("#");
                                                                         links.push(format!("[{}] [{}]({})", i + 1, title, uri));
                                                                     }
                                                                 }
                                                                 if !links.is_empty() {
-                                                                    grounding_text.push_str("\n\n**🌐 来源引文：**\n");
+                                                                    grounding_text.push_str("\n\n**🌐 Source citation:**\n");
                                                                     grounding_text.push_str(&links.join("\n"));
                                                                 }
                                                             }

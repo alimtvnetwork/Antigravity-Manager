@@ -54,7 +54,7 @@ pub async fn handle_images_generations_internal(
     state: AppState,
     body: Value,
 ) -> Result<(String, Value), (StatusCode, String, Option<String>)> {
-    // 1. 解析请求参数
+    // 1. Parse request parameters
     let prompt = body.get("prompt").and_then(|v| v.as_str()).ok_or((
         StatusCode::BAD_REQUEST,
         "Missing 'prompt' field".to_string(),
@@ -100,14 +100,14 @@ pub async fn handle_images_generations_internal(
         "[Images] Received generation request"
     );
 
-    // 2. 使用 common_utils 解析图片配置（统一逻辑，支持动态计算宽高比和 quality 映射）
+    // 2. Use common_utils to parse image configuration (unified logic, support dynamic calculation of aspect ratio and quality mapping)
     let (image_config, clean_model_name) =
         crate::proxy::mappers::common_utils::try_parse_image_config_with_params(
             model, size, quality, image_size,
         )
         .map_err(|message| (StatusCode::BAD_REQUEST, message, None))?;
 
-    // 3. Prompt Enhancement（保留原有逻辑）
+    // 3. Prompt Enhancement (retain original logic)
     let mut final_prompt = prompt.to_string();
     if quality == Some("hd") {
         final_prompt.push_str(", (high quality, highly detailed, 4k resolution, hdr)");
@@ -119,14 +119,14 @@ pub async fn handle_images_generations_internal(
     }
     let contents_parts = build_image_contents(final_prompt, &input_images, None);
 
-    // 4. 并发发送请求
-    // 注意：不再在外部获取 Token，而是移入 Task 内部并在重试时获取
+    // 4. Send requests concurrently
+    // Note: Token is no longer obtained externally, but moved inside the Task and obtained on retry
     let upstream = state.upstream.clone();
     let token_manager = state.token_manager.clone();
     let image_scheduler = state.image_scheduler.clone();
     let request_timeout = state.request_timeout;
     let max_pool_size = token_manager.len();
-    // [FIX #3485] 自适应多账号池与单账号退避最大重试次数 (单账号3次，多账号整池两轮)
+    // [FIX #3485] Maximum number of retries for adaptive multi-account pool and single-account backoff (3 times for a single account, two rounds for the entire pool with multiple accounts)
     let max_attempts = crate::proxy::handlers::common::calculate_max_retry_attempts(max_pool_size);
 
     let mut tasks = JoinSet::new();
@@ -139,7 +139,7 @@ pub async fn handle_images_generations_internal(
         let upstream = upstream.clone();
         let token_manager = token_manager.clone();
         let contents_parts = contents_parts.clone();
-        let image_config = image_config.clone(); // 使用解析后的完整配置
+        let image_config = image_config.clone(); // Use the parsed complete configuration
         let _response_format = response_format.to_string();
 
         let model_to_use = clean_model_name.clone();
@@ -224,8 +224,8 @@ pub async fn handle_images_generations_internal(
                             "parts": contents_parts
                         }],
                         "generationConfig": {
-                            "candidateCount": 1, // 强制单张
-                            "imageConfig": image_config // ✅ 使用完整配置（包含 aspectRatio 和 imageSize）
+                            "candidateCount": 1, // Mandatory leaflet
+                            "imageConfig": image_config // ✅ Use full configuration (including aspectRatio and imageSize)
                         },
                         "safetySettings": [
                             { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "OFF" },
@@ -268,7 +268,7 @@ pub async fn handle_images_generations_internal(
                                     false,
                                 )
                             });
-                            // 统一流水线限流裁决：500/503等服务异常绝不打入限流
+                            // Unified pipeline current limiting ruling: 500/503 and other service exceptions will never be subject to current limiting
                             let classification = crate::proxy::pipeline::UpstreamClassification::classify(
                                 status_code,
                                 &err_text,
@@ -390,7 +390,7 @@ pub async fn handle_images_generations_internal(
         });
     }
 
-    // 5. 收集结果
+    // 5. Collect results
     let mut images: Vec<Value> = Vec::new();
     let mut errors: Vec<String> = Vec::new();
     let mut used_email: Option<String> = None;
@@ -466,7 +466,7 @@ pub async fn handle_images_generations_internal(
         return Err((status, error_msg, attempted));
     }
 
-    // 部分成功时记录警告
+    // Log warning on partial success
     if !errors.is_empty() {
         tracing::warn!(
             "[Images] Partial success: {} out of {} requests succeeded. Errors: {}",
@@ -482,13 +482,13 @@ pub async fn handle_images_generations_internal(
         n
     );
 
-    // 6. 构建 OpenAI 格式响应
+    // 6. Construct OpenAI format response
     let openai_response = json!({
         "created": chrono::Utc::now().timestamp(),
         "data": images
     });
 
-    // [FIX] 图像生成成功后触发配额刷新 (Issue #1995)
+    // [FIX] Quota refresh triggered after successful image generation (Issue #1995)
     tokio::spawn(async move {
         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
         crate::error::record_ignored(

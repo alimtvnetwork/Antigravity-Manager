@@ -130,7 +130,7 @@ export function useUserTokens(): UseUserTokensResult {
             return;
         }
 
-        // 验证自定义时间
+        // Verify custom time
         if (newExpiresType === EXPIRES_TYPE_CUSTOM && !newCustomExpires) {
             showToast(t('user_token.custom_expires_required') || 'Please select a custom expiration time', 'error');
             return;
@@ -138,7 +138,7 @@ export function useUserTokens(): UseUserTokensResult {
 
         setCreating(true);
         try {
-            // 计算自定义过期时间戳
+            // Calculate custom expiration timestamp
             const customExpiresAt = newExpiresType === EXPIRES_TYPE_CUSTOM && newCustomExpires
                 ? Math.floor(new Date(newCustomExpires).getTime() / MS_PER_SECOND)
                 : undefined;
@@ -190,7 +190,7 @@ export function useUserTokens(): UseUserTokensResult {
         setEditingToken(token);
         setEditUsername(token.username);
         setEditDesc(token.description || '');
-        setEditMaxIps(token.max_ips ?? 0);  // 使用 ?? 确保 null/undefined 变为 0
+        setEditMaxIps(token.max_ips ?? 0);  // Use ?? to ensure null/undefined becomes 0
         setEditCurfewStart(token.curfew_start ?? '');
         setEditCurfewEnd(token.curfew_end ?? '');
         setShowEditModal(true);
@@ -211,7 +211,7 @@ export function useUserTokens(): UseUserTokensResult {
                     username: editUsername,
                     description: editDesc || undefined,
                     max_ips: editMaxIps,
-                    // 使用双层包装: undefined = 不更新, null = 清空, string = 设置值
+                    // Use double-layer packaging: undefined = no update, null = clear, string = set value
                     curfew_start: editCurfewStart === '' ? null : editCurfewStart,
                     curfew_end: editCurfewEnd === '' ? null : editCurfewEnd
                 }

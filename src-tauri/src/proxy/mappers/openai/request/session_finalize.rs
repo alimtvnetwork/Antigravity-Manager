@@ -1,5 +1,5 @@
 // Finalize phase (split from request.rs).
-// OpenAI → Gemini 请求转换
+// OpenAI → Gemini request conversion
 use super::super::models::*;
 use crate::proxy::model_specs;
 use crate::proxy::token_manager::ProxyToken;
@@ -18,17 +18,17 @@ pub(crate) fn phase_finalize(
     contents: &[serde_json::Value],
     inner_request: serde_json::Value,
 ) -> (serde_json::Value, String, usize, String) {
-    // requestId：官方 5 段形态，三适配器共用（含 unixMs → 幂等隔离）。
-    // 历史教训：复用 session / message-count 的 ID 会把后续请求 pin 到一次更早的 429 结果。
+    // requestId: Official 5-segment form, shared by three adapters (including unixMs → idempotent isolation).
+    // Lesson from history: reusing session/message-count IDs will pin subsequent requests to an earlier 429 result.
     let request_id =
         common_utils::build_official_request_id(&setup.session_id, setup.message_count as u64);
 
-    // 官方客户端指纹（企业 / GCP 账号为 jetski）—— 三适配器共用，避免指纹漂移
+    // Official client fingerprint (enterprise/GCP account is jetski) - shared by three adapters to avoid fingerprint drift
     let (official_user_agent, _official_ide_type) =
         common_utils::resolve_official_fingerprint(token);
 
-    // [NEW] 动态检测是否需要标记为 agent 请求
-    // 只有在请求携带 tools，或上下文包含工具调用交互时才打上 agent 标签
+    // [NEW] Dynamically detect whether requests need to be marked as agent
+    // The agent tag is only used when the request carries tools, or when the context contains tool call interactions.
     let has_tools = inner_request
         .get("tools")
         .and_then(|t| t.as_array())
@@ -43,7 +43,7 @@ pub(crate) fn phase_finalize(
 
     let mut final_body = json!({
         "project": project_id,
-        // [CACHE] 使用重排后的字段顺序，稳定前缀在前
+        // [CACHE] Use rearranged field order, stable prefix first
         "request": inner_request,
         "model": setup.config.final_model,
         "userAgent": official_user_agent,
@@ -60,8 +60,8 @@ pub(crate) fn phase_finalize(
         }
     }
 
-    // [CACHE:L3] 使用多层级缓存的 compute_prefix_hash 计算组合哈希
-    // Layer 1 + Layer 2 的独立 hash 组合 → Layer 3 key
+    // [CACHE:L3] Compute combined hashes using compute_prefix_hash of multi-level cache
+    // Independent hash combination of Layer 1 + Layer 2 → Layer 3 key
     let prefix_hash = {
         let si_json = final_body["request"]
             .get("systemInstruction")
@@ -83,8 +83,8 @@ pub(crate) fn phase_finalize(
         hash
     };
 
-    // [CACHE:L3] 尝试利用显式缓存：查询 prefix_hash 对应的 Gemini cache_id
-    // 若命中，注入 cachedContent 参数，告知 Gemini 服务端复用已缓存的前缀
+    // [CACHE:L3] Try to use explicit caching: query the Gemini cache_id corresponding to prefix_hash
+    // If hit, inject the cachedContent parameter to tell the Gemini server to reuse the cached prefix.
     let cache_manager = crate::proxy::cache_manager::global_cache_manager();
     if let Some(cache_name) = cache_manager.lookup_prefix(&prefix_hash) {
         if let Some(req_obj) = final_body["request"].as_object_mut() {
@@ -98,7 +98,7 @@ pub(crate) fn phase_finalize(
         }
     }
 
-    // [DEFENSE] 净化所有 contents 中的 inlineData，过滤或降级空数据/损坏数据
+    // [DEFENSE] Sanitize inlineData in all contents, filter or degrade empty/corrupted data
     if let Some(inner) = final_body.get_mut("request") {
         crate::proxy::mappers::common_utils::sanitize_gemini_payload_inline_data(inner);
     }

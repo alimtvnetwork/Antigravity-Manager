@@ -30,7 +30,7 @@ export const LogTable: React.FC<LogTableProps> = ({
         return DEFAULT_COL_WIDTHS;
     });
 
-    // 类似 Excel 的鼠标拖拽调整表头列宽机制
+    // Excel-like mouse dragging mechanism to adjust header and column widths
     const handleResizeStart = (colKey: keyof ColumnWidths, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -97,7 +97,7 @@ export const LogTable: React.FC<LogTableProps> = ({
                             <div
                                 onMouseDown={(e) => handleResizeStart('status', e)}
                                 className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors z-20 group-hover:bg-gray-300 dark:group-hover:bg-gray-600"
-                                title="拖动调整列宽"
+                                title="Drag to adjust column width"
                             />
                         </th>
                         <th style={{ width: `${colWidths.method}px`, minWidth: `${colWidths.method}px`, maxWidth: `${colWidths.method}px` }} className="py-2.5 px-3 relative group select-none">
@@ -105,7 +105,7 @@ export const LogTable: React.FC<LogTableProps> = ({
                             <div
                                 onMouseDown={(e) => handleResizeStart('method', e)}
                                 className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors z-20 group-hover:bg-gray-300 dark:group-hover:bg-gray-600"
-                                title="拖动调整列宽"
+                                title="Drag to adjust column width"
                             />
                         </th>
                         <th style={{ width: `${colWidths.model}px`, minWidth: `${colWidths.model}px`, maxWidth: `${colWidths.model}px` }} className="py-2.5 px-3 relative group select-none">
@@ -113,7 +113,7 @@ export const LogTable: React.FC<LogTableProps> = ({
                             <div
                                 onMouseDown={(e) => handleResizeStart('model', e)}
                                 className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors z-20 group-hover:bg-gray-300 dark:group-hover:bg-gray-600"
-                                title="拖动调整列宽"
+                                title="Drag to adjust column width"
                             />
                         </th>
                         <th style={{ width: `${colWidths.protocol}px`, minWidth: `${colWidths.protocol}px`, maxWidth: `${colWidths.protocol}px` }} className="py-2.5 px-3 relative group select-none">
@@ -121,7 +121,7 @@ export const LogTable: React.FC<LogTableProps> = ({
                             <div
                                 onMouseDown={(e) => handleResizeStart('protocol', e)}
                                 className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors z-20 group-hover:bg-gray-300 dark:group-hover:bg-gray-600"
-                                title="拖动调整列宽"
+                                title="Drag to adjust column width"
                             />
                         </th>
                         <th style={{ width: `${colWidths.account}px`, minWidth: `${colWidths.account}px`, maxWidth: `${colWidths.account}px` }} className="py-2.5 px-3 relative group select-none">
@@ -129,7 +129,7 @@ export const LogTable: React.FC<LogTableProps> = ({
                             <div
                                 onMouseDown={(e) => handleResizeStart('account', e)}
                                 className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors z-20 group-hover:bg-gray-300 dark:group-hover:bg-gray-600"
-                                title="拖动调整列宽"
+                                title="Drag to adjust column width"
                             />
                         </th>
                         <th style={{ width: `${colWidths.path}px`, minWidth: `${colWidths.path}px`, maxWidth: `${colWidths.path}px` }} className="py-2.5 px-3 relative group select-none">
@@ -137,7 +137,7 @@ export const LogTable: React.FC<LogTableProps> = ({
                             <div
                                 onMouseDown={(e) => handleResizeStart('path', e)}
                                 className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors z-20 group-hover:bg-gray-300 dark:group-hover:bg-gray-600"
-                                title="拖动调整列宽"
+                                title="Drag to adjust column width"
                             />
                         </th>
                         <th style={{ width: `${colWidths.usage}px`, minWidth: `${colWidths.usage}px`, maxWidth: `${colWidths.usage}px` }} className="text-right py-2.5 px-3 relative group select-none whitespace-nowrap">
@@ -145,7 +145,7 @@ export const LogTable: React.FC<LogTableProps> = ({
                             <div
                                 onMouseDown={(e) => handleResizeStart('usage', e)}
                                 className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors z-20 group-hover:bg-gray-300 dark:group-hover:bg-gray-600"
-                                title="拖动调整列宽"
+                                title="Drag to adjust column width"
                             />
                         </th>
                         <th style={{ width: `${colWidths.duration}px`, minWidth: `${colWidths.duration}px`, maxWidth: `${colWidths.duration}px` }} className="text-right py-2.5 px-3 relative group select-none">
@@ -153,7 +153,7 @@ export const LogTable: React.FC<LogTableProps> = ({
                             <div
                                 onMouseDown={(e) => handleResizeStart('duration', e)}
                                 className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors z-20 group-hover:bg-gray-300 dark:group-hover:bg-gray-600"
-                                title="拖动调整列宽"
+                                title="Drag to adjust column width"
                             />
                         </th>
                         <th style={{ width: `${colWidths.time}px`, minWidth: `${colWidths.time}px`, maxWidth: `${colWidths.time}px` }} className="text-right py-2.5 px-3 relative group select-none">
@@ -161,7 +161,7 @@ export const LogTable: React.FC<LogTableProps> = ({
                             <div
                                 onMouseDown={(e) => handleResizeStart('time', e)}
                                 className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 transition-colors z-20 group-hover:bg-gray-300 dark:group-hover:bg-gray-600"
-                                title="拖动调整列宽"
+                                title="Drag to adjust column width"
                             />
                         </th>
                     </tr>
@@ -257,7 +257,7 @@ export const LogTable: React.FC<LogTableProps> = ({
             {/* Empty state */}
             {!loading && logs.length === 0 && (
                 <div className="flex items-center justify-center p-8 text-gray-400 dark:text-gray-500 text-sm">
-                    {t('monitor.table.empty') || '暂无请求记录'}
+                    {t('monitor.table.empty') || 'No request record yet'}
                 </div>
             )}
         </div>

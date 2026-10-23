@@ -3,15 +3,15 @@ use crate::modules::process;
 use std::fs;
 use std::path::PathBuf;
 
-/// Antigravity 版本信息
+/// Antigravity version information
 #[derive(Debug, Clone)]
 pub struct AntigravityVersion {
     pub short_version: String,
-    #[allow(dead_code)] // 预留给构建/诊断输出
+    #[allow(dead_code)] // Reserved for build/diagnostic output
     pub bundle_version: String,
 }
 
-/// 从任意字符串中提取第一个语义化版本号 (X.Y.Z)
+/// Extracts the first semantic version number (X.Y.Z) from any string
 fn extract_semver(raw: &str) -> Option<String> {
     for token in raw.split(|c: char| c.is_whitespace() || c == ',' || c == ';') {
         let t = token.trim_matches(|c: char| c == '"' || c == '\'' || c == '(' || c == ')');
@@ -35,18 +35,18 @@ fn extract_semver(raw: &str) -> Option<String> {
     None
 }
 
-/// 检测 Antigravity 版本（跨平台，支持预快照路径优先）
+/// Detect Antigravity version (cross-platform, supports pre-snapshot path priority)
 pub fn get_antigravity_version_with_path(
     target_ide: Option<&str>,
     preferred_path: Option<&std::path::Path>,
 ) -> Result<AntigravityVersion, String> {
-    // 1. 优先使用预捕获路径，若无则探查 Antigravity 可执行文件路径
+    // 1. Preferentially use the pre-capture path, if not, explore the Antigravity executable file path
     let exe_path = preferred_path
         .map(|p| p.to_path_buf())
         .or_else(|| process::get_antigravity_executable_path(target_ide))
         .ok_or("Unable to locate Antigravity executable")?;
 
-    // 2. 根据平台读取版本信息
+    // 2. Read version information based on the platform
     #[cfg(target_os = "macos")]
     {
         get_version_macos(&exe_path)
@@ -63,18 +63,18 @@ pub fn get_antigravity_version_with_path(
     }
 }
 
-/// 检测 Antigravity 版本（跨平台）
+/// Detect Antigravity version (cross-platform)
 pub fn get_antigravity_version(target_ide: Option<&str>) -> Result<AntigravityVersion, String> {
     get_antigravity_version_with_path(target_ide, None)
 }
 
-/// macOS: 从 Info.plist 读取版本
+/// macOS: Reading version from Info.plist
 #[cfg(target_os = "macos")]
 fn get_version_macos(exe_path: &PathBuf) -> Result<AntigravityVersion, String> {
     use plist::Value;
 
-    // exe_path 可能是 /Applications/Antigravity.app 或内部可执行文件
-    // 需要找到 .app 目录
+    // exe_path may be /Applications/Antigravity.app or an internal executable
+    // Need to find the .app directory
     let path_str = exe_path.to_string_lossy();
     let app_path = if let Some(idx) = path_str.find(".app") {
         PathBuf::from(&path_str[..idx + 4])
@@ -113,13 +113,13 @@ fn get_version_macos(exe_path: &PathBuf) -> Result<AntigravityVersion, String> {
     })
 }
 
-/// Windows: 从可执行文件元数据读取版本
+/// Windows: Reading version from executable metadata
 #[cfg(target_os = "windows")]
 fn get_version_windows(exe_path: &PathBuf) -> Result<AntigravityVersion, String> {
     use crate::utils::command::CommandExtWrapper;
     use std::process::Command;
 
-    // Windows: 使用 PowerShell 读取文件版本信息
+    // Windows: Use PowerShell to read file version information
     let mut cmd = Command::new("powershell");
     let output = cmd
         .creation_flags_windows()
@@ -155,12 +155,12 @@ fn get_version_windows(exe_path: &PathBuf) -> Result<AntigravityVersion, String>
     })
 }
 
-/// Linux: 从 package.json 或 --version 参数读取
+/// Linux: read from package.json or --version parameter
 #[cfg(target_os = "linux")]
 fn get_version_linux(exe_path: &PathBuf) -> Result<AntigravityVersion, String> {
     use std::process::Command;
 
-    // 方法1 (优先): 尝试从安装目录的 package.json 读取，避免执行可执行文件意外拉起 GUI
+    // Method 1 (Priority): Try to read package.json from the installation directory to avoid accidentally launching the GUI when executing the executable file
     if let Some(parent) = exe_path.parent() {
         let package_json = parent.join("resources/app/package.json");
         if package_json.exists() {
@@ -177,7 +177,7 @@ fn get_version_linux(exe_path: &PathBuf) -> Result<AntigravityVersion, String> {
         }
     }
 
-    // 方法2 (兜底): 尝试执行 --version (仅在无法从 package.json 获取时执行)
+    // Method 2 (cover): Try executing --version (only executed if it cannot be obtained from package.json)
     let output = Command::new(exe_path).arg("--version").output();
 
     if let Ok(result) = output {
@@ -203,12 +203,12 @@ fn get_version_linux(exe_path: &PathBuf) -> Result<AntigravityVersion, String> {
     Err("Unable to determine Antigravity version on Linux".to_string())
 }
 
-/// 判断是否为新版本 (>= 1.16.5)
+/// Determine whether it is a new version (>= 1.16.5)
 pub fn is_new_version(version: &AntigravityVersion) -> bool {
     compare_version(&version.short_version, "1.16.5") >= std::cmp::Ordering::Equal
 }
 
-/// 比较版本号
+/// Compare version numbers
 pub fn compare_version(v1: &str, v2: &str) -> std::cmp::Ordering {
     let parts1: Vec<u32> = v1.split('.').filter_map(|s| s.parse().ok()).collect();
     let parts2: Vec<u32> = v2.split('.').filter_map(|s| s.parse().ok()).collect();

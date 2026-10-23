@@ -92,7 +92,7 @@ impl AttemptState {
         >,
     ) -> Self {
         let pool_size = token_manager.len();
-        // [FIX #3485] 自适应多账号池与单账号退避最大重试次数 (单账号3次，多账号整池两轮)
+        // [FIX #3485] Maximum number of retries for adaptive multi-account pool and single-account backoff (3 times for a single account, two rounds for the entire pool with multiple accounts)
         let max_attempts = crate::proxy::handlers::common::calculate_max_retry_attempts(pool_size);
         let request_for_body = setup.request.clone();
         Self {

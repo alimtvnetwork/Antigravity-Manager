@@ -17,7 +17,7 @@ pub(crate) mod tests {
         // Pre-release tests
         assert!(compare_versions("4.8.1-beta.2", "4.8.1-beta.1"));
         assert!(!compare_versions("4.8.1-beta.1", "4.8.1-beta.2"));
-        assert!(compare_versions("4.8.1", "4.8.1-beta.2")); // 正式版 > 预发布版
+        assert!(compare_versions("4.8.1", "4.8.1-beta.2")); // Official version > Pre-release version
         assert!(!compare_versions("4.8.1-beta.2", "4.8.1"));
         assert!(compare_versions("4.8.2-beta.1", "4.8.1"));
     }

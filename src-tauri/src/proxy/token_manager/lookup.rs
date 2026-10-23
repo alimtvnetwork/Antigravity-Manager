@@ -1,22 +1,22 @@
-//! 账号查询：按 ID / 邮箱 / 模型可用性查找。
+//! Account query: search by ID/email/model availability.
 
 use super::ProxyToken;
 use super::TokenManager;
 use std::collections::HashSet;
 
 impl TokenManager {
-    /// 根据账号 ID 获取完整的 ProxyToken 对象 (v4.1.29)
+    /// Get the complete ProxyToken object based on the account ID (v4.1.29)
     pub fn get_token_by_id(&self, account_id: &str) -> Option<ProxyToken> {
         self.tokens.get(account_id).map(|t| t.clone())
     }
 
-    /// 通过 email 获取指定账号的 Token（用于预热等需要指定账号的场景）
-    /// 此方法会自动刷新过期的 token
+    /// Obtain the token of the specified account through email (used for scenarios such as preheating that require a specified account)
+    /// This method will automatically refresh expired tokens
     pub async fn get_token_by_email(
         &self,
         email: &str,
     ) -> Result<(String, String, String, String, u64), String> {
-        // 查找账号信息
+        // Find account information
         let token_info = {
             let mut found = None;
             for entry in self.tokens.iter() {
@@ -47,14 +47,14 @@ impl TokenManager {
             project_id_opt,
         ) = match token_info {
             Some(info) => info,
-            None => return Err(format!("未找到账号: {}", email)),
+            None => return Err(format!("Account not found: {}", email)),
         };
 
         let project_id = project_id_opt
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "bamboo-precept-lgxtn".to_string());
 
-        // 检查是否过期 (提前5分钟)
+        // Check if expired (5 minutes in advance)
         if now < timestamp + expires_in - 300 {
             return Ok((
                 current_access_token,
@@ -67,20 +67,20 @@ impl TokenManager {
 
         tracing::info!("[Warmup] Token for {} is expiring, refreshing...", email);
 
-        // 调用 OAuth 刷新 token
+        // Call OAuth to refresh token
         match crate::modules::oauth::refresh_access_token(&refresh_token, Some(&account_id)).await {
             Ok(token_response) => {
                 tracing::info!("[Warmup] Token refresh successful for {}", email);
                 let new_now = chrono::Utc::now().timestamp();
 
-                // 更新缓存
+                // Update cache
                 if let Some(mut entry) = self.tokens.get_mut(&account_id) {
                     entry.access_token = token_response.access_token.clone();
                     entry.expires_in = token_response.expires_in;
                     entry.timestamp = new_now;
                 }
 
-                // 保存到磁盘
+                // save to disk
                 // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
                 crate::error::record_ignored(
                     self.save_refreshed_token(&account_id, &token_response)
@@ -103,39 +103,39 @@ impl TokenManager {
         }
     }
 
-    // ===== 限流管理方法 =====
+    // ===== Current limiting management method =====
 
-    /// 检查是否有可用的 Google 账号
+    /// Check if there is an available Google account
     ///
-    /// 用于"仅兜底"模式的智能判断:当所有 Google 账号不可用时才使用外部提供商。
+    /// Intelligent judgment for "cover only" mode: only use external providers when all Google accounts are unavailable.
     ///
-    /// # 参数
-    /// - `quota_group`: 配额组("claude" 或 "gemini"),暂未使用但保留用于未来扩展
-    /// - `target_model`: 目标模型名称(已归一化),用于配额保护检查
+    /// # Parameters
+    /// - `quota_group`: Quota group ("claude" or "gemini"), not used yet but reserved for future expansion
+    /// - `target_model`: target model name (normalized), used for quota protection checks
     ///
-    /// # 返回值
-    /// - `true`: 至少有一个可用账号(未限流且未被配额保护)
-    /// - `false`: 所有账号都不可用(被限流或被配额保护)
+    /// # Return value
+    /// - `true`: There is at least one available account (not limited and not protected by quota)
+    /// - `false`: All accounts are unavailable (limited or protected by quotas)
     ///
-    /// # 示例
+    /// # Example
     /// ```ignore
-    /// // 检查是否有可用账号处理 claude-sonnet 请求
+    /// // Check if there is an available account to handle claude-sonnet request
     /// let has_available = token_manager.has_available_account("claude", "claude-sonnet-4-20250514").await;
     /// if !has_available {
-    ///     // 切换到外部提供商
+    ///     // switch to external provider
     /// }
     /// ```
     pub async fn has_available_account(&self, _quota_group: &str, target_model: &str) -> bool {
-        // 检查配额保护是否启用
+        // Check if quota protection is enabled
         let quota_protection_enabled = crate::modules::config::load_app_config()
             .map(|cfg| cfg.quota_protection.enabled)
             .unwrap_or(false);
 
-        // 遍历所有账号,检查是否有可用的
+        // Traverse all accounts and check if any are available
         for entry in self.tokens.iter() {
             let token = entry.value();
 
-            // 1. 检查是否被限流
+            // 1. Check whether the current is limited
             if self.is_rate_limited(&token.account_id, None).await {
                 tracing::debug!(
                     "[Fallback Check] Account {} is rate-limited, skipping",
@@ -144,7 +144,7 @@ impl TokenManager {
                 continue;
             }
 
-            // 2. 检查是否被配额保护(如果启用)
+            // 2. Check whether it is protected by quota (if enabled)
             if quota_protection_enabled && token.protected_models.contains(target_model) {
                 tracing::debug!(
                     "[Fallback Check] Account {} is quota-protected for model {}, skipping",
@@ -154,7 +154,7 @@ impl TokenManager {
                 continue;
             }
 
-            // 找到至少一个可用账号
+            // Find at least one available account
             tracing::debug!(
                 "[Fallback Check] Found available account: {} for model {}",
                 token.email,
@@ -163,7 +163,7 @@ impl TokenManager {
             return true;
         }
 
-        // 所有账号都不可用
+        // All accounts are unavailable
         tracing::info!(
             "[Fallback Check] No available Google accounts for model {}, fallback should be triggered",
             target_model
@@ -171,7 +171,7 @@ impl TokenManager {
         false
     }
 
-    /// 获取当前所有可用账号中收集到的官方下发的所有动态模型集合
+    /// Get all officially issued dynamic model collections collected from all currently available accounts.
     pub fn get_all_collected_models(&self) -> std::collections::HashSet<String> {
         let mut all_models = std::collections::HashSet::new();
         for entry in self.tokens.iter() {
@@ -194,11 +194,11 @@ impl TokenManager {
         all_models
     }
 
-    /// [NEW] 从指定账号的动态额度数据中获取特定模型的 max_output_tokens
+    /// [NEW] Get the max_output_tokens of a specific model from the dynamic quota data of the specified account
     ///
-    /// # 返回
-    /// - `Some(u64)`: 找到了动态限额数据
-    /// - `None`: 账号不存在或该模型无数据（调用方应继续查静态默认表）
+    /// # Return
+    /// - `Some(u64)`: Dynamic limit data found
+    /// - `None`: The account does not exist or the model has no data (the caller should continue to check the static default table)
     pub fn get_model_output_limit_for_account(
         &self,
         account_id: &str,

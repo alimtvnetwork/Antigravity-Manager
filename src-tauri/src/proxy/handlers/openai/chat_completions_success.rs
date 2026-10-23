@@ -57,7 +57,7 @@ pub(crate) async fn chat_completions_success(
         prefix_hash: _prefix_hash,
         ..
     } = send;
-    // 5. 处理流式 vs 非流式
+    // 5. Handling streaming vs. non-streaming
     if actual_stream {
         use axum::body::Body;
         use axum::response::Response;
@@ -165,7 +165,7 @@ pub(crate) async fn chat_completions_success(
         })
         .chain(openai_stream);
 
-        // [NEW] 针对 OpenAI 流增加 300 秒空闲超时保护
+        // [NEW] Added 300 second idle timeout protection for OpenAI streams
         let image_permit_for_stream = image_permit.take();
         let track_image_success = config.request_type == "image_gen";
         let image_success_manager = token_manager.clone();
@@ -254,7 +254,7 @@ pub(crate) async fn chat_completions_success(
         );
 
         if client_wants_stream {
-            // [MULTI-TURN] 保存本次对话的 messages 到 session store（/v1/chat/completions）
+            // [MULTI-TURN] Save the messages of this conversation to the session store (/v1/chat/completions)
             {
                 let save_msgs = openai_req
                     .messages
@@ -281,7 +281,7 @@ pub(crate) async fn chat_completions_success(
                     crate::proxy::http_session_store::save_session(rid, entry).await;
                 });
             }
-            // 客户端请求流式，返回 SSE
+            // The client requests streaming and returns SSE
             let body = Body::from_stream(combined_stream);
             return Ok(ChatAttemptOutcome::Respond(
                 Response::builder()
@@ -302,8 +302,8 @@ pub(crate) async fn chat_completions_success(
                     .into_response(),
             ));
         } else {
-            // 客户端请求非流式，但内部强制转为流式
-            // 收集流数据并聚合为 JSON
+            // The client requested non-streaming, but was forced to stream internally
+            // Collect streaming data and aggregate into JSON
             use crate::proxy::mappers::openai::collector::collect_stream_to_json;
             use axum::response::{IntoResponse, Response};
             use bytes::Bytes;
@@ -372,8 +372,8 @@ pub(crate) async fn chat_completions_success(
 
     crate::proxy::thinking_store::capture_gemini_response(&session_id, &gemini_resp);
 
-    // [CACHE] 从 Gemini 响应中提取缓存信息，关闭反馈循环
-    // 兼容两种格式: cachedContentTokenCount (旧), total_cached_tokens (新)
+    // [CACHE] Extract cache information from Gemini responses, closing feedback loop
+    // Compatible with two formats: cachedContentTokenCount (old), total_cached_tokens (new)
     if let Some(usage) = gemini_resp.get("usageMetadata") {
         let cached = usage
             .get("total_cached_tokens")
@@ -383,7 +383,7 @@ pub(crate) async fn chat_completions_success(
         if cached > 0 {
             let cm = crate::proxy::cache_manager::global_cache_manager();
             cm.record_implicit_hit(&_prefix_hash);
-            // [CACHE] 分层统计日志
+            // [CACHE] Hierarchical statistics log
             let stats = cm.get_layer_stats();
             tracing::info!(
                         "[Cache-Opt] Implicit cache HIT: prefix_hash={} cached_tokens={} | L1(SI): {}/{}, L2(Tools): {}/{}, L3(Prefix): {}/{}",

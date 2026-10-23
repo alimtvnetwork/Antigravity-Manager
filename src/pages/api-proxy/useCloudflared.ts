@@ -25,15 +25,15 @@ export function useCloudflared({ appConfig, saveConfig, proxyRunning, onCopied }
     const [cfLoading, setCfLoading] = useState(false);
     const [cfMode, setCfMode] = useState<CloudflaredMode>('quick');
     const [cfToken, setCfToken] = useState('');
-    const [cfUseHttp2, setCfUseHttp2] = useState(true); // 默认启用HTTP/2，更稳定
+    const [cfUseHttp2, setCfUseHttp2] = useState(true); // HTTP/2 is enabled by default, which is more stable
 
-    // Cloudflared: 检查状态
+    // Cloudflared: Check status
     const loadCfStatus = useCallback(async () => {
         try {
             const status = await invoke<CloudflaredStatus>('cloudflared_get_status');
             setCfStatus(status);
         } catch (error) {
-            // 忽略错误，可能是manager未初始化；仅记录到错误历史
+            // Ignore the error, it may be that the manager is not initialized; only the error history is recorded
             useErrorStore.getState().trackWarning(error, {
                 source: 'useCloudflared.loadCfStatus',
                 triggerAction: 'cloudflared_get_status',
@@ -41,7 +41,7 @@ export function useCloudflared({ appConfig, saveConfig, proxyRunning, onCopied }
         }
     }, []);
 
-    // Cloudflared: 安装
+    // Cloudflared: Installation
     const handleCfInstall = useCallback(async () => {
         setCfLoading(true);
         try {
@@ -59,7 +59,7 @@ export function useCloudflared({ appConfig, saveConfig, proxyRunning, onCopied }
         }
     }, [t]);
 
-    // Cloudflared: 启动/停止
+    // Cloudflared: start/stop
     const handleCfToggle = useCallback(async (enable: boolean) => {
         if (enable && !proxyRunning) {
             showToast(
@@ -91,7 +91,7 @@ export function useCloudflared({ appConfig, saveConfig, proxyRunning, onCopied }
                 setCfStatus(status);
                 showToast(t('proxy.cloudflared.started', { defaultValue: 'Tunnel started' }), 'success');
 
-                // 持久化"启用"状态
+                // Persistent "enabled" state
                 if (appConfig) {
                     const newConfig = {
                         ...appConfig,
@@ -111,7 +111,7 @@ export function useCloudflared({ appConfig, saveConfig, proxyRunning, onCopied }
                 setCfStatus(status);
                 showToast(t('proxy.cloudflared.stopped', { defaultValue: 'Tunnel stopped' }), 'success');
 
-                // 持久化"禁用"状态
+                // Persistent "disabled" state
                 if (appConfig) {
                     const newConfig = {
                         ...appConfig,
@@ -134,7 +134,7 @@ export function useCloudflared({ appConfig, saveConfig, proxyRunning, onCopied }
         }
     }, [proxyRunning, cfStatus.installed, cfMode, cfToken, cfUseHttp2, appConfig, saveConfig, t]);
 
-    // Cloudflared: 复制URL
+    // Cloudflared: Copy URL
     const handleCfCopyUrl = useCallback(async () => {
         if (cfStatus.url) {
             const success = await copyToClipboard(cfStatus.url);
@@ -145,13 +145,13 @@ export function useCloudflared({ appConfig, saveConfig, proxyRunning, onCopied }
         }
     }, [cfStatus.url, onCopied]);
 
-    // 恢复 Cloudflared 持久化状态（原在 loadConfig 中同步执行）
+    // Restore Cloudflared persistence state (originally executed synchronously in loadConfig)
     useEffect(() => {
         const cf = appConfig?.cloudflared;
         if (!cf) return;
         setCfMode(cf.mode || 'quick');
         setCfToken(cf.token || '');
-        setCfUseHttp2(cf.use_http2 !== false); // 默认开启 HTTP/2
+        setCfUseHttp2(cf.use_http2 !== false); // HTTP/2 is enabled by default
     }, [appConfig?.cloudflared?.mode, appConfig?.cloudflared?.token, appConfig?.cloudflared?.use_http2]);
 
     useEffect(() => {

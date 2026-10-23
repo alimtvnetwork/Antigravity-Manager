@@ -9,7 +9,7 @@ pub async fn open_data_folder() -> Result<(), String> {
         std::process::Command::new("open")
             .arg(path)
             .spawn()
-            .map_err(|e| format!("打开文件夹失败: {}", e))?;
+            .map_err(|e| format!("Failed to open folder: {}", e))?;
     }
 
     #[cfg(target_os = "windows")]
@@ -19,7 +19,7 @@ pub async fn open_data_folder() -> Result<(), String> {
             .creation_flags_windows()
             .arg(path)
             .spawn()
-            .map_err(|e| format!("打开文件夹失败: {}", e))?;
+            .map_err(|e| format!("Failed to open folder: {}", e))?;
     }
 
     #[cfg(target_os = "linux")]
@@ -27,13 +27,13 @@ pub async fn open_data_folder() -> Result<(), String> {
         std::process::Command::new("xdg-open")
             .arg(path)
             .spawn()
-            .map_err(|e| format!("打开文件夹失败: {}", e))?;
+            .map_err(|e| format!("Failed to open folder: {}", e))?;
     }
 
     Ok(())
 }
 
-/// 获取数据目录绝对路径
+/// Get the absolute path of the data directory
 #[tauri::command]
 pub async fn get_data_dir_path() -> Result<String, String> {
     let path = modules::account::get_data_dir()?;

@@ -81,12 +81,12 @@ impl UpstreamClient {
     ) -> Result<Client, rquest::Error> {
         let mut builder = Client::builder()
             .emulation(rquest_util::Emulation::Chrome123)
-            // Connection settings (优化连接复用与 HTTP/2 多路复用，减少建立开销)
+            // Connection settings (optimize connection reuse and HTTP/2 multiplexing to reduce establishment overhead)
             .connect_timeout(Duration::from_secs(20))
-            .pool_max_idle_per_host(32) // 每主机最多 32 个空闲连接支持高并发多路复用
-            .pool_idle_timeout(Duration::from_secs(90)) // 空闲连接保持 90 秒
-            .tcp_keepalive(Duration::from_secs(90)) // TCP 保活探测 90 秒对齐长周期连接
-            // 强制开启 HTTP/2 协议，并支持在 SOCKS/HTTPS 代理下通过 ALPN 强制降级/协商
+            .pool_max_idle_per_host(32) // Up to 32 idle connections per host supports high-concurrency multiplexing
+            .pool_idle_timeout(Duration::from_secs(90)) // Idle connections remain open for 90 seconds
+            .tcp_keepalive(Duration::from_secs(90)) // TCP keepalive probe 90 seconds to align long-lived connections
+            // Forcibly enable HTTP/2 protocol and support forced downgrade/negotiation through ALPN under SOCKS/HTTPS proxy
             .timeout(Duration::from_secs(600));
 
         builder = Self::apply_default_user_agent(builder);

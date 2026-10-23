@@ -178,7 +178,7 @@ pub(crate) fn inspect_parts_with_anchor(
             let synthetic = synthesize_tool_id(&name, fc.get("args"), anchor, function_call_count);
             function_call_count += 1;
 
-            // 核心演进：全面转战因果伪哈希 ID！首位强制存入确定性 synthetic ID
+            // Core Evolution: Fully switch to causal pseudo-hash ID! The first position is forced to be stored in a deterministic synthetic ID.
             if !tool_ids.iter().any(|x| x == &synthetic) {
                 tool_ids.push(synthetic);
             }

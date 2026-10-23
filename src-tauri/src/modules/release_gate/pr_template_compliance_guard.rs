@@ -215,7 +215,7 @@ fn classify_header_title(header_title: &str) -> Option<PrTemplateSection> {
     if lower.contains("problem classification")
         || lower == "problem"
         || lower.starts_with("problem:")
-        || lower.contains("当前问题")
+        || lower.contains("Current issues")
     {
         Some(PrTemplateSection::ProblemClassification)
     } else if lower.contains("behavior alteration")
@@ -223,7 +223,7 @@ fn classify_header_title(header_title: &str) -> Option<PrTemplateSection> {
         || lower.contains("behavior changes")
         || lower == "behavior"
         || lower.starts_with("behavior:")
-        || lower.contains("引起的变化")
+        || lower.contains("changes caused")
     {
         Some(PrTemplateSection::BehaviorAlterations)
     } else if lower.contains("unverified path")

@@ -7,29 +7,29 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-/// IP 黑白名单过滤中间件
+/// IP black and white list filtering middleware
 pub async fn ip_filter_middleware(
     State(state): State<AppState>,
     request: Request,
     next: Next,
 ) -> Response {
-    // 提取客户端 IP
+    // Extract client IP
     let client_ip = extract_client_ip(&request);
 
     if let Some(ip) = &client_ip {
-        // 读取安全配置
+        // Read security configuration
         let security_config = state.security.read().await;
 
-        // 1. 检查白名单 (如果启用白名单模式,只允许白名单 IP)
+        // 1. Check the whitelist (if whitelist mode is enabled, only whitelist IPs are allowed)
         if security_config.security_monitor.whitelist.enabled {
             match security_db::is_ip_in_whitelist(ip) {
                 Ok(true) => {
-                    // 在白名单中,直接放行
+                    // In the whitelist, directly allow
                     tracing::debug!("[IP Filter] IP {} is in whitelist, allowing", ip);
                     return next.run(request).await;
                 }
                 Ok(false) => {
-                    // 不在白名单中,且启用了白名单模式,拒绝访问
+                    // Not in the whitelist, and whitelist mode is enabled, access is denied
                     tracing::warn!("[IP Filter] IP {} not in whitelist, blocking", ip);
                     return create_blocked_response(
                         ip,
@@ -41,7 +41,7 @@ pub async fn ip_filter_middleware(
                 }
             }
         } else {
-            // 白名单优先模式: 如果在白名单中,跳过黑名单检查
+            // Whitelist priority mode: If in the whitelist, skip the blacklist check
             if security_config
                 .security_monitor
                 .whitelist
@@ -53,7 +53,7 @@ pub async fn ip_filter_middleware(
                         return next.run(request).await;
                     }
                     Ok(false) => {
-                        // 继续检查黑名单
+                        // Keep checking the blacklist
                     }
                     Err(e) => {
                         tracing::error!("[IP Filter] Failed to check whitelist: {}", e);
@@ -62,13 +62,13 @@ pub async fn ip_filter_middleware(
             }
         }
 
-        // 2. 检查黑名单
+        // 2. Check the blacklist
         if security_config.security_monitor.blacklist.enabled {
             match security_db::get_blacklist_entry_for_ip(ip) {
                 Ok(Some(entry)) => {
                     tracing::warn!("[IP Filter] IP {} is in blacklist, blocking", ip);
 
-                    // 构建详细的封禁消息
+                    // Construct detailed ban messages
                     let reason = entry
                         .reason
                         .as_deref()
@@ -102,7 +102,7 @@ pub async fn ip_filter_middleware(
                     let detailed_message =
                         format!("Access denied. Reason: {}. {}", reason, ban_type);
 
-                    // 记录被封禁的访问日志
+                    // Record blocked access logs
                     let log = security_db::IpAccessLog {
                         id: uuid::Uuid::new_v4().to_string(),
                         client_ip: ip.clone(),
@@ -131,7 +131,7 @@ pub async fn ip_filter_middleware(
                     return create_blocked_response(ip, &detailed_message);
                 }
                 Ok(None) => {
-                    // 不在黑名单中,放行
+                    // Not in the blacklist, let go
                     tracing::debug!("[IP Filter] IP {} not in blacklist, allowing", ip);
                 }
                 Err(e) => {
@@ -143,18 +143,18 @@ pub async fn ip_filter_middleware(
         tracing::warn!("[IP Filter] Unable to extract client IP from request");
     }
 
-    // 放行请求
+    // Release request
     next.run(request).await
 }
 
-/// 规范化 IP 地址字符串：
-/// - 清理首尾空格及方括号 `[...]`
-/// - 剥离客户端端口（例如 `192.168.1.1:54321` 或 `[2409:8a55::1]:8046`）
-/// - 将 IPv4 映射的 IPv6 地址（如 `::ffff:192.168.1.1`）还原为原生 IPv4（`192.168.1.1`）
+/// Normalized IP address string:
+/// - Clean up leading and trailing spaces and square brackets `[...]`
+/// - Strip the client port (e.g. `192.168.1.1:54321` or `[2409:8a55::1]:8046`)
+/// - Revert an IPv4-mapped IPv6 address (e.g. `::ffff:192.168.1.1`) to native IPv4 (`192.168.1.1`)
 pub fn normalize_ip_str(raw: &str) -> String {
     let trimmed = raw.trim();
 
-    // 优先尝试直接按 IP 地址解析
+    // Prioritize trying to resolve directly by IP address
     let clean = trimmed.trim_matches('[').trim_matches(']');
     if let Ok(ip) = clean.parse::<std::net::IpAddr>() {
         return match ip {
@@ -169,7 +169,7 @@ pub fn normalize_ip_str(raw: &str) -> String {
         };
     }
 
-    // 若带有端口（如 192.168.1.100:12345 或 [::1]:8080），尝试解析为 SocketAddr
+    // If there is a port (such as 192.168.1.100:12345 or [::1]:8080), try to resolve it to SocketAddr
     if let Ok(socket_addr) = trimmed.parse::<std::net::SocketAddr>() {
         return match socket_addr.ip() {
             std::net::IpAddr::V6(v6) => {
@@ -183,7 +183,7 @@ pub fn normalize_ip_str(raw: &str) -> String {
         };
     }
 
-    // 手动前缀回退检测
+    // Manual prefix fallback detection
     if let Some(stripped) = clean.strip_prefix("::ffff:") {
         if stripped.parse::<std::net::Ipv4Addr>().is_ok() {
             return stripped.to_string();
@@ -193,16 +193,16 @@ pub fn normalize_ip_str(raw: &str) -> String {
     clean.to_string()
 }
 
-/// 从请求中提取客户端 IP（支持 X-Forwarded-For, X-Real-IP, ConnectInfo，并自动规范化 IPv4/IPv6）
+/// Extract client IP from request (supports X-Forwarded-For, X-Real-IP, ConnectInfo, and automatically normalizes IPv4/IPv6)
 pub fn extract_client_ip(request: &Request) -> Option<String> {
-    // 1. 优先从 X-Forwarded-For 提取 (取第一个 IP)
+    // 1. Extract from X-Forwarded-For first (take the first IP)
     let raw = request
         .headers()
         .get("x-forwarded-for")
         .and_then(|v| v.to_str().ok())
         .map(|s| s.split(',').next().unwrap_or(s).trim())
         .or_else(|| {
-            // 2. 备选从 X-Real-IP 提取
+            // 2. Alternative extraction from X-Real-IP
             request
                 .headers()
                 .get("x-real-ip")
@@ -216,7 +216,7 @@ pub fn extract_client_ip(request: &Request) -> Option<String> {
         }
     }
 
-    // 3. 最后尝试从 ConnectInfo 获取 (TCP 连接 IP)
+    // 3. Finally try to get (TCP connection IP) from ConnectInfo
     request
         .extensions()
         .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
@@ -232,7 +232,7 @@ pub fn extract_client_ip(request: &Request) -> Option<String> {
         })
 }
 
-/// 创建被封禁的响应
+/// Create a blocked response
 fn create_blocked_response(ip: &str, message: &str) -> Response {
     let body = serde_json::json!({
         "error": {

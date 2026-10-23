@@ -3,9 +3,9 @@ use super::*;
 impl CacheManager {
     // ===== Layer 2: Tools Cache =====
 
-    /// 查找已缓存的 processed tools
+    /// Find cached processed tools
     ///
-    /// 返回 Some(tools_json_string) 如果缓存有效，否则 None
+    /// Returns Some(tools_json_string) if cache is valid, otherwise None
     pub fn lookup_tools(&self, raw_hash: &str) -> Option<String> {
         if let Ok(mut stats) = self.tools_stats.write() {
             stats.0 += 1;
@@ -62,7 +62,7 @@ impl CacheManager {
         None
     }
 
-    /// 存入 Layer 2: raw → processed tools JSON
+    /// Save to Layer 2: raw → processed tools JSON
     pub fn cache_tools(&self, raw_hash: String, tools_json: String) {
         let entry = ToolsCacheEntry {
             tools_json,
@@ -92,17 +92,17 @@ impl CacheManager {
         }
     }
 
-    /// 计算 Layer 2 key: SHA256(raw tools JSON string)
+    /// Calculate Layer 2 key: SHA256(raw tools JSON string)
     pub fn compute_tools_key(raw_tools_json: &str) -> String {
         Self::sha256_hex(raw_tools_json.as_bytes())
     }
 
     // ===== Layer 3: Prefix Tracker =====
 
-    /// 计算稳定的组合前缀哈希
+    /// Compute stable combined prefix hash
     ///
-    /// 输入: systemInstruction 和 tools 的 JSON 字符串
-    /// 使用 Layer 1 + Layer 2 的独立 hash 组合，而非原始数据
+    /// Input: JSON string of systemInstruction and tools
+    /// Use independent hash combinations of Layer 1 + Layer 2 instead of raw data
     pub fn compute_prefix_hash(si_json: &str, tools_json: &str) -> String {
         let si_hash = Self::sha256_hex(si_json.as_bytes());
         let tools_hash = if tools_json.is_empty() {
@@ -110,7 +110,7 @@ impl CacheManager {
         } else {
             Self::sha256_hex(tools_json.as_bytes())
         };
-        // 组合: SHA256(si_hash + "::" + tools_hash)
+        // Combination: SHA256(si_hash + "::" + tools_hash)
         Self::sha256_hex(format!("{}::{}", si_hash, tools_hash).as_bytes())
     }
 }

@@ -88,7 +88,7 @@ export default function ApiProxy() {
         });
     };
 
-    // 生成自定义映射表单的选项 (从 models 动态生成，统一纯正 Model ID 风格)
+    // Option to generate custom mapping forms (dynamically generated from models, unified and pure Model ID style)
     const customMappingOptions: SelectOption[] = useMemo(() => {
         return models.map(model => ({
             value: model.id,
@@ -175,7 +175,7 @@ export default function ApiProxy() {
                     </div>
                 )}
 
-                {/* 配置区 */}
+                {/* Configuration area */}
                 {!configLoading && !configError && appConfig && (
                     <div className="bg-white dark:bg-base-100 rounded-xl shadow-xs border border-gray-200/80 dark:border-base-200">
                         <div className="px-4 sm:px-5 py-2.5 border-b border-gray-100 dark:border-base-200 bg-gray-50/60 dark:bg-base-200/80 flex flex-wrap items-center justify-between gap-3">
@@ -256,7 +256,7 @@ export default function ApiProxy() {
                             />
                         )}
 
-                        {/* TAB 2: CLI 一键配置 (cli) */}
+                        {/* TAB 2: CLI one-click configuration (cli) */}
                         {activeMenuTab === 'cli' && (
                             <CliSetupTab
                                 config={appConfig}
@@ -264,7 +264,7 @@ export default function ApiProxy() {
                             />
                         )}
 
-                        {/* TAB 3: 多协议支持 (protocols) */}
+                        {/* TAB 3: Multi-protocol support (protocols) */}
                         {activeMenuTab === 'protocols' && (
                             <ProtocolsTab
                                 config={appConfig}
@@ -282,7 +282,7 @@ export default function ApiProxy() {
                     </div>
                 )}
 
-                {/* External Providers Integration - 仅在服务配置 Tab 下展示 */}
+                {/* External Providers Integration - only displayed under the service configuration tab */}
                 {
                     !configLoading && !configError && appConfig && activeMenuTab === 'settings' && (
                         <ExternalProvidersSection
@@ -311,11 +311,11 @@ export default function ApiProxy() {
                 }
 
 
-                {/* 各种对话框 */}
+                {/* Various dialog boxes */}
                 <ModalDialog
                     isOpen={isResetConfirmOpen}
-                    title={t('proxy.dialog.reset_mapping_title') || '重置映射'}
-                    message={t('proxy.dialog.reset_mapping_msg') || '确定要重置所有模型映射为系统默认吗？'}
+                    title={t('proxy.dialog.reset_mapping_title') || 'Reset mapping'}
+                    message={t('proxy.dialog.reset_mapping_msg') || 'Are you sure you want to reset all model mappings to system defaults?'}
                     type="confirm"
                     isDestructive={true}
                     onConfirm={executeResetMapping}
@@ -334,8 +334,8 @@ export default function ApiProxy() {
 
                 <ModalDialog
                     isOpen={isClearBindingsConfirmOpen}
-                    title={t('proxy.dialog.clear_bindings_title') || '清除会话绑定'}
-                    message={t('proxy.dialog.clear_bindings_msg') || '确定要清除所有会话与账号的绑定映射吗？'}
+                    title={t('proxy.dialog.clear_bindings_title') || 'Clear session binding'}
+                    message={t('proxy.dialog.clear_bindings_msg') || 'Are you sure you want to clear all binding mappings between sessions and accounts?'}
                     type="confirm"
                     isDestructive={true}
                     onConfirm={executeClearSessionBindings}
@@ -344,8 +344,8 @@ export default function ApiProxy() {
 
                 <ModalDialog
                     isOpen={isClearRateLimitsConfirmOpen}
-                    title={t('proxy.dialog.clear_rate_limits_title') || '清除限流记录'}
-                    message={t('proxy.dialog.clear_rate_limits_confirm') || '确定要清除所有本地限流记录吗？'}
+                    title={t('proxy.dialog.clear_rate_limits_title') || 'Clear current limit record'}
+                    message={t('proxy.dialog.clear_rate_limits_confirm') || 'Are you sure you want to clear all local throttling records?'}
                     type="confirm"
                     isDestructive={true}
                     onConfirm={executeClearRateLimits}

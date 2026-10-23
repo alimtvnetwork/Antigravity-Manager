@@ -65,14 +65,14 @@ export const ApiKeyFun: React.FC = () => {
                     <div className="flex flex-col gap-1.5 max-w-4xl">
                         <div className="flex flex-col md:flex-row items-center md:items-end gap-3">
                             <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white tracking-wide leading-none">
-                                {t('apiKeyFun.title', { defaultValue: 'APIKEY.FUN 中转站' })}
+                                {t('apiKeyFun.title', { defaultValue: 'APIKEY.FUN transfer station' })}
                             </h1>
                             <span className="bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 border border-blue-200 dark:border-blue-800/40 px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase">
-                                {t('apiKeyFun.eyebrow', { defaultValue: '中转站' })}
+                                {t('apiKeyFun.eyebrow', { defaultValue: 'transfer station' })}
                             </span>
                         </div>
                         <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300/90 leading-relaxed font-normal mt-1">
-                            {t('apiKeyFun.description', { defaultValue: 'Antigravity Tools 官方合作中转站，为用户提供稳定、开放、高性价比的大模型 API 接入服务。支持 Claude、OpenAI、Gemini 等主流模型，适合在 Codex、Gemini CLI、Claude Code 及其他开发工具中统一配置使用。通过 Antigravity Tools 专属链接注册，可享受最高充值永久 95 折优惠。' })}
+                            {t('apiKeyFun.description', { defaultValue: 'Antigravity Tools official cooperative transfer station provides users with stable, open, and cost-effective large model API access services. It supports mainstream models such as Claude, OpenAI, and Gemini, and is suitable for unified configuration and use in Codex, Gemini CLI, Claude Code, and other development tools. Register through the Antigravity Tools exclusive link and enjoy a permanent 5% discount on the highest recharge.' })}
                         </p>
                     </div>
                 </div>
@@ -84,7 +84,7 @@ export const ApiKeyFun: React.FC = () => {
                     className="bg-white hover:bg-blue-50 dark:bg-base-200 dark:hover:bg-base-300 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50 px-6 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-md shadow-blue-500/10 dark:shadow-none flex-shrink-0 hover:scale-[1.02] active:scale-[0.98] duration-200 z-10"
                 >
                     <ExternalLink size={16} className="text-blue-500 dark:text-blue-400" />
-                    <span>{t('apiKeyFun.viewNow', { defaultValue: '立即查看' })}</span>
+                    <span>{t('apiKeyFun.viewNow', { defaultValue: 'View now' })}</span>
                 </a>
             </div>
 
@@ -100,7 +100,7 @@ export const ApiKeyFun: React.FC = () => {
                     </div>
                     <div className="flex flex-col min-w-0">
                         <span className="text-xs font-medium text-gray-400 dark:text-gray-500 truncate">
-                            {t('apiKeyFun.usage.remainingAmount', { defaultValue: '剩余额度' })}
+                            {t('apiKeyFun.usage.remainingAmount', { defaultValue: 'remaining balance' })}
                         </span>
                         <span className="text-xl font-bold text-gray-900 dark:text-white mt-0.5 tracking-tight truncate">
                             {usage ? usage.remaining : '$0.00'}
@@ -118,7 +118,7 @@ export const ApiKeyFun: React.FC = () => {
                     </div>
                     <div className="flex flex-col min-w-0">
                         <span className="text-xs font-medium text-gray-400 dark:text-gray-500 truncate">
-                            {t('apiKeyFun.usage.usedAmount', { defaultValue: '已用额度' })}
+                            {t('apiKeyFun.usage.usedAmount', { defaultValue: 'Used credit' })}
                         </span>
                         <span className="text-xl font-bold text-gray-900 dark:text-white mt-0.5 tracking-tight truncate">
                             {usage ? usage.used : '--'}

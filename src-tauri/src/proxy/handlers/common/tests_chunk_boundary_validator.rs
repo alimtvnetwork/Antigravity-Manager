@@ -32,7 +32,7 @@ mod tests {
 
     #[test]
     fn test_chunk_boundary_incomplete_utf8_multibyte() {
-        // "你好" in UTF-8 is [0xE4, 0xBD, 0xA0, 0xE5, 0xA5, 0xBD] (6 bytes)
+        // "Hello" in UTF-8 is [0xE4, 0xBD, 0xA0, 0xE5, 0xA5, 0xBD] (6 bytes)
         // Truncate at 4 bytes -> split mid-character at second character
         let bytes = [0xE4, 0xBD, 0xA0, 0xE5];
         match validate_chunk_boundary(&bytes) {

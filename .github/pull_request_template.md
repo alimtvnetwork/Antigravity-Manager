@@ -1,29 +1,29 @@
-## 变更类型
+## Change type
 
-- [ ] 修复（bug / 回归）
-- [ ] 功能
-- [ ] 文档 / 规范 / 发版基建（不夹带进功能 PR；同类文档改动合并为一个 PR）
-- [ ] 是否为大功能更改、修复、更新
+- [ ] Fixes (bugs/regressions)
+- [ ] function
+- [ ] Documents/Specifications/Release Infrastructure (Function PRs are not included; similar document changes are merged into one PR)
+- [ ] Whether it is a major feature change, fix, or update
 
-## 基于的分支与版本号
+## Based on the branch and version number
 
-## 当前问题、对用户使用体验会产生什么问题或影响
+## Current problems and what problems or impacts they will have on the user experience
 
-## 解決方案
+## Solution
 
-## 提交清单（组内独立、可单独回退）
+## Submit list (independent within the group, can be rolled back individually)
 
-| 提交 | 作用 | 可否单独 revert |
+| Submit | Function | Can it be revert alone |
 | -- | -- | ----------- |
 |    |    |             |
 
-## 每项提交引起的变化和影响面
+## Changes and impact caused by each submission
 
-## 自检（与 CI 相同的命令）
+## Self-test (same command as CI)
 
 - [ ] `cd src-tauri && cargo fmt -- --check`
 - [ ] `cd src-tauri && cargo clippy --all-targets --all-features`
 - [ ] `npm run build`
-- [ ] 改动涉及的模块已在本地运行单测（`cargo test` 不在 CI 门禁内，不做全量跑测）
+- [ ] The module involved in the change has been running a single test locally (`cargo test` is not within the CI access control and will not be fully tested)
 
-## 署名
+## Signature

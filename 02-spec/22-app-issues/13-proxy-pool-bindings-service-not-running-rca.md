@@ -18,14 +18,14 @@
      - **Message:** `Service not running`
      - **Trigger Action:** `tauri_invoke`
      - **Source:** `tauri.get_all_account_bindings`
-   - Background polling for `get_proxy_pool_config` periodically threw backend errors (`"服务未运行"`), which also risked triggering the global error capture modal.
+   - Background polling for `get_proxy_pool_config` periodically threw backend errors (`"Service is not running"`), which also risked triggering the global error capture modal.
 
 ---
 
 ## 2. Cause
 
 1. **Missing Service-Stopped Fallback in Backend Proxy Commands**:
-   - In [`src-tauri/src/commands/proxy_pool.rs`](../../src-tauri/src/commands/proxy_pool.rs) and [`src-tauri/src/commands/proxy.rs`](../../src-tauri/src/commands/proxy.rs), `get_all_account_bindings`, `get_proxy_pool_config`, and `get_preferred_account` assumed the Axum proxy service was running. When `instance_lock.as_ref()` was `None`, they returned `Err("Service not running".to_string())` or `Err("服务未运行".to_string())` instead of reading existing settings from [`AppConfig`](../../src-tauri/src/modules/config.rs).
+   - In [`src-tauri/src/commands/proxy_pool.rs`](../../src-tauri/src/commands/proxy_pool.rs) and [`src-tauri/src/commands/proxy.rs`](../../src-tauri/src/commands/proxy.rs), `get_all_account_bindings`, `get_proxy_pool_config`, and `get_preferred_account` assumed the Axum proxy service was running. When `instance_lock.as_ref()` was `None`, they returned `Err("Service not running".to_string())` or `Err("Service not running".to_string())` instead of reading existing settings from [`AppConfig`](../../src-tauri/src/modules/config.rs).
 2. **Missing Modal Suppression on Passive Settings Queries**:
    - In [`src/components/settings/ProxyPoolSettings.tsx`](../../src/components/settings/ProxyPoolSettings.tsx) and [`src/components/settings/proxy/ProxyBindingManager.tsx`](../../src/components/settings/proxy/ProxyBindingManager.tsx), `fetchBindings()` and the proxy status poller called `request('get_all_account_bindings')` and `request('get_proxy_pool_config')` without passing `{ _suppressGlobalModal: true }`.
 3. **Unsanitized Control Arguments in Request Utility**:
@@ -40,7 +40,7 @@
    - Updated `get_proxy_pool_config`, `get_preferred_account`, and `set_preferred_account` to read and persist to `AppConfig` directly when `instance.is_none()`.
    - Updated `check_proxy_health` to execute standalone health checks on configured proxies using `ProxyPoolManager::new(pool_state)` even when the proxy server is offline, saving the refreshed latency and health status to `AppConfig`.
    - Updated `get_proxy_scheduling_config` and `update_proxy_scheduling_config` to read and persist sticky session settings to `AppConfig.proxy.sticky_session` without failing when proxy service is stopped.
-   - Made `stop_proxy_service`, `reload_proxy_accounts`, `clear_proxy_session_bindings`, `clear_proxy_rate_limit`, and `clear_all_proxy_rate_limits` idempotent / return safe `Ok` responses when the service is stopped rather than failing with `"服务未运行"`.
+   - Made `stop_proxy_service`, `reload_proxy_accounts`, `clear_proxy_session_bindings`, `clear_proxy_rate_limit`, and `clear_all_proxy_rate_limits` idempotent / return safe `Ok` responses when the service is stopped rather than failing with `"Service is not running"`.
 2. **Modal Suppression Flag Sanitization (`src/utils/request.ts`)**:
    - Extracted `suppressGlobalModal` and created sanitized argument objects (`cleanedArgs`, `bodyArgs`), stripping `_suppressGlobalModal` so backend IPC parameters and HTTP endpoints receive clean payloads.
    - Enforced `if (!suppressGlobalModal)` in both Tauri IPC and Web fetch catch handlers before dispatching errors to `useErrorStore.getState().captureError(...)`.

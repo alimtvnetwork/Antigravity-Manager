@@ -116,7 +116,7 @@ MANDATORY release engineering and governance checks derived from `AGENTS.md` and
    - `version.json`
    - Other project manifests managed by `npm run bump`.
 3. **Strict `@aukgit` Attribution**: Audit `changelog.md` and `changelog_en.md` to ensure attribution strictly credits `@aukgit` (`(Thanks to @aukgit)`). No other GitHub handles (`@...`) may appear in release notes.
-4. **README Changelog Synchronization**: Ensure that release notes in both `README.md` and `README_EN.md` (under "## 📝 更新日志" / "## 📝 Changelog") are fully synchronized with the latest version.
+4. **README Changelog Synchronization**: Ensure that release notes in both `README.md` and `README_EN.md` (under "## 📝 Changelog" / "## 📝 Changelog") are fully synchronized with the latest version.
 5. **Pre-Flight Quality Gates**:
    - `cd src-tauri && cargo fmt -- --check`
    - `cd src-tauri && cargo clippy --all-targets --all-features`

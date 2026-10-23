@@ -250,12 +250,12 @@ mod tests {
         let turn_ascii = create_dialog_turn(0, "user", &long_ascii);
         assert_eq!(turn_ascii.content_snippet.chars().count(), 60);
 
-        let utf8_multibyte = "✨ 统一上下文结构对齐与前缀稳定性检测保护 🚀 确保模型缓存效率提升并防止 prompt 漂移与状态不一致！继续输入更多内容以验证截断处理。";
+        let utf8_multibyte = "✨ Unified context structure alignment and prefix stability detection and protection 🚀 Ensure improved model cache efficiency and prevent prompt drift and status inconsistency! Continue typing more to verify truncation processing.";
         let turn_utf8 = create_dialog_turn(1, "system", utf8_multibyte);
         assert!(turn_utf8.content_snippet.chars().count() <= 60);
         assert!(turn_utf8
             .content_snippet
-            .starts_with("✨ 统一上下文结构对齐"));
+            .starts_with("✨ Unified context structure alignment"));
     }
 
     #[test]

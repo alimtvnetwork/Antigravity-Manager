@@ -14,7 +14,7 @@ pub(crate) async fn handle_nonstream_success(st: &mut AttemptState, call: Attemp
         ..
     } = call;
     let s_id_owned: Option<String> = Some(session_id_str);
-    // 处理非流式响应
+    // Handling non-streaming responses
     let bytes = match response.bytes().await {
         Ok(b) => b,
         Err(e) => {
@@ -36,10 +36,10 @@ pub(crate) async fn handle_nonstream_success(st: &mut AttemptState, call: Attemp
         Err(e) => return (StatusCode::BAD_GATEWAY, format!("Parse error: {}", e)).into_response(),
     };
 
-    // 解包 response 字段（v1internal 格式）
+    // Unpack response field (v1internal format)
     let raw = gemini_resp.get("response").unwrap_or(&gemini_resp);
 
-    // 转换为 Gemini Response 结构
+    // Convert to Gemini Response structure
     let gemini_response: crate::proxy::mappers::claude::models::GeminiResponse =
         match serde_json::from_value(raw.clone()) {
             Ok(r) => r,
@@ -57,7 +57,7 @@ pub(crate) async fn handle_nonstream_success(st: &mut AttemptState, call: Attemp
         &request_with_mapped.model,
     );
 
-    // 转换
+    // Convert
     // [FIX #765] Pass session_id and model_name for signature caching (s_id_owned from line 16)
     // [FIX #3379] Extract registered tool names for non-streaming leakage recovery
     let ns_registered_tool_names: Vec<String> = request_with_mapped
@@ -65,7 +65,7 @@ pub(crate) async fn handle_nonstream_success(st: &mut AttemptState, call: Attemp
         .as_ref()
         .map(|tools| tools.iter().filter_map(|t| t.name.clone()).collect())
         .unwrap_or_default();
-    // 转换
+    // Convert
     let claude_response = match transform_response(
         &gemini_response,
         st.scaling_enabled,
@@ -85,7 +85,7 @@ pub(crate) async fn handle_nonstream_success(st: &mut AttemptState, call: Attemp
         }
     };
 
-    // [Optimization] 记录闭环日志：消耗情况
+    // [Optimization] Record closed-loop log: consumption status
     let cache_info = if let Some(cached) = claude_response.usage.cache_read_input_tokens {
         format!(", Cached: {}", cached)
     } else {

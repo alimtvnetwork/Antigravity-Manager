@@ -1,6 +1,6 @@
 /**
  * instanceService — facade
- * 实际实现拆分至 ./instanceService/ 子模块，此处统一 re-export 以保持导入路径不变。
+ * The actual implementation is split into the ./instanceService/ submodule, and re-export is unified here to keep the import path unchanged.
  */
 export * from './instanceService/types';
 export * from './instanceService/crud';

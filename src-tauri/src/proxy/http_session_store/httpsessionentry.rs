@@ -1,16 +1,16 @@
 use super::*;
 
-const SESSION_TTL_SECS: u64 = 3600; // 1小时过期
+const SESSION_TTL_SECS: u64 = 3600; // Expires in 1 hour
 
 #[derive(Debug, Clone)]
 pub struct HttpSessionEntry {
-    /// 对话历史：instructions + 所有 input items（包括历史response输出）
+    /// Conversation history: instructions + all input items (including historical response output)
     pub input_items: Vec<Value>,
-    /// 系统指令
+    /// System commands
     pub instructions: String,
-    /// 模型名
+    /// Model name
     pub model: String,
-    /// 上次访问时间（用于TTL淘汰）
+    /// Last access time (for TTL elimination)
     pub last_accessed: Instant,
 }
 
@@ -101,7 +101,7 @@ impl HttpSessionStore {
                 last_accessed: Instant::now(),
             },
         );
-        // 顺便淘汰过期 session（惰性清理）
+        // By the way, eliminate expired sessions (lazy cleanup)
         self.evict_expired();
     }
 
@@ -138,7 +138,7 @@ pub(crate) fn store() -> &'static Mutex<HttpSessionStore> {
     STORE.get_or_init(|| Mutex::new(HttpSessionStore::new()))
 }
 
-/// 根据 previous_response_id 查找历史会话
+/// Find historical conversations based on previous_response_id
 pub async fn get_session(previous_response_id: &str) -> Option<HttpSessionEntry> {
     store()
         .lock()
@@ -153,12 +153,12 @@ pub async fn get_session_with_parent(
     store().lock().await.get(previous_response_id)
 }
 
-/// 保存新的会话状态（以 response_id 为 key）
+/// Save the new session state (with response_id as key)
 pub async fn save_session(response_id: String, entry: HttpSessionEntry) {
     store().lock().await.insert(response_id, entry);
 }
 
-/// 保存 Responses 本轮增量；父节点的 Arc 强引用保证分支共享祖先。
+/// Save Responses for this round of increments; the Arc strong reference of the parent node ensures that the branches share ancestors.
 pub async fn save_session_delta(
     response_id: String,
     parent: Option<SessionParent>,
@@ -185,7 +185,7 @@ pub struct PreparedSessionInput {
     pub reset_parent: bool,
 }
 
-/// 合并请求历史，并在客户端回放完整历史时仅提取新增项。
+/// Merge request history and only extract new items when the client replays the full history.
 pub fn prepare_session_input(
     history: Vec<Value>,
     new_input: Vec<Value>,
@@ -309,16 +309,16 @@ pub fn prepare_session_input_with_storage(
     }
 }
 
-/// 把上一轮的 response output items 转成 input items 追加到历史中
-/// 同时把新的 user input items 追加进去
-/// 返回合并后的 input items
+/// Convert the previous round of response output items into input items and append them to the history
+/// At the same time, add new user input items
+/// Return the merged input items
 pub fn merge_history_with_new_input(
     mut history: Vec<Value>,
     response_output: &[Value],
     new_input: Vec<Value>,
     tool_call_cache: &HashMap<String, Value>,
 ) -> Vec<Value> {
-    // 检测新输入中是否包含 compaction / compaction_summary，如果包含，说明客户端正在发送压缩后的全新完整历史
+    // Check whether the new input contains compaction / compaction_summary. If it does, the client is sending a new and complete history after compression.
     let has_compaction = new_input.iter().any(|item| {
         let t = item.get("type").and_then(|v| v.as_str()).unwrap_or("");
         t == "compaction" || t == "compaction_summary"
@@ -329,7 +329,7 @@ pub fn merge_history_with_new_input(
             "[Session] Compaction detected in new input. Overwriting stale history (new items: {})",
             new_input.len()
         );
-        // 过滤掉 compaction 本身
+        // filter out compaction itself
         let mut filtered = Vec::new();
         for item in new_input {
             let t = item.get("type").and_then(|v| v.as_str()).unwrap_or("");
@@ -342,12 +342,12 @@ pub fn merge_history_with_new_input(
         return dedupe_input_items(filtered);
     }
 
-    // 追加上一轮 response output（assistant消息、工具调用等）
+    // Append the previous round of response output (assistant messages, tool calls, etc.)
     for item in response_output {
         history.push(item.clone());
     }
 
-    // 追加新的 input items
+    // Append new input items
     for item in new_input {
         let t = item.get("type").and_then(|v| v.as_str()).unwrap_or("");
         if t == "compaction" || t == "compaction_summary" {
@@ -356,10 +356,10 @@ pub fn merge_history_with_new_input(
         history.push(item);
     }
 
-    // 修复工具调用（确保function_call_output前有对应的function_call）
+    // Fix tool calls (make sure there is a corresponding function_call before function_call_output)
     repair_tool_calls(&mut history, tool_call_cache);
 
-    // 去重
+    // Remove duplicates
     dedupe_input_items(history)
 }
 

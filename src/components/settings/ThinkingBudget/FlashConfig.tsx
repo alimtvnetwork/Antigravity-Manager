@@ -11,12 +11,12 @@ export function FlashConfig(props: BudgetSectionProps) {
                                 <div>
                                     <span className="text-xs font-bold text-gray-900 dark:text-white">
                                         {t("proxy.config.thinking_budget.flash_family_title", {
-                                            defaultValue: "Gemini Flash ≥ 3.0 系列 (如 3-flash, 3.7-flash, 3.8-flash, tiered 等)",
+                                            defaultValue: "Gemini Flash ≥ 3.0 series (such as 3-flash, 3.7-flash, 3.8-flash, tiered, etc.)",
                                         })}
                                     </span>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                         {t("proxy.config.thinking_budget.flash_family_desc", {
-                                            defaultValue: "控制 Gemini ≥ 3.0 的 Flash 思考模型四大档位预算（< 3.0 如 2.5-flash 为传统非思考模型，网关自动剥离思考）",
+                                            defaultValue: "Control the four budget levels of the Flash thinking model of Gemini ≥ 3.0 (< 3.0 such as 2.5-flash is a traditional non-thinking model, and the gateway automatically strips thinking)",
                                         })}
                                     </p>
                                 </div>
@@ -30,7 +30,7 @@ export function FlashConfig(props: BudgetSectionProps) {
                                             className="text-blue-600 focus:ring-blue-500"
                                         />
                                         {t("proxy.config.thinking_budget.mode_default", {
-                                            defaultValue: "默认模式 (官方自适应)",
+                                            defaultValue: "Default mode (official adaptive)",
                                         })}
                                     </label>
                                     <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -42,7 +42,7 @@ export function FlashConfig(props: BudgetSectionProps) {
                                             className="text-blue-600 focus:ring-blue-500"
                                         />
                                         {t("proxy.config.thinking_budget.mode_custom", {
-                                            defaultValue: "自定义思考预算模式 (推荐)",
+                                            defaultValue: "Customized thinking budget model (recommended)",
                                         })}
                                     </label>
                                 </div>
@@ -54,7 +54,7 @@ export function FlashConfig(props: BudgetSectionProps) {
                                         <div>
                                             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                                                 {t("proxy.config.thinking_budget.tier_low", {
-                                                    defaultValue: "Low 档位",
+                                                    defaultValue: "Low gear",
                                                 })}
                                             </label>
                                             <input
@@ -78,14 +78,14 @@ export function FlashConfig(props: BudgetSectionProps) {
                                         />
                                             <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                                                 {t("proxy.config.thinking_budget.flash_low_hint", {
-                                                    defaultValue: "极低推理 (默认 1024)",
+                                                    defaultValue: "Very low inference (default 1024)",
                                                 })}
                                             </p>
                                         </div>
                                         <div>
                                             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                                                 {t("proxy.config.thinking_budget.tier_medium", {
-                                                    defaultValue: "Medium 档位",
+                                                    defaultValue: "Medium gear",
                                                 })}
                                             </label>
                                             <input
@@ -109,14 +109,14 @@ export function FlashConfig(props: BudgetSectionProps) {
                                         />
                                             <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                                                 {t("proxy.config.thinking_budget.flash_medium_hint", {
-                                                    defaultValue: "标准平衡档 (默认 4096)",
+                                                    defaultValue: "Standard balance file (default 4096)",
                                                 })}
                                             </p>
                                         </div>
                                         <div>
                                             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                                                 {t("proxy.config.thinking_budget.tier_high", {
-                                                    defaultValue: "High 档位",
+                                                    defaultValue: "High gear",
                                                 })}
                                             </label>
                                             <input
@@ -140,14 +140,14 @@ export function FlashConfig(props: BudgetSectionProps) {
                                         />
                                             <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                                                 {t("proxy.config.thinking_budget.flash_high_hint", {
-                                                    defaultValue: "深度推理档 (默认 16384)",
+                                                    defaultValue: "Deep inference file (default 16384)",
                                                 })}
                                             </p>
                                         </div>
                                         <div>
                                             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                                                 {t("proxy.config.thinking_budget.tier_tiered", {
-                                                    defaultValue: "Tiered (自由模型)",
+                                                    defaultValue: "Tiered (free model)",
                                                 })}
                                             </label>
                                             <input
@@ -171,7 +171,7 @@ export function FlashConfig(props: BudgetSectionProps) {
                                         />
                                             <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                                                 {t("proxy.config.thinking_budget.flash_tiered_hint", {
-                                                    defaultValue: "自适应/自由强度 (默认 -1)",
+                                                    defaultValue: "Adaptive/Free Strength (default -1)",
                                                 })}
                                             </p>
                                         </div>
@@ -179,7 +179,7 @@ export function FlashConfig(props: BudgetSectionProps) {
                                     <div className="p-3 bg-blue-50/70 dark:bg-blue-900/20 border border-blue-200/80 dark:border-blue-800/40 rounded-xl text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
                                         {t("proxy.config.thinking_budget.tiered_desc", {
                                             defaultValue:
-                                                "💡 Tiered 自由模型说明：该模型专为谷歌动态自适应打造。设置为 -1 时，模型根据问题难度自动分配思考量；若指定具体数值（如 30000+），可突破 High 档位解锁 Max 极限思考。",
+                                                "💡 Tiered Free Model Description: This model is specially built for Google Dynamic Adaptation. When set to -1, the model automatically allocates the amount of thinking according to the difficulty of the problem; if you specify a specific value (such as 30000+), you can break through the High gear to unlock Max extreme thinking.",
                                         })}
                                     </div>
                                 </div>
@@ -187,7 +187,7 @@ export function FlashConfig(props: BudgetSectionProps) {
                                 <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                                     {t("proxy.config.thinking_budget.flash_default_hint", {
                                         defaultValue:
-                                            "已启用官方默认模式：完全透传官方模型 ID，不注入 thinkingBudget，完全由 Google 上游模型自主决定思考行为。",
+                                            "The official default mode is enabled: the official model ID is completely transparent, no thinkingBudget is injected, and the thinking behavior is completely determined by Google's upstream model.",
                                     })}
                                 </p>
                             )}

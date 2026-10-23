@@ -3,13 +3,13 @@ use std::path::PathBuf;
 
 use super::*;
 
-/// 获取安全数据库路径
+/// Get secure database path
 pub fn get_security_db_path() -> Result<PathBuf, String> {
     let data_dir = crate::modules::account::get_data_dir()?;
     Ok(data_dir.join("security.db"))
 }
 
-/// 连接数据库
+/// Connect to database
 pub(crate) fn connect_db() -> Result<Connection, String> {
     let db_path = get_security_db_path()?;
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
@@ -28,11 +28,11 @@ pub(crate) fn connect_db() -> Result<Connection, String> {
     Ok(conn)
 }
 
-/// 初始化安全数据库
+/// Initialize security database
 pub fn init_db() -> Result<(), String> {
     let conn = connect_db()?;
 
-    // IP 访问日志表
+    // IP access log table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS ip_access_logs (
             id TEXT PRIMARY KEY,
@@ -51,7 +51,7 @@ pub fn init_db() -> Result<(), String> {
     )
     .map_err(|e| e.to_string())?;
 
-    // IP 黑名单表
+    // IP blacklist table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS ip_blacklist (
             id TEXT PRIMARY KEY,
@@ -66,7 +66,7 @@ pub fn init_db() -> Result<(), String> {
     )
     .map_err(|e| e.to_string())?;
 
-    // IP 白名单表
+    // IP whitelist table
     conn.execute(
         "CREATE TABLE IF NOT EXISTS ip_whitelist (
             id TEXT PRIMARY KEY,
@@ -78,7 +78,7 @@ pub fn init_db() -> Result<(), String> {
     )
     .map_err(|e| e.to_string())?;
 
-    // 创建索引
+    // Create index
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_ip_access_ip ON ip_access_logs (client_ip)",
         [],

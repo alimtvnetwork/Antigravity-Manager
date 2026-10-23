@@ -273,18 +273,18 @@ pub fn copy_image_to_clipboard(path: String) -> Result<(), String> {
     copy_images_to_clipboard(vec![path])
 }
 
-/// 保存文本文件 (绕过前端 Scope 限制)
+/// Save text file (bypassing front-end Scope restrictions)
 #[tauri::command]
 pub async fn save_text_file(path: String, content: String) -> Result<(), String> {
     let path = validate_user_json_path(&path, false)?;
-    std::fs::write(&path, content).map_err(|e| format!("写入文件失败: {}", e))
+    std::fs::write(&path, content).map_err(|e| format!("Failed to write file: {}", e))
 }
 
-/// 读取文本文件 (绕过前端 Scope 限制)
+/// Read text files (bypassing front-end Scope limitations)
 #[tauri::command]
 pub async fn read_text_file(path: String) -> Result<String, String> {
     let path = validate_user_json_path(&path, true)?;
-    std::fs::read_to_string(&path).map_err(|e| format!("读取文件失败: {}", e))
+    std::fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))
 }
 
 /// Read an image file directly from disk and return as a Base64 data URI (data:image/<ext>;base64,...)

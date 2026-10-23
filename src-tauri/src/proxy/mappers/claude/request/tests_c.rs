@@ -205,10 +205,10 @@ fn test_claude_adaptive_global_config() {
 
 #[test]
 fn test_mixed_tools_injection_for_gemini_2_0() {
-    // [场景] 使用 Gemini 2.0 模型，同时提供自定义工具和启用全网搜索
-    // 期望: 转换后的请求应同时包含 googleSearch 和 functionDeclarations
+    // [Scenario] Use the Gemini 2.0 model, while providing custom tools and enabling full network search
+    // Expectation: The converted request should contain both googleSearch and functionDeclarations
     let req = ClaudeRequest {
-        model: "claude-sonnet-4-6".to_string(), // 映射到 gemini-2.0-flash-exp
+        model: "claude-sonnet-4-6".to_string(), // Maps to gemini-2.0-flash-exp
         messages: vec![Message {
             role: "user".to_string(),
             content: MessageContent::String("Help me search and use tools".to_string()),
@@ -237,10 +237,10 @@ fn test_mixed_tools_injection_for_gemini_2_0() {
         quality: None,
     };
 
-    // 模拟映射到 Gemini 2.0
+    // Simulation mapped to Gemini 2.0
     let mapped_model = "gemini-2.0-flash-exp";
 
-    // 这里我们直接测试 build_tools 函数 (它是 pub(crate) 且在同模块下)
+    // Here we directly test the build_tools function (it is pub(crate) and under the same module)
     let result = build_tools(&req.tools, true, mapped_model);
     assert!(result.is_ok());
 
@@ -252,8 +252,8 @@ fn test_mixed_tools_injection_for_gemini_2_0() {
         .iter()
         .any(|t| t.get("functionDeclarations").is_some());
 
-    // 在 v1internal 接口受限环境下，强制禁用混合工具调用以避免 400 报错
-    // 存在自定义工具时，优先使用 functionDeclarations，不注入 googleSearch
+    // In an environment where the v1internal interface is restricted, mixed tool calls are forcibly disabled to avoid 400 errors.
+    // When there is a custom tool, functionDeclarations are used first and googleSearch is not injected.
     assert!(
         !has_google_search,
         "v1internal should avoid mixed Google Search when functionDeclarations present"
@@ -263,8 +263,8 @@ fn test_mixed_tools_injection_for_gemini_2_0() {
 
 #[test]
 fn test_no_mixed_tools_for_older_gemini() {
-    // [场景] 使用 Gemini 1.5 模型，同时提供自定义工具和启用全网搜索
-    // 期望: 转换后的请求应只包含 functionDeclarations，googleSearch 被跳过以避免 400
+    // [Scenario] Use the Gemini 1.5 model, while providing custom tools and enabling full network search
+    // Expectation: Transformed requests should only contain functionDeclarations, googleSearch is skipped to avoid 400
     let req = ClaudeRequest {
         model: "claude-sonnet-4-6".to_string(),
         messages: vec![Message {
@@ -295,10 +295,10 @@ fn test_no_mixed_tools_for_older_gemini() {
         quality: None,
     };
 
-    // 模拟映射到 Gemini 1.5
+    // Simulation mapped to Gemini 1.5
     let mapped_model = "gemini-1.5-flash-002";
 
-    // 测试 build_tools 函数
+    // Test the build_tools function
     let result = build_tools(&req.tools, true, mapped_model);
     assert!(result.is_ok());
 

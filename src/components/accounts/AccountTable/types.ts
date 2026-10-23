@@ -23,7 +23,7 @@ export interface AccountTableProps {
     onWarmup?: (accountId: string) => void;
     onUpdateLabel?: (accountId: string, label: string) => void;
     onUpdatePriority?: (accountId: string, priority: number) => Promise<void> | void;
-    /** 拖拽排序回调，当用户完成拖拽时触发 */
+    /** Drag-and-drop sort callback, triggered when user finishes dragging */
     onReorder?: (accountIds: string[]) => void;
     onViewError: (accountId: string) => void;
     focusedAccountId?: string | null;
@@ -107,8 +107,8 @@ export function isModelProtected(protectedModels: string[] | undefined, modelNam
 }
 
 /**
- * 提取账号的最快配额重置时间（毫秒时间戳）
- * 用于表格排序
+ * The fastest quota reset time for the extraction account (millisecond timestamp)
+ * for table sorting
  */
 export function extractAccountResetTime(account: Account): number | null {
     let earliestTime: number | null = null;

@@ -22,13 +22,13 @@ export function BudgetHeader(props: BudgetSectionProps) {
                                 />
                             </svg>
                             {t("proxy.config.thinking_budget.title", {
-                                defaultValue: "思考链预算控制 (Thinking Budget)",
+                                defaultValue: "Thinking Budget",
                             })}
                         </h4>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                             {t("proxy.config.thinking_budget.description", {
                                 defaultValue:
-                                    "跨协议归一化思考参数，统一调控 Gemini 与 Claude 模型的深度思考 Token 预算及自适应行为。",
+                                    "Normalize thinking parameters across protocols, and uniformly control the deep thinking token budget and adaptive behavior of Gemini and Claude models.",
                             })}
                         </p>
                     </div>

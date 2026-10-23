@@ -1,4 +1,4 @@
-// Autostart 命令
+// Autostart command
 use tauri_plugin_autostart::ManagerExt;
 
 #[tauri::command]
@@ -8,21 +8,26 @@ pub async fn toggle_auto_launch(app: tauri::AppHandle, enable: bool) -> Result<(
     if enable {
         manager
             .enable()
-            .map_err(|e| format!("启用自动启动失败: {}", e))?;
-        crate::modules::logger::log_info("已启用开机自动启动");
+            .map_err(|e| format!("Failed to enable autostart: {}", e))?;
+        crate::modules::logger::log_info("Automatic startup enabled");
     } else {
         match manager.disable() {
             Ok(_) => {
-                crate::modules::logger::log_info("已禁用开机自动启动");
+                crate::modules::logger::log_info("Automatic startup disabled");
             }
             Err(e) => {
                 let err_msg = e.to_string();
-                // 在 Windows 上，如果注册表项不存在，disable() 会返回 "系统找不到指定的文件" (os error 2)
-                // 这种情况应该视为成功，因为目标（禁用）已经达成
-                if err_msg.contains("os error 2") || err_msg.contains("找不到指定的文件") {
-                    crate::modules::logger::log_info("开机自启项已不存在，视为禁用成功");
+                // On Windows, if registry entry does not exist, disable() returns "The system cannot find the file specified" (os error 2)
+                // This situation should be considered a success because the goal (disabled) has been achieved
+                if err_msg.contains("os error 2")
+                    || err_msg.contains(
+                        "找不到指定的文件"
+                            || err_msg.contains("The system cannot find the file specified"),
+                    )
+                {
+                    crate::modules::logger::log_info("The auto-start item no longer exists and is deemed to be successfully disabled.");
                 } else {
-                    return Err(format!("禁用自动启动失败: {}", e));
+                    return Err(format!("Failed to disable autostart: {}", e));
                 }
             }
         }

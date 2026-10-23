@@ -12,26 +12,26 @@ pub fn transform_openai_response(
     let empty_set = std::collections::HashSet::new();
     let client_tool_names = client_tool_names.unwrap_or(&empty_set);
 
-    // 解包 response 字段
+    // Unpack response field
     let raw = gemini_response.get("response").unwrap_or(gemini_response);
 
     let mut choices = Vec::new();
 
-    // 支持多候选结果 (n > 1)
+    // Supports multiple candidate results (n > 1)
     if let Some(candidates) = raw.get("candidates").and_then(|c| c.as_array()) {
         for (idx, candidate) in candidates.iter().enumerate() {
             let mut content_out = String::new();
             let mut thought_out = String::new();
             let mut tool_calls = Vec::new();
 
-            // 提取 content 和 tool_calls
+            // Extract content and tool_calls
             if let Some(parts) = candidate
                 .get("content")
                 .and_then(|c| c.get("parts"))
                 .and_then(|p| p.as_array())
             {
                 for part in parts {
-                    // 捕获 thoughtSignature (Gemini 3 工具调用必需)
+                    // Capture thoughtSignature (required for Gemini 3 tool calls)
                     if let Some(sig) = part
                         .get("thoughtSignature")
                         .or(part.get("thought_signature"))
@@ -46,30 +46,30 @@ pub fn transform_openai_response(
                         }
                     }
 
-                    // 检查该 part 是否是思考内容 (thought: true)
+                    // Check whether the part is thought content (thought: true)
                     let is_thought_part = part
                         .get("thought")
                         .and_then(|v| v.as_bool())
                         .unwrap_or(false);
 
-                    // 文本部分
+                    // text part
                     if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
                         if is_thought_part {
-                            // thought: true 时，text 是思考内容
+                            // When thought: true, text is the thinking content
                             thought_out.push_str(text);
                         } else {
-                            // 正常内容
+                            // normal content
                             content_out.push_str(text);
                         }
                     }
 
-                    // 工具调用部分
+                    // Tool calling part
                     if let Some(fc) = part.get("functionCall") {
                         let name = fc.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
                         let mut args_json =
                             fc.get("args").unwrap_or(&serde_json::json!({})).clone();
 
-                        // [FIX #1575 & #3430] 标准化并清洗 shell / PowerShell 等工具参数名称与必填字段
+                        // [FIX #1575 & #3430] Standardize and clean tool parameter names and required fields for shell / PowerShell and other tools
                         normalize_and_sanitize_tool_args(name, &mut args_json);
 
                         let arguments_str = args_json.to_string();
@@ -104,7 +104,7 @@ pub fn transform_openai_response(
                         });
                     }
 
-                    // 图片处理 (响应中直接返回图片的情况)
+                    // Image processing (when images are returned directly in the response)
                     if let Some(img) = part.get("inlineData") {
                         let mime_type = img
                             .get("mimeType")
@@ -117,7 +117,7 @@ pub fn transform_openai_response(
                         }
                     }
 
-                    // 处理原生代码执行 (executableCode)
+                    // Handle native code execution (executableCode)
                     if let Some(exec_code) = part.get("executableCode") {
                         let lang = exec_code
                             .get("language")
@@ -133,7 +133,7 @@ pub fn transform_openai_response(
                         }
                     }
 
-                    // 处理代码执行结果 (codeExecutionResult)
+                    // Handle code execution results (codeExecutionResult)
                     if let Some(exec_result) = part.get("codeExecutionResult") {
                         let output = exec_result
                             .get("output")
@@ -152,21 +152,21 @@ pub fn transform_openai_response(
                 }
             }
 
-            // 提取并处理该候选结果的联网搜索引文 (Grounding Metadata)
+            // Extract and process the grounding search citations (Grounding Metadata) for this candidate result
             if let Some(grounding) = candidate.get("groundingMetadata") {
                 let mut grounding_text = String::new();
 
-                // 1. 处理搜索词
+                // 1. Process search terms
                 if let Some(queries) = grounding.get("webSearchQueries").and_then(|q| q.as_array())
                 {
                     let query_list: Vec<&str> = queries.iter().filter_map(|v| v.as_str()).collect();
                     if !query_list.is_empty() {
-                        grounding_text.push_str("\n\n---\n**🔍 已为您搜索：** ");
+                        grounding_text.push_str("\n\n---\n**🔍 Searched for you:**");
                         grounding_text.push_str(&query_list.join(", "));
                     }
                 }
 
-                // 2. 处理来源链接 (Chunks)
+                // 2. Process source links (Chunks)
                 if let Some(chunks) = grounding.get("groundingChunks").and_then(|c| c.as_array()) {
                     let mut links = Vec::new();
                     for (i, chunk) in chunks.iter().enumerate() {
@@ -174,14 +174,14 @@ pub fn transform_openai_response(
                             let title = web
                                 .get("title")
                                 .and_then(|v| v.as_str())
-                                .unwrap_or("网页来源");
+                                .unwrap_or("Web source");
                             let uri = web.get("uri").and_then(|v| v.as_str()).unwrap_or("#");
                             links.push(format!("[{}] [{}]({})", i + 1, title, uri));
                         }
                     }
 
                     if !links.is_empty() {
-                        grounding_text.push_str("\n\n**🌐 来源引文：**\n");
+                        grounding_text.push_str("\n\n**🌐 Source citation:**\n");
                         grounding_text.push_str(&links.join("\n"));
                     }
                 }
@@ -191,18 +191,18 @@ pub fn transform_openai_response(
                 }
             }
 
-            // 提取传统的 citationMetadata
+            // Extract traditional citationMetadata
             if let Some(citation) = candidate.get("citationMetadata") {
                 if let Some(sources) = citation.get("citationSources").and_then(|s| s.as_array()) {
                     let mut links = Vec::new();
                     for (i, source) in sources.iter().enumerate() {
                         if let Some(uri) = source.get("uri").and_then(|v| v.as_str()) {
-                            // 由于有时没有 title，直接用 URI 当标题
+                            // Since sometimes there is no title, use the URI directly as the title.
                             links.push(format!("[{}] [{}]({})", i + 1, uri, uri));
                         }
                     }
                     if !links.is_empty() {
-                        content_out.push_str("\n\n**📚 引用来源：**\n");
+                        content_out.push_str("\n\n**📚 Quote source:**\n");
                         content_out.push_str(&links.join("\n"));
                     }
                 }
@@ -210,7 +210,7 @@ pub fn transform_openai_response(
 
             let raw_finish_reason = candidate.get("finishReason").and_then(|f| f.as_str());
 
-            // 规范化 finish_reason：若包含工具调用，强制遵循 OpenAI 规范映射为 tool_calls
+            // Normalized finish_reason: If it contains tool calls, it is forced to follow the OpenAI specification and is mapped to tool_calls
             let finish_reason = if !tool_calls.is_empty() {
                 "tool_calls"
             } else {
@@ -263,7 +263,7 @@ pub fn transform_openai_response(
         }
     }
 
-    // 如果 candidates 为空，但存在 promptFeedback（被安全拦截），伪造一个被拒绝的 choice
+    // If candidates is empty but promptFeedback is present (intercepted by security), fake a rejected choice
     if choices.is_empty() {
         if let Some(feedback) = raw.get("promptFeedback") {
             let reason = feedback

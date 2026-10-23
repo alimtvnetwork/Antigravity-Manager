@@ -1,5 +1,5 @@
 // Request body phase (split from request.rs).
-// OpenAI → Gemini 请求转换
+// OpenAI → Gemini request conversion
 use super::super::models::*;
 use crate::proxy::model_specs;
 use crate::proxy::token_manager::ProxyToken;
@@ -16,7 +16,7 @@ pub(crate) fn phase_body(
     setup: &super::session_setup::SetupState,
     contents: &[serde_json::Value],
 ) -> (serde_json::Value, serde_json::Value) {
-    // 3. 构建请求体
+    // 3. Build the request body
 
     let mut gen_config = json!({
         // [CHANGED v4.1.24] Default topP from 0.95 → 1.0 to match native behavior
@@ -28,16 +28,16 @@ pub(crate) fn phase_body(
         gen_config["temperature"] = json!(temp);
     }
 
-    // [FIX] 移除旧的硬编码限额，改为动态查询 (v4.1.29)
+    // [FIX] Remove old hardcoded limits in favor of dynamic queries (v4.1.29)
     if let Some(max_tokens) = request.max_tokens {
         gen_config["maxOutputTokens"] = json!(max_tokens);
     } else {
-        // 使用动态优先的规格限额
+        // Use dynamically prioritized spec limits
         let limit = model_specs::get_max_output_tokens(mapped_model, token);
         gen_config["maxOutputTokens"] = json!(limit);
     }
 
-    // [NEW] 支持多候选结果数量 (n -> candidateCount)
+    // [NEW] Support multiple candidate result numbers (n -> candidateCount)
     if let Some(n) = request.n {
         gen_config["candidateCount"] = json!(n);
     }
@@ -52,7 +52,7 @@ pub(crate) fn phase_body(
         gen_config["seed"] = json!(seed);
     }
 
-    // 为 thinking 模型注入 thinkingConfig (使用流水线统一配置治理)
+    // Inject thinkingConfig into the thinking model (use pipeline unified configuration management)
     if setup.is_client_disabled {
         tracing::debug!(
             "[OpenAI-Request] Client direct control disabled thinking: removing thinkingConfig for {}",
@@ -79,7 +79,7 @@ pub(crate) fn phase_body(
                 "includeThoughts": false
             });
         } else {
-            // [CONFIGURABLE] 思考预算与思考配置：全协议统一由 InboundThinkingPipeline 流水线节点权威解析与治理
+            // [CONFIGURABLE] Thinking budget and thinking configuration: All protocols are unified and authoritatively parsed and governed by InboundThinkingPipeline pipeline nodes
             let client_effort = request
                 .reasoning_effort
                 .as_deref()
@@ -108,8 +108,8 @@ pub(crate) fn phase_body(
                 );
 
             if let Some(final_budget) = resolved_budget {
-                // [CRITICAL] 思维模型的 maxOutputTokens 必须大于 thinkingBudget
-                // [FIX #1675] 针对图像模型使用更保守的 max_tokens 增量，避免触发 128k 限制
+                // [CRITICAL] maxOutputTokens of thinking model must be greater than thinkingBudget
+                // [FIX #1675] Use a more conservative max_tokens increment for image models to avoid triggering the 128k limit
                 let overhead = if setup.config.request_type == "image_gen" {
                     2048
                 } else {
@@ -212,9 +212,9 @@ pub(crate) fn phase_body(
         }
     }
 
-    // [CACHE] inner_request 先创建为空的 Map，后续按稳定顺序填充
+    // [CACHE] inner_request creates an empty Map first, and then fills it in a stable order.
     let mut inner_request = json!({});
-    // 先放 contents（后续会被 reordered_request 覆盖到后面）
+    // Put contents first (it will be overwritten later by reordered_request)
     inner_request["contents"] = json!(contents);
     inner_request["generationConfig"] = gen_config.clone();
     inner_request["safetySettings"] = json!([
@@ -224,7 +224,7 @@ pub(crate) fn phase_body(
         { "category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "OFF" },
     ]);
 
-    // [PIPELINE] 统一清洗提示词与风控伪 Header（含 [undefined] 深度清理，见 PromptSanitizer）
+    // [PIPELINE] Unified cleaning prompt words and risk control pseudo-Headers (including [undefined] deep cleaning, see PromptSanitizer)
     crate::proxy::mappers::prompt_sanitizer::PromptSanitizer::sanitize_gemini_payload(
         &mut inner_request,
     );

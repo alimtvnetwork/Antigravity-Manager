@@ -3,10 +3,10 @@ use rusqlite::{params, Connection};
 use super::*;
 
 // ============================================================================
-// IP 访问日志操作
+// IP access log operations
 // ============================================================================
 
-/// 保存 IP 访问日志
+/// Save IP access logs
 pub fn save_ip_access_log(log: &IpAccessLog) -> Result<(), String> {
     let conn = connect_db()?;
 
@@ -33,7 +33,7 @@ pub fn save_ip_access_log(log: &IpAccessLog) -> Result<(), String> {
     Ok(())
 }
 
-/// 获取 IP 访问日志 (分页)
+/// Get IP access logs (paginated)
 pub fn get_ip_access_logs(
     limit: usize,
     offset: usize,
@@ -109,7 +109,7 @@ pub fn get_ip_access_logs(
     Ok(logs)
 }
 
-/// 获取 IP 统计概览
+/// Get an overview of IP statistics
 pub fn get_ip_stats() -> Result<IpStats, String> {
     let conn = connect_db()?;
 
@@ -166,7 +166,7 @@ pub fn get_ip_stats() -> Result<IpStats, String> {
     })
 }
 
-/// 获取 TOP N IP 访问排行
+/// Get TOP N IP access rankings
 pub fn get_top_ips(limit: usize, hours: i64) -> Result<Vec<IpRanking>, String> {
     let conn = connect_db()?;
 
@@ -189,7 +189,7 @@ pub fn get_top_ips(limit: usize, hours: i64) -> Result<Vec<IpRanking>, String> {
                 client_ip: row.get(0)?,
                 request_count: row.get(1)?,
                 last_seen: row.get(2)?,
-                is_blocked: false, // 稍后填充
+                is_blocked: false, // Fill in later
             })
         })
         .map_err(|e| e.to_string())?;
@@ -197,7 +197,7 @@ pub fn get_top_ips(limit: usize, hours: i64) -> Result<Vec<IpRanking>, String> {
     let mut rankings = Vec::new();
     for r in rankings_iter {
         let mut ranking = r.map_err(|e| e.to_string())?;
-        // 检查是否在黑名单中
+        // Check if it is in blacklist
         ranking.is_blocked = is_ip_in_blacklist(&ranking.client_ip)?;
         rankings.push(ranking);
     }
@@ -205,7 +205,7 @@ pub fn get_top_ips(limit: usize, hours: i64) -> Result<Vec<IpRanking>, String> {
     Ok(rankings)
 }
 
-/// 清理旧的 IP 访问日志
+/// Clean old IP access logs
 pub fn cleanup_old_ip_logs(days: i64) -> Result<usize, String> {
     let conn = connect_db()?;
 
@@ -224,7 +224,7 @@ pub fn cleanup_old_ip_logs(days: i64) -> Result<usize, String> {
     Ok(deleted)
 }
 
-/// 清空所有 IP 访问日志
+/// Clear all IP access logs
 pub fn clear_ip_access_logs() -> Result<(), String> {
     let conn = connect_db()?;
     conn.execute("DELETE FROM ip_access_logs", [])
@@ -232,7 +232,7 @@ pub fn clear_ip_access_logs() -> Result<(), String> {
     Ok(())
 }
 
-/// 获取 IP 访问日志总数
+/// Get the total number of IP access logs
 pub fn get_ip_access_logs_count(
     ip_filter: Option<&str>,
     blocked_only: bool,

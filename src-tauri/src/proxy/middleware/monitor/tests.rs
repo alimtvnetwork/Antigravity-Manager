@@ -113,8 +113,8 @@ fn test_extract_tokens_gemini_raw() {
 fn test_should_skip_request_log_only_suppresses_successful_get() {
     use axum::http::StatusCode;
 
-    // 胶囊开关关闭（默认）：GET 成功请求一律不记录 —— 含 /v1/models 轮询（本次修复的核心场景）
-    // 与 /health 探针，且与路径无关（GET 成功即噪音）
+    // Capsule switch is off (default): GET successful requests will not be recorded - including /v1/models polling (the core scenario of this repair)
+    // It is related to the /health probe and has nothing to do with the path (GET success is noise)
     for path in [
         "/v1/models",
         "/v1/models?limit=100",
@@ -128,35 +128,35 @@ fn test_should_skip_request_log_only_suppresses_successful_get() {
         for status in [200, 204, 201] {
             assert!(
                 super::should_skip_request_log("GET", StatusCode::from_u16(status).unwrap(), false),
-                "GET {status} {path} 应被抑制"
+                "GET {status} {path} should be suppressed"
             );
         }
     }
 
-    // 大写的 GET 同样识别
+    // Uppercase GET is also recognized
     assert!(super::should_skip_request_log("get", StatusCode::OK, false));
 
-    // 失败请求始终记录（供排障）—— 无论路径与方法
+    // Failed requests are always logged (for troubleshooting) - regardless of path or method
     for status in [400, 401, 403, 404, 429, 500, 502, 503, 504] {
         assert!(
             !super::should_skip_request_log("GET", StatusCode::from_u16(status).unwrap(), false),
-            "GET {status} 必须记录"
+            "GET {status} must be recorded"
         );
     }
 
-    // 非 GET 业务请求始终记录
+    // Non-GET business requests are always logged
     for method in ["POST", "PUT", "PATCH", "DELETE", "post"] {
         assert!(
             !super::should_skip_request_log(method, StatusCode::OK, false),
-            "{method} 200 必须记录"
+            "{method} 200 must be recorded"
         );
     }
 
-    // 开关开启（或 ABV_LOG_HEALTH_CHECKS=true）→ 全部记录并落库
+    // Switch on (or ABV_LOG_HEALTH_CHECKS=true) → all records and dropped into the library
     for (method, status) in [("GET", 200), ("GET", 503), ("POST", 200)] {
         assert!(
             !super::should_skip_request_log(method, StatusCode::from_u16(status).unwrap(), true),
-            "开关开启时 {method} {status} 必须记录"
+            "When the switch is turned on, {method} {status} must be recorded"
         );
     }
 }

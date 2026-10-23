@@ -1,15 +1,15 @@
-//! 官方报文对齐回归测试：五种 part 排列下签名锚点必须与真机一致。
+//! Official message alignment regression test: the signature anchor points under the five part arrangements must be consistent with the real machine.
 //!
-//! 依据 3 份官方 Antigravity 报文、23 处真实签名归纳出的不变量
-//! （见 `.workbuddy/outputs/correct-assembly-spec.md`）：
-//!   1. 签名只出现在 model 轮，每轮至多 1 个；
-//!   2. 锚点 = 该轮第一个 `thought != true` 的 part；
-//!   3. `thought: true` / `functionResponse` / 非锚点 —— 字段必须「缺席」；
-//!   4. 缺失签名被上游容忍，绝不发明哨兵。
+//! Invariants summarized based on 3 official Antigravity messages and 23 real signatures
+//! (See `.workbuddy/outputs/correct-assembly-spec.md`):
+//!   1. Signatures only appear in the model round, with a maximum of 1 in each round;
+//!   2. Anchor point = the first `thought != true` part of this round;
+//!   3. `thought: true` / `functionResponse` / non-anchor - the field must be "absent";
+//!   4. Missing signatures are tolerated by upstream and sentinels are never created.
 use super::*;
 use serde_json::json;
 
-/// 构造符合 Google 原生特征的假签名（Base64 解码后首字节 = protobuf tag 0x12）
+/// Construct a fake signature that conforms to Google's native characteristics (first byte after Base64 decoding = protobuf tag 0x12)
 fn gemini_sig(seed: u8) -> String {
     use base64::Engine;
     let mut raw = vec![0x12u8, seed];
@@ -19,25 +19,25 @@ fn gemini_sig(seed: u8) -> String {
 
 #[test]
 fn is_thought_part_only_accepts_explicit_flag() {
-    // 带签名但没有 thought 标志的正文 —— 绝不能判为思考块（旧启发式的核心错误）
+    // Signed text without the thought flag - must not be considered a thought block (the core error of the old heuristic)
     assert!(!is_thought_part(
         &json!({ "text": "answer", "thoughtSignature": "Eabc" })
     ));
-    // 带 functionCall 也不算
+    // It does not count with functionCall
     assert!(!is_thought_part(
         &json!({ "functionCall": { "name": "x" }, "thoughtSignature": "Eabc" })
     ));
-    // 只有显式 thought: true 才算
+    // Only explicit thought: true counts
     assert!(is_thought_part(
         &json!({ "text": "reasoning", "thought": true })
     ));
-    // 显式 false 不算
+    // Explicit false does not count
     assert!(!is_thought_part(&json!({ "text": "x", "thought": false })));
 }
 
 #[test]
 fn arrangement_a_thought_plus_text_keeps_signature_on_text() {
-    // 官方 f81eae5c contents[1] 的排列
+    // Official f81eae5c contents[1] arrangement
     let sig = gemini_sig(1);
     let mut parts = vec![
         json!({ "text": "reasoning", "thought": true }),
@@ -46,17 +46,17 @@ fn arrangement_a_thought_plus_text_keeps_signature_on_text() {
     let placed = place_turn_signature(&mut parts, None);
 
     assert_eq!(placed.as_deref(), Some(sig.as_str()));
-    assert_eq!(parts.len(), 2, "绝不能重排或增删 part");
+    assert_eq!(parts.len(), 2, "Never rearrange or add or delete parts");
     assert!(
         parts[0].get("thoughtSignature").is_none(),
-        "思考块绝不带签名"
+        "Thought blocks are never signed"
     );
-    assert_eq!(parts[1]["thoughtSignature"], sig, "锚点 = parts[1]");
+    assert_eq!(parts[1]["thoughtSignature"], sig, "anchor = parts[1]");
 }
 
 #[test]
 fn arrangement_b_parallel_calls_signs_only_the_first() {
-    // 官方 f81eae5c contents[3]：3 个并发 functionCall，签名只在 parts[0]
+    // Official f81eae5c contents[3]: 3 concurrent functionCalls, signature only in parts[0]
     let sig = gemini_sig(2);
     let mut parts = vec![
         json!({ "functionCall": { "id": "a", "name": "run_command" }, "thoughtSignature": sig }),
@@ -65,11 +65,11 @@ fn arrangement_b_parallel_calls_signs_only_the_first() {
     ];
     place_turn_signature(&mut parts, None);
 
-    assert_eq!(parts.len(), 3, "绝不插入假思考块");
+    assert_eq!(parts.len(), 3, "Never insert fake thought blocks");
     assert_eq!(parts[0]["thoughtSignature"], sig);
     assert!(
         parts[1].get("thoughtSignature").is_none(),
-        "字段必须缺席而非空串"
+        "Field must be absent and not empty string"
     );
     assert!(parts[2].get("thoughtSignature").is_none());
 }
@@ -81,7 +81,7 @@ fn arrangement_c_function_responses_never_signed() {
         json!({ "functionResponse": { "id": "a", "name": "x" } }),
         json!({ "functionResponse": { "id": "b", "name": "y" } }),
     ];
-    // 即便提供回填来源，也绝不写入 functionResponse
+    // functionResponse is never written even if a backfill source is provided
     let placed = place_turn_signature(&mut parts, Some(sig.as_str()));
 
     assert!(placed.is_none());
@@ -101,20 +101,20 @@ fn arrangement_d_pure_text_keeps_its_own_signature() {
 
 #[test]
 fn unsigned_anchor_stays_absent_when_no_source_available() {
-    // 官方 baogao.txt contents[17]：在飞 functionCall 就是无签名的
+    // Official baogao.txt contents[17]: In flying functionCall, it is unsigned
     let mut parts = vec![json!({ "functionCall": { "id": "call_x", "name": "bash" } })];
     let placed = place_turn_signature(&mut parts, None);
 
     assert!(placed.is_none());
     assert!(
         parts[0].get("thoughtSignature").is_none(),
-        "绝不发明哨兵，官方报文里哨兵出现 0 次"
+        "Sentinels will never be invented. Sentinels appear 0 times in official reports."
     );
 }
 
 #[test]
 fn fallback_signature_is_placed_on_anchor() {
-    // 跨协议路径：锚点无签名，但库里有真实签名
+    // Cross-protocol path: The anchor has no signature, but the library has a real signature
     let sig = gemini_sig(5);
     let mut parts = vec![json!({ "functionCall": { "id": "call_x", "name": "bash" } })];
     let placed = place_turn_signature(&mut parts, Some(sig.as_str()));
@@ -128,7 +128,10 @@ fn sentinel_is_never_accepted_as_a_source() {
     let mut parts = vec![json!({ "functionCall": { "id": "call_x", "name": "bash" } })];
     let placed = place_turn_signature(&mut parts, Some(SENTINEL_SIGNATURE));
 
-    assert!(placed.is_none(), "哨兵不是合法回填来源");
+    assert!(
+        placed.is_none(),
+        "Sentinel is not a legitimate backfill source"
+    );
     assert!(parts[0].get("thoughtSignature").is_none());
 }
 
@@ -143,12 +146,15 @@ fn non_anchor_signatures_are_purged_to_absence() {
     ];
     place_turn_signature(&mut parts, None);
 
-    assert_eq!(parts[0]["thoughtSignature"], sig_a, "锚点保留自己的真签名");
+    assert_eq!(
+        parts[0]["thoughtSignature"], sig_a,
+        "Anchors retain their own true signature"
+    );
     assert!(parts[1].get("thoughtSignature").is_none());
     assert!(parts[2].get("thoughtSignature").is_none());
     assert!(
         parts[2].get("thought_signature").is_none(),
-        "蛇形字段必须被清除"
+        "Snake fields must be cleared"
     );
 }
 
@@ -161,7 +167,10 @@ fn all_thought_turn_has_no_anchor() {
     ];
     let placed = place_turn_signature(&mut parts, Some(sig.as_str()));
 
-    assert!(placed.is_none(), "整轮皆思考则本轮无锚点");
+    assert!(
+        placed.is_none(),
+        "If you think the whole round, there will be no anchor point in this round."
+    );
     assert!(parts[0].get("thoughtSignature").is_none());
     assert!(parts[1].get("thoughtSignature").is_none());
 }

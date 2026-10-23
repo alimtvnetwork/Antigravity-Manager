@@ -12,8 +12,8 @@ import { AccountRowContent } from './AccountRowContent';
 import { AccountRowContextMenu } from './AccountRowContextMenu';
 
 /**
- * 可拖拽的表格行组件
- * 使用 @dnd-kit/sortable 实现拖拽功能
+ * Draggable table row component
+ * Use @dnd-kit/sortable to implement drag and drop functionality
  */
 export function SortableAccountRow({
     account,
@@ -106,7 +106,7 @@ export function SortableAccountRow({
                         : "border-l-transparent text-gray-800 dark:text-gray-200 font-medium hover:border-l-blue-500/80 dark:hover:border-l-[var(--ui-interactive)] hover:shadow-xs"
                 )}
             >
-                {/* 拖拽手柄 */}
+                {/* Drag handle */}
                 <td className="pl-2 py-0.5 w-7 align-middle border-b border-slate-200/90 dark:border-slate-800/90">
                     <div
                         {...(!isDragDisabled ? attributes : {})}
@@ -117,12 +117,12 @@ export function SortableAccountRow({
                                 ? "text-gray-200 dark:text-gray-700 cursor-not-allowed opacity-40"
                                 : "cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                         )}
-                        title={isDragDisabled ? t('accounts.drag_disabled_during_sort', '已激活列排序，拖拽排序已暂停') : t('accounts.drag_to_reorder')}
+                        title={isDragDisabled ? t('accounts.drag_disabled_during_sort', 'Column sorting is activated, drag sorting is paused') : t('accounts.drag_to_reorder')}
                     >
                         <GripVertical className="w-3.5 h-3.5" />
                     </div>
                 </td>
-                {/* 复选框 */}
+                {/* checkbox */}
                 <td className="px-1.5 py-0.5 w-8 align-middle border-b border-slate-200/90 dark:border-slate-800/90">
                     <input
                         type="checkbox"

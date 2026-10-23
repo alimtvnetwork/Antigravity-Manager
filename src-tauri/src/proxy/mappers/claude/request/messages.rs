@@ -1,6 +1,6 @@
 // Message preprocessing (split from request.rs).
-// Claude 请求转换 (Claude → Gemini v1internal)
-// 对应 transformClaudeRequestIn
+// Claude requested conversion (Claude → Gemini v1internal)
+// Corresponds to transformClaudeRequestIn
 
 use super::super::models::*;
 use crate::proxy::mappers::signature_store::get_thought_signature; // Deprecated, kept for fallback
@@ -23,15 +23,15 @@ pub(crate) fn normalize_claude_client_identity(text: &str) -> &str {
 /// Safety threshold levels for Gemini API
 /// Can be configured via GEMINI_SAFETY_THRESHOLD environment variable
 
-/// 清理消息中的 cache_control 字段
+/// Clean cache_control field in message
 ///
-/// 这个函数会深度遍历所有消息内容块,移除 cache_control 字段。
-/// 这是必要的,因为:
-/// 1. VS Code 等客户端会将历史消息(包含 cache_control)原封不动发回
-/// 2. Anthropic API 不接受请求中包含 cache_control 字段
-/// 3. 即使是转发到 Gemini,也应该清理以保持协议纯净性
+/// This function will deeply traverse all message content blocks and remove the cache_control field.
+/// This is necessary because:
+/// 1. Clients such as VS Code will send back historical messages (including cache_control) intact.
+/// 2. Anthropic API does not accept requests containing the cache_control field
+/// 3. Even if it is forwarded to Gemini, it should be cleaned to maintain protocol purity.
 ///
-/// [FIX #593] 增强版本:添加详细日志用于调试 MCP 工具兼容性问题
+/// [FIX #593] Enhanced version: Add detailed logs for debugging MCP tool compatibility issues
 pub fn clean_cache_control_from_messages(messages: &mut [Message]) {
     tracing::info!(
         "[DEBUG-593] Starting cache_control cleanup for {} messages",
@@ -105,15 +105,15 @@ pub fn clean_cache_control_from_messages(messages: &mut [Message]) {
     }
 }
 
-/// [FIX #593] 递归深度清理 JSON 中的 cache_control 字段
+/// [FIX #593] Recursive deep cleaning of cache_control field in JSON
 ///
-/// 用于处理嵌套结构和非标准位置的 cache_control。
-/// 这是最后一道防线,确保发送给 Antigravity 的请求中不包含任何 cache_control。
+/// cache_control for handling nested structures and non-standard locations.
+/// This is a last line of defense, ensuring that requests sent to Antigravity do not contain any cache_control.
 
-/// [FIX #593] 递归深度清理 JSON 中的 cache_control 字段
+/// [FIX #593] Recursive deep cleaning of cache_control field in JSON
 ///
-/// 用于处理嵌套结构和非标准位置的 cache_control。
-/// 这是最后一道防线,确保发送给 Antigravity 的请求中不包含任何 cache_control。
+/// cache_control for handling nested structures and non-standard locations.
+/// This is a last line of defense, ensuring that requests sent to Antigravity do not contain any cache_control.
 pub(crate) fn deep_clean_cache_control(value: &mut Value) {
     match value {
         Value::Object(map) => {
@@ -221,17 +221,17 @@ pub(crate) fn sort_thinking_blocks_first(messages: &mut [Message]) {
     }
 }
 
-/// 合并 ClaudeRequest 中连续的同角色消息
+/// Merge consecutive messages of the same role in ClaudeRequest
 ///
-/// 场景: 当从 Spec/Plan 模式切换回编码模式时，可能出现连续两条 "user" 消息
-/// (一条是 ToolResult，一条是 <system-reminder>)。
-/// 这会违反角色交替规则，导致 400 报错。
+/// Scenario: When switching back to encoding mode from Spec/Plan mode, two consecutive "user" messages may appear
+/// (One is ToolResult and one is <system-reminder>).
+/// This would violate the role alternation rules and result in a 400 error.
 
-/// 合并 ClaudeRequest 中连续的同角色消息
+/// Merge consecutive messages of the same role in ClaudeRequest
 ///
-/// 场景: 当从 Spec/Plan 模式切换回编码模式时，可能出现连续两条 "user" 消息
-/// (一条是 ToolResult，一条是 <system-reminder>)。
-/// 这会违反角色交替规则，导致 400 报错。
+/// Scenario: When switching back to encoding mode from Spec/Plan mode, two consecutive "user" messages may appear
+/// (One is ToolResult and one is <system-reminder>).
+/// This would violate the role alternation rules and result in a 400 error.
 pub fn merge_consecutive_messages(messages: &mut Vec<Message>) {
     if messages.len() <= 1 {
         return;
@@ -244,7 +244,7 @@ pub fn merge_consecutive_messages(messages: &mut Vec<Message>) {
     if let Some(mut current) = messages_iter.next() {
         for next in messages_iter {
             if current.role == next.role {
-                // 合并内容
+                // Merge content
                 match (&mut current.content, next.content) {
                     (MessageContent::Array(current_blocks), MessageContent::Array(next_blocks)) => {
                         current_blocks.extend(next_blocks);
@@ -274,7 +274,7 @@ pub fn merge_consecutive_messages(messages: &mut Vec<Message>) {
     *messages = merged;
 }
 
-// 转换 Claude 请求为 Gemini v1internal 格式
+// Convert Claude request to Gemini v1internal format
 /// [FIX #709] Reorder serialized Gemini parts to ensure thinking blocks are first,
 /// deduplicate multiple thinking blocks to at most ONE per model turn, and clean out raw dot placeholders.
 
@@ -286,12 +286,12 @@ pub(crate) fn reorder_gemini_parts(parts: &mut Vec<Value>) {
     }
 
     let mut thinking_parts = Vec::new();
-    // 非思考部件**保持原有相对顺序**。
+    // Non-thinking components **maintain their original relative order**.
     //
-    // 历史实现按 `[text] → [other] → [tool]` 重排，把 `functionCall` 挤到最后：
-    // 同一段对话经 Claude 入口与经 OpenAI / Gemini 入口会产出不同的 `contents`
-    // （前缀缓存哈希必然不命中），且在 text / tool 混排轮上移动签名锚点。
-    // parts 顺序即锚点语义，除「思考块置于首位」外不得改写。
+    // The historical implementation is rearranged according to `[text] → [other] → [tool]`, squeezing `functionCall` to the end:
+    // The same conversation will produce different `contents` through Claude and OpenAI/Gemini.
+    // (The prefix cache hash is bound to miss), and the signature anchor is moved on the text / tool shuffling wheel.
+    // The order of parts is the anchor semantics and cannot be rewritten except "thinking blocks are placed first".
     let mut rest_parts = Vec::new();
 
     for part in parts.drain(..) {

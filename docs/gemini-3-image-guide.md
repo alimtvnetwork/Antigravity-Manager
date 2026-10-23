@@ -1,64 +1,64 @@
-# Gemini 3 Pro Image 模型调用指南
+# Gemini 3 Pro Image Model Calling Guide
 
-本文档详细说明了在 **Antigravity** 项目中调用 Google `gemini-3-pro-image` (Imagen 3) 模型的方法。本项目已对该模型进行了 OpenAI 协议的完全兼容封装，并扩展支持了原生的摄影宽高比、人物生成安全策略，以及**图生图 (Image-to-Image)** 功能。
+This document details how to use Google's `gemini-3-pro-image` (Imagen 3) model in the **Antigravity** project. This project has encapsulated the model with full compatibility with the OpenAI protocol, and extended support for the native photography aspect ratio, character generation security policy, and **Image-to-Image** functionality.
 
-## 1. 基础信息
+## 1. Basic information
 
-*   **模型 ID**: `gemini-3-pro-image` (支持别名 `gemini-3-pro-image-preview`)
-*   **接口路径**:
-    *   `/v1/images/generations` (文生图 Text-to-Image)
-    *   `/v1/images/edits` (图生图 Image-to-Image / 编辑)
-    *   `/v1/chat/completions` (兼容模式)
-*   **底层模型**: Google Imagen 3 (Gemini Native)
+* **Model ID**: `gemini-3-pro-image` (supports alias `gemini-3-pro-image-preview`)
+* **Interface path**:
+    * `/v1/images/generations` (Text-to-Image)
+    * `/v1/images/edits` (Image-to-Image / edit)
+    * `/v1/chat/completions` (compatibility mode)
+* **Underlying model**: Google Imagen 3 (Gemini Native)
 
 ---
 
-## 2. 文生图 (Text-to-Image)
+## 2. Text-to-Image
 
-调用 `/v1/images/generations`，支持以下参数：
+Call `/v1/images/generations`, supporting the following parameters:
 
-### 2.1 画幅与宽高比 (Size / Aspect Ratio)
+### 2.1 Size / Aspect Ratio
 
-`size` 参数支持两种输入格式，系统会自动解析并映射到 Gemini 支持的标准比例：
+The `size` parameter supports two input formats, and the system will automatically parse and map to the standard scale supported by Gemini:
 
-1.  **直接输入比例 (推荐)**：如 `"16:9"`, `"4:3"`, `"1:1"`。这种方式最直观，且 100% 准确映射。
-2.  **输入分辨率 (兼容)**：如 `"1920x1080"`, `"1024x1024"`。系统会自动计算其宽高比（例如 1920/1080 ≈ 1.77），并将其归一化为最接近的标准比例（16:9）。
+1. **Directly enter the ratio (recommended)**: such as `"16:9"`, `"4:3"`, `"1:1"`. This way is the most intuitive and 100% accurate mapping.
+2. **Input resolution (compatible)**: such as `"1920x1080"`, `"1024x1024"`. The system automatically calculates its aspect ratio (e.g. 1920/1080 ≈ 1.77) and normalizes it to the nearest standard ratio (16:9).
 
-**⚠️ 重要说明**：Gemini (Imagen 3) **不支持自定义任意像素大小**。
-无论您在 `size` 中输入 `"1920x1080"` 还是 `"16:9"`，最终生成的**实际物理分辨率**仅由以下两个因素决定：
-1.  **宽高比**（由 `size` 解析得出）
-2.  **画质等级**（由 `quality` 参数决定：`1k`/`2k`/`4k`）
+**⚠️ IMPORTANT NOTE**: Gemini (Imagen 3) **does not support customizing arbitrary pixel sizes**.
+Whether you enter `"1920x1080"` or `"16:9"` in `size`, the resulting **actual physical resolution** is determined by only the following two factors:
+1. **Aspect Ratio** (parsed by `size`)
+2. **Image quality level** (determined by `quality` parameter: `1k`/`2k`/`4k`)
 
-*示例：输入 `size: "1920x1080"` (16:9) 且 `quality: "standard"` (1k)，实际生成的图片尺寸为 **1376x768** (16:9 下的 1K 分辨率)，而不是 1920x1080。*
+*Example: Entering `size: "1920x1080"` (16:9) and `quality: "standard"` (1k), the actual generated image size is **1376x768** (1K resolution at 16:9), not 1920x1080. *
 
-| 目标比例 | 适用场景 | `size` 参数示例 (分辨率) | 备注 |
+| target ratio | Applicable scenarios | `size` parameter example (resolution) | Remark |
 | :--- | :--- | :--- | :--- |
-| **16:9** | 宽屏、电影感 | `1920x1080`, `1280x720` | 标准宽屏 |
-| **9:16** | 手机壁纸、Stories | `1080x1920`, `720x1280` | 竖屏全屏 |
-| **1:1** | 头像、Instagram | `1024x1024` | 默认比例 |
-| **4:3** | 传统摄影、显示器 | `1024x768`, `800x600` | |
-| **3:4** | 纵向摄影 | `768x1024`, `600x800` | |
-| **21:9** | 超宽屏、电影 | `2560x1080` | 电影银幕 |
-| **3:2** | **[新增]** 全画幅单反 | `1500x1000` | 经典摄影比例 |
-| **2:3** | **[新增]** 竖构图摄影 | `1000x1500` | 海报、立绘 |
-| **5:4** | **[新增]** 大画幅 | `1280x1024` | 艺术摄影 |
-| **4:5** | **[新增]** 社交媒体竖图 | `1024x1280` | Ins 最佳展示比例 |
+| **16:9** | Widescreen, cinematic | `1920x1080`, `1280x720` | Standard widescreen |
+| **9:16** | Mobile wallpapers, Stories | `1080x1920`, `720x1280` | vertical full screen |
+| **1:1** | Avatar, Instagram | `1024x1024` | Default scale |
+| **4:3** | Traditional photography, monitor | `1024x768`, `800x600` | |
+| **3:4** | portrait photography | `768x1024`, `600x800` | |
+| **21:9** | Ultrawidescreen, movies | `2560x1080` | movie screen |
+| **3:2** | **[New]** Full frame DSLR | `1500x1000` | Classic photography proportions |
+| **2:3** | **[New]** Vertical composition photography | `1000x1500` | Posters, vertical paintings |
+| **5:4** | **[New]** Large format | `1280x1024` | art photography |
+| **4:5** | **[NEW]** Social media vertical image | `1024x1280` | Ins best display ratio |
 
-> **提示**: 您不需要精确匹配像素值，只需宽高比接近上述比例（容差 0.05）即可自动识别。
+> **Tip**: You don't need to match the pixel values ​​exactly, just an aspect ratio close to the ratio above (tolerance 0.05) for automatic recognition.
 
-### 2.2 画质与分辨率 (Quality)
+### 2.2 Image quality and resolution (Quality)
 
-通过 `quality` 参数控制生成的精细度。
+Control the granularity of the generation via the `quality` parameter.
 
-| 参数值 (`quality`) | 对应 Gemini 设置 | 说明 |
+| Parameter value (`quality`) | Corresponding Gemini settings | illustrate |
 | :--- | :--- | :--- |
-| `standard` / `1k` | Image Size: `1K` | 生成速度快，适合快速验证 (默认) |
-| `medium` / `2k` | Image Size: `2K` | 平衡质量与速度 |
-| `hd` / `4k` | Image Size: `4K` | **极高画质**，细节最丰富，耗时稍长 |
+| `standard` / `1k` | Image Size: `1K` | Fast generation, suitable for quick verification (default) |
+| `medium` / `2k` | Image Size: `2K` | Balancing quality and speed |
+| `hd` / `4k` | Image Size: `4K` | **Extremely high quality**, richest in details, takes slightly longer |
 
-#### 分辨率对照表 (Gemini 3 Pro Image)
+#### Resolution comparison table (Gemini 3 Pro Image)
 
-| 宽高比 | 1K 分辨率 (Standard) | 2K 分辨率 (Medium) | 4K 分辨率 (HD) |
+| aspect ratio | 1K resolution (Standard) | 2K resolution (Medium) | 4K resolution (HD) |
 | :--- | :--- | :--- | :--- |
 | **1:1** | 1024x1024 | 2048x2048 | 4096x4096 |
 | **2:3** | 848x1264 | 1696x2528 | 3392x5056 |
@@ -71,7 +71,7 @@
 | **16:9** | 1376x768 | 2752x1536 | 5504x3072 |
 | **21:9** | 1584x672 | 3168x1344 | 6336x2688 |
 
-### 调用示例 (Python)
+### Call example (Python)
 
 ```python
 import requests
@@ -93,28 +93,28 @@ response = requests.post(url, headers=headers, json=data)
 print(response.json())
 ```
 
-## 3. 图生图 (Image-to-Image / Edits) 🔥 [新增]
+## 3. Image-to-Image / Edits 🔥 [New]
 
-调用 `/v1/images/edits` 接口，支持通过参考图生成。
+Call the `/v1/images/edits` interface to support generation through reference images.
 
 *   **Content-Type**: `multipart/form-data`
-*   **支持多图**: 可同时上传多张参考图。
+* **Support multiple pictures**: Multiple reference pictures can be uploaded at the same time.
 
-### 表单字段说明
+### Form field descriptions
 
-| 字段名 | 类型 | 必填 | 说明 |
+| Field name | type | Required | illustrate |
 | :--- | :--- | :--- | :--- |
-| `prompt` | String | 是 | 文本提示词 |
-| `image1`...`imageN` | File | 是 | **参考图文件**。支持 `image1`, `image2` 等任意名称的文件字段 (非 standard `image` 或 `mask`)。 |
-| `image` | File | 否 | (兼容 OpenAI 标准) 主图像 |
-| `mask` | File | 否 | (兼容 OpenAI 标准) 遮罩图像 |
-| `aspect_ratio` | String | 否 | 显式指定比例，如 `"16:9"` (优先级高于 `size`) |
-| `image_size` | String | 否 | 显式指定分辨率，如 `"2K"`, `"4K"` (优先级高于 `quality`) |
-| `style` | String | 否 | 风格描述，会自动追加到 Prompt 中 |
-| `n` | Integer | 否 | 生成数量 (默认 1) |
-| `model` | String | 否 | 模型名称 (默认 `gemini-3.1-flash-image`) |
+| `prompt` | String | yes | text prompt word |
+| `image1`...`imageN` | File | yes | **Reference Picture File**. Supports `image1`, `image2` and other file fields with any names (not standard `image` or `mask`). |
+| `image` | File | no | (Compatible with OpenAI standards) Main image |
+| `mask` | File | no | (Compatible with OpenAI standards) Mask image |
+| `aspect_ratio` | String | no | Explicitly specify the ratio, such as `"16:9"` (has higher priority than `size`) |
+| `image_size` | String | no | Explicitly specify the resolution, such as `"2K"`, `"4K"` (higher than `quality`) |
+| `style` | String | no | Style description will be automatically appended to Prompt |
+| `n` | Integer | no | Generate quantity (default 1) |
+| `model` | String | no | Model name (default `gemini-3.1-flash-image`) |
 
-### 调用示例 (Python)
+### Call example (Python)
 
 ```python
 import requests
@@ -123,7 +123,7 @@ url = "http://localhost:8045/v1/images/edits"
 headers = {
     "Authorization": "Bearer <token>"
 }
-# 支持多张参考图 (image1, image2, ...)
+# Support multiple reference images (image1, image2, ...)
 files = {
     "image1": open("/path/to/reference_1.jpg", "rb"),
     "image2": open("/path/to/reference_2.jpg", "rb")
@@ -141,31 +141,31 @@ print(response.json())
 
 ---
 
-## 4. 后缀魔法 (Magic Suffix)
+## 4. Magic Suffix
 
-除了标准的 JSON 参数外，本项目还支持在 **模型名称** 中直接指定参数（方便在不支持自定义参数的客户端中使用）。
+In addition to standard JSON parameters, this project also supports directly specifying parameters in the **model name** (convenient for use in clients that do not support custom parameters).
 
-**格式**: `gemini-3-pro-image-{比例}-{画质}`
+**Format**: `gemini-3-pro-image-{ratio}-{quality}`
 
-*   **比例后缀**: `-16x9`, `-9x16`, `-4x3`, `-3x4`, `-3x2`, `-2x3` 等。
-*   **画质后缀**: `-4k` (对应 hd), `-2k` (对应 medium)。
+* **Scale suffix**: `-16x9`, `-9x16`, `-4x3`, `-3x4`, `-3x2`, `-2x3`, etc.
+* **Image quality suffix**: `-4k` (corresponding to hd), `-2k` (corresponding to medium).
 
-**示例**:
-使用模型名 `gemini-3-pro-image-16x9-4k` 等同于：
+**Example**:
+Using the model name `gemini-3-pro-image-16x9-4k` is equivalent to:
 *   `size`: "1920x1080" (16:9)
 *   `quality`: "hd"
 
-> **注意**: 如果 JSON Body 中显式传递了 `size` 或 `quality`，Body 中的参数优先级 **高于** 模型名后缀。
+> **Note**: If `size` or `quality` is explicitly passed in the JSON Body, the priority of the parameters in the Body is **higher** than the model name suffix.
 
 ---
 
-## 5. 常见问题
+## 5. FAQ
 
-1.  **Q: 为什么我设置了 `size: "1234x5678"` 但生成的图片比例不对？**
-    *   **A**: 系统会将您输入的尺寸归一化为 Gemini 支持的 10 种标准比例（见 2.1 节）。如果您的比例非常特殊且不匹配任何标准比例（容差 > 0.05），系统将回退到默认的 **1:1**。建议直接使用示例中的分辨率。
+1. **Q: Why do I set `size: "1234x5678"` but the proportion of the generated image is wrong? **
+    * **A**: The system will normalize the dimensions you enter to the 10 standard ratios supported by Gemini (see Section 2.1). If your ratio is very specific and doesn't match any standard ratio (tolerance > 0.05), the system will fall back to the default **1:1**. It is recommended to use the resolution in the example directly.
 
-2.  **Q: 支持一次生成多张图片吗？**
-    *   **A**: 支持。虽然 Gemini 上游单次请求限制生成 1 张，但 Antigravity 代理层会自动并发处理 `n` 参数。例如设置 `n: 4`，系统会并行发起 4 个请求并合并结果返回。
+2. **Q: Does it support generating multiple pictures at one time? **
+    * **A**: Supported. Although Gemini upstream is limited to generating 1 piece per request, the Antigravity proxy layer will automatically process the `n` parameter concurrently. For example, if `n: 4` is set, the system will initiate 4 requests in parallel and return the combined results.
 
-3.  **Q: `person_generation` 参数报错？**
-    *   **A**: 请确保该参数位于 JSON 的**根层级**（与 `prompt`, `model` 同级），而不是嵌套在其他字段中。支持 `snake_case` (`person_generation`) 和 `camelCase` (`personGeneration`)。
+3. **Q: `person_generation` parameter reports an error? **
+    * **A**: Please ensure that the parameter is located at the **root level** of JSON (same level as `prompt`, `model`) and not nested in other fields. Supports `snake_case` (`person_generation`) and `camelCase` (`personGeneration`).

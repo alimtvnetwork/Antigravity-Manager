@@ -1,4 +1,4 @@
-//! 单账号文件解析（load_single_account）。
+//! Single account file analysis (load_single_account).
 
 use super::helpers::update_account_json;
 use super::types::OnDiskAccountState;
@@ -9,17 +9,18 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 impl TokenManager {
-    /// 加载单个账号
+    /// Load a single account
     pub(crate) async fn load_single_account(
         &self,
         path: &PathBuf,
     ) -> Result<Option<ProxyToken>, String> {
-        let content = std::fs::read_to_string(path).map_err(|e| format!("读取文件失败: {}", e))?;
+        let content =
+            std::fs::read_to_string(path).map_err(|e| format!("Failed to read file: {}", e))?;
 
         let mut account: serde_json::Value =
-            serde_json::from_str(&content).map_err(|e| format!("解析 JSON 失败: {}", e))?;
+            serde_json::from_str(&content).map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
-        // [修复 #1344] 先检查账号是否被手动禁用(非配额保护原因)
+        // [Fix #1344] First check whether the account has been manually disabled (not due to quota protection)
         let is_proxy_disabled = account
             .get("proxy_disabled")
             .and_then(|v| v.as_bool())
@@ -93,7 +94,7 @@ impl TokenManager {
             }
         }
 
-        // 最终检查账号主开关
+        // Final check of account master switch
         if account
             .get("disabled")
             .and_then(|v| v.as_bool())
@@ -116,8 +117,8 @@ impl TokenManager {
             return Ok(None);
         }
 
-        // 配额保护检查 - 只处理配额保护逻辑
-        // 这样可以在加载时自动恢复配额已恢复的账号
+        // Quota protection check - only handles quota protection logic
+        // This will automatically restore accounts whose quotas have been restored when loading.
         if self.check_and_protect_quota(&mut account, path).await {
             tracing::debug!(
                 "Account skipped due to quota protection: {:?} (email={})",
@@ -130,7 +131,7 @@ impl TokenManager {
             return Ok(None);
         }
 
-        // [兼容性] 再次确认最终状态（可能被 check_and_protect_quota 修改）
+        // [Compatibility] Confirm final status again (may be modified by check_and_protect_quota)
         if account
             .get("proxy_disabled")
             .and_then(|v| v.as_bool())
@@ -147,52 +148,57 @@ impl TokenManager {
             return Ok(None);
         }
 
-        let account_id = account["id"].as_str().ok_or("缺少 id 字段")?.to_string();
+        let account_id = account["id"]
+            .as_str()
+            .ok_or("Missing id field")?
+            .to_string();
 
         let email = account["email"]
             .as_str()
-            .ok_or("缺少 email 字段")?
+            .ok_or("Missing email field")?
             .to_string();
 
-        let token_obj = account["token"].as_object().ok_or("缺少 token 字段")?;
+        let token_obj = account["token"].as_object().ok_or("Missing token field")?;
 
         let access_token = token_obj["access_token"]
             .as_str()
-            .ok_or("缺少 access_token")?
+            .ok_or("access_token missing")?
             .to_string();
 
         let refresh_token = token_obj["refresh_token"]
             .as_str()
-            .ok_or("缺少 refresh_token")?
+            .ok_or("Missing refresh_token")?
             .to_string();
 
-        let expires_in = token_obj["expires_in"].as_i64().ok_or("缺少 expires_in")?;
+        let expires_in = token_obj["expires_in"]
+            .as_i64()
+            .ok_or("missing expires_in")?;
 
         let timestamp = token_obj["expiry_timestamp"]
             .as_i64()
-            .ok_or("缺少 expiry_timestamp")?;
+            .ok_or("expiry_timestamp missing")?;
 
-        // project_id 是可选的
+        // project_id is optional
         let project_id = token_obj
             .get("project_id")
             .and_then(|v| v.as_str())
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string());
 
-        // 【新增】提取订阅等级 (subscription_tier 为 "FREE" | "PRO" | "ULTRA")
+        // [New] Extract subscription level (subscription_tier is "FREE" | "PRO" | "ULTRA")
         let subscription_tier = account
             .get("quota")
             .and_then(|q| q.get("subscription_tier"))
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        // [FIX #563] 提取最大剩余配额百分比用于优先级排序 (Option<i32> now)
+        // [FIX #563] Extract maximum remaining quota percentage for prioritization (Option<i32> now)
         let remaining_quota = account
             .get("quota")
             .and_then(|q| self.calculate_quota_stats(q));
-        // .filter(|&r| r > 0); // 移除 >0 过滤，因为 0% 也是有效数据，只是优先级低
+        // .filter(|&r| r > 0); // Remove the >0 filter, because 0% is also valid data, but has a low priority
 
-        // 【新增 #621】提取受限模型列表
+        // [New #621] Extract restricted model list
         let protected_models: HashSet<String> = account
             .get("protected_models")
             .and_then(|v| v.as_array())
@@ -210,12 +216,12 @@ impl TokenManager {
             .map(|v| *v)
             .unwrap_or(1.0);
 
-        // [NEW] 提取最近的配额刷新时间（用于排序优化：刷新时间越近优先级越高）
+        // [NEW] Extract the latest quota refresh time (used for sorting optimization: the closer the refresh time is, the higher the priority)
         let reset_time = self.extract_earliest_reset_time(&account);
 
-        // [OPTIMIZATION] 构建模型配额内存缓存，避免排序时读取磁盘
+        // [OPTIMIZATION] Build model quota memory cache to avoid disk reads during sorting
         let mut model_quotas = HashMap::new();
-        // [NEW] 构建模型输出限额内存缓存 (max_output_tokens)
+        // [NEW] Build model output limit memory cache (max_output_tokens)
         let mut model_limits: HashMap<String, u64> = HashMap::new();
         if let Some(models) = account
             .get("quota")
@@ -233,7 +239,7 @@ impl TokenManager {
                             .unwrap_or_else(|| name.to_string());
                     model_quotas.insert(standard_id, pct as i32);
                 }
-                // [NEW] 解析并缓存 max_output_tokens (按原始 model name，不归一化)
+                // [NEW] Parse and cache max_output_tokens (by original model name, not normalized)
                 if let (Some(name), Some(limit)) = (
                     model.get("name").and_then(|v| v.as_str()),
                     model.get("max_output_tokens").and_then(|v| v.as_u64()),
@@ -276,7 +282,7 @@ impl TokenManager {
             }
         }
 
-        // [NEW] 启动时自动同步持久化的淘汰模型路由表，注入热更新拦截器
+        // [NEW] Automatically synchronize the persistent obsolete model routing table at startup and inject a hot update interceptor
         if let Some(rules) = account
             .get("quota")
             .and_then(|q| q.get("model_forwarding_rules"))

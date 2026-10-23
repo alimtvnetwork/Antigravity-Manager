@@ -49,7 +49,7 @@ export function ServiceSettingsTab({
 
     return (
         <div className="p-4 space-y-4">
-            {/* 监听端口、超时和自启动 */}
+            {/* Listening port, timeout and auto-start */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                     <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -75,7 +75,7 @@ export function ServiceSettingsTab({
                         {t('proxy.config.port_hint')}
                     </p>
 
-                    {/* 监听端口下方空位：服务运行状态指示卡片 */}
+                    {/* The empty space below the listening port: Service running status indicator card */}
                     <div className="mt-2.5 p-2 rounded-lg border border-gray-200/80 dark:border-base-300/80 bg-gray-50/70 dark:bg-base-200/50 flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <div className={`w-2.5 h-2.5 rounded-full ${status.running ? 'bg-emerald-500 shadow-xs shadow-emerald-500/50 animate-pulse' : 'bg-gray-400 dark:bg-gray-500'}`} />
@@ -156,10 +156,10 @@ export function ServiceSettingsTab({
                 </div>
             </div>
 
-            {/* 局域网访问 & 访问授权 - 合并到同一行 */}
+            {/* LAN Access & Access Grants - merged into one line */}
             <div className="border-t border-gray-200 dark:border-base-300 pt-3 mt-3">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* 允许局域网访问 */}
+                    {/* Allow LAN access */}
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-medium text-gray-700 dark:text-gray-300 inline-flex items-center gap-1">
@@ -194,7 +194,7 @@ export function ServiceSettingsTab({
                         )}
                     </div>
 
-                    {/* 访问授权 */}
+                    {/* access authorization */}
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <label className="text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -261,7 +261,7 @@ export function ServiceSettingsTab({
                 </div>
             </div>
 
-            {/* API 密钥 */}
+            {/* API key */}
             <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                     <span className="inline-flex items-center gap-1">
@@ -336,7 +336,7 @@ export function ServiceSettingsTab({
                 </p>
             </div>
 
-            {/* Web UI 管理密码 */}
+            {/* Web UI management password */}
             <div className="border-t border-gray-200 dark:border-base-300 pt-3 mt-3">
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                     <span className="inline-flex items-center gap-1">

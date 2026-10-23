@@ -16,6 +16,7 @@ import { CreateInstanceDialog, EditInstanceDialog } from './instances/CreateEdit
 import { SwitchAccountDialog } from './instances/SwitchAccountDialog';
 import { CopyInstanceDialog } from './instances/CopyInstanceDialog';
 import { InstanceConfirmDialogs, InstanceAttachedModals } from './instances/InstanceModals';
+import { ErrorBoundary } from '../components/common/ErrorBoundary';
 
 export { isNodeOwnedByInstance } from './instances/instancePageUtils';
 
@@ -109,15 +110,29 @@ export default function Instances() {
                 )}
 
                 <div className="mt-8 pt-6 border-t border-slate-200/60 dark:border-slate-800/80">
-                    <FleetMachinesTable />
+                    <ErrorBoundary variant="card">
+                        <FleetMachinesTable />
+                    </ErrorBoundary>
                 </div>
 
-                <CreateInstanceDialog api={api} />
-                <SwitchAccountDialog api={api} />
-                <CopyInstanceDialog api={api} />
-                <EditInstanceDialog api={api} />
-                <InstanceAttachedModals api={api} />
-                <InstanceConfirmDialogs api={api} />
+                <ErrorBoundary variant="inline">
+                    <CreateInstanceDialog api={api} />
+                </ErrorBoundary>
+                <ErrorBoundary variant="inline">
+                    <SwitchAccountDialog api={api} />
+                </ErrorBoundary>
+                <ErrorBoundary variant="inline">
+                    <CopyInstanceDialog api={api} />
+                </ErrorBoundary>
+                <ErrorBoundary variant="inline">
+                    <EditInstanceDialog api={api} />
+                </ErrorBoundary>
+                <ErrorBoundary variant="inline">
+                    <InstanceAttachedModals api={api} />
+                </ErrorBoundary>
+                <ErrorBoundary variant="inline">
+                    <InstanceConfirmDialogs api={api} />
+                </ErrorBoundary>
             </div>
         </div>
     );

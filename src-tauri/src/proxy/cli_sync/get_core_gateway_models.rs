@@ -1,9 +1,9 @@
 use super::*;
 
-/// 导出网关全量核心模型（仅剔除带 -日期数字 的后缀版本）
+/// Export the full core model of the gateway (only remove the suffix version with -date number)
 pub fn get_core_gateway_models() -> &'static [CoreModel] {
     &[
-        // Claude 系列 (256k 上下文)
+        // Claude Series (256k context)
         CoreModel {
             id: "claude-sonnet-4-6",
             context_window: 256_000,
@@ -64,7 +64,7 @@ pub fn get_core_gateway_models() -> &'static [CoreModel] {
             id: "claude-3-haiku",
             context_window: 256_000,
         },
-        // Gemini 3.x 系列 (1M 上下文)
+        // Gemini 3.x series (1M context)
         CoreModel {
             id: "gemini-3.8-flash",
             context_window: 1_000_000,
@@ -201,7 +201,7 @@ pub fn get_core_gateway_models() -> &'static [CoreModel] {
             id: "gemini-3-pro-image",
             context_window: 1_048_576,
         },
-        // Gemini 2.x 系列 (1M 上下文)
+        // Gemini 2.x series (1M context)
         CoreModel {
             id: "gemini-2.5-pro",
             context_window: 1_048_576,
@@ -234,7 +234,7 @@ pub fn get_core_gateway_models() -> &'static [CoreModel] {
             id: "gemini-2.0-flash-thinking-exp",
             context_window: 1_048_576,
         },
-        // 其他高频模型
+        // Other high frequency models
         CoreModel {
             id: "grok-4.6",
             context_window: 500_000,
@@ -246,7 +246,7 @@ pub fn get_core_gateway_models() -> &'static [CoreModel] {
     ]
 }
 
-/// 核心逻辑：为 JeikCode 生成/更新 config.toml 内容
+/// Core logic: Generate/update config.toml content for JeikCode
 pub fn sync_jeikcode_toml_content(
     content: &str,
     proxy_url: &str,
@@ -273,7 +273,7 @@ pub fn sync_jeikcode_toml_content(
         .trim_end_matches("/v1")
         .trim_end_matches('/');
 
-    // 1. 查找并清理已经存在的相同提供商 URL 的账号 (以 anthropic 协议最兼容接入)
+    // 1. Find and clean up existing accounts with the same provider URL (the most compatible access with the anthropopic protocol)
     let mut accounts_to_remove = Vec::new();
     if let Some(accounts_table) = doc.get("provider_accounts").and_then(|i| i.as_table()) {
         for (acc_name, acc_item) in accounts_table.iter() {
@@ -292,7 +292,7 @@ pub fn sync_jeikcode_toml_content(
         }
     }
 
-    // 从 provider_accounts 移除旧同 URL 账号
+    // Remove the old same URL account from provider_accounts
     if let Some(accounts_table) = doc
         .get_mut("provider_accounts")
         .and_then(|i| i.as_table_mut())
@@ -302,7 +302,7 @@ pub fn sync_jeikcode_toml_content(
         }
     }
 
-    // 检查旧版 providers 表
+    // Check the legacy providers table
     if let Some(providers_table) = doc.get_mut("providers").and_then(|i| i.as_table_mut()) {
         let mut old_p_remove = Vec::new();
         for (p_name, p_item) in providers_table.iter() {
@@ -321,7 +321,7 @@ pub fn sync_jeikcode_toml_content(
         }
     }
 
-    // 2. 清理属于被删除账号的模型，以及之前属于 antigravity-manager 的旧模型（以便完全重新生成）
+    // 2. Clean up the models belonging to the deleted account, as well as the old models that previously belonged to antigravity-manager (for complete regeneration)
     if let Some(models_table) = doc.get_mut("models").and_then(|i| i.as_table_mut()) {
         let mut models_to_remove = Vec::new();
         for (m_key, m_item) in models_table.iter() {
@@ -336,7 +336,7 @@ pub fn sync_jeikcode_toml_content(
         }
     }
 
-    // 3. 添加 / 更新 [provider_accounts.antigravity-manager]，以 anthropic 协议接入
+    // 3. Add/update [provider_accounts.antigravity-manager], access with anthropopic protocol
     let accounts = doc
         .entry("provider_accounts")
         .or_insert(Item::Table(Table::new()));
@@ -351,7 +351,7 @@ pub fn sync_jeikcode_toml_content(
         }
     }
 
-    // 4. 添加最核心的所有 Claude 和 Gemini 模型
+    // 4. Add all core Claude and Gemini models
     let core_models = get_core_gateway_models();
 
     let models_entry = doc.entry("models").or_insert(Item::Table(Table::new()));
@@ -379,7 +379,7 @@ pub fn sync_jeikcode_toml_content(
         }
     }
 
-    // 5. 设置默认模型
+    // 5. Set default model
     let existing_default_model = doc
         .get("default_model")
         .and_then(|v| v.as_str())

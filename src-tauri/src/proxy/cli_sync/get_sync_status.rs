@@ -1,6 +1,6 @@
 use super::*;
 
-/// 读取当前配置并检测同步状态
+/// Read the current configuration and detect synchronization status
 pub fn get_sync_status(app: &CliApp, proxy_url: &str) -> (bool, bool, Option<String>) {
     let files = app.config_files();
     if files.is_empty() {
@@ -12,7 +12,7 @@ pub fn get_sync_status(app: &CliApp, proxy_url: &str) -> (bool, bool, Option<Str
     let mut current_base_url = None;
 
     for file in &files {
-        // 使用更简单的命名规则: original_name + .antigravity.bak
+        // Use simpler naming convention: original_name + .antigravity.bak
         let backup_path = file
             .path
             .with_file_name(format!("{}.antigravity.bak", file.name));
@@ -21,10 +21,10 @@ pub fn get_sync_status(app: &CliApp, proxy_url: &str) -> (bool, bool, Option<Str
             has_backup = true;
         }
 
-        // 如果物理文件不存在
-        // 如果物理文件不存在
+        // If the physical file does not exist
+        // If the physical file does not exist
         if !file.path.exists() {
-            // Gemini 的 settings.json/config.json 只要有一个存在即可，或者都不存在（视为未同步）
+            // As long as one of Gemini's settings.json/config.json exists, or neither exists (considered to be unsynchronized)
             if app == &CliApp::Gemini
                 && (file.name == "settings.json" || file.name == "config.json")
             {
@@ -67,7 +67,7 @@ pub fn get_sync_status(app: &CliApp, proxy_url: &str) -> (bool, bool, Option<Str
             }
             CliApp::Codex => {
                 if file.name == "config.toml" {
-                    // 正则匹配 base_url
+                    // Regular match base_url
                     let re =
                         regex::Regex::new(r#"(?m)^\s*base_url\s*=\s*['"]([^'"]+)['"]"#).unwrap();
                     if let Some(caps) = re.captures(&content) {
@@ -126,7 +126,7 @@ pub fn get_sync_status(app: &CliApp, proxy_url: &str) -> (bool, bool, Option<Str
                         if let Some(accounts) =
                             doc.get("provider_accounts").and_then(|i| i.as_table())
                         {
-                            // 优先检查 antigravity-manager 账号
+                            // Prioritize checking the antigravity-manager account
                             if let Some(ag_item) = accounts.get("antigravity-manager") {
                                 if let Some(base_url) =
                                     ag_item.get("base_url").and_then(|v| v.as_str())
@@ -146,7 +146,7 @@ pub fn get_sync_status(app: &CliApp, proxy_url: &str) -> (bool, bool, Option<Str
                                 }
                             }
 
-                            // 若尚未找到，但有其他同 URL 的账号，记录其 URL
+                            // If it has not been found yet, but there is another account with the same URL, record its URL.
                             if current_base_url.is_none() {
                                 for (_, acc_item) in accounts.iter() {
                                     if let Some(base_url) =
@@ -165,7 +165,7 @@ pub fn get_sync_status(app: &CliApp, proxy_url: &str) -> (bool, bool, Option<Str
                             }
                         }
 
-                        // 验证是否已同步最核心模型
+                        // Verify whether the core model has been synchronized
                         let has_core_models =
                             if let Some(models) = doc.get("models").and_then(|i| i.as_table()) {
                                 models.contains_key("claude-sonnet-4-6")
@@ -174,7 +174,7 @@ pub fn get_sync_status(app: &CliApp, proxy_url: &str) -> (bool, bool, Option<Str
                             };
 
                         if is_ag_synced && has_core_models {
-                            // 同步完全正常
+                            // Synchronization is completely fine
                         } else {
                             all_synced = false;
                         }

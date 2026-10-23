@@ -56,7 +56,8 @@ mod tests {
     #[test]
     fn test_stable_release_fully_synchronized() {
         let tag = "v4.251.0";
-        let readme_zh = "# Antigravity Manager\n## 📝 更新日志\n### v4.251.0\n- New feature added";
+        let readme_zh =
+            "# Antigravity Manager\n## 📝 Update log\n### v4.251.0\n- New feature added";
         let readme_en = "# Antigravity Manager\n## 📝 Changelog\n### v4.251.0\n- New feature added";
 
         let report = verify_readme_changelog_sync(tag, readme_zh, readme_en);
@@ -71,7 +72,7 @@ mod tests {
     #[test]
     fn test_stable_release_version_without_v_matches() {
         let tag = "v4.251.0";
-        let readme_zh = "## 📝 更新日志\nRelease 4.251.0 notes";
+        let readme_zh = "## 📝 Update log\nRelease 4.251.0 notes";
         let readme_en = "## 📝 Changelog\nRelease 4.251.0 notes";
 
         let report = verify_readme_changelog_sync(tag, readme_zh, readme_en);
@@ -82,7 +83,7 @@ mod tests {
     #[test]
     fn test_stable_release_missing_zh() {
         let tag = "v4.251.0";
-        let readme_zh = "## 📝 更新日志\nOld notes only";
+        let readme_zh = "## 📝 Update log\nOld notes only";
         let readme_en = "## 📝 Changelog\n### v4.251.0\n- New feature added";
 
         let report = verify_readme_changelog_sync(tag, readme_zh, readme_en);
@@ -100,7 +101,7 @@ mod tests {
     #[test]
     fn test_stable_release_missing_en() {
         let tag = "v4.251.0";
-        let readme_zh = "## 📝 更新日志\n### v4.251.0\n- Chinese summary";
+        let readme_zh = "## 📝 Update log\n### v4.251.0\n- Chinese summary";
         let readme_en = "## 📝 Changelog\nOld English notes only";
 
         let report = verify_readme_changelog_sync(tag, readme_zh, readme_en);
@@ -118,7 +119,7 @@ mod tests {
     #[test]
     fn test_stable_release_missing_both() {
         let tag = "v4.251.0";
-        let readme_zh = "## 📝 更新日志\nv4.250.0 notes";
+        let readme_zh = "## 📝 Update log\nv4.250.0 notes";
         let readme_en = "## 📝 Changelog\nv4.250.0 notes";
 
         let report = verify_readme_changelog_sync(tag, readme_zh, readme_en);
@@ -129,7 +130,7 @@ mod tests {
     #[test]
     fn test_prerelease_clean_changelog_only() {
         let tag = "v4.251.0-beta.1";
-        let readme_zh = "## 📝 更新日志\n### v4.250.0\n- Chinese summary";
+        let readme_zh = "## 📝 Update log\n### v4.250.0\n- Chinese summary";
         let readme_en = "## 📝 Changelog\n### v4.250.0\n- English summary";
 
         let report = verify_readme_changelog_sync(tag, readme_zh, readme_en);
@@ -144,7 +145,7 @@ mod tests {
     #[test]
     fn test_prerelease_improperly_placed_in_zh() {
         let tag = "v4.251.0-beta.1";
-        let readme_zh = "## 📝 更新日志\n### v4.251.0-beta.1\n- Beta leak";
+        let readme_zh = "## 📝 Update Log\n### v4.251.0-beta.1\n- Beta leak";
         let readme_en = "## 📝 Changelog\n### v4.250.0\n- English summary";
 
         let report = verify_readme_changelog_sync(tag, readme_zh, readme_en);
@@ -162,7 +163,7 @@ mod tests {
     #[test]
     fn test_prerelease_improperly_placed_in_en() {
         let tag = "v4.251.0-beta.1";
-        let readme_zh = "## 📝 更新日志\n### v4.250.0\n- Chinese summary";
+        let readme_zh = "## 📝 Update log\n### v4.250.0\n- Chinese summary";
         let readme_en = "## 📝 Changelog\n### v4.251.0-beta.1\n- Beta leak";
 
         let report = verify_readme_changelog_sync(tag, readme_zh, readme_en);
@@ -180,7 +181,7 @@ mod tests {
     #[test]
     fn test_prerelease_improperly_placed_in_both() {
         let tag = "v4.251.0-beta.1";
-        let readme_zh = "## 📝 更新日志\n### v4.251.0-beta.1\n- Beta leak";
+        let readme_zh = "## 📝 Update Log\n### v4.251.0-beta.1\n- Beta leak";
         let readme_en = "## 📝 Changelog\n### v4.251.0-beta.1\n- Beta leak";
 
         let report = verify_readme_changelog_sync(tag, readme_zh, readme_en);

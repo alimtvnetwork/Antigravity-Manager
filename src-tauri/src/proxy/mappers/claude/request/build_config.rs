@@ -1,6 +1,6 @@
 // Tools and generation config (split from request.rs).
-// Claude 请求转换 (Claude → Gemini v1internal)
-// 对应 transformClaudeRequestIn
+// Claude requested conversion (Claude → Gemini v1internal)
+// Corresponds to transformClaudeRequestIn
 
 use super::super::models::*;
 use crate::proxy::mappers::signature_store::get_thought_signature; // Deprecated, kept for fallback
@@ -8,7 +8,7 @@ use crate::proxy::session_manager::SessionManager;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
-/// 构建 Tools
+/// Build Tools
 pub(crate) fn build_tools(
     tools: &Option<Vec<Tool>>,
     has_web_search: bool,
@@ -41,13 +41,13 @@ pub(crate) fn build_tools(
 
         let mut tool_list = Vec::new();
 
-        // [优化] Gemini 2.0+ 及 3.0 系列模型通常支持混合工具调用 (Function Calling + Google Search)
-        // 但由于反代使用的 Google v1internal 接口为受限环境，不支持 include_server_side_tool_invocations，混合调用会报 400 错误。
-        // 因此在 v1internal 架构下，我们强制不开启混合工具调用以避免 400 报错。
+        // [Optimization] Gemini 2.0+ and 3.0 series models usually support hybrid tool calling (Function Calling + Google Search)
+        // However, since the Google v1internal interface used by the reverse generation is a restricted environment and does not support include_server_side_tool_invocations, a 400 error will be reported for mixed calls.
+        // Therefore, under the v1internal architecture, we force not to enable mixed tool calls to avoid 400 errors.
         let supports_mixed_tools = false;
 
         if !function_declarations.is_empty() {
-            // [CACHE] 按 function name 稳定字典序排序，确保全协议 tool schema 字节完全一致
+            // [CACHE] Stable lexicographic sorting by function name to ensure complete protocol tool schema byte consistency
             function_declarations.sort_by(|a, b| {
                 let name_a = a.get("name").and_then(|v| v.as_str()).unwrap_or("");
                 let name_b = b.get("name").and_then(|v| v.as_str()).unwrap_or("");
@@ -91,9 +91,9 @@ pub(crate) fn build_tools(
     Ok(None)
 }
 
-/// 构建 Generation Config
+/// Build Generation Config
 
-/// 构建 Generation Config
+/// Build Generation Config
 pub(crate) fn build_generation_config(
     claude_req: &ClaudeRequest,
     mapped_model: &str,
@@ -103,7 +103,7 @@ pub(crate) fn build_generation_config(
 ) -> Value {
     let mut config = json!({});
 
-    // Thinking 配置
+    // Thinking configuration
     let client_switch = crate::proxy::pipeline::extract_client_thinking_switch(
         claude_req.thinking.as_ref().map(|t| t.type_.as_str()),
         claude_req
@@ -178,7 +178,7 @@ pub(crate) fn build_generation_config(
             thinking_config["thinkingLevel"] = json!(mapped_level);
             config["thinkingConfig"] = thinking_config;
         } else {
-            // 协议无关：思考预算与 thinkingConfig 统一由进站流水线节点治理
+            // Protocol-independent: Thinking budget and thinkingConfig are unified and managed by the inbound pipeline node
             crate::proxy::pipeline::InboundThinkingPipeline::configure_inbound_thinking(
                 mapped_model,
                 &mut config,
@@ -190,7 +190,7 @@ pub(crate) fn build_generation_config(
         }
     }
 
-    // 其他参数
+    // Other parameters
     if let Some(temp) = claude_req.temperature {
         config["temperature"] = json!(temp);
     }
@@ -205,20 +205,20 @@ pub(crate) fn build_generation_config(
         config["topK"] = json!(40); // [ADDED v4.1.24] Default topK=40 to match official client
     }
 
-    // web_search 强制 candidateCount=1
+    // web_search forces candidateCount=1
     /*if has_web_search {
         config["candidateCount"] = json!(1);
     }*/
 
-    // max_tokens 映射为 maxOutputTokens
-    // [FIX] 不再默认设置 81920，防止非思维模型 (如 claude-sonnet-4-6) 报 400 Invalid Argument
+    // max_tokens maps to maxOutputTokens
+    // [FIX] No longer defaults to 81920 to prevent non-mental models (such as claude-sonnet-4-6) from reporting 400 Invalid Argument
     let mut final_max_tokens: Option<i64> = claude_req.max_tokens.map(|t| t as i64);
 
-    // [NEW] 确保 maxOutputTokens 大于 thinkingBudget (API 强约束)
-    // [NEW] 确保 maxOutputTokens 大于 thinkingBudget (API 强约束)
+    // [NEW] Make sure maxOutputTokens is greater than thinkingBudget (API strong constraint)
+    // [NEW] Make sure maxOutputTokens is greater than thinkingBudget (API strong constraint)
     let model_lower = mapped_model.to_lowercase();
-    // 重新计算 should_use_adaptive (因为上面定义的作用域仅在其 if 块内有效，或者我们可以假设在这里也需要同样的逻辑)
-    // 但为了简洁和解耦，我们这里重新从 config 读取
+    // Recalculate should_use_adaptive (since the scope defined above is only valid within its if block, or we can assume that the same logic is needed here as well)
+    // But for the sake of simplicity and decoupling, we re-read from config here
     let tb_config_chk = crate::proxy::config::get_thinking_budget_config();
     let global_adaptive = matches!(
         tb_config_chk.mode,
@@ -248,7 +248,7 @@ pub(crate) fn build_generation_config(
         {
             let current = final_max_tokens.unwrap_or(0);
             if current <= budget as i64 {
-                // [FIX #1675] 针对图像模型使用更小的增量 (2048)
+                // [FIX #1675] Use smaller increments for image models (2048)
                 let overhead = if mapped_model.contains("-image") {
                     2048
                 } else {

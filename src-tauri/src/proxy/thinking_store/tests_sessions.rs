@@ -12,7 +12,7 @@ fn test_sqlite_persistence_and_recovery() {
         &["call_persisted_999".to_string()],
         &["bash".to_string()],
     );
-    // 构造符合 Google 原生特征的假签名（Base64 解码后首字节 = protobuf tag 0x12）
+    // Construct a fake signature that conforms to Google's native characteristics (first byte after Base64 decoding = protobuf tag 0x12)
     let real_sig = {
         use base64::Engine;
         let mut raw = vec![0x12u8];
@@ -58,8 +58,8 @@ fn test_sqlite_persistence_and_recovery() {
     let parts = contents[0]["parts"].as_array().unwrap();
     assert_eq!(parts[0]["thought"], true);
     assert_eq!(parts[0]["text"], "Thought restored from SQLite");
-    // 锚点 = 该轮第一个非思考 part（这里是可见正文）：真实签名归位到它上面，
-    // 工具调用不再被盖章。
+    // Anchor point = the first non-thinking part of the round (here is the visible text): the real signature is placed on it,
+    // Tool calls are no longer stamped.
     assert_eq!(parts[1]["thoughtSignature"], real_sig);
     assert!(parts[2].get("thoughtSignature").is_none());
 }
@@ -72,7 +72,7 @@ fn sqlite_merges_latest_chunk_but_keeps_older_same_fingerprint_turn() {
     }
 
     let sig = "sig_hello_12345678901234567890123456789012345678901234567890";
-    let fp_hello = fingerprint("你好", &[], &[]);
+    let fp_hello = fingerprint("hello", &[], &[]);
     let fp_other = fingerprint("other", &["call_x".to_string()], &["bash".to_string()]);
 
     let save = |fp: &str, thought: &str, visible: &str, ids: &[String], names: &[String]| {
@@ -87,8 +87,8 @@ fn sqlite_merges_latest_chunk_but_keeps_older_same_fingerprint_turn() {
         )
     };
 
-    assert!(save(&fp_hello, "thought-1", "你好", &[], &[]).is_ok());
-    assert!(save(&fp_hello, "thought-1-longer", "你好", &[], &[]).is_ok());
+    assert!(save(&fp_hello, "thought-1", "hello", &[], &[]).is_ok());
+    assert!(save(&fp_hello, "thought-1-longer", "hello", &[], &[]).is_ok());
     assert!(save(
         &fp_other,
         "thought-tool",
@@ -97,13 +97,13 @@ fn sqlite_merges_latest_chunk_but_keeps_older_same_fingerprint_turn() {
         &["bash".to_string()]
     )
     .is_ok());
-    assert!(save(&fp_hello, "thought-3", "你好", &[], &[]).is_ok());
+    assert!(save(&fp_hello, "thought-3", "hello", &[], &[]).is_ok());
 
     let rows = crate::modules::proxy_db::load_thinking_records(store_key).unwrap_or_default();
     assert_eq!(
         rows.len(),
         3,
-        "older 你好 turn must not be overwritten: {rows:?}"
+        "older Hello turn must not be overwritten: {rows:?}"
     );
     assert_eq!(rows[0].thought, "thought-1-longer");
     assert_eq!(rows[1].thought, "thought-tool");
@@ -219,7 +219,7 @@ fn product_session_headers_win_over_generic_x_session_id() {
 
 #[test]
 fn test_3d_orthogonal_blended_session_stability_and_isolation() {
-    // 1. 同一对话多轮聊天：相同 Headers 与相同的 Anchor -> 100% 相同稳定
+    // 1. Multiple rounds of chat in the same conversation: same Headers and same Anchor -> 100% same and stable
     let mut headers = HeaderMap::new();
     headers.insert(
         "x-claude-code-session-id",
@@ -230,12 +230,12 @@ fn test_3d_orthogonal_blended_session_stability_and_isolation() {
     assert_eq!(scope_turn1.client_id, scope_turn2.client_id);
     assert_eq!(scope_turn1.store_key, scope_turn2.store_key);
 
-    // 2. 主 Agent 与 Subagent 在同一 CLI 进程下（相同 x-claude-code-session-id 但不同 Anchor） -> 绝对隔离！
+    // 2. The main Agent and Subagent are in the same CLI process (same x-claude-code-session-id but different Anchor) -> Absolute isolation!
     let scope_subagent = SessionScope::from_headers(&headers, "sid-subagent-distinct-prompt");
     assert_ne!(scope_turn1.client_id, scope_subagent.client_id);
     assert_ne!(scope_turn1.store_key, scope_subagent.store_key);
 
-    // 3. 不同租户多用户并发（不同 Authorization / API Key） -> 绝对隔离！
+    // 3. Multi-user concurrency from different tenants (different Authorization/API Key) -> Absolute isolation!
     let mut headers_user_a = headers.clone();
     headers_user_a.insert("authorization", "Bearer user-token-aaa".parse().unwrap());
     let mut headers_user_b = headers.clone();
@@ -244,7 +244,7 @@ fn test_3d_orthogonal_blended_session_stability_and_isolation() {
     let scope_user_b = SessionScope::from_headers(&headers_user_b, "sid-main-conversation-root");
     assert_ne!(scope_user_a.store_key, scope_user_b.store_key);
 
-    // 4. Header 乱序注入时哈希绝对一致（BTreeMap 保证确定性排序）
+    // 4. The hashes are absolutely consistent when Header is injected out of order (BTreeMap guarantees deterministic sorting)
     let mut headers_order1 = HeaderMap::new();
     headers_order1.insert("x-atomcode-session-id", "uuid-123".parse().unwrap());
     headers_order1.insert("x-jeikcode-sessionid", "uuid-456".parse().unwrap());
@@ -257,7 +257,7 @@ fn test_3d_orthogonal_blended_session_stability_and_isolation() {
     let scope_ord2 = SessionScope::from_headers(&headers_order2, "anchor-1");
     assert_eq!(scope_ord1.client_id, scope_ord2.client_id);
 
-    // 5. 跨协议相同显式会话头（如 Claude 切到 OpenAI）：相同会话锚点下 store_key 绝对一致共享，不同锚点下强隔离
+    // 5. The same explicit session header across protocols (such as Claude switching to OpenAI): store_key is absolutely consistent and shared under the same session anchor point, and is strongly isolated under different anchor points.
     let mut claude_headers = HeaderMap::new();
     claude_headers.insert("x-session-id", "conv-uuid-999".parse().unwrap());
     claude_headers.insert("x-api-key", "secret-token".parse().unwrap());
@@ -279,8 +279,8 @@ fn test_3d_orthogonal_blended_session_stability_and_isolation() {
 fn tail_first_match_uses_latest_record_for_latest_incomplete_turn() {
     let store = ThinkingStore::new();
     let key = "t:tail-hello";
-    store.record(key, rec("think-turn1", "你好", None));
-    store.record(key, rec("think-turn2", "你好", None));
+    store.record(key, rec("think-turn1", "hello", None));
+    store.record(key, rec("think-turn2", "hello", None));
 
     let sig = "s".repeat(60);
     let mut contents = vec![
@@ -288,12 +288,12 @@ fn tail_first_match_uses_latest_record_for_latest_incomplete_turn() {
             "role": "model",
             "parts": [
                 { "text": "think-turn1", "thought": true, "thoughtSignature": sig },
-                { "text": "你好" }
+                { "text": "hello" }
             ]
         }),
         json!({
             "role": "model",
-            "parts": [{ "text": "你好" }]
+            "parts": [{ "text": "hello" }]
         }),
     ];
     let restored = store.restore_gemini_contents(key, &mut contents);
@@ -302,7 +302,7 @@ fn tail_first_match_uses_latest_record_for_latest_incomplete_turn() {
     assert_eq!(contents[1]["parts"][0]["thought"], true);
     assert_eq!(
         contents[1]["parts"][0]["text"], "think-turn2",
-        "latest incomplete turn must take the latest matching record, not the first 你好"
+        "latest incomplete turn must take the latest matching record, not the first hello"
     );
 }
 

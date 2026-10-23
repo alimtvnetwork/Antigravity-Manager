@@ -6,10 +6,10 @@ use super::helpers::*;
 use std::cmp::Ordering;
 use std::time::Duration;
 
-/// 测试 is_ultra_required_model 辅助函数
+/// Test the is_ultra_required_model helper function
 #[test]
 fn test_is_ultra_required_model() {
-    // 需要 Ultra 账号的高端模型
+    // High-end models requiring Ultra account
     const ULTRA_REQUIRED_MODELS: &[&str] = &["claude-opus-4-6", "claude-opus-4-5", "opus"];
 
     fn is_ultra_required_model(model: &str) -> bool {
@@ -17,16 +17,16 @@ fn test_is_ultra_required_model() {
         ULTRA_REQUIRED_MODELS.iter().any(|m| lower.contains(m))
     }
 
-    // 应该识别为高端模型
+    // Should be identified as a high-end model
     assert!(is_ultra_required_model("claude-opus-4-6"));
     assert!(is_ultra_required_model("claude-opus-4-5"));
-    assert!(is_ultra_required_model("Claude-Opus-4-6")); // 大小写不敏感
-    assert!(is_ultra_required_model("CLAUDE-OPUS-4-5")); // 大小写不敏感
-    assert!(is_ultra_required_model("opus")); // 通配匹配
+    assert!(is_ultra_required_model("Claude-Opus-4-6")); // Case insensitive
+    assert!(is_ultra_required_model("CLAUDE-OPUS-4-5")); // Case insensitive
+    assert!(is_ultra_required_model("opus")); // Wildcard match
     assert!(is_ultra_required_model("opus-4-6-latest"));
     assert!(is_ultra_required_model("models/claude-opus-4-6"));
 
-    // 应该识别为普通模型
+    // Should be recognized as a normal model
     assert!(!is_ultra_required_model("claude-sonnet-4-5"));
     assert!(!is_ultra_required_model("claude-sonnet"));
     assert!(!is_ultra_required_model("gemini-1.5-flash"));
@@ -34,12 +34,12 @@ fn test_is_ultra_required_model() {
     assert!(!is_ultra_required_model("claude-haiku"));
 }
 
-/// 测试高端模型排序：Ultra 账号优先于 Pro 账号（即使 Pro 配额更高）
+/// Test high-end model sorting: Ultra accounts take precedence over Pro accounts (even if Pro has a higher quota)
 #[test]
 fn test_ultra_priority_for_high_end_models() {
     const RESET_TIME_THRESHOLD_SECS: i64 = 600;
 
-    // 模拟高端模型排序逻辑
+    // Simulate high-end model sorting logic
     fn compare_tokens_for_model(a: &ProxyToken, b: &ProxyToken, target_model: &str) -> Ordering {
         const ULTRA_REQUIRED_MODELS: &[&str] = &["claude-opus-4-6", "claude-opus-4-5", "opus"];
         let requires_ultra = {
@@ -47,12 +47,12 @@ fn test_ultra_priority_for_high_end_models() {
             ULTRA_REQUIRED_MODELS.iter().any(|m| lower.contains(m))
         };
 
-        // 直接复用生产实现，避免测试里另写一份「简化版关键词表」
-        // （旧版只匹配 "pro"，漏掉 premium/advanced，导致测试通过但生产行为未经验证）
+        // Directly reuse the production implementation to avoid writing another "simplified version of the keyword list" in the test
+        // (The old version only matches "pro" and misses premium/advanced, causing the test to pass but the production behavior is unverified)
         let tier_priority =
             |tier: &Option<String>| crate::models::quota::tier_priority(tier.as_deref());
 
-        // Priority 0: 高端模型时，订阅等级优先
+        // Priority 0: For high-end models, subscription level takes priority
         if requires_ultra {
             let tier_cmp =
                 tier_priority(&a.subscription_tier).cmp(&tier_priority(&b.subscription_tier));
@@ -90,32 +90,32 @@ fn test_ultra_priority_for_high_end_models() {
         Ordering::Equal
     }
 
-    // 创建测试账号：Ultra 低配额 vs Pro 高配额
+    // Create a test account: Ultra low quota vs Pro high quota
     let ultra_low_quota = create_test_token("ultra@test.com", Some("ULTRA"), 1.0, None, Some(20));
     let pro_high_quota = create_test_token("pro@test.com", Some("PRO"), 1.0, None, Some(80));
 
-    // 高端模型 (Opus 4.6): Ultra 应该优先，即使配额低
+    // High-end models (Opus 4.6): Ultra should take precedence even if quota is low
     assert_eq!(
         compare_tokens_for_model(&ultra_low_quota, &pro_high_quota, "claude-opus-4-6"),
-        Ordering::Less, // Ultra 排在前面
+        Ordering::Less, // Ultra comes first
         "Opus 4.6 should prefer Ultra account over Pro even with lower quota"
     );
 
-    // 高端模型 (Opus 4.5): Ultra 应该优先
+    // High-end models (Opus 4.5): Ultra should be preferred
     assert_eq!(
         compare_tokens_for_model(&ultra_low_quota, &pro_high_quota, "claude-opus-4-5"),
         Ordering::Less,
         "Opus 4.5 should prefer Ultra account over Pro"
     );
 
-    // 普通模型 (Sonnet): 高配额 Pro 应该优先
+    // Normal model (Sonnet): High quota Pro should be prioritized
     assert_eq!(
         compare_tokens_for_model(&ultra_low_quota, &pro_high_quota, "claude-sonnet-4-5"),
-        Ordering::Greater, // Pro (高配额) 排在前面
+        Ordering::Greater, // Pro (high quota) ranked first
         "Sonnet should prefer high-quota Pro over low-quota Ultra"
     );
 
-    // 普通模型 (Flash): 高配额 Pro 应该优先
+    // Normal model (Flash): High quota Pro should be given priority
     assert_eq!(
         compare_tokens_for_model(&ultra_low_quota, &pro_high_quota, "gemini-1.5-flash"),
         Ordering::Greater,
@@ -123,7 +123,7 @@ fn test_ultra_priority_for_high_end_models() {
     );
 }
 
-/// 测试排序：同为 Ultra 时按配额排序
+/// Test sorting: Sort by quota when both are Ultra
 #[test]
 fn test_ultra_accounts_sorted_by_quota() {
     fn compare_tokens_for_model(a: &ProxyToken, b: &ProxyToken, target_model: &str) -> Ordering {
@@ -133,8 +133,8 @@ fn test_ultra_accounts_sorted_by_quota() {
             ULTRA_REQUIRED_MODELS.iter().any(|m| lower.contains(m))
         };
 
-        // 直接复用生产实现，避免测试里另写一份「简化版关键词表」
-        // （旧版只匹配 "pro"，漏掉 premium/advanced，导致测试通过但生产行为未经验证）
+        // Directly reuse the production implementation to avoid writing another "simplified version of the keyword list" in the test
+        // (The old version only matches "pro" and misses premium/advanced, causing the test to pass but the production behavior is unverified)
         let tier_priority =
             |tier: &Option<String>| crate::models::quota::tier_priority(tier.as_deref());
 
@@ -154,15 +154,15 @@ fn test_ultra_accounts_sorted_by_quota() {
     let ultra_high = create_test_token("ultra_high@test.com", Some("ULTRA"), 1.0, None, Some(80));
     let ultra_low = create_test_token("ultra_low@test.com", Some("ULTRA"), 1.0, None, Some(20));
 
-    // Opus 4.6: 同为 Ultra，高配额优先
+    // Opus 4.6: Both are Ultra, high quota is given priority
     assert_eq!(
         compare_tokens_for_model(&ultra_high, &ultra_low, "claude-opus-4-6"),
-        Ordering::Less, // ultra_high 排在前面
+        Ordering::Less, // ultra_high ranks first
         "Among Ultra accounts, higher quota should come first"
     );
 }
 
-/// 测试完整排序场景：混合账号池
+/// Test full sorting scenario: mixed account pool
 #[test]
 fn test_full_sorting_mixed_accounts() {
     fn sort_tokens_for_model(tokens: &mut Vec<ProxyToken>, target_model: &str) {
@@ -173,7 +173,7 @@ fn test_full_sorting_mixed_accounts() {
         };
 
         tokens.sort_by(|a, b| {
-            // 直接复用生产实现
+            // Directly reuse production implementation
             let tier_priority =
                 |tier: &Option<String>| crate::models::quota::tier_priority(tier.as_deref());
 
@@ -204,14 +204,14 @@ fn test_full_sorting_mixed_accounts() {
         });
     }
 
-    // 创建混合账号池
+    // Create a mixed account pool
     let ultra_high = create_test_token("ultra_high@test.com", Some("ULTRA"), 1.0, None, Some(80));
     let ultra_low = create_test_token("ultra_low@test.com", Some("ULTRA"), 1.0, None, Some(20));
     let pro_high = create_test_token("pro_high@test.com", Some("PRO"), 1.0, None, Some(90));
     let pro_low = create_test_token("pro_low@test.com", Some("PRO"), 1.0, None, Some(30));
     let free = create_test_token("free@test.com", Some("FREE"), 1.0, None, Some(100));
 
-    // 高端模型 (Opus 4.6) 排序
+    // High-End Model (Opus 4.6) Sorting
     let mut tokens_opus = vec![
         pro_high.clone(),
         free.clone(),
@@ -222,7 +222,7 @@ fn test_full_sorting_mixed_accounts() {
     sort_tokens_for_model(&mut tokens_opus, "claude-opus-4-6");
 
     let emails_opus: Vec<&str> = tokens_opus.iter().map(|t| t.email.as_str()).collect();
-    // 期望顺序: Ultra(高配额) > Ultra(低配额) > Pro(高配额) > Pro(低配额) > Free
+    // Desired order: Ultra (high quota) > Ultra (low quota) > Pro (high quota) > Pro (low quota) > Free
     assert_eq!(
         emails_opus,
         vec![
@@ -235,7 +235,7 @@ fn test_full_sorting_mixed_accounts() {
         "Opus 4.6 should sort Ultra first, then by quota within each tier"
     );
 
-    // 普通模型 (Sonnet) 排序
+    // Normal model (Sonnet) sorting
     let mut tokens_sonnet = vec![
         pro_high.clone(),
         free.clone(),
@@ -246,7 +246,7 @@ fn test_full_sorting_mixed_accounts() {
     sort_tokens_for_model(&mut tokens_sonnet, "claude-sonnet-4-5");
 
     let emails_sonnet: Vec<&str> = tokens_sonnet.iter().map(|t| t.email.as_str()).collect();
-    // 期望顺序: Free(100%) > Pro(90%) > Ultra(80%) > Pro(30%) > Ultra(20%) - 按配额优先
+    // Desired order: Free(100%) > Pro(90%) > Ultra(80%) > Pro(30%) > Ultra(20%) - priority by quota
     assert_eq!(
         emails_sonnet,
         vec![
@@ -264,8 +264,8 @@ fn test_full_sorting_mixed_accounts() {
 fn test_sync_zero_quota_circuit_breaker_later_deadline_and_recovery() {
     let manager = TokenManager::new(PathBuf::from("/tmp/test"));
 
-    // 1. 周配额为 0，5H 配额为 0，两者均耗尽
-    // 周配额 reset_time 为 5天后，5H reset_time 为 2小时后
+    // 1. Weekly quota is 0, 5H quota is 0, both are exhausted
+    // Weekly quota reset_time is after 5 days, 5H reset_time is after 2 hours
     let now = chrono::Utc::now();
     let base_timestamp = now.timestamp();
     let reset_5h = (now + chrono::Duration::hours(2)).to_rfc3339();
@@ -296,7 +296,7 @@ fn test_sync_zero_quota_circuit_breaker_later_deadline_and_recovery() {
         }
     });
 
-    // 即使 lock_on_zero 为 false，周配额耗尽依然无条件锁定至周截止时间
+    // Even if lock_on_zero is false, the weekly quota is exhausted and is still unconditionally locked until the weekly deadline.
     manager.sync_zero_quota_circuit_breaker("acc1", &account);
     assert!(manager
         .rate_limit_tracker
@@ -309,8 +309,8 @@ fn test_sync_zero_quota_circuit_breaker_later_deadline_and_recovery() {
         "Should be locked for > 4 days due to weekly constraint"
     );
 
-    // 2. 模拟 provider 提前重置：周配额恢复为 100%，5H 配额仍为 0
-    // 若开启 lock_on_zero，应自动对齐到较短的 5H 截止时间 (2小时)
+    // 2. Simulate provider reset in advance: weekly quota is restored to 100%, and 5H quota is still 0
+    // If lock_on_zero is turned on, it should automatically align to the shorter 5H deadline (2 hours)
     {
         let mut cfg = manager.circuit_breaker_config.blocking_write();
         cfg.enabled = true;
@@ -351,7 +351,7 @@ fn test_sync_zero_quota_circuit_breaker_later_deadline_and_recovery() {
         "Should reconcile to 5h deadline (<= 2h)"
     );
 
-    // 3. 模拟 5H 也完全恢复 (全部配额为正)
+    // 3. Simulation 5H is also fully restored (all quotas are positive)
     let account_fully_recovered = serde_json::json!({
         "quota": {
             "last_updated": base_timestamp + 2,

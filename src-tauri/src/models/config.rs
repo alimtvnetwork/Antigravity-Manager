@@ -51,11 +51,11 @@ pub struct AppConfig {
     #[serde(default = "default_true")]
     pub auto_refresh_missing_tiers: bool, // [NEW] Startup backfill for accounts with missing subscription tier
     #[serde(default)]
-    pub suggestion_delete_thinking_store: Option<bool>, // [NEW] 建议删除历史思考块缓存开关
+    pub suggestion_delete_thinking_store: Option<bool>, // [NEW] It is recommended to delete the historical thinking block cache switch
     #[serde(default)]
-    pub thinking_cleanup_dismissed: Option<bool>, // [NEW] 用户是否已确认/忽略该建议
+    pub thinking_cleanup_dismissed: Option<bool>, // [NEW] Whether the user has confirmed/ignored the suggestion
     #[serde(default)]
-    pub dismissed_thinking_cleanup_version: Option<String>, // [NEW] 用户已确认或忽略建议的目标版本号
+    pub dismissed_thinking_cleanup_version: Option<String>, // [NEW] User has confirmed or ignored the suggested target version number
     #[serde(default = "default_max_backup_prompts")]
     pub max_backup_prompts: usize,
     #[serde(default = "default_prompt_preview_max_words")]

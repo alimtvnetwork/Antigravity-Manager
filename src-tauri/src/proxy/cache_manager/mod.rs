@@ -1,22 +1,22 @@
 //! Context Cache Manager — Multi-Layer Split Cache
 //!
-//! 维护三层独立缓存，遵循 Antigravity SignatureCache 的多层级模式。
-//! 每层独立 TTL、容限、LRU 淘汰、统计 — 一层变化不影响其他层的命中。
+//! Maintain three levels of independent cache, following the multi-level model of Antigravity SignatureCache.
+//! Each layer has independent TTL, tolerance, LRU elimination, statistics - changes in one layer do not affect hits in other layers.
 //!
-//! 架构:
+//! Architecture:
 //!   Layer 1 (SI Cache):        raw_instructions → sanitized_text
-//!     跨 session 复用：相同 system prompt 的不同对话共享 sanitized 结果
+//!     Cross-session reuse: different conversations with the same system prompt share sanitized results
 //!   Layer 2 (Tools Cache):     raw_tools_json → processed_tools
-//!     跨 session 复用：相同 tool schema 的不同对话共享处理结果
+//!     Cross-session reuse: different conversations with the same tool schema share processing results
 //!   Layer 3 (Prefix Tracker):  combined_key → PrefixTrackingEntry
-//!     追踪 (Layer1 + Layer2) 组合的生命周期，用于 cachedContent 注入和命中统计
+//!     Track the life cycle of (Layer1 + Layer2) combination for cachedContent injection and hit statistics
 //!
-//! 缓存生命周期:
-//! 1. 请求到达 → 计算 Layer 1 key → 查找或 sanitize systemInstruction
-//! 2. 计算 Layer 2 key → 查找或构建 tools
-//! 3. 计算 Layer 3 key → 查找是否已有 cache_name → 注入 cachedContent
-//! 4. 响应到达 → 若 cachedContentTokenCount > 0 → 更新 Layer 3 统计
-//! 5. 过期条目在 insert 时被动淘汰 (LRU on limit breach)
+//! Cache life cycle:
+//! 1. The request arrives → calculate Layer 1 key → find or sanitize systemInstruction
+//! 2. Calculate Layer 2 key → Find or build tools
+//! 3. Calculate Layer 3 key → Find whether cache_name already exists → Inject cachedContent
+//! 4. Response arrives → if cachedContentTokenCount > 0 → Update Layer 3 statistics
+//! 5. Expired entries are passively eliminated during insert (LRU on limit breach)
 
 use dashmap::DashMap;
 use sha2::{Digest, Sha256};

@@ -12,14 +12,14 @@ pub(crate) async fn prepare_attempt(st: &mut AttemptState, attempt: usize) -> Pr
     // [Stage 2 Timing] Normalization start time
     let norm_start = std::time::Instant::now();
 
-    // 2. 模型路由解析
+    // 2. Model routing analysis
     let mapped_model = crate::proxy::common::model_mapping::resolve_model_route(
         &st.request_for_body.model,
         &*st.custom_mapping.read().await,
     );
     st.last_mapped_model = Some(mapped_model.clone());
 
-    // 将 Claude 工具转为 Value 数组以便探测联网
+    // Convert Claude tool to Value array for detecting networking
     let tools_val: Option<Vec<Value>> = st.request_for_body.tools.as_ref().map(|list| {
         list.iter()
             .map(|t| serde_json::to_value(t).unwrap_or(json!({})))
@@ -36,8 +36,8 @@ pub(crate) async fn prepare_attempt(st: &mut AttemptState, attempt: usize) -> Pr
         None,                          // body
     );
 
-    // 0. 尝试提取 session_id 用于粘性调度 (Phase 2/3)
-    // 使用 SessionManager 生成稳定的会话指纹，优先以显式会话头对齐跨协议 store_key
+    // 0. Try to extract session_id for sticky scheduling (Phase 2/3)
+    // Use SessionManager to generate stable session fingerprints, prioritizing explicit session header alignment across protocols store_key
     let explicit_sid = st
         .headers
         .get("x-session-id")
@@ -112,7 +112,7 @@ pub(crate) async fn prepare_attempt(st: &mut AttemptState, attempt: usize) -> Pr
 
     request_with_mapped.model = mapped_model.clone();
 
-    // 生成 Trace ID (简单用时间戳后缀)
+    // Generate Trace ID (simply use timestamp suffix)
     // let _trace_id = format!("req_{}", chrono::Utc::now().timestamp_subsec_millis());
 
     let token_obj = st.token_manager.get_token_by_id(&account_id);
@@ -194,9 +194,9 @@ pub(crate) async fn prepare_attempt(st: &mut AttemptState, attempt: usize) -> Pr
         .await;
     }
 
-    // 4. 上游调用 - 自动转换逻辑
+    // 4. Upstream call - automatic conversion logic
     let client_wants_stream = st.request.stream;
-    // [AUTO-CONVERSION] 非 Stream 请求自动转换为 Stream 以享受更宽松的配额
+    // [AUTO-CONVERSION] Non-Stream requests are automatically converted to Stream to enjoy looser quotas
     let force_stream_internally = !client_wants_stream;
     let actual_stream = client_wants_stream || force_stream_internally;
 
@@ -274,7 +274,7 @@ pub(crate) async fn prepare_attempt(st: &mut AttemptState, attempt: usize) -> Pr
         }
     };
 
-    // [NEW] 记录端点降级日志到 debug 文件
+    // [NEW] Record endpoint downgrade log to debug file
     if !call_result.fallback_attempts.is_empty() && debug_logger::is_enabled(&st.debug_cfg) {
         let fallback_entries: Vec<Value> = call_result
             .fallback_attempts
@@ -307,7 +307,7 @@ pub(crate) async fn prepare_attempt(st: &mut AttemptState, attempt: usize) -> Pr
     }
 
     let response = call_result.response;
-    // [NEW] 提取实际请求的上游端点 URL，用于日志记录和排查
+    // [NEW] Extract the actual requested upstream endpoint URL for logging and troubleshooting purposes
     let upstream_url = response.url().to_string();
     let status = response.status();
     st.last_status = status;

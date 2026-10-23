@@ -1,6 +1,6 @@
 // Thinking config (split from request.rs).
-// Claude 请求转换 (Claude → Gemini v1internal)
-// 对应 transformClaudeRequestIn
+// Claude requested conversion (Claude → Gemini v1internal)
+// Corresponds to transformClaudeRequestIn
 
 use super::super::models::*;
 use crate::proxy::mappers::signature_store::get_thought_signature; // Deprecated, kept for fallback
@@ -14,7 +14,7 @@ use std::collections::HashMap;
 /// This function determines if the model should have thinking enabled
 /// when no explicit thinking configuration is provided.
 pub(crate) fn should_enable_thinking_by_default(model: &str) -> bool {
-    // [保底防御] Gemini < 3 的模型（例如 gemini-2.5-flash, gemini-2.5-pro, gemini-2.0 等），直接不注入思考参数，保留思考为关
+    // [Guaranteed Defense] For models with Gemini < 3 (such as gemini-2.5-flash, gemini-2.5-pro, gemini-2.0, etc.), do not inject the thinking parameters directly, and keep the thinking as off
     if crate::proxy::model_specs::is_gemini_under_v3(model) {
         return false;
     }
@@ -41,7 +41,7 @@ pub(crate) fn should_enable_thinking_by_default(model: &str) -> bool {
         return true;
     }
 
-    // Gemini 3 及以上模型（如 gemini-3.7-flash, gemini-3-pro, gemini-3.1-pro, gemini-3.8-flash 等）强行开启思考
+    // Gemini 3 and above models (such as gemini-3.7-flash, gemini-3-pro, gemini-3.1-pro, gemini-3.8-flash, etc.) forcefully open thinking
     if crate::proxy::model_specs::is_gemini_v3_or_above(model) {
         tracing::debug!(
             "[Thinking-Mode] Auto-enabling thinking for Gemini 3+ model: {}",
@@ -75,7 +75,7 @@ pub(crate) fn model_supports_thinking(mapped_model: &str) -> bool {
     if crate::proxy::model_specs::is_gemini_v3_or_above(mapped_model) {
         return true;
     }
-    // [保底防御] Gemini < 3 的普通非思考模型（如 gemini-2.5-flash）不支持 thinkingConfig，严禁注入
+    // [Basic Defense] Ordinary non-thinking models with Gemini < 3 (such as gemini-2.5-flash) do not support thinkingConfig, and injection is strictly prohibited
     if crate::proxy::model_specs::is_gemini_under_v3(mapped_model) {
         return false;
     }

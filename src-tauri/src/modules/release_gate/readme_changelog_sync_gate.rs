@@ -1,8 +1,8 @@
 //! README Changelog Synchronization Gate.
 //!
 //! Enforces release documentation discipline per AGENTS.md:
-//! "Synchronize README Changelog (同步首页更新日志): For stable releases, you MUST update the release
-//! summary in both `README.md` (under '## 📝 更新日志') and `README_EN.md` (under '## 📝 Changelog').
+//! "Synchronize README Changelog (synchronize homepage update log): For stable releases, you MUST update the release
+//! summary in both `README.md` (under '## 📝 Changelog') and `README_EN.md` (under '## 📝 Changelog').
 //! Never update only `CHANGELOG.md` while leaving `README.md` / `README_EN.md` with outdated release notes.
 //! Pre-release / beta versions remain exclusively in changelogs; stable releases require full synchronization
 //! across both README files."
@@ -16,7 +16,7 @@ static VERSION_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"v?(\d+\.\d+\.\d+(-[a-zA-Z0-9\.]+)?)").expect("valid version regex"));
 
 /// Section header for changelog in Chinese README.
-pub const CHINESE_CHANGELOG_HEADER: &str = "## 📝 更新日志";
+pub const CHINESE_CHANGELOG_HEADER: &str = "## 📝 Update log";
 
 /// Section header for changelog in English README.
 pub const ENGLISH_CHANGELOG_HEADER: &str = "## 📝 Changelog";
@@ -70,7 +70,7 @@ impl std::fmt::Display for ReadmeSyncViolation {
             Self::MissingChineseReadmeChangelogSection => {
                 write!(
                     f,
-                    "Missing Chinese changelog section '## 📝 更新日志' in README.md"
+                    "Missing Chinese changelog section '## 📝 changelog' in README.md"
                 )
             }
             Self::MissingEnglishReadmeChangelogSection => {
@@ -211,7 +211,7 @@ fn audit_readme_language_sync(
 /// Rules:
 /// - If `channel == ReleaseChannel::BetaPreRelease`: returns `is_synchronized = true, is_exempt_from_readme = true`.
 /// - If `channel == ReleaseChannel::Stable`:
-///   - Checks that `readme_zh_text` contains `## 📝 更新日志` and mentions `target_version`.
+///   - Checks that `readme_zh_text` contains `## 📝 changelog` and mentions `target_version`.
 ///   - Checks that `readme_en_text` contains `## 📝 Changelog` and mentions `target_version`.
 ///   - Checks summaries. If either is missing or outdated, flags violation.
 pub fn verify_readme_changelog_synchronization(

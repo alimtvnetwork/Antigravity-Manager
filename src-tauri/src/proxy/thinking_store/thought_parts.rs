@@ -13,15 +13,15 @@ const PLACEHOLDER_THOUGHTS: &[&str] = &[
 /// Server-side auto thinking. Clients usually omit thinking config;
 /// if any of `claude` / `flash` / `pro` / `agent` appears in a model id
 /// (requested or mapped), the proxy enables thoughts + signature restore.
-/// 判定某个 Part 是否为思考块。
+/// Determine whether a Part is a thinking block.
 ///
-/// **铁律：只认 `thought == true`。**
+/// **Iron rule: Only recognize `thought == true`. **
 ///
-/// 绝不能退化为"带 `thoughtSignature` 且无 `functionCall`/`functionResponse`"——
-/// 真实 Antigravity 报文会把签名挂在**纯正文 part** 上（官方不变量见
-/// `.workbuddy/outputs/correct-assembly-spec.md`）。旧启发式会把可见回答误判为思考块，
-/// 进而在回填阶段把正文改写成"内部思考"，并丢掉该轮唯一的签名——这正是
-/// "签名剥离 → 跨请求死循环"事故的根因。
+/// It must not degenerate into "with `thoughtSignature` and no `functionCall`/`functionResponse`" -
+/// The real Antigravity message will hang the signature on the **plain text part** (see the official invariant
+/// `.workbuddy/outputs/correct-assembly-spec.md`). The old heuristic misclassified visible responses as thought blocks,
+/// Then during the backfilling stage, the text was rewritten as "Internal Thoughts" and the only signature of the round was discarded - this is exactly
+/// The root cause of the "Signature Stripping → Cross-Request Infinite Loop" accident.
 #[inline]
 pub fn is_thought_part(part: &Value) -> bool {
     part.get("thought")
@@ -29,25 +29,25 @@ pub fn is_thought_part(part: &Value) -> bool {
         .unwrap_or(false)
 }
 
-/// 把签名归位到**该轮第一个非思考 part**，其余 part 一律删除签名字段。
+/// Return the signature to the first non-thinking part of the round, and delete the signature field in the remaining parts.
 ///
-/// 由官方报文归纳出的四条硬约束：
+/// Four hard constraints summarized from official reports:
 ///
-/// 1. 锚点 = 该轮第一个 `thought != true` 的 part，**不是**硬编码的 `parts[0]`
-///    （该轮有思考块时，官方签名落在 `parts[1]`）；
-/// 2. `thought: true` / `functionResponse` / 其余 part —— 字段必须**缺席**，而不是空串；
-/// 3. 锚点自带真实签名时**原样保留**（覆盖"纯正文轮"与"思考块 + 正文轮"两种排列）；
-/// 4. 锚点无签名且 `fallback_sig` 也为空时 —— **什么都不写**。官方在"在飞轮"上就是缺席的，
-///    缺失签名是被容忍的，**绝不发明哨兵**。
+/// 1. Anchor = the first `thought != true` part of the round, **not** hard-coded `parts[0]`
+///    (When there is a thinking block in this round, the official signature falls in `parts[1]`);
+/// 2. `thought: true` / `functionResponse` / remaining part - the field must be **absent**, not an empty string;
+/// 3. When the anchor comes with a real signature, it is **retained as it is** (covering the two arrangements of "pure text wheel" and "thinking block + text wheel");
+/// 4. When the anchor has no signature and `fallback_sig` is also empty - **write nothing**. Officials are absent from "On the Flywheel".
+///    Missing signatures are tolerated and sentinels are never invented.
 ///
-/// 本函数**绝不重排、绝不插入** part —— 顺序即锚点语义。
+/// This function **never rearranges or inserts** part - the order is the anchor semantics.
 ///
-/// 返回最终写入锚点的签名（若有）。
+/// Returns the final signature written to the anchor (if any).
 pub fn place_turn_signature(parts: &mut [Value], fallback_sig: Option<&str>) -> Option<String> {
-    // 1. 锚点 = 第一个非思考 part；整轮皆思考则本轮无锚点
+    // 1. Anchor point = the first non-thinking part; if you think about it throughout the round, there will be no anchor point in this round.
     let anchor = parts.iter().position(|p| !is_thought_part(p))?;
 
-    // 2. 必须在清空之前取出锚点自带的签名
+    // 2. The signature that comes with the anchor must be removed before clearing it.
     let own_sig = parts[anchor]
         .get("thoughtSignature")
         .or_else(|| parts[anchor].get("thought_signature"))
@@ -55,7 +55,7 @@ pub fn place_turn_signature(parts: &mut [Value], fallback_sig: Option<&str>) -> 
         .filter(|s| is_real_signature(s))
         .map(str::to_string);
 
-    // 3. 全量清空，保证非锚点 part 的签名字段确实"缺席"
+    // 3. Clear all of them to ensure that the signature field of the non-anchor part is indeed "absent"
     for part in parts.iter_mut() {
         if let Some(obj) = part.as_object_mut() {
             obj.remove("thoughtSignature");
@@ -63,19 +63,19 @@ pub fn place_turn_signature(parts: &mut [Value], fallback_sig: Option<&str>) -> 
         }
     }
 
-    // 4. functionResponse 永不携带签名
+    // 4. functionResponse never carries a signature
     if parts[anchor].get("functionResponse").is_some() {
         return None;
     }
 
-    // 5. 锚点自带优先，缺失时才使用回填来源（跨协议路径）
+    // 5. The anchor point comes with priority. If it is missing, the backfill source will be used (cross-protocol path)
     let sig = own_sig.or_else(|| {
         fallback_sig
             .filter(|s| is_real_signature(s))
             .map(str::to_string)
     })?;
 
-    // 权威防裂化：如果签名是原始二进制 protobuf (首字节 0x12)，必须转为标准 Base64 编码后再发送给 Gemini！
+    // Authoritative anti-cracking: If the signature is a raw binary protobuf (first byte 0x12), it must be converted to standard Base64 encoding before being sent to Gemini!
     let final_sig = if sig.as_bytes().first() == Some(&0x12) {
         use base64::Engine;
         base64::engine::general_purpose::STANDARD.encode(sig.as_bytes())
@@ -84,7 +84,7 @@ pub fn place_turn_signature(parts: &mut [Value], fallback_sig: Option<&str>) -> 
     };
     parts[anchor]["thoughtSignature"] = json!(final_sig);
 
-    // 反向入库优化：如果锚点是工具调用，反向更新/修补回签名缓存与 SQLite tool_signatures 库！
+    // Reverse warehousing optimization: If the anchor is a tool call, reversely update/patch back the signature cache and SQLite tool_signatures library!
     if let Some(fc) = parts[anchor].get("functionCall") {
         if let Some(id) = fc.get("id").and_then(|v| v.as_str()) {
             crate::proxy::SignatureCache::global().cache_tool_signature(id, final_sig.clone());
@@ -106,7 +106,7 @@ pub fn is_meaningful_thought(thought: &str) -> bool {
     if t.is_empty() || is_placeholder_thought(t) {
         return false;
     }
-    // 拦截伪思考标签与客户端占位脏数据
+    // Intercept pseudo-thinking tags and client-side placeholder dirty data
     let stripped = t
         .trim_start_matches("<think>")
         .trim_end_matches("</think>")
@@ -125,9 +125,9 @@ pub fn is_meaningful_thought(thought: &str) -> bool {
     true
 }
 
-/// 提取并切除文本中的 `<think>...</think>` 标签内容（用于跨模型自愈与正文思考文本重提升）
-/// 支持任意大小写（<think> / <THINK>）、前后正文无缝缝合拼接、以及未闭合标签容错
-/// 返回 `Some((thought, remaining_visible))`
+/// Extract and cut off the `<think>...</think>` tag content in the text (used for cross-model self-healing and text thinking text re-improvement)
+/// Supports any upper and lower case (<think> / <THINK>), seamless stitching of front and rear text, and tolerance for unclosed tags
+/// Return `Some((thought, remaining_visible))`
 pub fn extract_think_tags(text: &str) -> Option<(String, String)> {
     let lower = text.to_lowercase();
     let start_tag = "<think>";
@@ -149,7 +149,7 @@ pub fn extract_think_tags(text: &str) -> Option<(String, String)> {
             };
             return Some((thought, visible));
         } else {
-            // 未闭合标签容错：截断到文本末尾
+            // Unclosed tag tolerance: truncate to end of text
             let thought = text[after_start..].trim().to_string();
             let before = text[..start_pos].trim();
             return Some((thought, before.to_string()));
@@ -159,10 +159,10 @@ pub fn extract_think_tags(text: &str) -> Option<(String, String)> {
 }
 
 pub(crate) fn is_capturable_thought(thought: &str, signature: Option<&str>) -> bool {
-    // 占位符或纯空白思考绝不可捕获为新的持久化思考记录！
+    // Placeholder or plain blank thoughts are never captured as new persistent thought records!
     if is_placeholder_thought(thought) || thought.trim().is_empty() {
-        // [DECOUPLE 2026-09-26] 官方新规：任何 model 轮都可能返回签名（正文轮 / 工具轮 / 纯思考轮）。
-        // 纯 fc 轮（无思考文本）只要携带真实签名，也必须入库——否则下一轮锚点回填时找不到签名。
+        // [DECOUPLE 2026-09-26] Official new rule: Any model wheel may return a signature (text wheel / tool wheel / pure thinking wheel).
+        // Pure fc rounds (no thinking text) must also be entered into the database as long as they carry real signatures - otherwise the signatures will not be found in the next round of anchor backfill.
         return signature.is_some_and(is_real_signature);
     }
     if signature.is_some_and(is_real_signature) {

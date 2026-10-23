@@ -175,7 +175,7 @@ where
     S: Subscriber,
 {
     fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
-        // [FIX] 如果调试控制台未启用，直接跳过所有处理，避免性能损耗
+        // [FIX] If the debug console is not enabled, skip all processing directly to avoid performance loss
         if !LOG_BRIDGE_ENABLED.load(Ordering::Relaxed) {
             return;
         }

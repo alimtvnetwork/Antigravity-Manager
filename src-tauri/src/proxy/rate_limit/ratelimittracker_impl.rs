@@ -10,7 +10,7 @@ impl RateLimitTracker {
         model: Option<String>,
         cap_to_max: bool,
     ) -> bool {
-        // 尝试解析 ISO 8601 格式
+        // Try to parse ISO 8601 format
         match chrono::DateTime::parse_from_rfc3339(reset_time_str) {
             Ok(dt) => {
                 let reset_time =
@@ -20,7 +20,7 @@ impl RateLimitTracker {
             }
             Err(e) => {
                 tracing::warn!(
-                    "无法解析配额刷新时间 '{}': {},将使用默认退避策略",
+                    "Unable to parse quota refresh time ' {} ': {} , default backoff policy will be used",
                     reset_time_str,
                     e
                 );
@@ -29,12 +29,12 @@ impl RateLimitTracker {
         }
     }
 
-    /// 使用 ISO 8601 时间字符串精确锁定账号
+    /// Precisely lock accounts using ISO 8601 time strings
     ///
-    /// 解析类似 "2026-01-08T17:00:00Z" 格式的时间字符串
+    /// Parse a time string in a format similar to "2026-01-08T17:00:00Z"
     ///
-    /// # 参数
-    /// - `model`: 可选的模型名称,用于模型级别限流
+    /// # Parameters
+    /// - `model`: optional model name, used for model-level current limiting
     pub fn set_lockout_until_iso(
         &self,
         account_id: &str,
@@ -45,13 +45,13 @@ impl RateLimitTracker {
         self.set_lockout_until_iso_with_cap(account_id, reset_time_str, reason, model, true)
     }
 
-    /// 从错误响应解析限流信息
+    /// Parse throttling information from error response
     ///
     /// # Arguments
-    /// * `account_id` - 账号 ID
-    /// * `status` - HTTP 状态码
-    /// * `retry_after_header` - Retry-After header 值
-    /// * `body` - 错误响应 body
+    /// * `account_id` - Account ID
+    /// * `status` - HTTP status code
+    /// * `retry_after_header` - Retry-After header value
+    /// * `body` - error response body
     pub fn parse_from_error(
         &self,
         account_id: &str,
@@ -59,7 +59,7 @@ impl RateLimitTracker {
         retry_after_header: Option<&str>,
         body: &str,
         model: Option<String>,
-        backoff_steps: &[u64], // [NEW] 传入退避配置
+        backoff_steps: &[u64], // [NEW] Incoming backoff configuration
     ) -> Option<RateLimitInfo> {
         self.parse_from_error_with_mode(
             account_id,
@@ -102,7 +102,7 @@ impl RateLimitTracker {
         backoff_steps: &[u64],
         parser_mode: RetryParserMode,
     ) -> Option<RateLimitInfo> {
-        // 关键防御：网关内部自产生的排队/无可用账号错误，绝对禁止解析为上游限流，杜绝自噬死循环
+        // Key defense: Queuing/no available account errors generated internally within the gateway are absolutely prohibited from being resolved into upstream current limiting, to prevent self-destructive loops.
         let lower_body = body.to_lowercase();
         if lower_body.contains("all accounts limited")
             || lower_body.contains("no accounts available")
@@ -114,12 +114,12 @@ impl RateLimitTracker {
             return None;
         }
 
-        // 仅对真正的上游限流 429 和过载 529 进行账号冷却跟踪；500/503 属于服务瞬时不可用，绝不打入冷却池！
+        // Only the real upstream current limit 429 and overload 529 are tracked for account cooling; 500/503 means the service is temporarily unavailable and will never be entered into the cooling pool!
         if status != 429 && status != 529 {
             return None;
         }
 
-        // 1. 解析限流原因类型
+        // 1. Analyze the type of current limiting reason
         let reason = if status == 429 {
             tracing::warn!("Google 429 Error Body: {}", body);
             self.parse_rate_limit_reason(body)
@@ -147,10 +147,10 @@ impl RateLimitTracker {
                 .and_then(normalize_image_model_id)
                 .is_some();
 
-        // 4. 处理默认值与软避让逻辑（根据限流类型设置不同默认值）
+        // 4. Process default values and soft avoidance logic (set different default values according to current limiting type)
         let retry_sec = match retry_after_sec {
             Some(s) => {
-                // 设置安全缓冲区：最小 2 秒，防止极高频无效重试
+                // Set safety buffer: minimum 2 seconds to prevent extremely high frequency invalid retries
                 if s < 2 {
                     2
                 } else {
@@ -158,15 +158,15 @@ impl RateLimitTracker {
                 }
             }
             None => {
-                // 获取连续失败次数，用于指数退避（带自动过期逻辑）
-                // [FIX] ServerError (5xx) 不累加 failure_count，避免污染 429 的退避阶梯
+                // Get the number of consecutive failures, used for exponential backoff (with automatic expiration logic)
+                // [FIX] ServerError (5xx) does not accumulate failure_count to avoid polluting the 429 backoff ladder
                 let failure_count = if reason != RateLimitReason::ServerError {
-                    // 只有非 ServerError 才累加失败计数（用于指数退避）
+                    // Failure count is accumulated only for non-ServerError (used for exponential backoff)
                     let now = SystemTime::now();
-                    // 这里我们使用 account_id 作为 key，不区分模型，
-                    // 因为这里是为了计算连续"账号级"问题的退避。
-                    // 如果需要针对模型的连续失败计数，可能需要改变 failure_counts 的 key。
-                    // 暂时保持 account_id，这样如果一个模型一直挂，也会增加计数，符合逻辑。
+                    // Here we use account_id as the key without distinguishing between models.
+                    // Because this is to calculate the backoff of consecutive "account level" problems.
+                    // If you need consecutive failure counts for your model, you may need to change the failure_counts key.
+                    // Keep the account_id temporarily so that if a model keeps hanging, the count will be increased, which is logical.
                     let mut entry = self
                         .failure_counts
                         .entry(account_id.to_string())
@@ -178,7 +178,7 @@ impl RateLimitTracker {
                         .as_secs();
                     if elapsed > FAILURE_COUNT_EXPIRY_SECONDS {
                         tracing::debug!(
-                            "账号 {} 失败计数已过期（{}秒），重置为 0",
+                            "Account {} failure count has expired ( {} seconds) and reset to 0",
                             account_id,
                             elapsed
                         );
@@ -188,13 +188,13 @@ impl RateLimitTracker {
                     entry.1 = now;
                     entry.0
                 } else {
-                    // ServerError (5xx) 使用固定值 1，不累加，避免污染 429 的退避阶梯
+                    // ServerError (5xx) uses a fixed value of 1 and does not accumulate to avoid polluting the 429 backoff ladder.
                     1
                 };
 
                 match reason {
                     RateLimitReason::QuotaExhausted => {
-                        // [智能限流] 根据 failure_count 和配置的 backoff_steps 计算
+                        // [Intelligent current limiting] Calculated based on failure_count and configured backoff_steps
                         let index = (failure_count as usize).saturating_sub(1);
                         let lockout = if index < backoff_steps.len() {
                             backoff_steps[index]
@@ -203,14 +203,14 @@ impl RateLimitTracker {
                         };
 
                         tracing::warn!(
-                            "检测到配额耗尽 (QUOTA_EXHAUSTED)，第{}次连续失败，根据配置锁定 {} 秒",
+                            "Quota exhausted (QUOTA_EXHAUSTED) detected, {} consecutive failures, locked for {} seconds as configured",
                             failure_count,
                             lockout
                         );
                         lockout
                     }
                     RateLimitReason::RateLimitExceeded => {
-                        // 速率限制 (TPM/RPM)
+                        // Rate Limiting (TPM/RPM)
                         let body_lower = body.to_lowercase();
                         let lockout = if body_lower.contains("resource has been exhausted")
                             || body_lower.contains("resource_exhausted")
@@ -220,20 +220,20 @@ impl RateLimitTracker {
                             5
                         };
                         tracing::debug!(
-                            "检测到速率限制 (RATE_LIMIT_EXCEEDED)，使用默认值 {}秒",
+                            "Rate limit detected (RATE_LIMIT_EXCEEDED), using default value of {} seconds",
                             lockout
                         );
                         lockout
                     }
                     RateLimitReason::ModelCapacityExhausted => {
-                        // 模型容量耗尽
+                        // Model capacity exhausted
                         let lockout = match failure_count {
                             1 => 5,
                             2 => 10,
                             _ => 15,
                         };
                         tracing::warn!(
-                            "检测到模型容量不足 (MODEL_CAPACITY_EXHAUSTED)，第{}次失败，{}秒后重试",
+                            "Insufficient model capacity detected (MODEL_CAPACITY_EXHAUSTED), failed for {} times, try again in {} seconds",
                             failure_count,
                             lockout
                         );
@@ -241,12 +241,16 @@ impl RateLimitTracker {
                     }
                     RateLimitReason::ServerError => {
                         let lockout = 8;
-                        tracing::warn!("检测到 {} 错误, 执行 {}s 软避让...", status, lockout);
+                        tracing::warn!(
+                            "{} error detected, executing {} s soft avoidance...",
+                            status,
+                            lockout
+                        );
                         lockout
                     }
                     RateLimitReason::Unknown => {
-                        // 未知原因
-                        tracing::debug!("无法解析 429 限流原因, 使用默认值 60秒");
+                        // unknown reason
+                        tracing::debug!("Unable to parse 429 current limit reason, use the default value of 60 seconds");
                         60
                     }
                 }
@@ -278,8 +282,8 @@ impl RateLimitTracker {
             model: model.clone(),
         };
 
-        // [FIX] 细粒度模型隔离：只要调用方传入了具体的 model，限流必须针对该 model 进行隔离！
-        // 杜绝因某单个模型（或不存在的模型/特定模型限流）而将全账号的所有模型连坐封锁，导致正常账号宕机。
+        // [FIX] Fine-grained model isolation: As long as the caller passes in a specific model, the current limit must be isolated for that model!
+        // Prevent all models in the entire account from being blocked due to a single model (or non-existent model/specific model current limit), causing normal account downtime.
         let key = if let Some(m) = model.as_deref().filter(|s| !s.is_empty()) {
             self.get_limit_key(account_id, Some(m))
         } else {
@@ -289,7 +293,7 @@ impl RateLimitTracker {
         self.limits.insert(key, info.clone());
 
         tracing::warn!(
-            "账号 {} [{}] 限流类型: {:?}, 重置延时: {}秒",
+            "Account {} [ {} ] Current limit type: {:?} , reset delay: {} seconds",
             account_id,
             status,
             reason,
@@ -299,9 +303,9 @@ impl RateLimitTracker {
         Some(info)
     }
 
-    /// 解析限流原因类型
+    /// Analyze the current limiting reason type
     pub(crate) fn parse_rate_limit_reason(&self, body: &str) -> RateLimitReason {
-        // 尝试从 JSON 中提取 reason 字段
+        // Try to extract reason field from JSON
         let trimmed = body.trim();
         if trimmed.starts_with('{') || trimmed.starts_with('[') {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(trimmed) {
@@ -320,7 +324,7 @@ impl RateLimitTracker {
                         _ => RateLimitReason::Unknown,
                     };
                 }
-                // [NEW] 尝试从 message 字段进行文本匹配（防止 missed reason）
+                // [NEW] Attempt text matching from message field (to prevent missed reason)
                 if let Some(msg) = json
                     .get("error")
                     .and_then(|e| e.get("message"))
@@ -334,9 +338,9 @@ impl RateLimitTracker {
             }
         }
 
-        // 如果无法从 JSON 解析，尝试从消息文本判断
+        // If it cannot be parsed from JSON, try judging from the message text
         let body_lower = body.to_lowercase();
-        // [FIX] 优先判断分钟级限制，避免将 TPM 误判为 Quota
+        // [FIX] Prioritize judgment of minute-level limits to avoid misjudgment of TPM as Quota
         let generic_resource_exhausted = body_lower.contains("resource has been exhausted")
             || body_lower.contains("resource_exhausted");
         let explicit_quota_exhausted = body_lower.contains("quotaresetdelay")
@@ -363,7 +367,7 @@ impl RateLimitTracker {
         }
     }
 
-    /// 从错误消息 body 中解析重置时间
+    /// Parse reset time from error message body
     pub(crate) fn parse_retry_time_from_body(&self, body: &str) -> Option<u64> {
         crate::proxy::upstream::retry::parse_retry_delay(body, None)
             .map(|delay_ms| delay_ms.saturating_add(999) / 1000)
@@ -448,7 +452,7 @@ impl RateLimitTracker {
         None
     }
 
-    /// 获取账号的限流信息
+    /// Get the current limit information of the account
     pub fn get(&self, account_id: &str) -> Option<RateLimitInfo> {
         self.limits.get(account_id).map(|r| r.clone())
     }

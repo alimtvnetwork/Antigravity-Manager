@@ -61,7 +61,7 @@ export function useProxyLogs({ captureHealthLogs, onConfigLoaded }: UseProxyLogs
     const [filter, setFilter] = useState('');
     const [accountFilter, setAccountFilter] = useState('');
 
-    // [FIX] 使用 ref 存储最新的筛选条件，避免 setInterval 闭包问题
+    // [FIX] Use ref to store the latest filter conditions to avoid setInterval closure issues
     const filterRef = useRef(filter);
     const accountFilterRef = useRef(accountFilter);
     const currentPageRef = useRef(1);
@@ -173,7 +173,7 @@ export function useProxyLogs({ captureHealthLogs, onConfigLoaded }: UseProxyLogs
     const goToPage = (page: number) => {
         if (page >= 1 && page <= totalPages && page !== currentPage) {
             setCurrentPage(page);
-            currentPageRef.current = page; // [FIX] 同步 ref
+            currentPageRef.current = page; // [FIX] Sync ref
             loadData(page, filter, accountFilter);
         }
     };
@@ -206,7 +206,7 @@ export function useProxyLogs({ captureHealthLogs, onConfigLoaded }: UseProxyLogs
 
                 const newLog = event.payload;
 
-                // 移除 body 以减少内存占用
+                // Remove body to reduce memory usage
                 const logSummary = {
                     ...newLog,
                     request_body: undefined,
@@ -223,7 +223,7 @@ export function useProxyLogs({ captureHealthLogs, onConfigLoaded }: UseProxyLogs
 
                 pendingLogsRef.current.push(logSummary);
 
-                // 防抖:每 500ms 批量更新一次
+                // Anti-shake: batch update every 500ms
                 if (updateTimeout) clearTimeout(updateTimeout);
                 updateTimeout = window.setTimeout(async () => {
                     if (!isMountedRef.current) return;
@@ -261,14 +261,14 @@ export function useProxyLogs({ captureHealthLogs, onConfigLoaded }: UseProxyLogs
         };
         setupListener();
 
-        // Web 模式補強：如果不是 Tauri 環境，則啟用定時輪詢
+        // Web mode enhancement: If it is not a Tauri environment, enable scheduled polling
         let pollInterval: number | null = null;
         if (!isTauri()) {
             console.debug('[ProxyMonitor] Web mode detected, starting auto-poll (10s)');
             pollInterval = window.setInterval(() => {
                 if (isMountedRef.current) {
                     if (!loading) {
-                        // [FIX] 使用 ref.current 获取最新的筛选条件
+                        // [FIX] Use ref.current to get the latest filter
                         loadData(currentPageRef.current, filterRef.current, accountFilterRef.current);
                     }
                 }
@@ -309,7 +309,7 @@ export function useProxyLogs({ captureHealthLogs, onConfigLoaded }: UseProxyLogs
     useEffect(() => {
         setCurrentPage(1);
         loadData(1, filter, accountFilter);
-        // [FIX] 同步 ref 值，供 setInterval 使用
+        // [FIX] Synchronize ref values ​​for use by setInterval
         filterRef.current = filter;
         accountFilterRef.current = accountFilter;
         currentPageRef.current = 1;

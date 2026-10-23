@@ -174,7 +174,7 @@ pub fn resolve_with_tier(
     let is_gemini_3_family =
         is_v3 && (lower.contains("flash") || lower.contains("pro") || lower.contains("agent"));
     if is_gemini_3_family {
-        // [NEW] 如果是 >= 3.6 的无后缀 Flash 衍生模型，统一预设路由为 tiered 真实模型 ID，彻底杜绝上游 429
+        // [NEW] If it is an unsuffixed Flash derivative model >= 3.6, the unified default route is the tiered real model ID, completely eliminating upstream 429
         let resolved_id = if crate::proxy::model_specs::is_bare_gemini_v36_or_above_flash(canonical)
         {
             format!("{}-tiered", canonical)

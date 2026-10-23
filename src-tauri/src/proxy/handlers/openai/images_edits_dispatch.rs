@@ -39,14 +39,14 @@ pub(crate) fn spawn_image_edit_tasks(
     response_format: String,
     clean_model_name: String,
 ) {
-    // 4. 并发发送请求
-    // 注意：不再在外部获取 Token，而是移入 Task 内部
+    // 4. Send requests concurrently
+    // Note: Token is no longer obtained externally, but moved inside Task
     let upstream = upstream.clone();
     let token_manager = token_manager.clone();
     let image_scheduler = state.image_scheduler.clone();
     let request_timeout = state.request_timeout;
     let max_pool_size = token_manager.len();
-    // [FIX #3485] 自适应多账号池与单账号退避最大重试次数 (单账号3次，多账号整池两轮)
+    // [FIX #3485] Maximum number of retries for adaptive multi-account pool and single-account backoff (3 times for a single account, two rounds for the entire pool with multiple accounts)
     let max_attempts = crate::proxy::handlers::common::calculate_max_retry_attempts(max_pool_size);
 
     let mut tasks = JoinSet::new();
@@ -73,7 +73,7 @@ pub(crate) fn spawn_image_edit_tasks(
                 max_attempts,
                 retry_credentials.is_some(),
             ) {
-                // 4.1 获取 Token
+                // 4.1 Obtain Token
                 let (access_token, project_id, email, account_id, _wait_ms) =
                     if let Some(credentials) = retry_credentials.take() {
                         credentials
@@ -152,7 +152,7 @@ pub(crate) fn spawn_image_edit_tasks(
                                     false,
                                 )
                             });
-                            // 统一流水线限流裁决：500/503等服务异常绝不打入限流
+                            // Unified pipeline current limiting ruling: 500/503 and other service exceptions will never be subject to current limiting
                             let classification =
                                 crate::proxy::pipeline::UpstreamClassification::classify(
                                     status_code,

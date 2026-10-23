@@ -94,7 +94,7 @@ Based on the inventory, populate the release skeleton:
 > 2. With `generateReleaseNotes: false` configured, GitHub is prevented from auto-generating external contributor lists from git commit histories.
 > 3. **Beta Releases do not enter README**: Pre-release tags containing `-` (`-beta`, `-cleaned`, `-rc`, etc.) are **recorded only in `changelog.md`** and must not be written to README version badges or latest version sections. README always reflects the latest **stable** release. `bump-version.mjs` automatically skips README updates for pre-releases.
 > 4. **Inline Contributor Credits**: Credit contributors strictly inline as `(Thanks to @aukgit)`. The Release page avatar list will strictly display only aukgit.
-> 5. **Mandatory README Changelog Synchronization for Stable Releases**: When releasing a stable version, in addition to updating `changelog.md` (and `changelog_en.md`), you **MUST** update the release summary in both `readme.md` (under `## 📝 更新日志`) and `readme_en.md` (under `## 📝 Changelog`). Never update only the changelogs while leaving the README homepages outdated.
+> 5. **Mandatory README Changelog Synchronization for Stable Releases**: When releasing a stable version, in addition to updating `changelog.md` (and `changelog_en.md`), you **MUST** update the release summary in both `readme.md` (under `## 📝 changelog`) and `readme_en.md` (under `## 📝 Changelog`). Never update only the changelogs while leaving the README homepages outdated.
 
 ### Step 3: Commit and Push Target Branch
 

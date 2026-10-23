@@ -51,7 +51,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // 按优先级查找配额模型
+    // Find quota models by priority
     const geminiProModel = findQuotaModel(account.quota?.models, 'gemini-pro');
     const geminiFlashModel = findQuotaModel(account.quota?.models, 'gemini-flash');
     const isDisabled = Boolean(account.disabled);
@@ -74,7 +74,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                 : "border-l-transparent text-gray-800 dark:text-gray-200 hover:!bg-white dark:hover:!bg-white hover:!text-black dark:hover:!text-black hover:border-l-blue-500/70",
             (isRefreshing || isDisabled) && "opacity-70"
         )}>
-            {/* 序号 */}
+            {/* serial number */}
             <td className="pl-6 py-1 w-12 group-hover:!bg-white dark:group-hover:!bg-white">
                 <input
                     type="checkbox"
@@ -85,7 +85,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                 />
             </td>
 
-            {/* 邮箱 */}
+            {/* Mail */}
             <td className="px-4 py-0.5 group-hover:!bg-white dark:group-hover:!bg-white transition-colors">
                 <div className="flex items-center gap-3">
                     <span className={cn(
@@ -132,10 +132,10 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                             </span>
                         )}
 
-                        {/* 订阅类型徽章 */}
+                        {/* Subscription type badge */}
                         <TierBadge tier={account.quota?.subscription_tier} size="md" />
 
-                        {/* 优先级徽章 */}
+                        {/* Priority badge */}
                         <PriorityBadge
                             priority={account.priority}
                             accountId={account.id}
@@ -145,7 +145,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                     </div>
             </td>
 
-            {/* 4H 模型配额 */}
+            {/* 4H model quota */}
             <td className="px-2.5 py-0.5 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 group-hover:!bg-white dark:group-hover:!bg-white border-l border-slate-300 dark:border-[#40285e] transition-colors">
                 {account.quota?.is_forbidden ? (
                     <div className="flex items-center gap-1.5 text-[10px] text-rose-600 dark:text-rose-400 bg-rose-500/10 p-1 rounded-[5px] border border-rose-400/20 group-hover:!text-black dark:group-hover:!text-black transition-colors">
@@ -162,7 +162,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                 )}
             </td>
 
-            {/* Weekly 配额 */}
+            {/* Weekly Quota */}
             <td className="px-2.5 py-0.5 align-middle min-w-[210px] w-1/2 bg-slate-50/50 dark:bg-slate-900/40 group-hover:!bg-white dark:group-hover:!bg-white border-r border-slate-300 dark:border-[#40285e] transition-colors">
                 {account.quota?.is_forbidden ? (
                     <span className="text-[10px] text-gray-400 italic group-hover:!text-black dark:group-hover:!text-black transition-colors">--</span>
@@ -199,14 +199,14 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                 )}
             </td>
 
-            {/* 最后使用 */}
+            {/* last used */}
             <td className="px-2 py-0.5 align-middle whitespace-nowrap w-[95px] group-hover:!bg-white dark:group-hover:!bg-white transition-colors">
                 <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400 group-hover:!text-black dark:group-hover:!text-black font-mono transition-colors" title={formatDateTime(account.last_used)}>
                     {formatDateOnly(account.last_used)}
                 </span>
             </td>
 
-            {/* 操作 */}
+            {/* operate */}
             <td className="px-4 py-0.5 group-hover:!bg-white dark:group-hover:!bg-white transition-colors">
                 <div className="flex items-center gap-0.5 opacity-80 group-hover:opacity-100 transition-opacity">
                     {/* 1. Refresh button (first) */}
@@ -227,7 +227,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")} />
                     </button>
 
-                    {/* 2. 切换/实例选择按钮 (排在第二位) */}
+                    {/* 2. Toggle/instance selection button (second in line) */}
                     <div className="relative inline-flex items-center" ref={menuRef}>
                         <button
                             type="button"
@@ -289,7 +289,7 @@ function AccountRow({ account, selected, onSelect, isCurrent, isRefreshing, isSw
                         )}
                     </div>
 
-                    {/* 3. 详情与其它操作 */}
+                    {/* 3. Details and other operations */}
                     <button
                         type="button"
                         role="button"

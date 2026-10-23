@@ -43,8 +43,8 @@ pub fn save_thinking_record(
     let packed_thought = pack_thought(thought);
     let signature = persist_signature(signature);
 
-    // 智能防叠加与幂等查重：只允许合并/更新当前会话中的【最新一条】活跃轮次（流式碎片拼接或更长思考补齐）
-    // 绝不能回溯更新历史早期轮次！
+    // Intelligent anti-overlay and idempotent duplication checking: only allow merging/updating the [latest] active round in the current session (streaming fragment splicing or longer thinking completion)
+    // Never go back and update earlier rounds in history!
     let latest_row: Option<(
         i64,
         usize,
@@ -107,11 +107,11 @@ pub fn save_thinking_record(
     };
 
     if let Some((id, old_thought_len, old_sig)) = existing_id {
-        // 已存在记录：检查是否需要更新（防止将已有实质思考覆盖为占位符，但允许补全更长思考或有效签名）
+        // Existing record: Check if update is needed (prevents overwriting existing substantive thoughts as placeholders, but allows completion of longer thoughts or valid signatures)
         let incoming_has_meaningful_thought =
             !crate::proxy::thinking_store::is_placeholder_thought(thought)
                 && !thought.trim().is_empty();
-        let old_is_dummy = old_thought_len <= 10; // "RAW1..." 或占位符非常短
+        let old_is_dummy = old_thought_len <= 10; // "RAW1..." or the placeholder is very short
 
         let should_update_thought = incoming_has_meaningful_thought || old_is_dummy;
         let healed_old_sig = old_sig.as_deref().and_then(normalize_and_heal_signature);
@@ -139,7 +139,7 @@ pub fn save_thinking_record(
         } else if (signature.is_some() && signature.as_deref() != old_sig.as_deref())
             || (healed_old_sig.as_deref() != old_sig.as_deref())
         {
-            // 仅更新签名，保留已有的高质量实质思考（同时修复旧签名的脏数据）
+            // Only update the signature, retaining the existing high-quality substantive thinking (while repairing the dirty data of the old signature)
             let mut stmt = conn
                 .prepare_cached(
                     "UPDATE thinking_records
@@ -151,7 +151,7 @@ pub fn save_thinking_record(
                 .map_err(|e| e.to_string())?;
         }
     } else {
-        // 全新轮次：插入新记录（同时写入 primary_tool_id 与 causal_tool_id 列）
+        // New round: insert new records (write both primary_tool_id and causal_tool_id columns)
         let mut stmt = conn
             .prepare_cached(
                 "INSERT INTO thinking_records (session_key, fingerprint, thought, signature, tool_ids, tool_names, visible, created_at, primary_tool_id, causal_tool_id)

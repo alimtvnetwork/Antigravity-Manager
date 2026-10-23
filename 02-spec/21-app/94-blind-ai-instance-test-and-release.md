@@ -130,7 +130,7 @@ Follow `docs/release_guide.md` and `AGENTS.md`.
    - `npm run build`
 3. Stable patch: `npm run bump patch`. This is the release bump script. It updates the manifests and the changelog skeleton together. Do not edit version files by hand.
 4. Fill the new changelog section in `CHANGELOG.md` and `changelog_en.md`. The only GitHub handle allowed is `@aukgit`, written as `(Thanks to @aukgit)`.
-5. Copy the stable summary into `README.md` under `## 📝 更新日志` and `README_EN.md` under `## 📝 Changelog`.
+5. Copy the stable summary into `README.md` under `## 📝 Changelog` and `README_EN.md` under `## 📝 Changelog`.
 6. Commit those release files. Push `main`. Do not force-push.
 7. Wait until GitHub Actions for that commit is green. A cancelled run is not green.
 8. Tag with the exact changelog heading, including the `v` prefix: `git tag vX.Y.Z && git push origin vX.Y.Z`.

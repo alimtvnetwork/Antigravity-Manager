@@ -1,15 +1,15 @@
 use super::*;
 
 impl CacheManager {
-    // ===== 向后兼容 API =====
+    // ===== Backward Compatibility API =====
 
-    /// 查找前缀: 兼容旧 API，等同于 lookup_prefix
+    /// Lookup prefix: compatible with old API, equivalent to lookup_prefix
     #[inline]
     pub fn lookup(&self, hash: &str) -> Option<String> {
         self.lookup_prefix(hash)
     }
 
-    /// 插入前缀: 兼容旧 API
+    /// Insert prefix: compatible with old API
     #[inline]
     pub fn insert(&self, hash: String, cache_name: String, ttl_secs: Option<u64>) {
         self.insert_prefix(
@@ -24,7 +24,7 @@ impl CacheManager {
 
     // ===== Stats & Management =====
 
-    /// 获取分层统计
+    /// Get stratified statistics
     pub fn get_layer_stats(&self) -> LayerStats {
         let si = self.si_stats.read().unwrap();
         let tools = self.tools_stats.read().unwrap();
@@ -59,7 +59,7 @@ impl CacheManager {
         }
     }
 
-    /// 淘汰所有过期条目
+    /// Eliminate all expired entries
     pub fn evict_expired(&self) -> usize {
         let si_before = self.si_cache.len();
         self.si_cache
@@ -84,7 +84,7 @@ impl CacheManager {
         total
     }
 
-    /// 清空所有层缓存和统计
+    /// Clear all layer caches and statistics
     pub fn clear(&self) {
         self.si_cache.clear();
         self.tools_cache.clear();

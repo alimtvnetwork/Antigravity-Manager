@@ -30,7 +30,7 @@ pub(crate) fn weekly_quota_account(now: i64) -> serde_json::Value {
     })
 }
 
-/// 创建测试用的 ProxyToken
+/// Create a ProxyToken for testing
 pub(crate) fn create_test_token(
     email: &str,
     tier: Option<&str>,
@@ -61,11 +61,11 @@ pub(crate) fn create_test_token(
     }
 }
 
-/// 测试排序比较函数（与 get_token_internal 中的逻辑一致）
+/// Test the sorting comparison function (same logic as in get_token_internal)
 pub(crate) fn compare_tokens(a: &ProxyToken, b: &ProxyToken) -> Ordering {
-    const RESET_TIME_THRESHOLD_SECS: i64 = 600; // 10 分钟阈值
+    const RESET_TIME_THRESHOLD_SECS: i64 = 600; // 10 minute threshold
 
-    // 统一走 models::quota::tier_priority（与生产排序逻辑共用同一实现）
+    // Unify models::quota::tier_priority (share the same implementation with production sorting logic)
     let tier_priority =
         |tier: &Option<String>| crate::models::quota::tier_priority(tier.as_deref());
 
@@ -102,7 +102,7 @@ pub(crate) fn compare_tokens(a: &ProxyToken, b: &ProxyToken) -> Ordering {
     quota_b.cmp(&quota_a)
 }
 
-/// 创建带 protected_models 的测试 Token
+/// Create a test token with protected_models
 pub(crate) fn create_test_token_with_protected(
     email: &str,
     remaining_quota: Option<i32>,

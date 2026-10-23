@@ -7,7 +7,7 @@ pub async fn get_device_profiles(
     modules::get_device_profiles(&account_id)
 }
 
-/// 绑定设备指纹（capture: 采集当前；generate: 生成新指纹），并写入 storage.json
+/// Bind device fingerprint (capture: capture current; generate: generate new fingerprint) and write to storage.json
 #[tauri::command]
 pub async fn bind_device_profile(
     account_id: String,
@@ -16,13 +16,13 @@ pub async fn bind_device_profile(
     modules::bind_device_profile(&account_id, &mode)
 }
 
-/// 预览生成一个指纹（不落盘）
+/// Preview generates a fingerprint (without placing it on the disk)
 #[tauri::command]
 pub async fn preview_generate_profile() -> Result<crate::models::DeviceProfile, String> {
     Ok(crate::modules::device::generate_profile())
 }
 
-/// 使用给定指纹直接绑定
+/// Bind directly using given fingerprint
 #[tauri::command]
 pub async fn bind_device_profile_with_profile(
     account_id: String,
@@ -31,7 +31,7 @@ pub async fn bind_device_profile_with_profile(
     modules::bind_device_profile_with_profile(&account_id, profile, Some("generated".to_string()))
 }
 
-/// 将账号已绑定的指纹应用到 storage.json
+/// Apply the fingerprint bound to the account to storage.json
 #[tauri::command]
 pub async fn apply_device_profile(
     account_id: String,
@@ -39,13 +39,13 @@ pub async fn apply_device_profile(
     modules::apply_device_profile(&account_id)
 }
 
-/// 恢复最早的 storage.json 备份（近似“原始”状态）
+/// Restore the oldest storage.json backup (approximately "original" state)
 #[tauri::command]
 pub async fn restore_original_device() -> Result<String, String> {
     modules::restore_original_device()
 }
 
-/// 列出指纹版本
+/// List fingerprint versions
 #[tauri::command]
 pub async fn list_device_versions(
     account_id: String,
@@ -53,7 +53,7 @@ pub async fn list_device_versions(
     modules::list_device_versions(&account_id)
 }
 
-/// 按版本恢复指纹
+/// Recover fingerprints by version
 #[tauri::command]
 pub async fn restore_device_version(
     account_id: String,
@@ -62,21 +62,21 @@ pub async fn restore_device_version(
     modules::restore_device_version(&account_id, &version_id)
 }
 
-/// 删除历史指纹（baseline 不可删）
+/// Delete historical fingerprints (baseline cannot be deleted)
 #[tauri::command]
 pub async fn delete_device_version(account_id: String, version_id: String) -> Result<(), String> {
     modules::delete_device_version(&account_id, &version_id)
 }
 
-/// 打开设备存储目录
+/// Open the device storage directory
 #[tauri::command]
 pub async fn open_device_folder(app: tauri::AppHandle) -> Result<(), String> {
     let dir = modules::device::get_storage_dir()?;
     let dir_str = dir
         .to_str()
-        .ok_or("无法解析存储目录路径为字符串")?
+        .ok_or("Unable to parse storage directory path as string")?
         .to_string();
     app.opener()
         .open_path(dir_str, None::<&str>)
-        .map_err(|e| format!("打开目录失败: {}", e))
+        .map_err(|e| format!("Failed to open directory: {}", e))
 }

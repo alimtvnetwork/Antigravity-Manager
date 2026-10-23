@@ -29,10 +29,10 @@ export function GeneralTab(props: SettingsPageApi) {
                                         updateLanguage(newLang);
                                     }}
                                 >
-                                    <option value="zh">简体中文</option>
-                                    <option value="zh-TW">繁體中文</option>
+                                    <option value="zh">Simplified Chinese</option>
+                                    <option value="zh-TW">Traditional Chinese</option>
                                     <option value="en">English</option>
-                                    <option value="ja">日本語</option>
+                                    <option value="ja">Japanese</option>
                                     <option value="tr">Türkçe</option>
                                     <option value="vi">Tiếng Việt</option>
                                     <option value="pt">Português</option>

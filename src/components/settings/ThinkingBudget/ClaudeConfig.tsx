@@ -12,13 +12,13 @@ export function ClaudeConfig(props: BudgetSectionProps) {
                                 <div>
                                     <span className="text-xs font-bold text-gray-900 dark:text-white">
                                         {t("proxy.config.thinking_budget.claude_family_title", {
-                                            defaultValue: "Claude 系列思考模型 (如 claude-3-7-sonnet-thinking 等)",
+                                            defaultValue: "Claude series thinking models (such as claude-3-7-sonnet-thinking, etc.)",
                                         })}
                                     </span>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                         {t("proxy.config.thinking_budget.claude_family_desc", {
                                             defaultValue:
-                                                "调控 Claude 思考模型的 Token 预算（官方模型列表仅区分 -thinking 与普通模型，此项专用于思考模型）",
+                                                "Control the Token budget of Claude's thinking model (the official model list only distinguishes between -thinking and ordinary models, this item is dedicated to thinking models)",
                                         })}
                                     </p>
                                 </div>
@@ -32,7 +32,7 @@ export function ClaudeConfig(props: BudgetSectionProps) {
                                             className="text-blue-600 focus:ring-blue-500"
                                         />
                                         {t("proxy.config.thinking_budget.mode_default", {
-                                            defaultValue: "默认模式 (官方规范)",
+                                            defaultValue: "Default mode (official specification)",
                                         })}
                                     </label>
                                     <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -44,7 +44,7 @@ export function ClaudeConfig(props: BudgetSectionProps) {
                                             className="text-blue-600 focus:ring-blue-500"
                                         />
                                         {t("proxy.config.thinking_budget.mode_custom", {
-                                            defaultValue: "自定义思考预算模式 (推荐)",
+                                            defaultValue: "Customized thinking budget model (recommended)",
                                         })}
                                     </label>
                                 </div>
@@ -52,18 +52,18 @@ export function ClaudeConfig(props: BudgetSectionProps) {
 
                             {currentConfig.claude_mode !== "default" ? (
                                 <div className="space-y-3.5">
-                                    {/* 核心统一预算输入 */}
+                                    {/* core unified budget input */}
                                     <div className="p-3.5 bg-purple-50/70 dark:bg-purple-900/20 border border-purple-200/80 dark:border-purple-800/40 rounded-xl space-y-2.5 shadow-2xs">
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                                             <div>
                                                 <label className="block text-xs font-bold text-gray-900 dark:text-white">
                                                     {t("proxy.config.thinking_budget.claude_budget_title", {
-                                                        defaultValue: "Claude 思考模型预算 (Tokens)",
+                                                        defaultValue: "Claude Thinking Model Budget (Tokens)",
                                                     })}
                                                 </label>
                                                 <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">
                                                     {t("proxy.config.thinking_budget.claude_budget_desc", {
-                                                        defaultValue: "客户端调用思考模型（如 claude-3-7-sonnet-thinking）时的核心 Token 预算（填 -1 则由官方自适应）",
+                                                        defaultValue: "The core Token budget when the client calls the thinking model (such as claude-3-7-sonnet-thinking) (fill in -1 to be automatically adapted by the official)",
                                                     })}
                                                 </p>
                                             </div>
@@ -87,7 +87,7 @@ export function ClaudeConfig(props: BudgetSectionProps) {
                                                                     : "bg-white dark:bg-base-200 border border-gray-300 dark:border-base-300 text-gray-700 dark:text-gray-200 hover:border-purple-400 hover:text-purple-600 dark:hover:text-purple-300"
                                                             }`}
                                                         >
-                                                            {val === -1 ? t("proxy.config.thinking_budget.preset_adaptive", { defaultValue: "自适应 (-1)" }) : `${val.toLocaleString()}`}
+                                                            {val === -1 ? t("proxy.config.thinking_budget.preset_adaptive", { defaultValue: "Adaptive (-1)" }) : `${val.toLocaleString()}`}
                                                         </button>
                                                     );
                                                 })}
@@ -107,13 +107,13 @@ export function ClaudeConfig(props: BudgetSectionProps) {
                                             />
                                             <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
                                                 {t("proxy.config.thinking_budget.claude_budget_current", {
-                                                    defaultValue: "推荐默认值: 16,384 Tokens (兼顾思考深度与响应速率)",
+                                                    defaultValue: "Recommended default value: 16,384 Tokens (taking into account depth of thinking and response rate)",
                                                 })}
                                             </span>
                                         </div>
                                     </div>
 
-                                    {/* 高级：客户端 Effort 档位映射 */}
+                                    {/* Advanced: Client Effort gear mapping */}
                                     <div>
                                         <button
                                             type="button"
@@ -123,8 +123,8 @@ export function ClaudeConfig(props: BudgetSectionProps) {
                                             <ChevronDown size={14} className={`transition-transform duration-200 ${showClaudeAdvanced ? "" : "-rotate-90"}`} />
                                             <span>
                                                 {showClaudeAdvanced
-                                                    ? t("proxy.config.thinking_budget.claude_hide_advanced", { defaultValue: "收起客户端 Effort 档位映射" })
-                                                    : t("proxy.config.thinking_budget.claude_show_advanced", { defaultValue: "展开高级设置：客户端 Effort 档位映射 (low / medium / high)" })}
+                                                    ? t("proxy.config.thinking_budget.claude_hide_advanced", { defaultValue: "Close client Effort gear mapping" })
+                                                    : t("proxy.config.thinking_budget.claude_show_advanced", { defaultValue: "Expand advanced settings: Client Effort gear mapping (low / medium / high)" })}
                                             </span>
                                         </button>
 
@@ -132,13 +132,13 @@ export function ClaudeConfig(props: BudgetSectionProps) {
                                             <div className="mt-2.5 p-3.5 bg-gray-50 dark:bg-base-200 border border-gray-200 dark:border-base-300 rounded-xl space-y-2.5 shadow-2xs">
                                                 <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
                                                     {t("proxy.config.thinking_budget.claude_effort_mapping_desc", {
-                                                        defaultValue: "当部分商业客户端（如 Cline, Roo 等）在请求头或参数中附带 reasoning_effort 时，按以下预算映射：",
+                                                        defaultValue: "When some commercial clients (such as Cline, Roo, etc.) include reasoning_effort in the request header or parameter, they are mapped according to the following budget:",
                                                     })}
                                                 </p>
                                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                                     <div>
                                                         <label className="block text-xs font-semibold text-gray-700 dark:text-gray-200 mb-1">
-                                                            {t("proxy.config.thinking_budget.tier_low", { defaultValue: "Low 档位" })}
+                                                            {t("proxy.config.thinking_budget.tier_low", { defaultValue: "Low gear" })}
                                                         </label>
                                                         <input
                                                             type="text"
@@ -150,12 +150,12 @@ export function ClaudeConfig(props: BudgetSectionProps) {
                                                         />
                                                         <PresetButtons field="claude_low" presets={[1024, 2048]} color="purple" inputValues={inputValues} currentConfig={currentConfig} setInputValues={setInputValues} onChange={onChange} getPresetTooltip={getPresetTooltip} />
                                                         <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                                                            {t("proxy.config.thinking_budget.claude_low_hint", { defaultValue: "轻量思考 (默认 1024)" })}
+                                                            {t("proxy.config.thinking_budget.claude_low_hint", { defaultValue: "Lightweight thinking (default 1024)" })}
                                                         </p>
                                                     </div>
                                                     <div>
                                                         <label className="block text-xs font-semibold text-gray-700 dark:text-gray-200 mb-1">
-                                                            {t("proxy.config.thinking_budget.tier_medium", { defaultValue: "Medium 档位" })}
+                                                            {t("proxy.config.thinking_budget.tier_medium", { defaultValue: "Medium gear" })}
                                                         </label>
                                                         <input
                                                             type="text"
@@ -167,12 +167,12 @@ export function ClaudeConfig(props: BudgetSectionProps) {
                                                         />
                                                         <PresetButtons field="claude_medium" presets={[4096, 8192]} color="purple" inputValues={inputValues} currentConfig={currentConfig} setInputValues={setInputValues} onChange={onChange} getPresetTooltip={getPresetTooltip} />
                                                         <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                                                            {t("proxy.config.thinking_budget.claude_medium_hint", { defaultValue: "日常平衡档 (默认 4096)" })}
+                                                            {t("proxy.config.thinking_budget.claude_medium_hint", { defaultValue: "Daily balancing file (default 4096)" })}
                                                         </p>
                                                     </div>
                                                     <div>
                                                         <label className="block text-xs font-semibold text-gray-700 dark:text-gray-200 mb-1">
-                                                            {t("proxy.config.thinking_budget.tier_high", { defaultValue: "High 档位" })}
+                                                            {t("proxy.config.thinking_budget.tier_high", { defaultValue: "High gear" })}
                                                         </label>
                                                         <input
                                                             type="text"
@@ -184,7 +184,7 @@ export function ClaudeConfig(props: BudgetSectionProps) {
                                                         />
                                                         <PresetButtons field="claude_high" presets={[16384, 32768]} color="purple" inputValues={inputValues} currentConfig={currentConfig} setInputValues={setInputValues} onChange={onChange} getPresetTooltip={getPresetTooltip} />
                                                         <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
-                                                            {t("proxy.config.thinking_budget.claude_high_hint", { defaultValue: "深度思考档 (默认 16384)" })}
+                                                            {t("proxy.config.thinking_budget.claude_high_hint", { defaultValue: "Deep thinking file (default 16384)" })}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -192,11 +192,11 @@ export function ClaudeConfig(props: BudgetSectionProps) {
                                         )}
                                     </div>
 
-                                    {/* 全宽背景说明条 */}
+                                    {/* Full width background caption bar */}
                                     <div className="w-full p-3 bg-purple-50/70 dark:bg-purple-900/20 border border-purple-200/80 dark:border-purple-800/40 rounded-xl text-xs text-purple-800 dark:text-purple-200 leading-relaxed">
                                         {t("proxy.config.thinking_budget.claude_thinking_note", {
                                             defaultValue:
-                                                "💡 Claude 思考模型说明：Claude 系列在模型列表中仅提供思考版模型（如 claude-3-7-sonnet-thinking）与普通版，未拆分 low/medium/high 后缀。此处设置的值将作为调用 Claude 思考模型时的统一深度思考预算。",
+                                                "💡 Claude thinking model description: The Claude series only provides thinking version models (such as claude-3-7-sonnet-thinking) and ordinary versions in the model list, without splitting the low/medium/high suffixes. The value set here will serve as the unified deep thinking budget when invoking Claude's thinking model.",
                                         })}
                                     </div>
                                 </div>
@@ -204,7 +204,7 @@ export function ClaudeConfig(props: BudgetSectionProps) {
                                 <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                                     {t("proxy.config.thinking_budget.claude_default_hint", {
                                         defaultValue:
-                                            "已启用官方默认模式：完全按官方协议规范透传，不注入额外自定义预算限制。",
+                                            "The official default mode is enabled: transparent transmission in full compliance with official protocol specifications, without injecting additional custom budget restrictions.",
                                     })}
                                 </p>
                             )}

@@ -70,8 +70,8 @@ pub(crate) async fn extract_request_context(
 
     let request_body_str;
 
-    // [FIX] 从请求 extensions 提取 UserTokenIdentity (由 Auth 中间件注入)
-    // 必须在处理 request body 之前提取，因为 into_parts() 后需要保留这个值
+    // [FIX] Extract UserTokenIdentity from request extensions (injected by Auth middleware)
+    // Must be extracted before processing the request body because this value needs to be retained after into_parts()
     let user_token_identity = request.extensions().get::<UserTokenIdentity>().cloned();
 
     let request = if method == "POST" {

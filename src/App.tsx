@@ -33,11 +33,13 @@ import { request as invoke } from './utils/request';
 import { AdminAuthGuard } from './components/common/AdminAuthGuard';
 import { ErrorModal } from './components/errors/error-modal';
 import { initGlobalErrorListeners } from './lib/error-listener';
+import { RouteErrorBoundary } from './components/common/RouteErrorBoundary';
 
 const router = createBrowserRouter([
   {
     path: '/',
     element: <Layout />,
+    errorElement: <RouteErrorBoundary />,
     children: [
       {
         index: true,
@@ -121,7 +123,7 @@ function App() {
     loadConfig();
   }, [loadConfig]);
 
-  // Sync language from config (仅在不同步时通过 startTransition 非阻塞调度)
+  // Sync language from config (non-blocking scheduling via startTransition only when not synchronized)
   useEffect(() => {
     if (config?.language && i18n.language !== config.language) {
       startTransition(() => {
@@ -136,7 +138,7 @@ function App() {
     if (!isTauri()) return;
     const unlistenPromises: Promise<() => void>[] = [];
 
-    // 监听托盘切换账号事件
+    // Listen for tray switching account events
     unlistenPromises.push(
       listen('tray://account-switched', () => {
         console.log('[App] Tray account switched, refreshing...');
@@ -145,7 +147,7 @@ function App() {
       })
     );
 
-    // 监听托盘刷新事件
+    // Listen for tray refresh events
     unlistenPromises.push(
       listen('tray://refresh-current', () => {
         console.log('[App] Tray refresh triggered, refreshing...');
@@ -154,7 +156,7 @@ function App() {
       })
     );
 
-    // 监听后端全量刷新事件 (Command / Scheduler)
+    // Listen for backend full refresh events (Command / Scheduler)
     unlistenPromises.push(
       listen('accounts://refreshed', () => {
         console.log('[App] Backend triggered quota refresh, syncing UI...');

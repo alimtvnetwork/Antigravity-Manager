@@ -1,12 +1,12 @@
 use super::*;
 
-/// 生成 API Key
+/// Generate API Key
 #[tauri::command]
 pub fn generate_api_key() -> String {
     format!("sk-{}", uuid::Uuid::new_v4().simple())
 }
 
-/// 重新加载账号（当主应用添加/删除账号时调用）
+/// Reload account (called when the main application adds/delete an account)
 #[tauri::command]
 pub async fn reload_proxy_accounts(state: State<'_, ProxyServiceState>) -> Result<usize, String> {
     let instance_lock = state.instance.read().await;
@@ -17,19 +17,19 @@ pub async fn reload_proxy_accounts(state: State<'_, ProxyServiceState>) -> Resul
         // won't be routed to the previously bound (wrong) account
         instance.token_manager.clear_all_sessions();
 
-        // 重新加载账号
+        // Reload account
         let count = instance
             .token_manager
             .load_accounts()
             .await
-            .map_err(|e| format!("重新加载账号失败: {}", e))?;
+            .map_err(|e| format!("Failed to reload account: {}", e))?;
         Ok(count)
     } else {
         Ok(0)
     }
 }
 
-/// 更新模型映射表 (热更新)
+/// Update model mapping table (hot update)
 #[tauri::command]
 pub async fn update_model_mapping(
     config: ProxyConfig,
@@ -37,14 +37,14 @@ pub async fn update_model_mapping(
 ) -> Result<(), String> {
     let instance_lock = state.instance.read().await;
 
-    // 1. 如果服务正在运行，立即更新内存中的映射 (这里目前只更新了 anthropic_mapping 的 RwLock,
-    // 后续可以根据需要让 resolve_model_route 直接读取全量 config)
+    // 1. If the service is running, immediately update the mapping in memory (currently only the RwLock of anthropic_mapping is updated here,
+    // Later, you can let resolve_model_route directly read the full config as needed)
     if let Some(instance) = instance_lock.as_ref() {
         instance.axum_server.update_mapping(&config).await;
-        tracing::debug!("后端服务已接收全量模型映射配置");
+        tracing::debug!("The backend service has received the full model mapping configuration");
     }
 
-    // 2. 无论是否运行，都保存到全局配置持久化
+    // 2. Regardless of whether it is running or not, it is saved to global configuration persistence.
     let mut app_config = crate::modules::config::load_app_config()?;
     app_config.proxy.custom_mapping = config.custom_mapping;
     crate::modules::config::save_app_config(&app_config)?;
@@ -165,7 +165,7 @@ pub async fn fetch_zai_models(
     Ok(models)
 }
 
-/// 获取当前调度配置
+/// Get the current scheduling configuration
 #[tauri::command]
 pub async fn get_proxy_scheduling_config(
     state: State<'_, ProxyServiceState>,
@@ -179,7 +179,7 @@ pub async fn get_proxy_scheduling_config(
     }
 }
 
-/// 更新调度配置
+/// Update scheduling configuration
 #[tauri::command]
 pub async fn update_proxy_scheduling_config(
     state: State<'_, ProxyServiceState>,
@@ -193,16 +193,16 @@ pub async fn update_proxy_scheduling_config(
             .await;
     }
 
-    let mut app_config =
-        crate::modules::config::load_app_config().map_err(|e| format!("加载配置失败: {}", e))?;
+    let mut app_config = crate::modules::config::load_app_config()
+        .map_err(|e| format!("Failed to load configuration: {}", e))?;
     app_config.proxy.scheduling = config;
     crate::modules::config::save_app_config(&app_config)
-        .map_err(|e| format!("保存配置失败: {}", e))?;
+        .map_err(|e| format!("Failed to save configuration: {}", e))?;
 
     Ok(())
 }
 
-/// 清除所有会话粘性绑定
+/// Clear all session sticky bindings
 #[tauri::command]
 pub async fn clear_proxy_session_bindings(
     state: State<'_, ProxyServiceState>,
@@ -214,33 +214,33 @@ pub async fn clear_proxy_session_bindings(
     Ok(())
 }
 
-// ===== [FIX #820] 固定账号模式命令 =====
+// ===== [FIX #820] Fixed account mode command =====
 
-/// 设置优先使用的账号（固定账号模式）
-/// 传入 account_id 启用固定模式，传入 null/空字符串恢复轮询模式
+/// Set priority account (fixed account mode)
+/// Pass in account_id to enable fixed mode, pass in null/empty string to restore polling mode
 #[tauri::command]
 pub async fn set_preferred_account(
     state: State<'_, ProxyServiceState>,
     account_id: Option<String>,
 ) -> Result<(), String> {
     let instance_lock = state.instance.read().await;
-    // 过滤空字符串为 None
+    // Filter empty strings to None
     let cleaned_id = account_id.filter(|s| !s.trim().is_empty());
 
     if let Some(instance) = instance_lock.as_ref() {
-        // 1. 更新内存状态
+        // 1. Update memory status
         instance
             .token_manager
             .set_preferred_account(cleaned_id.clone())
             .await;
     }
 
-    // 2. 持久化到配置文件 (修复 Issue #820 自动关闭问题)
-    let mut app_config =
-        crate::modules::config::load_app_config().map_err(|e| format!("加载配置失败: {}", e))?;
+    // 2. Persistence to configuration file (fixes Issue #820 automatic shutdown problem)
+    let mut app_config = crate::modules::config::load_app_config()
+        .map_err(|e| format!("Failed to load configuration: {}", e))?;
     app_config.proxy.preferred_account_id = cleaned_id.clone();
     crate::modules::config::save_app_config(&app_config)
-        .map_err(|e| format!("保存配置失败: {}", e))?;
+        .map_err(|e| format!("Failed to save configuration: {}", e))?;
 
     if let Some(ref id) = cleaned_id {
         tracing::info!(
@@ -254,7 +254,7 @@ pub async fn set_preferred_account(
     Ok(())
 }
 
-/// 获取当前优先使用的账号ID
+/// Get the currently preferred account ID
 #[tauri::command]
 pub async fn get_preferred_account(
     state: State<'_, ProxyServiceState>,
@@ -268,7 +268,7 @@ pub async fn get_preferred_account(
     }
 }
 
-/// 清除指定账号的限流记录
+/// Clear the current limit record of the specified account
 #[tauri::command]
 pub async fn clear_proxy_rate_limit(
     state: State<'_, ProxyServiceState>,
@@ -282,7 +282,7 @@ pub async fn clear_proxy_rate_limit(
     }
 }
 
-/// 清除所有限流记录
+/// Clear all throttling records
 #[tauri::command]
 pub async fn clear_all_proxy_rate_limits(
     state: State<'_, ProxyServiceState>,
@@ -294,7 +294,7 @@ pub async fn clear_all_proxy_rate_limits(
     Ok(())
 }
 
-/// 触发所有代理的健康检查，并返回更新后的配置
+/// Trigger a health check on all agents and return the updated configuration
 #[tauri::command]
 pub async fn check_proxy_health(
     state: State<'_, ProxyServiceState>,

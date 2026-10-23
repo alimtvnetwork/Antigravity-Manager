@@ -129,7 +129,7 @@ fn test_normalize_and_sanitize_tool_args_passthrough() {
         "arbitrary_field": 123
     });
     normalize_and_sanitize_tool_args("shell", &mut args);
-    // 验证纯透传：参数原样保持，没有任何字段被重命名、删除或注入
+    // Verify pure transparent transmission: parameters remain intact, no fields are renamed, deleted or injected
     assert_eq!(args["cmd"], "ls -la /tmp");
     assert_eq!(args["description"], "Custom description");
     assert_eq!(args["arbitrary_field"], 123);

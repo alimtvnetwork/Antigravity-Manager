@@ -10,7 +10,7 @@ impl<'a> PartProcessor<'a> {
     pub(crate) fn process_text(&mut self, text: &str, signature: Option<String>) -> Vec<Bytes> {
         let mut chunks = Vec::new();
 
-        // 空 text 带签名 - 暂存
+        // Empty text with signature - temporary storage
         if text.is_empty() {
             if signature.is_some() {
                 self.state.set_trailing_signature(signature);
@@ -21,7 +21,7 @@ impl<'a> PartProcessor<'a> {
         // [FIX #859] Mark that we have received actual content (text)
         self.state.has_content = true;
 
-        // 处理之前的 trailingSignature
+        // Processing previous trailingSignature
         if self.state.has_trailing_signature() {
             chunks.extend(self.state.end_block());
             if let Some(trailing_sig) = self.state.trailing_signature.take() {
@@ -45,11 +45,11 @@ impl<'a> PartProcessor<'a> {
             }
         }
 
-        // 非空 text 带签名 - 立即处理
+        // Non-empty text with signature - processed immediately
         if signature.is_some() {
-            // [FIX] 为保护签名, 签名所在的 Text 块直接发送
-            // 注意: 不得在此开启 thinking 块, 因为之前可能已有非 thinking 内容。
-            // 这种情况下, 我们只需确签被缓存在状态中。
+            // [FIX] To protect the signature, the Text block where the signature is located is sent directly
+            // Note: You must not open the thinking block here, as there may be non-thinking content before it.
+            // In this case, we just need to make sure that the signature is cached in the state.
             self.state.store_signature(signature);
 
             chunks.extend(
@@ -86,7 +86,7 @@ impl<'a> PartProcessor<'a> {
                                 serde_json::from_str(input_str.trim())
                                     .unwrap_or_else(|_| json!({ "input": input_str.trim() }));
 
-                            // 构造并发送 tool_use
+                            // Construct and send tool_use
                             let fc = FunctionCall {
                                 name: tool_name.to_string(),
                                 args: Some(input_json),
@@ -95,14 +95,14 @@ impl<'a> PartProcessor<'a> {
 
                             let tool_chunks = self.process_function_call(&fc, None);
 
-                            // 清理缓冲区并重置状态
+                            // Clean buffer and reset state
                             self.state.mcp_xml_buffer.clear();
                             self.state.in_mcp_xml = false;
 
-                            // 处理标签之前可能存在的非 XML 文本
+                            // Handle non-XML text that may exist before the tag
                             if start_idx > 0 {
                                 let prefix_text = &buffer[..start_idx];
-                                // 这里不能递归。直接 emit 之前的 text 块。
+                                // No recursion here. Directly emit the previous text block.
                                 if self.state.current_block_type() != BlockType::Text {
                                     chunks.extend(self.state.start_block(
                                         BlockType::Text,
@@ -117,10 +117,10 @@ impl<'a> PartProcessor<'a> {
 
                             chunks.extend(tool_chunks);
 
-                            // 处理标签之后可能存在的非 XML 文本
+                            // Handle non-XML text that may exist after tags
                             let suffix = &buffer[close_idx + end_tag.len()..];
                             if !suffix.is_empty() {
-                                // 递归处理后缀内容
+                                // Process suffix content recursively
                                 chunks.extend(self.process_text(suffix, None));
                             }
 

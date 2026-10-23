@@ -1,6 +1,6 @@
 /**
- * 账号表格组件
- * 支持拖拽排序功能，用户可以通过拖拽行来调整账号顺序
+ * Account form component
+ * Supports drag and drop sorting function, users can adjust the order of accounts by dragging rows
  */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -136,7 +136,7 @@ export function AccountTable({
         return values.size > 1;
     }, [accounts]);
     const [activeId, setActiveId] = useState<string | null>(null);
-    // 排序状态配置: 支持按配额重置时间 (reset_time)、最后使用时间 (last_used) 或算法得分 (score) 排序
+    // Sorting status configuration: Supports sorting by quota reset time (reset_time), last used time (last_used) or algorithm score (score)
     const [sortConfig, setSortConfig] = useState<{
         key: 'reset_time' | 'last_used' | 'score' | null;
         direction: 'asc' | 'desc' | null;
@@ -165,7 +165,7 @@ export function AccountTable({
         });
     };
 
-    // 根据排序状态对 accounts 进行拦截排序
+    // Interception sorting of accounts based on sorting status
     const sortedAccounts = useMemo(() => {
         if (!isSortingActive) return accounts;
 
@@ -174,7 +174,7 @@ export function AccountTable({
                 const timeA = extractAccountResetTime(a);
                 const timeB = extractAccountResetTime(b);
 
-                // 没有 reset_time 的排到后面
+                // Those without reset_time are queued to the back.
                 if (timeA === null && timeB === null) return 0;
                 if (timeA === null) return 1;
                 if (timeB === null) return -1;
@@ -203,10 +203,10 @@ export function AccountTable({
         });
     }, [accounts, sortConfig, isSortingActive]);
 
-    // 配置拖拽传感器
+    // Configure drag sensor
     const sensors = useSensors(
         useSensor(PointerSensor, {
-            activationConstraint: { distance: 8 }, // 需要移动 8px 才触发拖拽
+            activationConstraint: { distance: 8 }, // Need to move 8px to trigger drag
         }),
         useSensor(KeyboardSensor, {
             coordinateGetter: sortableKeyboardCoordinates,
@@ -409,7 +409,7 @@ export function AccountTable({
                 </table >
             </div >
 
-            {/* 拖拽悬浮预览层 */}
+            {/* Drag and drop the floating preview layer */}
             <DragOverlay>
                 {
                     activeAccount ? (

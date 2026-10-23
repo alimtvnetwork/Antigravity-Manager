@@ -4,7 +4,7 @@ use crate::proxy::token_manager::ProxyToken;
 use std::path::PathBuf;
 
 // ==================================================================================
-// 辅助函数：创建模拟账号
+// Auxiliary function: Create a simulated account
 // ==================================================================================
 
 fn create_mock_token(
@@ -36,7 +36,7 @@ fn create_mock_token(
     }
 }
 
-/// 辅助函数：创建带有自定义 account_path 的 mock token
+/// Helper function: Create mock token with custom account_path
 fn create_mock_token_with_path(
     account_id: &str,
     email: &str,

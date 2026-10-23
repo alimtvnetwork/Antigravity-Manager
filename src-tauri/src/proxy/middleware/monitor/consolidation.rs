@@ -13,7 +13,7 @@ pub(crate) fn build_canonical_consolidated_response(
     timing_obj: serde_json::Map<String, Value>,
     usage_obj: Option<serde_json::Map<String, Value>>,
 ) -> Value {
-    // 权威网关签名回填：若当前签名为空，尝试通过工具调用ID或会话ID从网关状态机(内存 L1 / SQLite L2 DB 思考持久化)恢复
+    // Authoritative gateway signature backfill: If the current signature is empty, try to restore it from the gateway state machine (memory L1 / SQLite L2 DB thinking persistence) through tool call ID or session ID
     if thinking_signature.is_empty() {
         for tc in &tool_calls {
             if let Some(call_id) = tc.get("id").and_then(|v| v.as_str()) {
@@ -28,7 +28,7 @@ pub(crate) fn build_canonical_consolidated_response(
             }
         }
         if thinking_signature.is_empty() {
-            // 1. 优先按当前轮次的思考文本片段精准直捞专属签名
+            // 1. Prioritize the current round of thinking text fragments to accurately obtain exclusive signatures
             if !thinking_content.is_empty() {
                 let trimmed = thinking_content.trim();
                 let snippet = if trimmed.len() > 32 {
@@ -43,7 +43,7 @@ pub(crate) fn build_canonical_consolidated_response(
                 }
             }
 
-            // 2. 兜底按会话状态机与会话数据库查找最新签名
+            // 2. Search the session state machine and session database to find the latest signature
             if thinking_signature.is_empty() {
                 if let Some(sid) = session_id {
                     if let Some(sig) =
@@ -62,14 +62,14 @@ pub(crate) fn build_canonical_consolidated_response(
 
     let mut consolidated = serde_json::Map::new();
 
-    // 1. 会话/思考唯一标识
+    // 1. Conversation/Thinking Unique Identifier
     let candidate_id = session_id.unwrap_or(log_id);
     consolidated.insert(
         "_session_thinking_id".to_string(),
         Value::String(candidate_id.to_string()),
     );
 
-    // 2. 思考文本与权威签名
+    // 2. Think about text and authoritative signatures
     if !thinking_content.is_empty() {
         consolidated.insert("thinking".to_string(), Value::String(thinking_content));
     }
@@ -80,23 +80,23 @@ pub(crate) fn build_canonical_consolidated_response(
         );
     }
 
-    // 3. 正文输出
+    // 3. Text output
     if !response_content.is_empty() {
         consolidated.insert("content".to_string(), Value::String(response_content));
     }
 
-    // 4. 工具调用列表 (过滤 Null)
+    // 4. Tool call list (filter Null)
     let clean_tool_calls: Vec<Value> = tool_calls.into_iter().filter(|v| !v.is_null()).collect();
     if !clean_tool_calls.is_empty() {
         consolidated.insert("tool_calls".to_string(), Value::Array(clean_tool_calls));
     }
 
-    // 5. 耗时诊断
+    // 5. Time-consuming diagnosis
     if !timing_obj.is_empty() {
         consolidated.insert("_timing".to_string(), Value::Object(timing_obj));
     }
 
-    // 6. 用量统计
+    // 6. Usage statistics
     if let Some(usage) = usage_obj {
         if !usage.is_empty() {
             consolidated.insert("usage".to_string(), Value::Object(usage));
@@ -111,7 +111,7 @@ pub(crate) fn consolidate_non_streaming_response(
     log: &ProxyRequestLog,
     headers_map: &serde_json::Map<String, Value>,
 ) -> Option<Value> {
-    // 若本就已是统一的 consolidated 格式 (例如带有顶层 thinking/tool_calls 且无 choices/candidates)，直接返回 None
+    // If it is already a unified consolidated format (for example, with top-level thinking/tool_calls and no choices/candidates), return None directly.
     let has_consolidated_fields = raw_json.get("thinking").is_some()
         || raw_json.get("tool_calls").is_some()
         || raw_json.get("_session_thinking_id").is_some();
@@ -128,7 +128,7 @@ pub(crate) fn consolidate_non_streaming_response(
     let mut response_content = String::new();
     let mut tool_calls = Vec::new();
 
-    // 1. OpenAI 格式 (choices)
+    // 1. OpenAI format (choices)
     if let Some(choices) = raw_json.get("choices").and_then(|c| c.as_array()) {
         for choice in choices {
             if let Some(msg) = choice.get("message") {
@@ -178,7 +178,7 @@ pub(crate) fn consolidate_non_streaming_response(
             }
         }
     }
-    // 2. Gemini 格式 (candidates)
+    // 2. Gemini format (candidates)
     else if let Some(candidates) = raw_json.get("candidates").and_then(|c| c.as_array()) {
         for cand in candidates {
             if let Some(parts) = cand
@@ -245,7 +245,7 @@ pub(crate) fn consolidate_non_streaming_response(
             }
         }
     }
-    // 3. Claude 格式 (content 数组)
+    // 3. Claude format (content array)
     else if let Some(content) = raw_json.get("content").and_then(|c| c.as_array()) {
         for block in content {
             match block.get("type").and_then(|t| t.as_str()) {
@@ -293,7 +293,7 @@ pub(crate) fn consolidate_non_streaming_response(
         return None;
     }
 
-    // 提取耗时诊断
+    // Extract time-consuming diagnostics
     let mut timing_obj = serde_json::Map::new();
     for key in [
         "clean_ms",
@@ -318,7 +318,7 @@ pub(crate) fn consolidate_non_streaming_response(
         );
     }
 
-    // 提取 Token 用量与缓存命中率
+    // Extract Token usage and cache hit rate
     let usage_source = raw_json
         .get("usage")
         .or_else(|| raw_json.get("usageMetadata"));

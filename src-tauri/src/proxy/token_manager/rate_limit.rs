@@ -1,10 +1,10 @@
-//! 限流状态查询与清理。
+//! Current limit status query and cleanup.
 
 use super::TokenManager;
 
 impl TokenManager {
-    /// 标记账号限流(从外部调用,通常在 handler 中)
-    /// 参数为 email，内部会自动转换为 account_id
+    /// Mark account current limit (called from outside, usually in handler)
+    /// The parameter is email, which will be automatically converted to account_id internally.
     pub async fn mark_rate_limited(
         &self,
         email: &str,
@@ -12,13 +12,13 @@ impl TokenManager {
         retry_after_header: Option<&str>,
         error_body: &str,
     ) {
-        // [NEW] 检查熔断是否启用 (使用内存缓存，极快)
+        // [NEW] Check if circuit breaker is enabled (uses memory cache, extremely fast)
         let config = self.circuit_breaker_config.read().await.clone();
         if !config.enabled {
             return;
         }
 
-        // 【替代方案】转换 email -> account_id
+        // [Alternative] Convert email -> account_id
         let key = self
             .email_to_account_id(email)
             .unwrap_or_else(|| email.to_string());
@@ -29,13 +29,13 @@ impl TokenManager {
             retry_after_header,
             error_body,
             None,
-            &config.backoff_steps, // [NEW] 传入配置
+            &config.backoff_steps, // [NEW] Incoming configuration
         );
     }
 
-    /// 检查账号是否在限流中 (支持模型级)
+    /// Check whether the account is under current limit (supports model level)
     pub async fn is_rate_limited(&self, account_id: &str, model: Option<&str>) -> bool {
-        // [NEW] 检查熔断是否启用
+        // [NEW] Check if circuit breaker is enabled
         let config = self.circuit_breaker_config.read().await;
         if !config.enabled {
             return self
@@ -46,20 +46,20 @@ impl TokenManager {
         self.rate_limit_tracker.is_rate_limited(account_id, model)
     }
 
-    /// 获取距离限流重置还有多少秒
+    /// Get the number of seconds until the current limit is reset
     #[allow(dead_code)]
     pub fn get_rate_limit_reset_seconds(&self, account_id: &str) -> Option<u64> {
         self.rate_limit_tracker.get_reset_seconds(account_id)
     }
 
-    /// 清除过期的限流记录
+    /// Clear expired current limiting records
     #[allow(dead_code)]
     pub fn clean_expired_rate_limits(&self) {
         self.rate_limit_tracker.cleanup_expired();
     }
 
-    /// 【替代方案】通过 email 查找对应的 account_id
-    /// 用于将 handlers 传入的 email 转换为 tracker 使用的 account_id
+    /// [Alternative] Find the corresponding account_id through email
+    /// Used to convert the email passed in by handlers to the account_id used by the tracker
     pub(crate) fn email_to_account_id(&self, email: &str) -> Option<String> {
         self.tokens
             .iter()
@@ -67,7 +67,7 @@ impl TokenManager {
             .map(|entry| entry.value().account_id.clone())
     }
 
-    /// 清除指定账号的限流记录
+    /// Clear the current limit record of the specified account
     pub fn clear_rate_limit(&self, account_id: &str) -> bool {
         let cleared = self.rate_limit_tracker.clear(account_id);
         let persisted_cleared = self.clear_all_persisted_live_limits(account_id);
@@ -78,7 +78,7 @@ impl TokenManager {
         self.rate_limit_tracker.clear(account_id)
     }
 
-    /// 清除所有限流记录
+    /// Clear all throttling records
     pub fn clear_all_rate_limits(&self) {
         self.rate_limit_tracker.clear_all();
         let accounts_dir = self.resolved_data_dir().join("accounts");
@@ -184,5 +184,5 @@ impl TokenManager {
         self.rate_limit_tracker.clear_model(account_id, &model_key);
     }
 
-    // ===== 调度配置相关方法 =====
+    // ===== Scheduling configuration related methods =====
 }

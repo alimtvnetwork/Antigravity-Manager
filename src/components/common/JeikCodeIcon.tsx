@@ -5,7 +5,7 @@ import { cn } from '../../utils/cn';
 export type JeikCodeIconProps = React.ComponentProps<IconType>;
 
 /**
- * JeikCode 官方品牌彩色矢量图标 (默认自带深邃科技背景框与霓虹发光描边，遵循 @lobehub/icons 规范)
+ * JeikCode official brand color vector icon (default comes with a deep technological background frame and neon glowing stroke, following @lobehub/icons specifications)
  */
 const JeikCodeBase: IconType = memo(({ size = '1em', className = '', style = {}, ...rest }) => {
     const rawIds = useFillIds('jeikcode', 3);
@@ -101,7 +101,7 @@ const JeikCodeBase: IconType = memo(({ size = '1em', className = '', style = {},
 });
 
 /**
- * 纯图形矢量（无底框），用于在已有深浅色背景中无缝嵌入
+ * Pure graphic vector (no bottom frame) for seamless embedding on existing dark and light backgrounds
  */
 const JeikCodeColor: IconType = memo(({ size = '1em', className = '', style = {}, ...rest }) => {
     const rawIds = useFillIds('jeikcode-color', 1);

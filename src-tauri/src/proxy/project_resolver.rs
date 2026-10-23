@@ -1,18 +1,18 @@
 use serde_json::Value;
 
-// loadCodeAssist 端点（fallback order: Daily → Sandbox → Prod）
+// loadCodeAssist endpoint (fallback order: Daily → Sandbox → Prod)
 //
-// [FIX Issue #3525] Daily 优先，与官方 Antigravity language_server 的出站端点一致。
-// Sandbox 在部分地区会对合规账号返回终止性 400 `User location is not supported for the API use.`；
-// 官方从不访问 sandbox 端点，保留它仅作为可用性兜底。
+// [FIX Issue #3525] Daily takes precedence, consistent with the outbound endpoint of the official Antigravity language_server.
+// Sandbox will return termination 400 `User location is not supported for the API use.` to compliant accounts in some regions;
+// The sandbox endpoint is never officially accessed, and is reserved only as a safety net for availability.
 const LOAD_PROJECT_ENDPOINTS: [&str; 3] = [
     "https://daily-cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
     "https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:loadCodeAssist",
     "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
 ];
 
-/// 使用 Antigravity 的 loadCodeAssist API 获取 project_id
-/// 这是获取 cloudaicompanionProject 的正确方式
+/// Get the project_id using Antigravity's loadCodeAssist API
+/// This is the correct way to get cloudaicompanionProject
 pub async fn fetch_project_id(access_token: &str) -> Result<String, String> {
     let request_body = serde_json::json!({
         "metadata": {
@@ -39,31 +39,34 @@ pub async fn fetch_project_id(access_token: &str) -> Result<String, String> {
                     let data: Value = resp
                         .json()
                         .await
-                        .map_err(|e| format!("解析响应失败: {}", e))?;
+                        .map_err(|e| format!("Failed to parse response: {}", e))?;
 
                     if let Some(project_id) =
                         data.get("cloudaicompanionProject").and_then(|v| v.as_str())
                     {
                         return Ok(project_id.to_string());
                     } else {
-                        return Err("账号无资格获取官方 cloudaicompanionProject".to_string());
+                        return Err("The account is not eligible to obtain the official cloudaicompanionProject".to_string());
                     }
                 } else {
                     let status = resp.status();
                     let body = resp.text().await.unwrap_or_default();
-                    last_error = format!("loadCodeAssist [{}] 返回错误 {}: {}", url, status, body);
+                    last_error = format!(
+                        "loadCodeAssist [ {} ] returns error {} : {}",
+                        url, status, body
+                    );
                     continue;
                 }
             }
             Err(e) => {
-                last_error = format!("loadCodeAssist [{}] 请求失败: {}", url, e);
+                last_error = format!("loadCodeAssist [ {} ] request failed: {}", url, e);
                 continue;
             }
         }
     }
 
     Err(if last_error.is_empty() {
-        "loadCodeAssist 所有端点均不可用".to_string()
+        "loadCodeAssist All endpoints are unavailable".to_string()
     } else {
         last_error
     })

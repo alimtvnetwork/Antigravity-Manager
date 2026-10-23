@@ -307,7 +307,7 @@ impl SystemIntegration for DesktopIntegration {
     }
 
     fn show_notification(&self, title: &str, body: &str) {
-        // 使用 tauri-plugin-dialog 或原生通知（此处简化）
+        // Use tauri-plugin-dialog or native notifications (simplified here)
         crate::modules::logger::log_info(&format!("[Notification] {}: {}", title, body));
     }
 }

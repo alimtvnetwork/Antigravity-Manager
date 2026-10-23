@@ -98,24 +98,9 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
     const [showAllEmails, setShowAllEmails] = useState(false);
     const [revealedEmails, setRevealedEmails] = useState<Record<string, boolean>>({});
 
-    const isEmailVisible = (id: string) => showAllEmails || Boolean(revealedEmails[id]);
-    const toggleEmail = (id: string, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setRevealedEmails((prev) => ({ ...prev, [id]: !prev[id] }));
-    };
-
-    if (!switchTargetInstance) return null;
-
-    const targetId = switchTargetInstance.config.id;
-    const isSwitching = actionState[targetId] === 'switch' || switchingAccountId !== null;
+    const targetId = switchTargetInstance?.config?.id;
+    const isSwitching = Boolean(targetId && actionState[targetId] === 'switch') || switchingAccountId !== null;
     const isAnySwitching = isSwitching || isLoading;
-
-    const boundAccount = accounts.find((a) => {
-        if (switchTargetInstance.config.bound_account_id) return a.id === switchTargetInstance.config.bound_account_id;
-        if (switchTargetInstance.config.bound_email) return a.email.toLowerCase() === switchTargetInstance.config.bound_email.toLowerCase();
-        return false;
-    });
-    const boundQuota = boundAccount ? accountQuotaScores(boundAccount) : null;
 
     const close = useCallback(() => {
         if (isAnySwitching) return;
@@ -123,6 +108,35 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
         setAccountSearchQuery('');
         setSwitchingAccountId(null);
     }, [isAnySwitching, setAccountSearchQuery, setSwitchTargetInstance]);
+
+    useEffect(() => {
+        if (!switchTargetInstance) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (isAnySwitching) {
+                return;
+            }
+            if (e.key === 'Escape') {
+                close();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [close, isAnySwitching, switchTargetInstance]);
+
+    if (!switchTargetInstance || !targetId) return null;
+
+    const isEmailVisible = (id: string) => showAllEmails || Boolean(revealedEmails[id]);
+    const toggleEmail = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        setRevealedEmails((prev) => ({ ...prev, [id]: !prev[id] }));
+    };
+
+    const boundAccount = accounts.find((a) => {
+        if (switchTargetInstance.config.bound_account_id) return a.id === switchTargetInstance.config.bound_account_id;
+        if (switchTargetInstance.config.bound_email) return a.email.toLowerCase() === switchTargetInstance.config.bound_email.toLowerCase();
+        return false;
+    });
+    const boundQuota = boundAccount ? accountQuotaScores(boundAccount) : null;
 
     const filtered = accounts
         .filter((a) => {
@@ -156,19 +170,6 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
             setSwitchingAccountId(null);
         }
     };
-
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (isAnySwitching) {
-                return;
-            }
-            if (e.key === 'Escape') {
-                close();
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [close, isAnySwitching]);
 
     return (
         <div

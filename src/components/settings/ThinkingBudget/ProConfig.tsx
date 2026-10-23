@@ -11,13 +11,13 @@ export function ProConfig(props: BudgetSectionProps) {
                                 <div>
                                     <span className="text-xs font-bold text-gray-900 dark:text-white">
                                         {t("proxy.config.thinking_budget.pro_family_title", {
-                                            defaultValue: "Gemini Pro ≥ 3.0 系列 (如 3-pro, 3.1-pro 等)",
+                                            defaultValue: "Gemini Pro ≥ 3.0 series (such as 3-pro, 3.1-pro, etc.)",
                                         })}
                                     </span>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                         {t("proxy.config.thinking_budget.pro_family_desc", {
                                             defaultValue:
-                                                "Google 官方 Gemini ≥ 3.0 Pro 体系仅提供 Low 与 High 两个档位。未指定 effort 或 medium 将自动走 High 保证 Pro 深度思考。",
+                                                "Google's official Gemini ≥ 3.0 Pro system only provides two gears: Low and High. Not specifying effort or medium will automatically go to High to ensure Pro deep thinking.",
                                         })}
                                     </p>
                                 </div>
@@ -31,7 +31,7 @@ export function ProConfig(props: BudgetSectionProps) {
                                             className="text-blue-600 focus:ring-blue-500"
                                         />
                                         {t("proxy.config.thinking_budget.mode_default", {
-                                            defaultValue: "默认模式 (官方自适应)",
+                                            defaultValue: "Default mode (official adaptive)",
                                         })}
                                     </label>
                                     <label className="inline-flex items-center gap-1.5 cursor-pointer text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -43,7 +43,7 @@ export function ProConfig(props: BudgetSectionProps) {
                                             className="text-blue-600 focus:ring-blue-500"
                                         />
                                         {t("proxy.config.thinking_budget.mode_custom", {
-                                            defaultValue: "自定义思考预算模式 (推荐)",
+                                            defaultValue: "Customized thinking budget model (recommended)",
                                         })}
                                     </label>
                                 </div>
@@ -54,7 +54,7 @@ export function ProConfig(props: BudgetSectionProps) {
                                     <div>
                                         <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                                             {t("proxy.config.thinking_budget.tier_low", {
-                                                defaultValue: "Low 档位",
+                                                defaultValue: "Low gear",
                                             })}
                                         </label>
                                         <input
@@ -78,14 +78,14 @@ export function ProConfig(props: BudgetSectionProps) {
                                         />
                                         <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                                             {t("proxy.config.thinking_budget.pro_low_hint", {
-                                                defaultValue: "低思考档位 (默认 1001，填 -1 则走官方自适应)",
+                                                defaultValue: "Low thinking gear (default 1001, fill in -1 to use official adaptive)",
                                             })}
                                         </p>
                                     </div>
                                     <div>
                                         <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                                             {t("proxy.config.thinking_budget.tier_pro_high", {
-                                                defaultValue: "High 档位 (默认/主力档位)",
+                                                defaultValue: "High gear (default/main gear)",
                                             })}
                                         </label>
                                         <input
@@ -109,7 +109,7 @@ export function ProConfig(props: BudgetSectionProps) {
                                         />
                                         <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                                             {t("proxy.config.thinking_budget.pro_high_hint", {
-                                                defaultValue: "深度思考档位 (默认 10001，填 -1 则走官方自适应)",
+                                                defaultValue: "Deep thinking gear (default 10001, fill in -1 to use official adaptive)",
                                             })}
                                         </p>
                                     </div>
@@ -118,7 +118,7 @@ export function ProConfig(props: BudgetSectionProps) {
                                 <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                                     {t("proxy.config.thinking_budget.pro_default_hint", {
                                         defaultValue:
-                                            "已启用官方默认模式：Gemini Pro 系列将由 Google 官方动态确定思考强度。",
+                                            "Official default mode enabled: The Gemini Pro series will have its thinking intensity determined by Google official dynamics.",
                                     })}
                                 </p>
                             )}

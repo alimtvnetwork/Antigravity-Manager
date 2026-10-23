@@ -15,7 +15,7 @@ pub fn is_model_compatible(cached: &str, target: &str) -> bool {
         return true;
     }
 
-    // Claude 全系列通用兼容：凡是同属 Claude 家族模型，直接判定签名兼容（面向未来任何 Claude 5/新模型及变体）
+    // All Claude series are universally compatible: All models belonging to the same Claude family will be directly judged to be signature compatible (for any future Claude 5/new models and variants)
     if c.contains("claude") && t.contains("claude") {
         return true;
     }
@@ -55,14 +55,14 @@ pub fn is_model_compatible(cached: &str, target: &str) -> bool {
     false
 }
 
-/// 解析官方客户端指纹，返回 `(userAgent, ideType)`。
+/// Parse the official client fingerprint and return `(userAgent, ideType)`.
 ///
-/// 官方 Go Worker 中**企业 / GCP 账号**（非 `@gmail.com` / `@googlemail.com` 邮箱）
-/// 使用 `jetski` 指纹，其余使用 `antigravity`。
+/// **Enterprise/GCP account** in official Go Worker (not `@gmail.com` / `@googlemail.com` email address)
+/// Use `jetski` fingerprint and `antigravity` for the rest.
 ///
-/// **三个适配器必须共用本函数** —— 否则同一账号经不同协议入口会产出不同指纹。
-/// 历史缺陷：jetski 仿真只实现在 Gemini 路径，Claude / OpenAI 路径硬编码
-/// `"antigravity"`，导致企业账号发生指纹漂移。
+/// **Three adapters must share this function** - otherwise the same account will generate different fingerprints through different protocol entrances.
+/// Historical defect: jetski simulation is only implemented in the Gemini path, and the Claude/OpenAI path is hard-coded
+/// `"antigravity"`, causing fingerprint drift in corporate accounts.
 pub fn resolve_official_fingerprint(
     token: Option<&crate::proxy::token_manager::ProxyToken>,
 ) -> (&'static str, &'static str) {
@@ -76,32 +76,32 @@ pub fn resolve_official_fingerprint(
     }
 }
 
-/// 构造官方形态的 requestId：`agent/{conversationId}/{unixMs}/{trajectoryId}/{step}`。
+/// Construct the requestId of the official form: `agent/ {conversationId} / {unixMs} / {trajectoryId} / {step} `.
 ///
-/// 官方样本（3 份报文逐字核对），例如：
+/// Official sample (3 documents verified verbatim), for example:
 ///
 /// ```text
 /// agent/a89a2006-72b4-470d-8282-3f1e4c88dc29/1790410048596/d3a2e3d2-21f9-411b-967f-53811898c2cd/14
 /// ```
 ///
-/// **第 2 段 `unixMs` 每次请求都不同 → 天然的幂等隔离**，避免重试命中上一次的
-/// 429 / 旧缓存。历史缺陷：Claude 路径曾用 `agent/antigravity/{session[:8]}/{count}`，
-/// **不含时间戳** —— 同一会话同一轮次重试会拿到完全相同的 ID。
+/// **Paragraph 2 `unixMs` Each request is different → Natural idempotent isolation** to avoid retrying the previous one
+/// 429 / old cache. Historical defect: Claude’s path used `agent/antigravity/ {session[:8]} / {count} `,
+/// **Excluding timestamp** - Retrying in the same session and the same round will get the exact same ID.
 ///
-/// **三适配器必须共用本函数** —— 否则同一对话经不同入口会产出不同 ID 形态。
+/// **Three adapters must share this function** - otherwise the same conversation will produce different ID forms through different entrances.
 ///
-/// ## 与 `session_id` 的关系（重要）
+/// ## Relationship with `session_id` (important)
 ///
-/// 本函数**只读 `session_id`，绝不写它**，也**不影响**它的唯一性：
-/// 防主子 agent 并发串话的机制是 `thinking_store::derive_blended_session_id`
-/// 的 SHA256 多维正交哈希（tenant + 会话语义头 + query sid + body sid + anchor），
-/// 它决定的是 thinking store / signature cache / prefix cache 的 key，
-/// 与出站 requestId 是**两条独立通路**（全仓无任何代码从 requestId 反推 session）。
+/// This function only reads `session_id`, never writes it**, and does not affect** its uniqueness:
+/// The mechanism to prevent concurrent crosstalk between master and sub-agents is `thinking_store::derive_blended_session_id`
+/// SHA256 multidimensional orthogonal hash (tenant + session semantic header + query sid + body sid + anchor),
+/// It determines the key of thinking store / signature cache / prefix cache.
+/// and outbound requestId are **two independent paths** (there is no code in the entire warehouse to reverse the session from requestId).
 ///
-/// 会话段使用 `session_id` 的**单向哈希派生**而非原文：
-/// - 同一会话稳定（贴近官方 conversationId 语义）；
-/// - 不把网关内部 blended session_id 的原文暴露给上游；
-/// - 不同 agent / 会话的 session_id 不同 → 派生值不同，隔离性保持。
+/// Session segments use a one-way hash derivation of `session_id` instead of the original text:
+/// - The same session is stable (close to the official conversationId semantics);
+/// - Do not expose the original text of the blended session_id inside the gateway to the upstream;
+/// - The session_id of different agents/sessions is different → the derived value is different, and the isolation is maintained.
 pub fn build_official_request_id(session_id: &str, step: u64) -> String {
     let ts = chrono::Utc::now().timestamp_millis();
     let sanitized = crate::proxy::thinking_store::sanitize_session_id(session_id);
@@ -114,15 +114,15 @@ pub fn build_official_request_id(session_id: &str, step: u64) -> String {
         let hex = format!("{:x}", digest);
         hex[..16].to_string()
     };
-    // 轨迹段每请求唯一，与 unixMs 共同保证幂等隔离
+    // The trajectory segment is unique per request, and together with unixMs ensures idempotent isolation
     let trajectory = &uuid::Uuid::new_v4().simple().to_string()[..8];
     format!("agent/{}/{}/{}/{}", conversation, ts, trajectory, step)
 }
 
 /// [JEIKCODE SYNTHETIC USER REMINDER]
-/// 将对话中途动态插入的系统消息就地包装为 `<system-reminder>` 标签块。
-/// 提示词采用英文，明确告知模型：本内容为系统层注入的背景提醒，并非本轮用户输入，
-/// 从而保证用户原始 query 完整透传，同时全局顶层 systemInstruction 保持绝对冻结以稳定 KV Cache。
+/// In-place wrapping of system messages dynamically inserted mid-conversation into a `<system-reminder>` tag block.
+/// The prompt words are in English, clearly informing the model: This content is a background reminder injected by the system layer, not user input in this round.
+/// This ensures that the user's original query is completely transparently transmitted, while the global top-level systemInstruction remains absolutely frozen to stabilize the KV Cache.
 pub fn wrap_in_system_reminder(content: &str) -> String {
     let trimmed = content.trim();
     if trimmed.is_empty() {
@@ -137,19 +137,19 @@ pub fn wrap_in_system_reminder(content: &str) -> String {
     )
 }
 
-/// [DEFENSE] 通用中转报文保底文本（温和提示继续分析，避免触发 Agent 误进入修改阶段）
+/// [DEFENSE] General transfer message guaranteed text (gentle reminder to continue analysis to avoid triggering the Agent to mistakenly enter the modification stage)
 pub const TRANSIT_DEFENSE_FALLBACK_TEXT: &str = "Please continue your analysis.";
 
-/// [DEFENSE] 通用中转报文保底防御节点（协议无关性）
-/// 确保发给 Google Gemini 的报文末尾轮次严格符合规范：
-/// 1. 自动兼容平铺 payload 或包含 "request" 包装的 payload；
-/// 2. 若 contents 为空，追加 {"role": "user", "parts": [{"text": TRANSIT_DEFENSE_FALLBACK_TEXT}]}；
-/// 3. 若末尾轮次为 "model"（缺失用户轮次），追加 {"role": "user", "parts": [{"text": TRANSIT_DEFENSE_FALLBACK_TEXT}]}；
-///    例外：末尾 model 轮若携带 functionCall / functionResponse（模型主动发起的工具轮），
-///    视为合法中间态，不注入（否则会与 normalize_function_response_roles 的 fr@model 对齐
-///    打架，把官方合法报文误判为缺用户轮，注入"Please continue your analysis."造成工具死循环）；
-/// 4. 若末尾轮次为 "user" 且其 parts 为空、或仅含有空文本 / "(no content)" / "·" 且无工具/图片，规范化填充为 [{"text": TRANSIT_DEFENSE_FALLBACK_TEXT}]；
-/// 5. 修复中间轮次中 parts 为空的情况，防止 Google 返回 400 "parts must not be empty"。
+/// [DEFENSE] Universal relay message protection node (protocol-independent)
+/// Make sure that the last round of the message sent to Google Gemini strictly meets the specifications:
+/// 1. Automatically compatible with tiled payloads or payloads containing "request" packaging;
+/// 2. If contents is empty, append {"role": "user", "parts": [ {"text": TRANSIT_DEFENSE_FALLBACK_TEXT} ]};
+/// 3. If the last round is "model" (missing user round), add {"role": "user", "parts": [ {"text": TRANSIT_DEFENSE_FALLBACK_TEXT} ]};
+///    Exception: If the model wheel at the end carries functionCall / functionResponse (a tool wheel actively initiated by the model),
+///    Considered as a legal intermediate state and not injected (otherwise it will be aligned with fr@model of normalize_function_response_roles
+///    Fight, misjudge the official legal message as missing user turn, inject "Please continue your analysis." to cause an infinite loop in the tool);
+/// 4. If the last round is "user" and its parts are empty, or contains only empty text / "(no content)" / "·" and no tools / pictures, the normalized filling is [ {"text": TRANSIT_DEFENSE_FALLBACK_TEXT} ];
+/// 5. Fix the situation where parts is empty in the middle round to prevent Google from returning 400 "parts must not be empty".
 pub fn ensure_gemini_payload_ends_with_user(body: &mut Value) -> bool {
     let contents = if let Some(contents) = body
         .get_mut("request")
@@ -165,7 +165,7 @@ pub fn ensure_gemini_payload_ends_with_user(body: &mut Value) -> bool {
 
     let mut modified = false;
 
-    // 防御 1: contents 整体为空
+    // Defense 1: contents is entirely empty
     if contents.is_empty() {
         tracing::warn!("[Defense] Gemini contents array is empty, appending fallback user turn");
         contents.push(json!({
@@ -175,7 +175,7 @@ pub fn ensure_gemini_payload_ends_with_user(body: &mut Value) -> bool {
         return true;
     }
 
-    // 防御 2: 修复历史/中间轮次中可能存在的 parts 为空
+    // Defense 2: Fix possible empty parts in history/intermediate rounds
     for turn in contents.iter_mut() {
         let is_model = turn
             .get("role")
@@ -194,15 +194,15 @@ pub fn ensure_gemini_payload_ends_with_user(body: &mut Value) -> bool {
         }
     }
 
-    // 防御 3: 检查末尾轮次。
-    // 注意：InboundThinkingPipeline::normalize_function_response_roles 会把纯回执轮对齐为
-    // role=model（官方 Antigravity 报文约定 fr 恒在 model 轮）。因此「末尾为 model 轮」
-    // 并不代表报文不完整——若该轮携带 functionCall（模型主动发起工具轮，等待回执，
-    // 属于合法的中间态），绝不能注入假用户话术，否则会放大成 Agent 工具死循环。
+    // Defense 3: Check the end of the turn.
+    // Note: InboundThinkingPipeline::normalize_function_response_roles will align the pure receipt wheel to
+    // role=model (the official Antigravity message convention is that fr is always in the model wheel). Therefore "the end is the model wheel"
+    // It does not mean that the message is incomplete - if the round carries functionCall (the model actively initiates the tool round and waits for the receipt,
+    // It is a legal intermediate state), and fake user words must not be injected, otherwise it will amplify into an infinite loop of the Agent tool.
     let need_append_user = if let Some(last_turn) = contents.last_mut() {
         let role = last_turn.get("role").and_then(|r| r.as_str()).unwrap_or("");
         if role == "model" || role == "assistant" {
-            // 工具轮合法：末尾 model 轮含 functionCall 或 functionResponse 时不注入
+            // The tool wheel is legal: it is not injected when the model wheel at the end contains functionCall or functionResponse
             let is_tool_turn = last_turn
                 .get("parts")
                 .and_then(|p| p.as_array())
@@ -261,8 +261,8 @@ pub fn ensure_gemini_payload_ends_with_user(body: &mut Value) -> bool {
     modified
 }
 
-/// 安全地按最大字节数截断字符串切片，保证切片边界严格对齐在 UTF-8 字符边界上。
-/// 若 max_bytes 恰好落在多字节字符中间，会自动向左回退到最近的合法字符边界。
+/// Safely truncate string slices by the maximum number of bytes, ensuring that slice boundaries are strictly aligned on UTF-8 character boundaries.
+/// If max_bytes happens to fall in the middle of multi-byte characters, it will automatically fall back to the left to the nearest legal character boundary.
 pub fn safe_truncate_str(s: &str, max_bytes: usize) -> &str {
     if s.len() <= max_bytes {
         return s;
@@ -274,8 +274,8 @@ pub fn safe_truncate_str(s: &str, max_bytes: usize) -> &str {
     &s[..end]
 }
 
-/// 安全地按最大字符数 (Unicode 标量值) 截断字符串切片。
-/// 如果字符总数超过 max_chars，截取前 max_chars 个字符对应的有效切片。
+/// Safely truncate a string slice by the maximum number of characters (Unicode scalar value).
+/// If the total number of characters exceeds max_chars, valid slices corresponding to the first max_chars characters are intercepted.
 pub fn safe_truncate_chars(s: &str, max_chars: usize) -> &str {
     match s.char_indices().nth(max_chars) {
         Some((byte_idx, _)) => &s[..byte_idx],

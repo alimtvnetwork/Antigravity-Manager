@@ -1,4 +1,4 @@
-//! 内部辅助函数（账号 JSON 更新、图片调度等待、限流原因分类等）。
+//! Internal auxiliary functions (account JSON update, image scheduling waiting, current limiting reason classification, etc.).
 
 pub(crate) fn classify_rate_limit_reason(
     error_body: &str,
@@ -57,11 +57,11 @@ pub(crate) async fn wait_for_image_token_selection<T>(
     tokio::time::timeout(remaining, selection).await.ok()
 }
 
-/// 异步安全的账号 JSON 更新函数
+/// Asynchronous and secure account JSON update function
 ///
-/// 使用 `tokio::task::spawn_blocking` 将阻塞的文件 I/O 与 `std::sync::Mutex`
-/// 的获取操作转移到 Tokio 的阻塞线程池中，避免占用 Tokio Worker Thread，
-/// 防止高并发场景下因同步锁争抢导致 Tokio 运行时饥饿（runtime starvation）。
+/// Use `tokio::task::spawn_blocking` to combine blocked file I/O with `std::sync::Mutex`
+/// The acquisition operation is transferred to Tokio's blocking thread pool to avoid occupying Tokio Worker Thread.
+/// Prevent Tokio runtime starvation due to synchronization lock contention in high concurrency scenarios.
 pub(crate) async fn update_account_json(
     path: &std::path::Path,
     update: impl FnOnce(&mut serde_json::Value) + Send + 'static,
@@ -69,13 +69,14 @@ pub(crate) async fn update_account_json(
     let path = path.to_path_buf();
     tokio::task::spawn_blocking(move || {
         let _account_write = crate::modules::account::lock_account_file_updates()?;
-        let raw = std::fs::read_to_string(&path).map_err(|e| format!("读取文件失败: {}", e))?;
+        let raw =
+            std::fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))?;
         let mut content: serde_json::Value =
-            serde_json::from_str(&raw).map_err(|e| format!("解析 JSON 失败: {}", e))?;
+            serde_json::from_str(&raw).map_err(|e| format!("Failed to parse JSON: {}", e))?;
         update(&mut content);
         let serialized = serde_json::to_string_pretty(&content)
-            .map_err(|e| format!("序列化 JSON 失败: {}", e))?;
-        std::fs::write(&path, serialized).map_err(|e| format!("写入文件失败: {}", e))
+            .map_err(|e| format!("Failed to serialize JSON: {}", e))?;
+        std::fs::write(&path, serialized).map_err(|e| format!("Failed to write file: {}", e))
     })
     .await
     .map_err(|e| format!("spawn_blocking panicked: {}", e))?
@@ -91,7 +92,7 @@ pub(crate) fn unix_timestamp_ceil(time: std::time::SystemTime) -> Option<i64> {
     i64::try_from(seconds).ok()
 }
 
-/// 截断过长的原因字符串
+/// Truncate too long reason string
 pub(crate) fn truncate_reason(reason: &str, max_len: usize) -> String {
     if reason.len() <= max_len {
         reason.to_string()

@@ -1,6 +1,6 @@
 /**
- * 模型配置 — facade
- * 实际实现拆分至 ./modelConfig/ 子模块，此处统一 re-export 以保持导入路径不变。
+ * Model configuration — facade
+ * The actual implementation is split into ./modelConfig/ submodules, and re-export is unified here to keep the import path unchanged.
  */
 export type { ModelConfig } from './modelConfig/types';
 export { MODEL_CONFIG } from './modelConfig/data';
@@ -16,7 +16,7 @@ export {
     sortModels,
 } from './modelConfig/helpers';
 
-// ── 模型分类与保护键（实现在 src/utils/modelCategory.ts，此处只 re-export）───
+// ── Model classification and protection keys (implemented in src/utils/modelCategory.ts, only re-export here)───
 
 export {
     categorizeModel,

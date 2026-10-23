@@ -160,8 +160,8 @@ pub(crate) async fn handle_stream_success(
         },
     ));
 
-    // [FIX #Bug1] 针对 Claude 流增加空闲超时保护，从 300s 降至 120s
-    // 300s 会导致客户端等待长达 5 分钟；120s 仍有足够容错余量
+    // [FIX #Bug1] Add idle timeout protection for Claude flow, reducing it from 300s to 120s
+    // 300s will cause the client to wait up to 5 minutes; 120s still has enough error tolerance
     let combined_stream = async_stream::stream! {
         let mut s = Box::pin(combined_stream);
         loop {
@@ -177,9 +177,9 @@ pub(crate) async fn handle_stream_success(
         }
     };
 
-    // 判断客户端期望的格式
+    // Determine the format expected by the client
     if client_wants_stream {
-        // 客户端本就要 Stream，直接返回 SSE
+        // The client originally needs Stream and returns directly to SSE.
         return StreamOutcome::Respond(
             Response::builder()
                 .status(StatusCode::OK)
@@ -201,7 +201,7 @@ pub(crate) async fn handle_stream_success(
         );
     }
 
-    // 客户端要非 Stream，需要收集完整响应并转换为 JSON
+    // If the client is not a Stream, it needs to collect the complete response and convert it to JSON
     use crate::proxy::handlers::claude::attempt::AttemptCall;
     use crate::proxy::handlers::claude::attempt::AttemptState;
     use crate::proxy::handlers::claude::attempt::StreamOutcome;

@@ -4,43 +4,43 @@ use std::path::{Path, PathBuf};
 use tauri::{Emitter, Manager};
 use tauri_plugin_opener::OpenerExt;
 
-// 导出 proxy 命令
+// Export proxy command
 pub mod proxy;
-// 导出 autostart 命令
+// Export autostart command
 pub mod autostart;
-// 导出 cloudflared 命令
+// export cloudflared command
 pub mod cloudflared;
-// 导出 security 命令 (IP 监控)
+// Export security command (IP monitoring)
 pub mod security;
-// 导出 proxy_pool 命令
+// Export proxy_pool command
 pub mod proxy_pool;
-// 导出 user_token 命令
+// Export user_token command
 pub mod user_token;
-// 导出 patch 命令
+// Export patch command
 pub mod patch;
 pub use patch::*;
-// 导出 instance 命令
+// Export instance command
 pub mod instance;
 pub use instance::*;
-// 导出 email 命令
+// export email command
 pub mod email;
 pub use email::*;
-// 导出 supabase 命令
+// export supabase command
 pub mod supabase;
 pub use supabase::*;
-// 导出 telegram 命令
+// Export telegram command
 pub mod telegram;
 pub use telegram::*;
-// 导出 toolchain 命令 (Toolchain Installer UI backend)
+// Export toolchain command (Toolchain Installer UI backend)
 pub mod toolchain;
 pub use toolchain::*;
-// 导出 fleet 命令 (GitMap Fleet Sync)
+// Export fleet command (GitMap Fleet Sync)
 pub mod fleet;
 pub use fleet::*;
-// 导出 ssh 命令 (GitMap Multi-Machine & RSA SSH Vault)
+// Export ssh command (GitMap Multi-Machine & RSA SSH Vault)
 pub mod ssh;
 pub use ssh::*;
-// 导出 doctor 命令 (Imp-90: System Diagnostics)
+// Export doctor command (Imp-90: System Diagnostics)
 pub mod doctor;
 pub use doctor::*;
 

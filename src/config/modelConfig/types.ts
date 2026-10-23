@@ -1,34 +1,34 @@
 import type React from 'react';
 
 /**
- * 模型配置接口
+ * Model configuration interface
  */
 export interface ModelConfig {
-    /** 模型完整显示名称 (作为回退或默认展示) */
+    /** Full display name of the model (as fallback or default presentation) */
     label: string;
-    /** 模型简短标签 (用于列表/卡片) */
+    /** Short label for the model (for lists / cards) */
     shortLabel: string;
-    /** 保护模型的键名 */
+    /** Key name of the protected model */
     protectedKey: string;
-    /** 模型图标组件 */
+    /** Model icon component */
     Icon: React.ComponentType<any>;
-    /** 国际化键名 (用于动态名称) */
+    /** i18n key name (for dynamic names) */
     i18nKey: string;
-    /** 描述信息键名 (用于详细说明) */
+    /** Description i18n key (for detailed notes) */
     i18nDescKey: string;
-    /** 所属系列/分组 */
+    /** Series / category family */
     group: string;
-    /** 选填标签 (用于筛选) */
+    /** Optional tags (for filtering) */
     tags?: string[];
-    /** 展示优先级 (数字越小越靠前) */
+    /** Display priority (lower values appear first) */
     priority?: number;
-    /** 能力标签: 模型擅长什么 */
+    /** Capability tags: what the model excels at */
     capabilities?: Array<'chat' | 'reasoning' | 'code' | 'image' | 'vision' | 'agent' | 'fast' | 'long-context'>;
-    /** 速度档位: 响应有多快 */
+    /** Speed rating: how fast the model responds */
     speed?: 'nano' | 'fast' | 'balanced' | 'powerful';
 }
 
 /**
- * 模型配置映射
- * 键为模型 ID，值为模型配置
+ * Model configuration mapping
+ * The key is the model ID and the value is the model configuration
  */

@@ -75,7 +75,7 @@ export function ActionsCell(props: ActionsCellProps) {
     return (
 <td className={cn(
     "px-2 py-0.5 sticky right-0 z-10 w-[220px] xl:w-[280px] shadow-[-12px_0_12px_-12px_rgba(0,0,0,0.1)] dark:shadow-[-12px_0_12px_-12px_rgba(255,255,255,0.05)] text-center align-middle transition-colors border-b border-slate-200/90 dark:border-slate-800/90",
-    // 动态高对比高亮处理 (100% 不透明，防止横向滚动文字透底重叠)
+    // Dynamic high-contrast highlighting (100% opaque to prevent horizontal scrolling text from showing through and overlapping)
     isFocused
         ? "bg-teal-50 dark:bg-[#171025]"
         : selected
@@ -160,7 +160,7 @@ export function ActionsCell(props: ActionsCellProps) {
             {showInstanceMenu && (
                 <div className="absolute top-full left-0 mt-1 w-52 rounded-xl shadow-xl bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 py-1.5 z-50 animate-in fade-in zoom-in-95">
                     <div className="px-3 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                        目标实例 / Target Instance
+                        Target Instance
                     </div>
                     {instances.map((inst) => (
                         <button

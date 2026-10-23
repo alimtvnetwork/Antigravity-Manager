@@ -5,9 +5,9 @@ use rquest_util::Emulation;
 use std::collections::HashMap;
 use std::sync::RwLock;
 
-/// 共享客户端的身份：决定超时长度与是否启用 JA3/TLS 仿真。
+/// Sharing the client's identity: Determines the timeout length and whether to enable JA3/TLS emulation.
 ///
-/// 每个组合只构建一次并长期复用（`Client` 自带连接池，clone 很轻且共享同一个池）。
+/// Each combination is built only once and reused for a long time (`Client` comes with its own connection pool, clone is very light and shares the same pool).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct ClientKey {
     timeout_secs: u64,
@@ -58,18 +58,18 @@ fn acquire(key: ClientKey) -> Client {
     guard.get(key)
 }
 
-/// 丢弃所有已构建的共享客户端，令其在下次访问时按当前配置重建。
+/// Discard any built shared clients, causing them to be rebuilt with their current configuration the next time they are accessed.
 ///
-/// **为什么必须存在**：`create_base_client` / `create_standard_client` 只在**构建时**
-/// 读取一次 `load_app_config().proxy.upstream_proxy`。这些客户端此前是 `Lazy` 静态值 ——
-/// 首次使用即定型、永不重建，于是用户在运行期间改动上游代理后，
-/// 主请求路径已热更新（`UpstreamClient::rebuild_default_client`），
-/// 但这些共享客户端仍带着**旧代理**继续跑：表现为「改完代理，聊天正常，
-/// 但 token 刷新 / 配额刷新 / 项目解析（loadCodeAssist）一直失败」，
-/// 必须重启应用才能恢复。
+/// **Why it must exist**: `create_base_client` / `create_standard_client` only at **build time**
+/// Read once `load_app_config().proxy.upstream_proxy`. These clients were previously `Lazy` static values -
+/// It is finalized when used for the first time and will never be rebuilt. Therefore, after the user changes the upstream agent during operation,
+/// The main request path has been hot updated (`UpstreamClient::rebuild_default_client`),
+/// However, these shared clients still continue to run with the **old proxy**: the performance is "After changing the proxy, the chat is normal.
+/// But token refresh/quota refresh/project analysis (loadCodeAssist) keeps failing."
+/// The app must be restarted to restore.
 ///
-/// 调用点：`AxumServer::update_proxy`（上游代理热更新）。
-/// 采用惰性重建 —— 若之后无人使用，不付出任何构建成本。
+/// Call point: `AxumServer::update_proxy` (upstream proxy hot update).
+/// Use lazy rebuilding - if no one uses it later, there is no construction cost.
 pub fn invalidate_shared_clients() {
     let mut guard = SHARED_CLIENTS
         .write()
@@ -84,7 +84,7 @@ pub fn invalidate_shared_clients() {
     }
 }
 
-/// 测试用：列出当前已构建的客户端 key。
+/// For testing: List the currently built client keys.
 #[cfg(test)]
 fn shared_client_keys() -> Vec<ClientKey> {
     let guard = SHARED_CLIENTS
@@ -93,22 +93,22 @@ fn shared_client_keys() -> Vec<ClientKey> {
     guard.built.keys().copied().collect()
 }
 
-/// 统一的 HTTP 客户端（15s 超时，带 JA3 仿真）
+/// Unified HTTP client (15s timeout, with JA3 emulation)
 pub fn get_client() -> Client {
     acquire(ClientKey::new(15, true))
 }
 
-/// 标准 HTTP 客户端（15s 超时，**不带** JA3 仿真）
+/// Standard HTTP client (15s timeout, **without** JA3 emulation)
 pub fn get_standard_client() -> Client {
     acquire(ClientKey::new(15, false))
 }
 
-/// 长超时的标准客户端（60s，**不带** JA3 仿真）
+/// Standard client with long timeout (60s, **without** JA3 emulation)
 pub fn get_long_standard_client() -> Client {
     acquire(ClientKey::new(60, false))
 }
 
-/// 应用当前上游代理配置到 builder 上。
+/// Apply the current upstream proxy configuration to the builder.
 fn apply_upstream_proxy(builder: rquest::ClientBuilder, label: &str) -> rquest::ClientBuilder {
     if let Ok(config) = load_app_config() {
         let proxy_config = config.proxy.upstream_proxy;
@@ -167,21 +167,24 @@ mod tests {
         let _ = get_client();
         assert!(
             shared_client_keys().contains(&emulated_15_key()),
-            "get_client 应产出对应 key 的客户端"
+            "get_client should output the client corresponding to key"
         );
 
-        // 同一 key 只应存在一份（HashMap 语义），重复获取不得新建实例。
+        // There should be only one copy of the same key (HashMap semantics), and no new instance can be created for repeated acquisition.
         // Justification: warms the shared-client cache; the returned client handle is intentionally unused.
         let _ = get_client();
         let count = shared_client_keys()
             .iter()
             .filter(|k| **k == emulated_15_key())
             .count();
-        assert_eq!(count, 1, "重复获取同一 key 不应产生第二个实例");
+        assert_eq!(
+            count, 1,
+            "Retrieving the same key repeatedly should not produce a second instance"
+        );
     }
 
-    /// 这是本次修复的核心语义：上游代理热更新后，已构建的共享客户端必须被丢弃，
-    /// 否则它们会带着**旧代理**继续跑（token 刷新 / 配额刷新 / 项目解析）。
+    /// This is the core semantic of this fix: after a hot update of the upstream proxy, the built shared client must be discarded,
+    /// Otherwise they will continue to run with the **old agent** (token refresh/quota refresh/project resolution).
     #[test]
     fn invalidate_drops_clients_so_they_rebuild_with_current_proxy() {
         let _guard = crate::proxy::config::TEST_CONFIG_LOCK
@@ -195,15 +198,15 @@ mod tests {
         invalidate_shared_clients();
         assert!(
             !shared_client_keys().contains(&emulated_15_key()),
-            "invalidate 必须丢弃已构建的客户端，否则改代理后仍走旧代理直到重启"
+            "invalidate must discard the built client, otherwise after changing the proxy, the old proxy will still be used until restarted"
         );
 
-        // 下次访问按当前配置重建
+        // Rebuild according to current configuration on next visit
         // Justification: warms the shared-client cache; the returned client handle is intentionally unused.
         let _ = get_client();
         assert!(
             shared_client_keys().contains(&emulated_15_key()),
-            "失效后应重新构建"
+            "Should be rebuilt after failure"
         );
 
         invalidate_shared_clients();

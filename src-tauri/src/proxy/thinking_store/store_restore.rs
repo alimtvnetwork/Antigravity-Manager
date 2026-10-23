@@ -100,7 +100,7 @@ impl ThinkingStore {
                 .push(rec_idx);
         }
 
-        // Phase 0: 真实签名直查（最高优先级：客户端历史若自带真实签名，直接精确反向匹配）
+        // Phase 0: Direct verification of real signatures (highest priority: if the client history has its own real signature, direct and accurate reverse matching)
         for turn in model_turns.iter_mut() {
             if turn.already_complete || turn.matched_record_idx.is_some() {
                 continue;
@@ -109,7 +109,7 @@ impl ThinkingStore {
                 let norm = normalize_signature_for_comparison(sig);
                 if let Some(&rec_idx) = by_sig.get(norm.as_ref()) {
                     if !used[rec_idx] {
-                        // 防错配保护：工具调用轮次绝不能匹配纯文本记录，纯文本轮次绝不能匹配工具记录！
+                        // Anti-mismatch protection: tool call rounds must never match plain text records, and plain text rounds must never match tool records!
                         let turn_has_tools =
                             !turn.tool_ids.is_empty() || !turn.tool_names.is_empty();
                         let rec_has_tools = !records[rec_idx].tool_ids.is_empty()
@@ -132,7 +132,7 @@ impl ThinkingStore {
             }
         }
 
-        // Phase 1: 工具调用 ID 精准锚定（包括原生唯一 ID 与确定性合成 ID，正向保序匹配）
+        // Phase 1: Accurate anchoring of tool call IDs (including native unique IDs and deterministic synthetic IDs, forward order-preserving matching)
         for turn in model_turns.iter_mut() {
             if turn.already_complete
                 || turn.matched_record_idx.is_some()
@@ -152,7 +152,7 @@ impl ThinkingStore {
                     if used[i] {
                         return false;
                     }
-                    // 严密防御工具名不匹配：防止 ID 碰撞导致把其他工具的思考与签名挂到当前工具上！
+                    // Tightly defend against tool name mismatches: Prevent ID collisions from causing thoughts and signatures from other tools to be linked to the current tool!
                     if !turn.tool_names.is_empty() && !records[i].tool_names.is_empty() {
                         if turn.tool_names != records[i].tool_names {
                             return false;
@@ -167,7 +167,7 @@ impl ThinkingStore {
             }
         }
 
-        // Phase 2: 完整指纹匹配（正向保序匹配，杜绝修剪后逆向滑窗相位错位）
+        // Phase 2: Complete fingerprint matching (forward order-preserving matching, eliminating reverse sliding window phase misalignment after pruning)
         for turn in model_turns.iter_mut() {
             if turn.already_complete || turn.matched_record_idx.is_some() {
                 continue;
@@ -200,7 +200,7 @@ impl ThinkingStore {
             }
         }
 
-        // Phase 3: 纯文本前缀 / 正文相似匹配（仅限纯文本轮次）
+        // Phase 3: Plain text prefix/text similarity matching (plain text round only)
         // Normalize each record once. The old inner-loop split_whitespace().collect().join()
         // was O(turns * records * visible_len) and stalled 10s+ at ~300K context.
         let needs_phase3 = model_turns.iter().any(|t| {
@@ -253,8 +253,8 @@ impl ThinkingStore {
             }
         }
 
-        // Phase 3.5: L2 SQLite 精准穿透回捞 (针对超过内存容量淘汰或冷启动的历史轮次)
-        // 核心原则：淘汰轮次绝不盲目降级占位符！优先通过 signature / tool_id / fingerprint 从 SQLite 索引中精准回捞
+        // Phase 3.5: L2 SQLite precise penetration recovery (for historical rounds that exceed the memory capacity and are eliminated or cold started)
+        // Core principle: Never blindly demote placeholders in the elimination round! Prioritize precise retrieval from SQLite index through signature / tool_id / fingerprint
         for turn in model_turns.iter_mut() {
             if turn.already_complete || turn.matched_record_idx.is_some() {
                 continue;
@@ -262,7 +262,7 @@ impl ThinkingStore {
 
             let mut fetched_rec: Option<ThinkingRecord> = None;
 
-            // 0. 优先按签名精准穿透
+            // 0. Prioritize signature penetration for accurate penetration
             if let Some(ref sig) = turn.existing_sig {
                 let mut found =
                     crate::modules::proxy_db::load_thinking_by_signature(store_key, sig);
@@ -292,7 +292,7 @@ impl ThinkingStore {
                 }
             }
 
-            // 1. 工具调用精准穿透点查 (利用 primary_tool_id Partial Index，纳秒级命中)
+            // 1. Tool call precise penetration check (using primary_tool_id Partial Index, nanosecond level hit)
             if fetched_rec.is_none() && !turn.tool_ids.is_empty() {
                 for id in &turn.tool_ids {
                     if let Ok(Some(persisted)) =
@@ -318,7 +318,7 @@ impl ThinkingStore {
                     }
                 }
             } else if fetched_rec.is_none() && !turn.visible.trim().is_empty() {
-                // 2. 纯文本轮次精准穿透点查 (利用 idx_thinking_rec_fp 索引)
+                // 2. Accurate penetration and enumeration of plain text rounds (using idx_thinking_rec_fp index)
                 if turn.fp.is_empty() {
                     turn.fp = fingerprint(&turn.visible, &turn.tool_ids, &turn.tool_names);
                 }
@@ -342,7 +342,7 @@ impl ThinkingStore {
                 used.push(true);
                 let new_idx = records.len() - 1;
                 turn.matched_record_idx = Some(new_idx);
-                // 同步注册回内存会话实体，确保后续轮次无需重复点查
+                // Synchronously register back to the memory session entity to ensure that subsequent rounds do not require repeated enumeration.
                 if let Some(mut entry) = self.sessions.get_mut(store_key) {
                     entry.bytes = entry.bytes.saturating_add(record_bytes(&rec_arc));
                     entry.turns.push(rec_arc);

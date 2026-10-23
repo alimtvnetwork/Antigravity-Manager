@@ -1,122 +1,122 @@
-# 稳定性与搜索功能：测试示例指南
+# Stability and Search Functionality: A Guide to Testing Examples
 
-为了验证近期对 API 400 错误及“搜索文件错误”的修复效果，您可以在 Claude CLI (Claude Code) 中运行以下指令进行实测。
+In order to verify the recent fixes to API 400 errors and "Search File Error", you can run the following command in Claude CLI (Claude Code) for actual testing.
 
-## 1. 验证搜索工具自愈 (Grep/Glob Fix)
+## 1. Verify search tool self-healing (Grep/Glob Fix)
 
-针对之前的 "Error searching files" 问题，这些指令将触发 `Grep` 和 `Glob` 工具调用，并验证参数映射是否正确。
+In response to the previous "Error searching files" issue, these instructions will trigger the `Grep` and `Glob` tool calls and verify that the parameter mapping is correct.
 
-### 测试指令示例
-*   **指令 A**：`在当前目录中搜索包含 "fn handle_messages" 的 Rust 文件。`
-    *   *验证点*：检查代理是否能正确将 `query` 映射为 `pattern`，并注入默认的 `path: "."`。
-*   **指令 B**：`列出 src-tauri 目录下所有 .rs 文件。`
-    *   *验证点*：验证 `Glob` 工具名是否被正确识别，且路径过滤逻辑正常。
-
----
-
-## 2. 验证协议顺序与签名稳定性 (Thinking/Signature Fix)
-
-针对之前的 `Found 'text'` 和 `Invalid signature` 400 错误。
-
-### 测试指令示例
-*   **指令 A（推理+搜索）**：`分析本项目中处理云端请求的核心逻辑，按调用顺序总结，并给出关键代码行的 Grep 搜索证据。`
-    *   *验证点*：验证在“思维 -> 工具调用 -> 结果 -> 继续思维”循环中，块顺序是否正确。
-*   **指令 B（历史记录重试）**：在长对话中频繁切换模型，观察系统是否在 400 报错时静默修复签名并重试。
+### Test command example
+* **Command A**: `Search the current directory for Rust files containing "fn handle_messages". `
+    * *Verification point*: Check whether the proxy can correctly map `query` to `pattern` and inject the default `path: "."`.
+* **Command B**: `List all .rs files in the src-tauri directory. `
+    * *Verification point*: Verify whether the `Glob` tool name is correctly recognized and the path filtering logic is normal.
 
 ---
 
-## 附录：深度错误对照与修复方案
+## 2. Verify protocol sequence and signature stability (Thinking/Signature Fix)
 
-| 错误类别 | 具体报错特征码 (Error Detail) | 代理采取的修复/应对逻辑 |
+For previous `Found 'text'` and `Invalid signature` 400 errors.
+
+### Test command example
+* **Instruction A (Inference + Search)**: `Analyze the core logic of processing cloud requests in this project, summarize it in the order of calls, and give Grep search evidence of key lines of code. `
+    * *Verification Point*: Verify that the order of blocks is correct in the "Think -> Tool Call -> Result -> Continue Thinking" loop.
+* **Command B (history retry)**: Switch models frequently in long conversations and observe whether the system silently repairs the signature when a 400 error is reported and tries again.
+
+---
+
+## Appendix: In-depth error comparison and repair plan
+
+| Error category | Specific error code (Error Detail) | Repair/coping logic adopted by the agent |
 | :--- | :--- | :--- |
-| **消息流顺序违规** | `If an assistant message contains any thinking blocks... Found 'text'.` | **已修复**：`streaming.rs` 不再允许在文字块之后非法追加思维块。 |
-| **思维签名不匹配** | `Invalid signature in thinking block` | **已修复**：优先保留原始名称以保护 Google 后端签名校验。 |
-| **思维签名缺失** | `Function call is missing a thought_signature` | **已修复**：自动注入 `skip_thought_signature_validator` 占位符。 |
-| **非法缓存标记** | `thinking.cache_control: Extra inputs are not permitted` | **已修复**：全局剔除历史消息中的 `cache_control` 标记。 |
-| **Plan Mode 报错**| `EnterPlanMode tool call: InputValidationError: Extra inputs are not permitted` | **已修复**：`streaming.rs` 强制清空工具参数以符合官方无参协议。 |
-| **连续 User 消息**| `Consecutive user messages are not allowed` | **已修复**：`merge_consecutive_messages` 自动合并相邻同角色消息。 |
+| **Message flow order violation** | `If an assistant message contains any thinking blocks... Found 'text'.` | **Fixed**: `streaming.rs` no longer allows illegal appending of thought blocks after text blocks. |
+| **thought signature mismatch** | `Invalid signature in thinking block` | **Fixed**: Prefer retaining original names to protect Google backend signature verification. |
+| **Thought signature missing** | `Function call is missing a thought_signature` | **FIXED**: Automatic injection of `skip_thought_signature_validator` placeholder. |
+| **Illegal cache tag** | `thinking.cache_control: Extra inputs are not permitted` | **Fixed**: Globally cull `cache_control` tag in history messages. |
+| **Plan Mode error** | `EnterPlanMode tool call: InputValidationError: Extra inputs are not permitted` | **Fixed**: `streaming.rs` forced clearing of tool parameters to comply with the official no-argument protocol. |
+| **Continuous User Messages** | `Consecutive user messages are not allowed` | **Fixed**: `merge_consecutive_messages` automatically merges adjacent messages of the same role. |
 
 ---
 
-## 3. 验证 Claude Code Plan Mode 与角色交替 (Issue #813)
+## 3. Verify Claude Code Plan Mode and role alternation (Issue #813)
 
-针对 Plan Mode 切换导致的协议报错问题。
+Aiming at the problem of protocol error caused by Plan Mode switching.
 
-### A. 验证 Plan Mode 激活 (UI 状态)
-*   **指令**：`进入 Plan Mode 调研 src-tauri 的目录结构。`
-*   **预期结果**：
-    *   终端左下角应立即出现蓝色的 **`plan mode on`** 标签。
-    *   日志中应看到 `[Streaming] Tool Call: 'EnterPlanMode' Args: {}`。
+### A. Verify Plan Mode activation (UI status)
+* **Command**: `Enter Plan Mode to investigate the directory structure of src-tauri. `
+* **Expected results**:
+    * A blue **`plan mode on`** label should immediately appear in the lower left corner of the terminal.
+    * You should see `[Streaming] Tool Call: 'EnterPlanMode' Args: {}` in the log.
 
-### B. 验证角色交替自愈 (Consecutive Messages)
-*   **指令**：`在 Plan Mode 下帮我分析 proxy/mappers/claude/request.rs 的逻辑，然后退出 Plan Mode 并给出一个简要总结。`
-*   **预期结果**：
-    *   模型切换模式（如从 Plan 到 Code）时不会因“连续两条 User 消息”而报 400 错误。
-    *   日志中会体现 `merge_consecutive_messages` 的合并动作。
-
----
-
-## 4. QuotaData 字段逻辑解析
-
-设置页面中的“账号管理”列表，下方的进度条数据来源于 `QuotaData`。系统会在请求前检查账号配额，并在触及阈值时自动轮换。
+### B. Verify role replacement and self-healing (Consecutive Messages)
+* **Command**: `Help me analyze the logic of proxy/mappers/claude/request.rs in Plan Mode, then exit Plan Mode and give a brief summary. `
+* **Expected results**:
+    * When the model switches modes (such as from Plan to Code), a 400 error will not be reported due to "two consecutive User messages".
+    * The merge action of `merge_consecutive_messages` will be reflected in the log.
 
 ---
 
-## 调试建议
+## 4. QuotaData field logical analysis
+
+In the "Account Management" list in the settings page, the progress bar data below comes from `QuotaData`. The system checks account quotas before making requests and automatically rotates when the threshold is hit.
+
+---
+
+## Debugging suggestions
 ```bash
 RUST_LOG=debug npm run tauri dev
 ```
-在日志中搜索 `[Claude-Request]`，关注消息角色的排列顺序。
+Search for `[Claude-Request]` in the log and pay attention to the order of message roles.
 
 ---
 
-## 5. 验证 Thinking 签名持久化与重启容错 (Proxy Restart Test)
+## 5. Verify Thinking signature persistence and restart fault tolerance (Proxy Restart Test)
 
-此测试模拟代理服务主要逻辑：验证当代理重启（内存签名缓存丢失）后，携带旧签名的历史消息是否会导致 400 错误。这是复现 `Invalid signature` 最有效的方法。
+This test simulates the main logic of the proxy service: verifying whether historical messages carrying old signatures will cause a 400 error when the proxy is restarted (the memory signature cache is lost). This is the most efficient way to reproduce `Invalid signature`.
 
-### 测试流程
-1.  **生成 Thinking (Step 1)**:
-    *   **指令**：`详细分析 proxy/mappers/claude/request.rs 的代码结构，特别是它是如何处理 Thinking Block 的。请展示思维过程。`
-    *   *状态*：Claude CLI 会接收到包含 Thinking 和 Signature 的响应。
+### Test process
+1. **Generate Thinking (Step 1)**:
+    * **Instruction**: `Analyze the code structure of proxy/mappers/claude/request.rs in detail, especially how it handles Thinking Block. Please show the thought process. `
+    * *STATUS*: Claude CLI will receive a response containing Thinking and Signature.
 
-2.  **模拟环境变更 (Step 2)**:
-    *   **动作**：**保持当前 Claude CLI 会话不关闭**。
-    *   **动作**：在另一个终端完全重启 Antigravity (或 `npm run tauri dev`)。
-    *   *原理*：重启会清空代理内存中的“签名白名单”，这意味着 Step 1 中下发的签名现在对代理来说是“未知/不可信”的。
+2. **Simulating environment changes (Step 2)**:
+    * **Action**: **Keep the current Claude CLI session from closing**.
+    * **Action**: Completely restart Antigravity in another terminal (or `npm run tauri dev`).
+    * *Principle*: Restarting will clear the "signature whitelist" in the agent's memory, which means that the signatures issued in Step 1 are now "unknown/untrusted" to the agent.
 
-3.  **触发历史重放 (Step 3)**:
-    *   **指令**：`根据上面的分析，总结一下签名验证的核心逻辑。`
-    *   *原理*：CLI 会将 Step 1 中的 Thinking Block + Signature 作为历史记录发送给重启后的代理。
+3. **Trigger history replay (Step 3)**:
+    * **Instruction**: `Based on the above analysis, summarize the core logic of signature verification. `
+    * *Principle*: The CLI will send the Thinking Block + Signature in Step 1 as a history record to the restarted agent.
 
-### 预期结果 (验证修复)
-*   **如果不通过**：报错 `Invalid signature in thinking block` (因为代理无法验证该签名，直接透传给了 Google，被 Google 拒收)。
-*   **如果通过 (当前版本)**：代理发现签名不在内存缓存中，**自动触发降级逻辑**（剥离 Thinking Block 或作为纯文本发送），对话正常继续，无报错。
+### Expected results (verify fix)
+* **If it fails**: Error `Invalid signature in thinking block` (because the agent cannot verify the signature, it is directly transmitted to Google and rejected by Google).
+* **If passed (current version)**: The agent finds that the signature is not in the memory cache, **automatically triggers the downgrade logic** (strips the Thinking Block or sends it as plain text), and the conversation continues normally without error.
 
 ---
 
-## 6. 验证动态思维剥离 (Dynamic Thinking Stripping)
+## 6. Verify Dynamic Thinking Stripping
 
-此测试验证系统能否在**高 Context 压力**或**签名失效**场景下，自动剥离无用的历史 Thinking Block，从而解决 "Prompt is too long" 和 "Invalid signature" 错误。
+This test verifies whether the system can automatically strip useless historical Thinking Blocks under high Context pressure or signature invalidation scenarios, thereby solving "Prompt is too long" and "Invalid signature" errors.
 
-### 前置条件
-*   开启 Debug 日志: `RUST_LOG=debug npm run tauri dev`
-*   确保使用支持 Thinking 的模型 (如 `claude-3-7-sonnet` 或映射后的 `gemini-2.0-flash-thinking-exp`)
+### Preconditions
+* Enable Debug log: `RUST_LOG=debug npm run tauri dev`
+* Make sure to use a model that supports Thinking (such as `claude-3-7-sonnet` or the mapped `gemini-2.0-flash-thinking-exp`)
 
-### 验证场景 A: 模拟超长 Context 压力 (Simulate High Load)
+### Verification Scenario A: Simulate High Load
 
-此场景验证当对话历史接近 Token 上限时，系统是否会自动清理旧的 Thinking。
+This scenario verifies whether the system will automatically clean up old Thinking when the conversation history approaches the Token limit.
 
-1.  **构造长对话**:
-    *   **方法 1 (自动生成)**: 运行 `docs/generate_long_payload.sh` 生成 2MB 测试文件。
+1. **Constructing a long dialogue**:
+    * **Method 1 (auto-generated)**: Run `docs/generate_long_payload.sh` to generate a 2MB test file.
         ```bash
         chmod +x docs/generate_long_payload.sh
         ./docs/generate_long_payload.sh
         cat docs/long_context_payload.txt | pbcopy
         ```
-        然后将剪贴板内容多次粘贴给 Claude，直到感知到显著延迟或收到上下文警告。
+        The clipboard contents are then pasted to Claude multiple times until significant delay is perceived or a contextual warning is received.
 
-    *   **方法 2 (Deep Thinking 诱导 - 持续施压)**:
-        以下 Prompts 经过设计，能诱导模型进行极长的思维推理。可以轮流发送：
+    * **Method 2 (Deep Thinking Induction - Continuous Pressure)**:
+        The following prompts are designed to induce extremely long thought reasoning in the model. Can be sent in turn:
 
         > **Round 1 (History)**: "Please analyze the history of computing from the abacus to quantum computers. For every major milestone (at least 20), perform a deep 'thinking' block simulating the thought process of the inventors. Detailed thinking is required. Aim for maximum output tokens."
 
@@ -126,174 +126,174 @@ RUST_LOG=debug npm run tauri dev
 
         > **Round 4 (Literature)**: "Write a recursive story where the protagonist is a recursive function. The story must nest at least 20 levels deep, and for each level, you must 'think' about the symbolic meaning of that recursion depth before writing the narrative part."
 
-2.  **观察日志**:
-    *   在终端搜索 `[ContextManager]`。
-    *   **预期日志**:
+2. **Observation log**:
+    * Search for `[ContextManager]` in the terminal.
+    * **Expected log**:
         ```
         [INFO] [ContextManager] Context pressure: 95.0% (1900000 / 2000000), Strategy: Aggressive => Purifying history
         [DEBUG] History purified successfully
         ```
 
-3.  **验证结果**:
-    *   Request 成功发送给 Gemini，没有报 "Prompt is too long"。
-    *   HTTP 响应头包含 `X-Context-Purified: true`。
-    *   Claude CLI 用户侧无感（历史记录仍在 CLI 本地显示，但服务端已净化）。
+3. **Verification results**:
+    * The Request was successfully sent to Gemini, but no "Prompt is too long" was reported.
+    * The HTTP response header contains `X-Context-Purified: true`.
+    * Claude CLI is user-agnostic (the history is still displayed locally in the CLI, but the server side has been sanitized).
 
-### 验证场景 B: 签名失效免疫 (Signature Immunity via Stripping)
+### Verification scenario B: Signature Immunity via Stripping
 
-此场景验证即使不触发重试逻辑，高负载下的主动剥离也能顺带解决签名问题。
+This scenario verifies that even if retry logic is not triggered, active stripping under high load can incidentally solve the signature problem.
 
-1.  **生成带签名的 Thinking**:
-    *   **指令**: `思考一下 Rust 的所有权机制，写 500 字。`
+1. **Generate signed Thinking**:
+    * **Instructions**: `Think about Rust’s ownership mechanism and write 500 words. `
 
-2.  **重启 Proxy 且注入虚假负载 (可选)**:
-    *   重启代理（清空签名缓存）。
-    *   继续对话。此时带有旧签名的 Thinking 会被发送给代理。
+2. **Restart Proxy and inject fake payload (optional)**:
+    * Restart the agent (clear the signature cache).
+    * Continue the conversation. At this point the Thinking with the old signature will be sent to the agent.
 
-3.  **预期结果**:
-    *   如果上下文压力较大触发了 Stripping，或者因签名报错触发了 RetriedWithoutThinking，系统会剥离 Thinking Block。
-    *   **关键点**: 一旦 Thinking Block 被剥离，`thought_signature` 也会随之消失。
-    *   Gemini 收到的是纯文本历史，**绝不会报 Invalid Signature**。
+3. **Expected results**:
+    * If Stripping is triggered due to high context pressure, or RetriedWithoutThinking is triggered due to a signature error, the system will strip off the Thinking Block.
+    * **Key Point**: Once the Thinking Block is stripped off, `thought_signature` will also disappear.
+    * Gemini receives plain text history and will never report Invalid Signature.
 
 ---
 
-## 7. OpenCode (Claude Code CLI) 多协议接入测试
+## 7. OpenCode (Claude Code CLI) multi-protocol access test
 
-**Antigravity 已全面支持 OpenCode 的多协议接入**，彻底解决了 `AI_TypeValidationError` 等兼容性问题。您可以根据需要选择以下任一方式接入。
+**Antigravity has fully supported OpenCode's multi-protocol access**, completely solving compatibility issues such as `AI_TypeValidationError`. You can choose any of the following ways to access according to your needs.
 
-### 端点配置表
+### Endpoint configuration table
 
-| 协议类型 | Base URL (Antigravity) | 对应的 OpenCode Provider | 备注 |
+| protocol type | Base URL (Antigravity) | Corresponding OpenCode Provider | Remark |
 | :--- | :--- | :--- | :--- |
-| **Anthropic (原生)** | `http://localhost:8045/v1` | `anthropic` | **推荐**。支持 Thinking、工具调用、Artifacts 预览。 |
-| **OpenAI (标准)** | `http://localhost:8045/v1` | `openai` | 支持通用 OpenAI 客户端逻辑。 |
-| **OA-Compatible** | `http://localhost:8045/v1` | `openai-compatible` | 适用于强制指定非标准模型名称的场景。 |
-| **Google Gemini** | `http://localhost:8045/v1` | `gemini` | 直接使用 Gemini 协议，支持 Google 原生 SDK 特性。 |
+| **Anthropic (native)** | `http://localhost:8045/v1` | `anthropic` | **recommend**. Supports Thinking, tool calling, and Artifacts preview. |
+| **OpenAI (Standard)** | `http://localhost:8045/v1` | `openai` | Supports common OpenAI client logic. |
+| **OA-Compatible** | `http://localhost:8045/v1` | `openai-compatible` | Suitable for scenarios where non-standard model names are forced to be specified. |
+| **Google Gemini** | `http://localhost:8045/v1` | `gemini` | Directly uses the Gemini protocol and supports Google's native SDK features. |
 
-### A. 方式 1：Anthropic 原生协议 (推荐)
+### A. Method 1: Anthropic native protocol (recommended)
 
-此方式能获得最佳的 Claude 原生体验，支持 Thinking 签名保护与 Beta 特性。
+This method provides the best Claude native experience and supports Thinking signature protection and Beta features.
 
-1.  **配置**:
+1. **Configuration**:
     ```bash
-    # 设置 Base URL (注意：OpenCode 的 anthropic provider 有时需要完整路径)
+    # Set Base URL (note: OpenCode’s anthropic provider sometimes requires a full path)
     export ANTHROPIC_BASE_URL="http://localhost:8045/v1"
-    # 设置 API Key (Antigravity 的密钥)
+    # Set API Key (Antigravity’s key)
     export ANTHROPIC_API_KEY="sk-antigravity-key"
     ```
 
-2.  **测试指令**:
+2. **Test Instructions**:
     ```bash
-    claude "请使用思维链 (Thinking) 分析当前目录下的 Cargo.toml 依赖结构。"
+    claude "Please use Thinking to analyze the Cargo.toml dependency structure in the current directory."
     ```
 
-3.  **验证点**:
-    *   **Thinking**: 是否能看到蓝色的思维块输出？
-    *   **签名**: 检查 Antigravity 日志，应显示 `Cached signature to session ... [FIFO: true]`。
-    *   **无错**: 全程无 `Invalid signature` 报错。
+3. **Verification Point**:
+    * **Thinking**: Can you see the blue thinking block output?
+    * **Signature**: Check the Antigravity log, it should show `Cached signature to session ... [FIFO: true]`.
+    * **No errors**: No `Invalid signature` error was reported throughout the process.
 
-### B. 方式 2：OpenAI 协议 (含 Compatible)
+### B. Method 2: OpenAI protocol (including Compatible)
 
-适用于习惯使用 OpenAI 生态或需要特定模型映射的用户。
+Suitable for users who are accustomed to using the OpenAI ecosystem or need specific model mapping.
 
-1.  **配置**:
+1. **Configuration**:
     ```bash
-    # 设置 Base URL
+    # Set Base URL
     export OPENAI_BASE_URL="http://localhost:8045/v1"
     export OPENAI_API_KEY="sk-antigravity-key"
     ```
 
-2.  **启动 OpenCode**:
+2. **Start OpenCode**:
     ```bash
     claude --provider openai --model gemini-2.0-flash
-    # 或者使用 compatible 模式
+    # Or use compatible mode
     claude --provider openai-compatible --model gemini-2.0-flash
     ```
 
-3.  **验证点**:
-    *   **JSON 错误**: 尝试故意断网或使用无效 Key，OpenCode 应显示友好的 JSON 错误信息（如 `{"error": {"message": "..."}}`），而不再是 Crash。
-    *   **非流式兼容**: OpenCode 的某些工具调用可能会使用非流式请求，验证其是否能正常解析 JSON 响应。
+3. **Verification Point**:
+    * **JSON Error**: When trying to intentionally disconnect or use an invalid Key, OpenCode should display a friendly JSON error message (such as `{"error": {"message": "..."}}`) instead of crashing.
+    * **Non-Streaming Compatible**: Some OpenCode tool calls may use non-streaming requests, verify that they can parse the JSON response properly.
 
-### C. 方式 3：Google Gemini 原生协议
+### C. Method 3: Google Gemini native protocol
 
-Antigravity v4.1.4 新增支持。
+Antigravity v4.1.4 added support.
 
-1.  **配置**:
+1. **Configuration**:
     ```bash
     export GEMINI_API_KEY="sk-antigravity-key"
-    # 如果 OpenCode 支持 GEMINI_BASE_URL (通常需要反代工具如 cloudflared 或修改 config):
+    # If OpenCode supports GEMINI_BASE_URL (usually requires anti-generation tools such as cloudflared or modified config):
     export GEMINI_BASE_URL="http://localhost:8045/v1"
     ```
 
-2.  **验证点**:
-    *   **适配器检测**: Antigravity 日志应显示 `[Gemini] Client Adapter detected`。
-    *   **Let It Crash**: 当遇到 403/404 错误时，响应应立即返回，而不是让 OpenCode 挂起等待重试。
+2. **Verification Point**:
+    * **Adapter Detection**: Antigravity logs should show `[Gemini] Client Adapter detected`.
+    * **Let It Crash**: When a 403/404 error is encountered, the response should be returned immediately rather than letting OpenCode hang waiting for a retry.
 
-### D. 常见问题排查
+### D. Troubleshooting common problems
 
-*   **Q: 报错 `AI_TypeValidationError`？**
-    *   **A**: 请确保升级 Antigravity 到 v4.1.2+。旧版本返回的错误格式（纯文本）无法通过 OpenCode 的 Zod 校验。
+* **Q: Error `AI_TypeValidationError` reported? **
+    * **A**: Please make sure to upgrade Antigravity to v4.1.2+. Older versions returned incorrect formats (plain text) that failed OpenCode's Zod validation.
 
-*   **Q: Thinking 块显示为 `[Redacted]` 或直接消失？**
-    *   **A**: 这是正常现象。为了保护 Google 的签名不被破坏，Antigravity 可能会在特定情况下（如高上下文压力或签名验证失败时）主动剥离思维块。只要对话能继续，说明 "Dynamic Stripping" 机制正在工作。
-
----
-
-## 8. 多轮连续对话压力测试 (Continuous Conversation Stress Test)
-
-此测试旨在验证高频、多轮交互下的 **Signed Session Stability**（签名会话稳定性）。请在一个 OpenCode 会话中**连续**执行以下步骤，不要重启或清空上下文。
-
-### 场景：Rust 项目重构实战
-
-#### 第 1 轮：深度代码审查 (Initial Analysis)
-*   **指令**:
-    ```bash
-    claude "请详细审查 src-tauri/src/proxy/handlers/claude.rs 文件。关注其中的 handle_messages 函数，分析它是如何处理 Beta Headers 注入的。请使用思维链列出你的分析步骤。"
-    ```
-*   **验证点**:
-    *   必须看到通过 `ClientAdapter` 注入 Header 的逻辑分析。
-    *   响应包含完整的 Thinking Block。
-
-#### 第 2 轮：模拟修改建议 (Refactoring Proposal)
-*   **指令**:
-    ```bash
-    claude "基于你的分析，如果我要新增一个名为 'CherryStudio' 的适配器，应该在哪些文件中进行修改？请给出一个具体的实现计划，不要直接修改文件。"
-    ```
-*   **验证点**:
-    *   Claude 能准确引用第 1 轮的上下文（证明 Session ID 传递正常）。
-    *   Thinking 签名未丢失（若报错 `Invalid signature`，说明签名缓存失效）。
-
-#### 第 3 轮：高频并发测试 (Concurrent Simulation)
-*   **背景**: 在此轮中，我们模拟快速连续的追问，测试 FIFO 签名队列的鲁棒性。
-*   **指令 (请连续快速执行 3 次)**:
-    ```bash
-    # 快速输入以下简短指令，模拟用户急促的追问
-    claude "刚才的计划中，StreamingState 需要改吗？"
-    claude "那 ClientAdapter trait 呢？"
-    claude "Cargo.toml 需要加依赖吗？"
-    ```
-*   **验证点**:
-    *   **乱序容忍**: 即使响应到达顺序可能与请求不一致，客户端不应崩溃。
-    *   **队列深度**: Antigravity 日志中应显示 Signature Cache 正常更新，未出现覆盖导致的前序签名失效。
-
-#### 第 4 轮：长文本生成 (Output Token Limit)
-*   **指令**:
-    ```bash
-    claude "请为 ClientAdapter trait 编写一份详尽的开发者文档（Markdown格式），包含所有方法的详细注释、三个不同场景的最佳实践示例代码。字数要求 2000 字以上。"
-    ```
-*   **验证点**:
-    *   验证在大输出量下，SSE 流是否稳定。
-    *   观察日志中是否触发了 `ContextManager` 的主动纯化（Purify），以及签名是否被安全剥离。
+* **Q: Is the Thinking block displayed as `[Redacted]` or disappears directly? **
+    * **A**: This is normal. To protect Google's signatures from being compromised, Antigravity may proactively strip blocks of thought in certain situations, such as high contextual pressure or when signature verification fails. As long as the conversation continues, the "Dynamic Stripping" mechanism is working.
 
 ---
 
-## 6. 智能上下文压缩等级验证 (Compression Level Test)
+## 8. Multiple rounds of continuous conversation stress test (Continuous Conversation Stress Test)
 
-针对新版本引入的 `智能上下文压缩等级` (Disabled / Low / Medium / High)，您可以使用以下步骤验证各等级的净化降噪表现。
+This test is designed to verify **Signed Session Stability** (signed session stability) under high-frequency, multi-round interactions. Please perform the following steps **continuously** within an OpenCode session without restarting or clearing the context.
 
-### A. 基础测试数据准备
+### Scenario: Rust project reconstruction in practice
 
-在客户端（如 Cline 或 Cherry Studio）中开启新会话，我们将准备一段混合了**冗余客套口语**和**典型重复构建日志**的文本作为第一轮的请求：
+#### Round 1: In-depth Code Review (Initial Analysis)
+* **instruction**:
+    ```bash
+    claude "Please review the src-tauri/src/proxy/handlers/claude.rs file in detail. Pay attention to the handle_messages function and analyze how it handles Beta Headers injection. Please use a thought chain to list your analysis steps."
+    ```
+* **Verification Point**:
+    * You must see the logic analysis of injecting Header through `ClientAdapter`.
+    * The response contains the complete Thinking Block.
+
+#### Round 2: Refactoring Proposal
+* **instruction**:
+    ```bash
+    claude "Based on your analysis, if I want to add an adapter named 'CherryStudio', which files should be modified? Please give a specific implementation plan and do not modify the files directly."
+    ```
+* **Verification Point**:
+    * Claude can accurately reference the context of round 1 (proof that the Session ID is passed properly).
+    * The Thinking signature has not been lost (if an error message of `Invalid signature` is reported, it means that the signature cache is invalid).
+
+#### Round 3: High-frequency concurrent testing (Concurrent Simulation)
+* **Background**: In this round, we simulate a rapid succession of queries to test the robustness of the FIFO signature queue.
+* **Command (please execute 3 times in quick succession)**:
+    ```bash
+    # Quickly enter the following short instructions to simulate the user's urgent questioning
+    claude "In the plan just now, does StreamingState need to be changed?"
+    claude "What about the ClientAdapter trait?"
+    claude "Does Cargo.toml need to add dependencies?"
+    ```
+* **Verification Point**:
+    * **Out-of-order tolerance**: Even though responses may arrive in an order inconsistent with the request, the client should not crash.
+    * **Queue Depth**: The Antigravity log should show that the Signature Cache is updated normally, and there is no pre-order signature failure caused by overwriting.
+
+#### Round 4: Long Text Generation (Output Token Limit)
+* **instruction**:
+    ```bash
+    claude "Please write a detailed developer documentation (Markdown format) for the ClientAdapter trait, including detailed comments on all methods and best practice example code for three different scenarios. The word count is required to be more than 2000 words."
+    ```
+* **Verification Point**:
+    * Verify that SSE flow is stable under large output volumes.
+    * Observe in the log whether active purification of `ContextManager` is triggered and whether the signature is safely stripped.
+
+---
+
+## 6. Intelligent context compression level test (Compression Level Test)
+
+For the `Intelligent Contextual Compression Levels` (Disabled / Low / Medium / High) introduced in the new version, you can use the following steps to verify the purification and noise reduction performance of each level.
+
+### A. Basic test data preparation
+
+Starting a new session in a client (such as Cline or Cherry Studio), we will prepare a text that is a mixture of redundant polite language and typical repetitive build logs as the first round of requests:
 
 ```text
 Hello, could you please help me build this package? Actually, basically, I think probably it is failed.
@@ -306,41 +306,41 @@ Progress: 50%
 Error: compilation failed at src/main.rs:25
 ```
 
-当模型回复后，紧接着进行**第二轮追问**（例如：`How to fix this error?`），此时第一轮消息将成为“历史消息”，从而触发对应的静态清洗规则。
+After the model replies, it will then conduct a second round of questioning (for example: `How to fix this error?`). At this time, the first round of messages will become "historical messages", thus triggering the corresponding static cleaning rules.
 
 ---
 
-### B. 验证 Low 等级 (仅日志降噪)
+### B. Verify Low level (log noise reduction only)
 
-1.  **设置**：在设置面板中，将 `智能上下文压缩等级` 选择为 **`低度 (Low - 日志降噪)`**。
-2.  **测试**：执行上述两轮对话。
-3.  **日志与效果验证**：
-    *   在 `npm run tauri:debug` 的控制台中，观察第二轮请求发送时的 payload：
-        *   **RTK 日志去噪生效**：第一轮消息中的 `Progress: 10% ... 50%` 会被自动净化并折叠成类似 `[Collapsed 3 similar lines]` 的占位符。
-        *   **报错安全捞回**：底部的 `Error: compilation failed...` 报错信息被完整保留。
-        *   **口语保持原样**：第一轮消息开头的 `Hello, could you please...` 客套话仍然完整保留在 payload 中，未被精简。
-
----
-
-### C. 验证 Medium 等级 (日志降噪 + 口语净化)
-
-1.  **设置**：在设置面板中，将 `智能上下文压缩等级` 选择为 **`中度 (Medium - 日志+口语)`**。
-2.  **测试**：重新开辟会话，并执行上述两轮对话。
-3.  **日志与效果验证**：
-    *   在控制台中观察第二轮请求发送时的 payload：
-        *   **RTK 日志去噪生效**：重复的进度行继续被成功折叠。
-        *   **Caveman 口语净化生效**：历史消息中的开头文本被大幅纯化，无实质意义的 `Hello, could you please...` 和 `Actually, basically, I think probably...` 等修饰性语气词被完全剔除，转换为骨架极简的原始人语风。
-        *   **代码隔离安全**：所有的代码片段和堆栈路径（如 `src/main.rs:25`）均未被破坏。
+1. **Settings**: In the Settings panel, select `Smart Context Compression Level` to **`Low - Log Noise Reduction`**.
+2. **Test**: Execute the above two rounds of dialogue.
+3. **Log and effect verification**:
+    * In the console of `npm run tauri:debug`, observe the payload when the second round of requests is sent:
+        * **RTK log denoising takes effect**: `Progress: 10% ... 50%` in the first round of messages will be automatically purified and collapsed into placeholders similar to `[Collapsed 3 similar lines]`.
+        * **Safe recovery of error reports**: The `Error: compilation failed...` error message at the bottom is completely retained.
+        * **Spoken language remains intact**: The `Hello, could you please...` polite words at the beginning of the first round of messages are still intact in the payload and have not been streamlined.
 
 ---
 
-### D. 验证 High 等级 (日志+口语+动态防暴)
+### C. Verify Medium level (log noise reduction + spoken language purification)
 
-1.  **设置**：在设置面板中，将 `智能上下文压缩等级` 选择为 **`高度 (High - 动态防暴)`**。
-2.  **测试**：发送一段较长或包含数万 Token 的项目代码，促使上下文用量上升。
-3.  **日志与效果验证**：
-    *   **动态三级压强自适应**：在控制台中将能够看到 `ContextManager` 实时估算当前上下文的压强比例（如 `Context pressure: 45.2%`）。
-    *   **分级触发日志**：
-        *   超出 L1 阈值：触发 `[Layer-1] Tool trimming` 裁剪老旧工具包。
-        *   超出 L2 阈值：触发 `[Layer-2] Thinking compression` 压缩历史思考，同时重播并保护签名。
-        *   超出 L3 阈值：触发 `[Layer-3] Fork+Summary` 终极重置，控制台将显示重开会话以及摘要的生成，同时首条摘要的 payload 中将显示注入的 `cache_control: {"type": "ephemeral"}` 标记（在后续聊天中，您会在客户端观察到 Prompt Cache 命中率呈几何级飙升，极速响应）。
+1. **Settings**: In the Settings panel, select `Smart Contextual Compression Level` to **`Medium (Log + Spoken)`**.
+2. **Test**: Reopen the session and perform the above two rounds of dialogue.
+3. **Log and effect verification**:
+    * Observe the payload when the second round of request is sent in the console:
+        * **RTK log denoising takes effect**: Duplicate progress lines continue to be successfully collapsed.
+        * **Caveman spoken language purification takes effect**: The opening text in the historical message has been greatly purified. Modifying modal particles such as `Hello, could you please...` and `Actually, basically, I think probably...` that have no substantive meaning have been completely removed, and converted into a minimalist primitive style.
+        * **Code Isolation Security**: All code snippets and stack paths (such as `src/main.rs:25`) are not broken.
+
+---
+
+### D. Verify High level (log + spoken + dynamic anti-riot)
+
+1. **Settings**: In the Settings panel, select `Smart Context Compression Level` to **`High (High - Dynamic Vandal Protection)`**.
+2. **Test**: Send a long piece of project code or contain tens of thousands of Tokens to increase context usage.
+3. **Log and effect verification**:
+    * **Dynamic three-level pressure adaptation**: You will be able to see in the console that `ContextManager` estimates the pressure ratio of the current context in real time (such as `Context pressure: 45.2%`).
+    * **Grade trigger log**:
+        * L1 threshold exceeded: trigger `[Layer-1] Tool trimming` trimming legacy toolkit.
+        * L2 threshold exceeded: Trigger `[Layer-2] Thinking compression` to compress historical thinking while replaying and protecting signatures.
+        * Exceeding the L3 threshold: triggering the `[Layer-3] Fork+Summary` ultimate reset, the console will display the session restart and summary generation, and the injected `cache_control: {"type": "ephemeral"}` tag will be displayed in the payload of the first summary (in subsequent chats, you will observe a geometric surge in the Prompt Cache hit rate on the client, and extremely fast response).

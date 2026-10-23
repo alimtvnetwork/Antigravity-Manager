@@ -3,12 +3,12 @@ use super::*;
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-/// Windows 常见 CLI 安装路径扫描
+/// Windows common CLI installation path scanning
 #[cfg(target_os = "windows")]
 pub(crate) fn scan_windows_cli_paths(cmd: &str) -> Option<PathBuf> {
     let mut common_paths: Vec<PathBuf> = Vec::new();
 
-    // 常见 Windows 安装路径，按优先级排序（仅加入可推导出的绝对路径，避免空/相对路径误判）
+    // Common Windows installation paths, sorted by priority (only absolute paths that can be deduced are added to avoid misjudgment of empty/relative paths)
     if let Some(app_data) = std::env::var_os("APPDATA") {
         let npm_base = PathBuf::from(app_data).join("npm");
         common_paths.push(npm_base.join(format!("{}.cmd", cmd)));
@@ -62,11 +62,11 @@ pub(crate) fn scan_windows_cli_paths(cmd: &str) -> Option<PathBuf> {
         }
     }
 
-    // 扫描 NVM Windows 目录
+    // Scan NVM Windows directory
     if let Ok(nvm_home) = std::env::var("NVM_HOME") {
         let nvm_path = PathBuf::from(nvm_home);
         if nvm_path.is_dir() {
-            // NVM Windows 结构: %NVM_HOME%\v{version}\{cmd}.cmd
+            // NVM Windows structure: %NVM_HOME%\v {version} \ {cmd} .cmd
             if let Ok(entries) = fs::read_dir(&nvm_path) {
                 for entry in entries.flatten() {
                     let cmd_path = entry.path().join(format!("{}.cmd", cmd));
@@ -74,7 +74,7 @@ pub(crate) fn scan_windows_cli_paths(cmd: &str) -> Option<PathBuf> {
                         tracing::debug!("[CLI-Sync] Detected {} via NVM_HOME: {:?}", cmd, cmd_path);
                         return Some(cmd_path);
                     }
-                    // 也检查 .exe 版本
+                    // Also check the .exe version
                     let exe_path = entry.path().join(format!("{}.exe", cmd));
                     if is_safe_path(&exe_path) {
                         tracing::debug!("[CLI-Sync] Detected {} via NVM_HOME: {:?}", cmd, exe_path);
@@ -88,7 +88,7 @@ pub(crate) fn scan_windows_cli_paths(cmd: &str) -> Option<PathBuf> {
     None
 }
 
-/// 解析 where 命令输出获取第一个有效路径
+/// Parse the where command output to get the first valid path
 #[cfg(target_os = "windows")]
 pub(crate) fn parse_where_output(output: &[u8]) -> Option<PathBuf> {
     let stdout = String::from_utf8_lossy(output);
@@ -104,7 +104,7 @@ pub(crate) fn parse_where_output(output: &[u8]) -> Option<PathBuf> {
     None
 }
 
-/// 检测备用 CLI 别名命令是否存在并返回其路径
+/// Detects the existence of an alternate CLI alias command and returns its path
 pub(crate) fn detect_fallback_binary(name: &str) -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
@@ -129,7 +129,7 @@ pub(crate) fn detect_fallback_binary(name: &str) -> Option<PathBuf> {
     }
 }
 
-/// 检查路径是否是 .cmd/.bat 文件
+/// Check if the path is a .cmd/.bat file
 #[cfg(target_os = "windows")]
 pub(crate) fn is_cmd_file(path: &PathBuf) -> bool {
     path.extension()
@@ -138,20 +138,20 @@ pub(crate) fn is_cmd_file(path: &PathBuf) -> bool {
         .unwrap_or(false)
 }
 
-/// 验证路径是否安全（防止命令注入）
+/// Verify the path is safe (prevent command injection)
 #[cfg(target_os = "windows")]
 pub(crate) fn is_safe_path(path: &PathBuf) -> bool {
-    // 检查路径是否存在且是文件
+    // Check if the path exists and is a file
     if !path.exists() || !path.is_file() {
         return false;
     }
 
-    // 必须为绝对路径，避免执行相对路径文件
+    // Must be an absolute path, avoid executing relative path files
     if !path.is_absolute() {
         return false;
     }
 
-    // 检查路径是否包含危险字符
+    // Check if path contains dangerous characters
     let path_str = path.to_string_lossy();
     let dangerous_chars = ['&', '|', ';', '<', '>', '(', ')', '`', '$', '^', '%', '!'];
     if path_str.chars().any(|c| dangerous_chars.contains(&c)) {
@@ -165,16 +165,16 @@ pub(crate) fn is_safe_path(path: &PathBuf) -> bool {
     true
 }
 
-/// 执行版本命令（Windows 特殊处理 .cmd/.bat）
+/// Execute version command (Windows special processing .cmd/.bat)
 #[cfg(target_os = "windows")]
 pub(crate) fn run_version_command(executable_path: &PathBuf) -> Option<String> {
-    // 安全校验：验证路径不包含危险字符
+    // Security verification: Verify that the path does not contain dangerous characters
     if !is_safe_path(executable_path) {
         return None;
     }
 
     let output = if is_cmd_file(executable_path) {
-        // 使用引号包裹路径防止注入，使用 /S 开关确保安全解析
+        // Use quotes to prevent injection and use the /S switch to ensure safe parsing.
         let quoted_path = format!("\"{}\"", executable_path.to_string_lossy());
         Command::new("cmd.exe")
             .arg("/C")
@@ -192,16 +192,16 @@ pub(crate) fn run_version_command(executable_path: &PathBuf) -> Option<String> {
     match output {
         Ok(out) if out.status.success() => {
             let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            // 使用正则提取版本号（更精确）
+            // Use regular expressions to extract version numbers (more precise)
             extract_version(&s)
         }
         _ => None,
     }
 }
 
-/// 提取版本号（使用更精确的 semver 匹配）
+/// Extract version number (using more precise semver matching)
 pub(crate) fn extract_version(s: &str) -> Option<String> {
-    // 匹配 semver 格式: x.y.z 或 x.y
+    // Matches semver format: x.y.z or x.y
     let re = regex::Regex::new(r"(\d+\.\d+(?:\.\d+)?)").ok()?;
     re.captures(s)
         .and_then(|caps| caps.get(1))
@@ -335,16 +335,16 @@ pub struct CliStatus {
     pub is_synced: bool,
     pub has_backup: bool,
     pub current_base_url: Option<String>,
-    pub files: Vec<String>, // 返回关联的文件名列表供前端展示
+    pub files: Vec<String>, // Returns a list of associated file names for front-end display
 }
 
-/// 检测 CLI 是否安装并获取版本
+/// Detect whether the CLI is installed and get the version
 pub fn check_cli_installed(app: &CliApp) -> (bool, Option<String>) {
     let cmd = app.as_str();
-    // 默认使用命令名，如果 fallback 找到路径则更新为绝对路径
+    // The command name is used by default. If fallback finds the path, it will be updated to the absolute path.
     let mut executable_path = PathBuf::from(cmd);
 
-    // 1. 优先使用 which/where 检测 (遵循 PATH)
+    // 1. Prioritize using which/where detection (follow PATH)
     let which_output = if cfg!(target_os = "windows") {
         let mut c = Command::new("where");
         c.arg(cmd);
@@ -377,8 +377,8 @@ pub fn check_cli_installed(app: &CliApp) -> (bool, Option<String>) {
         }
     }
 
-    // [FIX #765] macOS 增强检测: 如果 which 失败,显式搜索常用二进制路径
-    // 解决 Tauri 进程 PATH 可能不完整导致检测不到已安装 CLI 的问题
+    // [FIX #765] macOS enhanced detection: explicit search for common binary paths if which fails
+    // Solve the problem that the Tauri process PATH may be incomplete, resulting in the installed CLI not being detected
     if !installed && !cfg!(target_os = "windows") {
         let home = dirs::home_dir().unwrap_or_default();
         let mut common_paths = vec![
@@ -393,7 +393,7 @@ pub fn check_cli_installed(app: &CliApp) -> (bool, Option<String>) {
             PathBuf::from("/usr/bin"),
         ];
 
-        // 增强：扫描 nvm 目录下的所有 node 版本
+        // Enhancement: Scan all node versions in the nvm directory
         let nvm_base = home.join(".nvm/versions/node");
         if nvm_base.exists() {
             if let Ok(entries) = std::fs::read_dir(&nvm_base) {
@@ -421,7 +421,7 @@ pub fn check_cli_installed(app: &CliApp) -> (bool, Option<String>) {
         }
     }
 
-    // 如果是 JeikCode 且常规检测未命中，尝试检测 atomcode 别名或配置文件是否存在
+    // If it's JeikCode and regular detection misses, try to detect if the atomcode alias or configuration file exists
     if !installed && app == &CliApp::JeikCode {
         if let Some(p) = detect_fallback_binary("atomcode") {
             executable_path = p;
@@ -438,7 +438,7 @@ pub fn check_cli_installed(app: &CliApp) -> (bool, Option<String>) {
         }
     }
 
-    // 如果是 GrokBuild 且常规检测未命中，尝试检测 grokbuild 别名或配置文件是否存在
+    // If it's GrokBuild and regular detection misses, try to detect whether the grokbuild alias or configuration file exists
     if !installed && app == &CliApp::GrokBuild {
         if let Some(p) = detect_fallback_binary("grokbuild") {
             executable_path = p;
@@ -460,7 +460,7 @@ pub fn check_cli_installed(app: &CliApp) -> (bool, Option<String>) {
         return (false, None);
     }
 
-    // 2. 获取版本（Windows 使用特殊处理 .cmd/.bat）
+    // 2. Get the version (Windows uses special processing .cmd/.bat)
     #[cfg(target_os = "windows")]
     let version = run_version_command(&executable_path);
 

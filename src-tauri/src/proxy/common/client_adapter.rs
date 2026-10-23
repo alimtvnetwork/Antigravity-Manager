@@ -3,76 +3,76 @@ use axum::http::HeaderMap;
 use once_cell::sync::Lazy;
 use std::sync::Arc; // [NEW] Import Arc
 
-/// 客户端适配器 trait
+/// client adapter trait
 ///
-/// 为不同的客户端（如 opencode、Cherry Studio）提供定制化的协议处理策略。
-/// 每个客户端可以实现自己的适配器来处理特定的需求。
+/// Provide customized protocol processing strategies for different clients (such as opencode, Cherry Studio).
+/// Each client can implement its own adapter to handle specific needs.
 ///
-/// # 设计原则
-/// 1. **完全隔离**：适配器作为可选的增强层，不修改现有协议核心逻辑
-/// 2. **向后兼容**：未匹配到适配器的请求完全按照现有流程处理
-/// 3. **单文件修改**：客户端特定逻辑封装在各自的适配器文件中
+/// # design principles
+/// 1. **Complete isolation**: The adapter serves as an optional enhancement layer and does not modify the core logic of the existing protocol.
+/// 2. **Backward Compatibility**: Requests that do not match the adapter will be processed completely according to the existing process.
+/// 3. **Single file modification**: Client-specific logic is encapsulated in respective adapter files
 pub trait ClientAdapter: Send + Sync {
-    /// 判断该适配器是否匹配给定的请求
+    /// Determines whether this adapter matches the given request
     ///
     /// # Arguments
-    /// * `headers` - 请求头，通常通过 User-Agent 等字段识别客户端
+    /// * `headers` - request headers, usually identifying the client through fields such as User-Agent
     ///
     /// # Returns
-    /// 如果匹配返回 true，否则返回 false
+    /// Returns true if there is a match, false otherwise
     fn matches(&self, headers: &HeaderMap) -> bool;
 
-    /// 是否绕过签名校验
+    /// Whether to bypass signature verification
     ///
-    /// 某些客户端可能不需要严格的 thinking 签名匹配
+    /// Some clients may not require strict thinking signature matching
     #[allow(dead_code)]
     fn bypass_signature_matching(&self) -> bool {
         false
     }
 
-    /// 是否采用 "let it crash" 哲学
+    /// Whether to adopt the "let it crash" philosophy
     ///
-    /// 减少不必要的重试和恢复逻辑，让错误快速暴露
+    /// Reduce unnecessary retries and recovery logic to quickly expose errors
     fn let_it_crash(&self) -> bool {
         false
     }
 
-    /// 签名缓存策略
+    /// Signature caching strategy
     ///
-    /// 不同客户端可能需要不同的签名管理方式（FIFO/LIFO）
+    /// Different clients may require different signature management methods (FIFO/LIFO)
     fn signature_buffer_strategy(&self) -> SignatureBufferStrategy {
         SignatureBufferStrategy::Default
     }
 
-    /// 注入客户端缺少的 Beta Header
+    /// Inject the missing Beta Header on the client
     ///
-    /// 某些客户端可能需要特定的 Beta Header 才能正常工作
+    /// Some clients may require specific Beta Headers to work properly
     fn inject_beta_headers(&self, _headers: &mut HeaderMap) {
-        // 默认不注入
+        // Not injected by default
     }
 
-    /// 声明支持的协议
+    /// Declare supported protocols
     ///
-    /// 用于多协议客户端（如 opencode）
+    /// for multi-protocol clients (like opencode)
     #[allow(dead_code)]
     fn supported_protocols(&self) -> Vec<Protocol> {
-        vec![Protocol::Anthropic] // 默认只支持 Anthropic
+        vec![Protocol::Anthropic] // Only Anthropic is supported by default
     }
 }
 
-/// 签名缓存策略
+/// Signature caching strategy
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SignatureBufferStrategy {
-    /// 默认策略（当前实现）
+    /// Default strategy (current implementation)
     Default,
-    /// FIFO（先进先出）- 适用于多并发工具调用
+    /// FIFO (first in, first out) - suitable for multiple concurrent tool calls
     Fifo,
-    /// LIFO（后进先出）- 适用于嵌套调用
+    /// LIFO (last in, first out) - suitable for nested calls
     #[allow(dead_code)]
     Lifo,
 }
 
-/// 支持的协议类型
+/// Supported protocol types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum Protocol {
@@ -82,18 +82,18 @@ pub enum Protocol {
     GoogleGemini,
 }
 
-/// 全局客户端适配器注册表
+/// Global client adapter registry
 ///
-/// 所有注册的适配器都会在请求处理时被检查
+/// All registered adapters are checked during request processing
 pub static CLIENT_ADAPTERS: Lazy<Vec<Arc<dyn ClientAdapter>>> = Lazy::new(|| {
     vec![
         Arc::new(OpencodeAdapter),
-        // 未来可以轻松添加更多适配器:
+        // More adapters can be easily added in the future:
         // Arc::new(CherryStudioAdapter),
     ]
 });
 
-/// 辅助函数：从 HeaderMap 中提取 User-Agent
+/// Helper function: extract User-Agent from HeaderMap
 pub fn get_user_agent(headers: &HeaderMap) -> Option<String> {
     headers
         .get("user-agent")

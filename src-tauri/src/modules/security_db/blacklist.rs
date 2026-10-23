@@ -3,10 +3,10 @@ use rusqlite::{params, Connection};
 use super::*;
 
 // ============================================================================
-// 黑名单操作
+// Blacklist operation
 // ============================================================================
 
-/// 添加 IP 到黑名单
+/// Add IP to blacklist
 pub fn add_to_blacklist(
     ip_pattern: &str,
     reason: Option<&str>,
@@ -36,7 +36,7 @@ pub fn add_to_blacklist(
     })
 }
 
-/// 从黑名单移除
+/// Remove from blacklist
 pub fn remove_from_blacklist(id: &str) -> Result<(), String> {
     let conn = connect_db()?;
 
@@ -46,7 +46,7 @@ pub fn remove_from_blacklist(id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 获取黑名单列表
+/// Get blacklist list
 pub fn get_blacklist() -> Result<Vec<IpBlacklistEntry>, String> {
     let conn = connect_db()?;
 
@@ -79,17 +79,17 @@ pub fn get_blacklist() -> Result<Vec<IpBlacklistEntry>, String> {
     Ok(entries)
 }
 
-/// 检查 IP 是否在黑名单中
+/// Check if IP is in blacklist
 pub fn is_ip_in_blacklist(ip: &str) -> Result<bool, String> {
     get_blacklist_entry_for_ip(ip).map(|entry| entry.is_some())
 }
 
-/// 获取 IP 对应的黑名单条目（如果存在）
+/// Get the blacklist entry corresponding to the IP (if it exists)
 pub fn get_blacklist_entry_for_ip(ip: &str) -> Result<Option<IpBlacklistEntry>, String> {
     let conn = connect_db()?;
     let now = chrono::Utc::now().timestamp();
 
-    // 清理过期的黑名单条目
+    // Clean up expired blacklist entries
     // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
     crate::error::record_ignored(
         conn.execute(
@@ -99,7 +99,7 @@ pub fn get_blacklist_entry_for_ip(ip: &str) -> Result<Option<IpBlacklistEntry>, 
         "db execute",
     );
 
-    // 精确匹配
+    // exact match
     let entry_result = conn.query_row(
         "SELECT id, ip_pattern, reason, created_at, expires_at, created_by, hit_count
          FROM ip_blacklist WHERE ip_pattern = ?1",
@@ -118,7 +118,7 @@ pub fn get_blacklist_entry_for_ip(ip: &str) -> Result<Option<IpBlacklistEntry>, 
     );
 
     if let Ok(entry) = entry_result {
-        // 增加命中计数
+        // Increase hit count
         // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
         crate::error::record_ignored(
             conn.execute(
@@ -130,12 +130,12 @@ pub fn get_blacklist_entry_for_ip(ip: &str) -> Result<Option<IpBlacklistEntry>, 
         return Ok(Some(entry));
     }
 
-    // CIDR 匹配与 IP 等价匹配
+    // CIDR matching and IP equivalence matching
     let entries = get_blacklist()?;
     for entry in entries {
         if entry.ip_pattern.contains('/') {
             if cidr_match(ip, &entry.ip_pattern) {
-                // 增加命中计数
+                // Increase hit count
                 // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
                 crate::error::record_ignored(
                     conn.execute(
@@ -175,7 +175,7 @@ pub fn get_blacklist_entry_for_ip(ip: &str) -> Result<Option<IpBlacklistEntry>, 
     Ok(None)
 }
 
-/// CIDR 匹配 (同时支持 IPv4 和 IPv6)
+/// CIDR matching (supports both IPv4 and IPv6)
 pub(crate) fn cidr_match(ip: &str, cidr: &str) -> bool {
     let parts: Vec<&str> = cidr.split('/').collect();
     if parts.len() != 2 {
@@ -200,7 +200,7 @@ pub(crate) fn cidr_match(ip: &str, cidr: &str) -> bool {
         Err(_) => return false,
     };
 
-    // 尝试展开 IPv4-mapped
+    // Try expanding IPv4-mapped
     let ip_addr = match ip_addr {
         std::net::IpAddr::V6(v6) => {
             if let Some(v4) = v6.to_ipv4_mapped() {

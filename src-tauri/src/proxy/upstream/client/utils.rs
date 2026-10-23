@@ -1,6 +1,6 @@
 use super::*;
 
-/// 派生确定性 UUID 格式的客户端窗口 Session ID (RFC 4122 v4 格式)
+/// Derive a client window Session ID in deterministic UUID format (RFC 4122 v4 format)
 pub(crate) fn derive_session_uuid(seed: &str) -> String {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();

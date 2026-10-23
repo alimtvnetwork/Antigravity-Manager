@@ -1,14 +1,14 @@
 use super::*;
 
 // ============================================================================
-// 测试类别 6: IP 访问日志
+// Test Category 6: IP Access Logs
 // ============================================================================
 
 #[test]
 fn test_access_log_save_and_retrieve() {
     let _lock = setup_test();
 
-    // 保存访问日志
+    // Save access log
     let log = IpAccessLog {
         id: uuid::Uuid::new_v4().to_string(),
         client_ip: "test.log.ip".to_string(),
@@ -31,7 +31,7 @@ fn test_access_log_save_and_retrieve() {
         save_result.err()
     );
 
-    // 检索日志
+    // Retrieve logs
     let logs = get_ip_access_logs(10, 0, Some("test.log.ip"), false);
     assert!(logs.is_ok());
 
@@ -46,7 +46,7 @@ fn test_access_log_save_and_retrieve() {
 fn test_access_log_blocked_filter() {
     let _lock = setup_test();
 
-    // 保存正常日志
+    // Save normal log
     let normal_log = IpAccessLog {
         id: uuid::Uuid::new_v4().to_string(),
         client_ip: "normal.access.ip".to_string(),
@@ -64,7 +64,7 @@ fn test_access_log_blocked_filter() {
     // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
     crate::error::record_ignored(save_ip_access_log(&normal_log), "save_ip_access_log");
 
-    // 保存被阻止的日志
+    // Save blocked logs
     let blocked_log = IpAccessLog {
         id: uuid::Uuid::new_v4().to_string(),
         client_ip: "blocked.access.ip".to_string(),
@@ -82,7 +82,7 @@ fn test_access_log_blocked_filter() {
     // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
     crate::error::record_ignored(save_ip_access_log(&blocked_log), "save_ip_access_log");
 
-    // 只检索被阻止的日志
+    // Retrieve only blocked logs
     let blocked_only = get_ip_access_logs(10, 0, None, true).unwrap();
     assert_eq!(blocked_only.len(), 1);
     assert_eq!(blocked_only[0].client_ip, "blocked.access.ip");
@@ -92,18 +92,18 @@ fn test_access_log_blocked_filter() {
 }
 
 // ============================================================================
-// 测试类别 7: 统计功能
+// Test Category 7: Statistical Functions
 // ============================================================================
 
 #[test]
 fn test_ip_stats() {
     let _lock = setup_test();
 
-    // 添加一些测试数据
+    // Add some test data
     for i in 0..5 {
         let log = IpAccessLog {
             id: uuid::Uuid::new_v4().to_string(),
-            client_ip: format!("stats.test.{}", i % 3), // 3 个唯一 IP
+            client_ip: format!("stats.test.{}", i % 3), // 3 unique IPs
             timestamp: now_timestamp(),
             method: Some("POST".to_string()),
             path: Some("/v1/messages".to_string()),
@@ -111,7 +111,7 @@ fn test_ip_stats() {
             status: Some(200),
             duration: Some(100),
             api_key_hash: None,
-            blocked: i == 4, // 最后一个被阻止
+            blocked: i == 4, // The last one was blocked
             block_reason: if i == 4 {
                 Some("Test".to_string())
             } else {
@@ -123,7 +123,7 @@ fn test_ip_stats() {
         crate::error::record_ignored(save_ip_access_log(&log), "save_ip_access_log");
     }
 
-    // 添加黑名单和白名单条目
+    // Add blacklist and whitelist entries
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(
         add_to_blacklist("stats.black.1", None, None, "test"),
@@ -137,7 +137,7 @@ fn test_ip_stats() {
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(add_to_whitelist("stats.white.1", None), "add_to_whitelist");
 
-    // 获取统计
+    // Get statistics
     let stats = get_ip_stats();
     assert!(stats.is_ok());
 
@@ -155,18 +155,18 @@ fn test_ip_stats() {
 }
 
 // ============================================================================
-// 测试类别 8: 清理功能
+// Test Category 8: Cleaning Function
 // ============================================================================
 
 #[test]
 fn test_cleanup_old_logs() {
     let _lock = setup_test();
 
-    // 添加一条 "旧" 日志 (模拟 2 天前)
+    // Add an "old" log (simulated 2 days ago)
     let old_log = IpAccessLog {
         id: uuid::Uuid::new_v4().to_string(),
         client_ip: "old.log.ip".to_string(),
-        timestamp: now_timestamp() - (2 * 24 * 3600), // 2 天前
+        timestamp: now_timestamp() - (2 * 24 * 3600), // 2 days ago
         method: Some("GET".to_string()),
         path: Some("/old".to_string()),
         user_agent: None,
@@ -180,7 +180,7 @@ fn test_cleanup_old_logs() {
     // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
     crate::error::record_ignored(save_ip_access_log(&old_log), "save_ip_access_log");
 
-    // 添加一条新日志
+    // Add a new post
     let new_log = IpAccessLog {
         id: uuid::Uuid::new_v4().to_string(),
         client_ip: "new.log.ip".to_string(),
@@ -198,16 +198,16 @@ fn test_cleanup_old_logs() {
     // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
     crate::error::record_ignored(save_ip_access_log(&new_log), "save_ip_access_log");
 
-    // 清理 1 天前的日志
+    // Clear logs from 1 day ago
     let deleted = cleanup_old_ip_logs(1);
     assert!(deleted.is_ok());
     assert!(deleted.unwrap() >= 1, "Should delete at least 1 old log");
 
-    // 验证新日志仍然存在
+    // Verify that the new log still exists
     let logs = get_ip_access_logs(10, 0, Some("new.log.ip"), false).unwrap();
     assert!(!logs.is_empty(), "New log should still exist");
 
-    // 验证旧日志已被清理
+    // Verify old logs have been cleaned
     let old_logs = get_ip_access_logs(10, 0, Some("old.log.ip"), false).unwrap();
     assert!(old_logs.is_empty(), "Old log should be cleaned up");
 

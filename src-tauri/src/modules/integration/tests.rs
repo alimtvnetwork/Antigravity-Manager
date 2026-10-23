@@ -39,7 +39,7 @@ pub(crate) mod tests {
 
     #[test]
     pub(crate) fn test_resolve_effective_target_explicit_classic() {
-        // 显式指定 classic，即便 IDE 正在运行或只有 IDE exe，也必须严格判定为经典版
+        // Explicitly specify classic, even if the IDE is running or there is only IDE exe, it must be strictly determined as the classic version
         let (is_ide, effective) = resolve_effective_target(
             Some("classic"),
             false,
@@ -53,7 +53,7 @@ pub(crate) mod tests {
 
     #[test]
     pub(crate) fn test_resolve_effective_target_explicit_ide() {
-        // 显式指定 ide，必须判定为 ide
+        // Explicitly specify ide, which must be determined as ide
         let (is_ide, effective) = resolve_effective_target(Some("ide"), true, false, true, None);
         assert!(is_ide);
         assert_eq!(effective, Some("ide"));
@@ -61,7 +61,7 @@ pub(crate) mod tests {
 
     #[test]
     pub(crate) fn test_resolve_effective_target_autodetect_classic_running() {
-        // target_ide 为 None，经典版正在运行，必须优先保持经典版
+        // target_ide is None, the classic version is running, the classic version must be kept first
         let (is_ide, effective) = resolve_effective_target(
             None,
             true,
@@ -75,7 +75,7 @@ pub(crate) mod tests {
 
     #[test]
     pub(crate) fn test_resolve_effective_target_autodetect_ide_running_only() {
-        // target_ide 为 None，仅 IDE 正在运行，推导为 IDE
+        // target_ide is None, only IDE is running, deduced to IDE
         let (is_ide, effective) = resolve_effective_target(
             None,
             false,
@@ -89,7 +89,7 @@ pub(crate) mod tests {
 
     #[test]
     pub(crate) fn test_resolve_effective_target_autodetect_classic_exe_exists() {
-        // target_ide 为 None，两者均未运行，但经典版 exe 存在，优先经典版
+        // target_ide is None, neither is running, but the classic version exe exists, the classic version takes precedence
         let (is_ide, effective) = resolve_effective_target(
             None,
             false,
@@ -103,7 +103,7 @@ pub(crate) mod tests {
 
     #[test]
     pub(crate) fn test_resolve_effective_target_autodetect_fallback_ide_exe() {
-        // target_ide 为 None，两者均未运行，无经典版但有 IDE exe，推导为 IDE
+        // target_ide is None, neither is running, there is no classic version but there is IDE exe, it is deduced to be IDE
         let (is_ide, effective) = resolve_effective_target(
             None,
             false,
@@ -117,7 +117,7 @@ pub(crate) mod tests {
 
     #[test]
     pub(crate) fn test_resolve_effective_target_autodetect_default_fallback() {
-        // target_ide 为 None，均未运行且均未检测到 exe，默认保底经典版
+        // target_ide is None, none of them are running and none of the exes are detected. The default is the guaranteed classic version.
         let (is_ide, effective) = resolve_effective_target(None, false, false, false, None);
         assert!(!is_ide);
         assert_eq!(effective, None);

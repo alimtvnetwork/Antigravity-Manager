@@ -126,7 +126,7 @@ pub async fn handle_chat_completions(
             .await;
         }
 
-        // [FIX] 使用原始 body 副本记录日志，确保不丢失任何字段
+        // [FIX] Use original body copy for logging to ensure no fields are lost
         let original_payload = json!({
             "kind": "original_request",
             "protocol": "openai",
@@ -210,7 +210,7 @@ pub async fn handle_chat_completions(
         raw_client_budget
     } else if is_v3_or_above || is_explicit_tier_model {
         if let Some(ref mut t) = openai_req.thinking {
-            t.budget_tokens = None; // 清理客户端 budget_tokens，防止污染
+            t.budget_tokens = None; // Clean up client budget_tokens to prevent contamination
         }
         if let Some(ref mut r) = openai_req.reasoning {
             r.max_tokens = None;
@@ -278,8 +278,8 @@ pub async fn handle_chat_completions(
                 effort: effort_hint.map(|s| s.to_string()),
             });
         } else if is_client_control {
-            // [CRITICAL FIX] 客户端控制模式下，客户端未传数字预算（全缺省或仅传等级）
-            // 严禁伪造并塞入 spec.thinking_budget (4000)！保持真实客户端状态
+            // [CRITICAL FIX] In client control mode, the client does not transmit the digital budget (full default or only level)
+            // Forgery and stuffing into spec.thinking_budget (4000) is strictly prohibited! Maintain real client state
             if let Some(ref mut t) = openai_req.thinking {
                 t.budget_tokens = None;
             }
@@ -294,7 +294,7 @@ pub async fn handle_chat_completions(
             openai_req.tools = None;
             openai_req.tool_choice = None;
         } else {
-            // 网关控制模式继续保留 4000 (Medium) 权威回填
+            // Gateway control mode continues to retain 4000 (Medium) authoritative backfill
             openai_req.thinking = Some(crate::proxy::mappers::openai::models::ThinkingConfig {
                 thinking_type: Some("enabled".to_string()),
                 budget_tokens: Some(spec.thinking_budget),
@@ -307,13 +307,13 @@ pub async fn handle_chat_completions(
     let client_tool_names =
         crate::proxy::mappers::openai::request::extract_client_tool_names(&openai_req.tools);
 
-    // 1. 获取 UpstreamClient (Clone handle)
+    // 1. Get UpstreamClient (Clone handle)
     let upstream = state.upstream.clone();
     let image_scheduler = state.image_scheduler.clone();
     let request_timeout = state.request_timeout;
     let token_manager = state.token_manager;
     let pool_size = token_manager.len();
-    // [FIX #3485] 自适应多账号池与单账号退避最大重试次数 (单账号3次，多账号整池两轮)
+    // [FIX #3485] Maximum number of retries for adaptive multi-account pool and single-account backoff (3 times for a single account, two rounds for the entire pool with multiple accounts)
     let max_attempts = crate::proxy::handlers::common::calculate_max_retry_attempts(pool_size);
 
     let mut last_error = String::new();
@@ -325,7 +325,7 @@ pub async fn handle_chat_completions(
     let mut used_attempts = 0;
     let mut retried_without_thinking = false;
 
-    // 2. 模型路由解析 (移到循环外以支持在所有路径返回 X-Mapped-Model)
+    // 2. Model routing parsing (moved outside the loop to support returning X-Mapped-Model on all paths)
     let mapped_model = crate::proxy::common::model_mapping::resolve_model_route(
         &openai_req.model,
         &*state.custom_mapping.read().await,
@@ -438,7 +438,7 @@ pub async fn handle_chat_completions(
         }
     }
 
-    // 所有尝试均失败：仅当全部结构化失败状态均为 429 时返回 429
+    // All attempts failed: Return 429 only if all structured failure statuses are 429
     let final_status = failure_statuses.final_status();
     let headers = crate::proxy::handlers::common::build_token_error_headers(
         Some(mapped_model.as_str()),

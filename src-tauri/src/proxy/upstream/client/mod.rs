@@ -1,5 +1,5 @@
-// 上游客户端实现
-// 基于高性能通讯接口封装
+// Upstream client implementation
+// Based on high-performance communication interface packaging
 
 use dashmap::DashMap;
 use rquest::{header, Client, Response, StatusCode};

@@ -1,6 +1,6 @@
 use super::*;
 
-/// 执行同步逻辑
+/// Execute synchronization logic
 pub fn sync_config(
     app: &CliApp,
     proxy_url: &str,
@@ -10,7 +10,7 @@ pub fn sync_config(
     let files = app.config_files();
 
     for file in &files {
-        // Gemini 兼容性逻辑：优先使用 settings.json
+        // Gemini compatibility logic: use settings.json first
         if app == &CliApp::Gemini && file.name == "config.json" && !file.path.exists() {
             let settings_path = file.path.with_file_name("settings.json");
             if settings_path.exists() {
@@ -19,11 +19,11 @@ pub fn sync_config(
         }
 
         if let Some(parent) = file.path.parent() {
-            fs::create_dir_all(parent).map_err(|e| format!("无法创建目录: {}", e))?;
+            fs::create_dir_all(parent).map_err(|e| format!("Unable to create directory: {}", e))?;
         }
 
-        // [New Feature] 自动备份：如果文件存在且没有备份，创建 .antigravity.bak 备份
-        // 这样可以保留用户最初的配置，后续多次同步不会覆盖这个备份
+        // [New Feature] Automatic backup: if file exists and no backup exists, create .antigravity.bak backup
+        // This way, the user's original configuration can be retained, and subsequent synchronizations will not overwrite this backup.
         if file.path.exists() {
             let backup_path = file
                 .path
@@ -89,24 +89,24 @@ pub fn sync_config(
                                     "ANTHROPIC_API_KEY".to_string(),
                                     Value::String(api_key.to_string()),
                                 );
-                                // [FIX] 避免冲突：如果存在则移除 ANTHROPIC_AUTH_TOKEN
+                                // [FIX] Avoid conflicts: remove ANTHROPIC_AUTH_TOKEN if present
                                 env_obj.remove("ANTHROPIC_AUTH_TOKEN");
                             }
 
-                            // [FIX] 清理可能来自其他 Provider 的模型覆盖设置
+                            // [FIX] Clean up model override settings that may come from other Providers
                             env_obj.remove("ANTHROPIC_MODEL");
                             env_obj.remove("ANTHROPIC_DEFAULT_HAIKU_MODEL");
                             env_obj.remove("ANTHROPIC_DEFAULT_OPUS_MODEL");
                             env_obj.remove("ANTHROPIC_DEFAULT_SONNET_MODEL");
                         } else {
-                            // 如果 API Key 为空，则移除该键，避免设置为空字符串
+                            // If the API Key is empty, remove the key to avoid setting it to an empty string
                             env_obj.remove("ANTHROPIC_API_KEY");
                             env_obj.remove("ANTHROPIC_AUTH_TOKEN");
                         }
                     }
 
                     if let Some(m) = model {
-                        // 注意：Claude Code 的官方配置中，当前选定模型放在根节点的 model 字段
+                        // Note: In the official configuration of Claude Code, the currently selected model is placed in the model field of the root node.
                         json.as_object_mut()
                             .unwrap()
                             .insert("model".to_string(), Value::String(m.to_string()));
@@ -126,7 +126,7 @@ pub fn sync_config(
                         if proxy_url.contains("apikey.fun") || proxy_url.contains("apikey.fan") {
                             obj.remove("OPENAI_BASE_URL");
                         } else {
-                            // Codex 的 auth.json 似乎也支持 OPENAI_BASE_URL，但 ccs 没写，我们也同步写一下
+                            // Codex's auth.json seems to also support OPENAI_BASE_URL, but ccs has not written it. Let's write it simultaneously.
                             obj.insert(
                                 "OPENAI_BASE_URL".to_string(),
                                 Value::String(proxy_url.to_string()),
@@ -140,7 +140,7 @@ pub fn sync_config(
                         .parse::<DocumentMut>()
                         .unwrap_or_else(|_| DocumentMut::new());
 
-                    // 必须使用 custom 提供商，Codex 不支持原生的 codex provider
+                    // You must use a custom provider, Codex does not support the native codex provider
                     let provider_key = "custom";
                     let is_apikey_fun =
                         proxy_url.contains("apikey.fun") || proxy_url.contains("apikey.fan");
@@ -150,7 +150,7 @@ pub fn sync_config(
                         "Custom Node"
                     };
 
-                    // 优先设置 Root Keys 确保位于顶部
+                    // Prioritize Root Keys and make sure they are at the top
                     doc.insert("model_provider", value(provider_key));
 
                     if is_apikey_fun {
@@ -178,11 +178,11 @@ pub fn sync_config(
                         }
                     }
 
-                    // 移除可能的根级别旧配置
+                    // Remove possible root level old configuration
                     doc.remove("openai_api_key");
                     doc.remove("openai_base_url");
 
-                    // 设置层级 [model_providers.custom]
+                    // Set hierarchy [model_providers.custom]
                     let providers = doc
                         .entry("model_providers")
                         .or_insert(toml_edit::Item::Table(toml_edit::Table::new()));
@@ -326,13 +326,13 @@ pub fn sync_config(
                         _ => "gemini-3.8-flash-high",
                     };
 
-                    // 1. 设置 [models] default 为真实选定的网关模型
+                    // 1. Set [models] default to the actual selected gateway model
                     let models_sec = doc.entry("models").or_insert(Item::Table(Table::new()));
                     if let Some(m_table) = models_sec.as_table_mut() {
                         m_table.insert("default", value(default_model_id));
                     }
 
-                    // 2. 注入所有网关真实模型到 [model."<id>"]
+                    // 2. Inject all gateway real models into [model."<id>"]
                     let model_sec = doc.entry("model").or_insert(Item::Table(Table::new()));
                     if let Some(m_table) = model_sec.as_table_mut() {
                         for m in core_models {
@@ -356,10 +356,12 @@ pub fn sync_config(
             }
         }
 
-        // 使用临时文件原子写入
+        // Using temporary files for atomic writes
         let tmp_path = file.path.with_extension("tmp");
-        fs::write(&tmp_path, &content).map_err(|e| format!("写入临时文件失败: {}", e))?;
-        fs::rename(&tmp_path, &file.path).map_err(|e| format!("重命名配置文件失败: {}", e))?;
+        fs::write(&tmp_path, &content)
+            .map_err(|e| format!("Failed to write to temporary file: {}", e))?;
+        fs::rename(&tmp_path, &file.path)
+            .map_err(|e| format!("Failed to rename configuration file: {}", e))?;
     }
 
     Ok(())
@@ -414,28 +416,28 @@ pub async fn execute_cli_restore(app_type: CliApp) -> Result<(), String> {
         let files = app_type.config_files();
         let mut restored_count = 0;
 
-        // 尝试从备份恢复
+        // Try restoring from backup
         for file in &files {
             let backup_path = file
                 .path
                 .with_file_name(format!("{}.antigravity.bak", file.name));
             if backup_path.exists() {
-                // 还原：覆盖原文件
+                // Restore: overwrite the original file
                 if let Err(e) = fs::rename(&backup_path, &file.path) {
-                    return Err(format!("恢复备份失败 {}: {}", file.name, e));
+                    return Err(format!("Failed to restore backup {} : {}", file.name, e));
                 }
                 restored_count += 1;
             }
         }
 
         if restored_count > 0 {
-            // 如果成功恢复了至少一个备份，就认为是恢复成功
+            // The recovery is considered successful if at least one backup is successfully restored.
             return Ok(());
         }
 
-        // 如果没有备份，则执行原来的逻辑：恢复为默认配置
+        // If there is no backup, execute the original logic: restore to default configuration
         let default_url = app_type.default_url();
-        // 恢复默认时清空 API Key，让用户重新授权或使用官方 Key
+        // Clear the API Key when restoring to default, allowing users to reauthorize or use the official Key
         sync_config(&app_type, default_url, "", None)
     })
     .await
@@ -453,18 +455,19 @@ pub async fn get_cli_config_content(
             files
                 .into_iter()
                 .find(|f| f.name == name)
-                .ok_or("找不到指定的文件".to_string())?
+                .ok_or("The file specified cannot be found".to_string())?
         } else {
             files
                 .into_iter()
                 .next()
-                .ok_or("找不到配置文件".to_string())?
+                .ok_or("Configuration file not found".to_string())?
         };
 
         if !file.path.exists() {
-            return Err("配置文件不存在".to_string());
+            return Err("Configuration file does not exist".to_string());
         }
-        fs::read_to_string(&file.path).map_err(|e| format!("读取配置文件失败: {}", e))
+        fs::read_to_string(&file.path)
+            .map_err(|e| format!("Failed to read configuration file: {}", e))
     })
     .await
     .unwrap_or_else(|_| Err("Task panicked".to_string()))

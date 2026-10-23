@@ -26,8 +26,8 @@
     - Rely on CI for full-app compilation (`tauri build`) and full test execution. Local pre-flight covers fmt + clippy + frontend build only.
 - **Release Channels & Discipline**:
   - **Release Channel Separation**:
-    - **Stable Releases (正式版)**: Exclusively on `main`. Deploys official production packages, updates Docker/GitHub `latest` tags, and services automatic update channels.
-    - **Preview Releases (预览版 / Beta)**: Exclusively on `beta`. Independently builds and publishes pre-releases (`makeLatest: false`, `prerelease: true`) without touching production update channels.
+    - **Stable Releases**: Exclusively on `main`. Deploys official production packages, updates Docker/GitHub `latest` tags, and services automatic update channels.
+    - **Preview Releases (Beta)**: Exclusively on `beta`. Independently builds and publishes pre-releases (`makeLatest: false`, `prerelease: true`) without touching production update channels.
   - **Maintainer Staging Protocol**:
     - When introducing new changes (features, major refactors, non-trivial fixes), prompt and confirm with maintainers whether to implement and test on `beta` branch first.
     - Validate stability on `beta` (with optional independent preview builds) prior to merging into `main`.
@@ -35,13 +35,13 @@
     1. **Atomic Version Sync**: Run `npm run bump <patch|minor|beta|version>` to synchronize all project manifests and generate changelog skeletons.
     2. **Documentation & Attribution**:
        - Audit Git history (`<last-tag>..HEAD`). Attribution must attribute strictly `@aukgit` (`(Thanks to @aukgit)`) in `changelog.md` and `changelog_en.md`. Do NOT include any other GitHub user handles (`@...`) in release changelogs or release notes, ensuring the GitHub release page contributors list only contains `aukgit` and none else.
-       - **Synchronize README Changelog (同步首页更新日志)**: For stable releases, you **MUST** update the release summary in both `README.md` (under "## 📝 更新日志") and `README_EN.md` (under "## 📝 Changelog"). Never update only `CHANGELOG.md` while leaving `README.md` / `README_EN.md` with outdated release notes. Pre-release / beta versions remain exclusively in changelogs; stable releases require full synchronization across both README files.
+       - **Synchronize README Changelog**: For stable releases, you **MUST** update the release summary in both `README.md` (under "## 📝 Changelog") and `README_EN.md` (under "## 📝 Changelog"). Never update only `CHANGELOG.md` while leaving `README.md` / `README_EN.md` with outdated release notes. Pre-release / beta versions remain exclusively in changelogs; stable releases require full synchronization across both README files.
     3. **Pre-flight before Tagging**: Run the Pre-flight Checks above on the exact commit to be tagged.
     4. **Commit, Tag & Push**: Push stable releases to `main` (`git tag vX.Y.Z && git push origin vX.Y.Z`), reserving `beta` exclusively for pre-releases (`git tag vX.Y.Z-beta.N && git push origin vX.Y.Z-beta.N`). The release gate strictly intercepts cross-branch misplacement. Tags must match `CHANGELOG.md` headings character-for-character (including `v` prefix and pre-release suffix).
     5. **Strictly Relative Git Paths Invariant**: Never output or record absolute filesystem paths (e.g. `D:\...`, `C:\...`, `/home/...`) in specifications, plans, commit messages, `changelog.md`, `changelog_en.md`, `README.md`, `README_EN.md`, or GitHub release notes. All file references MUST be repository-relative Git paths (e.g., `02-spec/...`, `.ai-memory/...`, `src/...`, `src-tauri/...`).
     6. **Caller IDE Self-Preservation & Transient Test Sandboxing**: Automated tests, CLI commands, and auto-switcher daemons MUST detect the caller's active IDE process (`detect_caller_instance_id()`) to prevent terminating the developer's working IDE session. Commands targeting the caller instance (`agm instances stop`, `rm`, `switch`) must fail-fast with exit code 2 unless `--force` is explicitly provided. Integration tests must always generate transient, isolated test sandboxes (`agm instances test-create`) and clean them up completely (`agm instances test-clean`), leaving zero orphan processes or filesystem remnants.
   - *Full procedure*: See `docs/release_guide.md` for bump options, changelog templates, and rollback steps.
-- **Thinking Cache Invalidation Control (发版清理建议)**:
+- **Thinking Cache Invalidation Control**:
   - File: `src/components/common/SuggestionDeleteThinkingModal.tsx`
   - Routine releases (no prompt): Keep `SUGGESTION_DELETE_THINKING_STORE = false`.
   - Architecture / schema refactors (prompt users to clean once):

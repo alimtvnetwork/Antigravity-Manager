@@ -59,10 +59,10 @@ pub(crate) fn apply_retention_with_connection(
     conn: &Connection,
     policy: &LogRetentionConfig,
 ) -> Result<(usize, usize), String> {
-    // 请求体不再按时间强制清空，完全由容量上限与行数滑动窗口整体托管，保留完整报文
+    // The request body is no longer forcibly cleared according to time. It is completely managed by the capacity limit and the sliding window of the number of rows, and the complete message is retained.
     let bodies_cleared = 0;
 
-    // 注意：已移除基于 max_age_days 的按天整行删除逻辑，改为条数上限与空间上限滑动窗口淘汰
+    // Note: The logic of deleting entire rows by day based on max_age_days has been removed and replaced by sliding window elimination of upper limit of number of items and upper limit of space.
     let mut rows_deleted = 0;
     if policy.max_rows > 0 {
         rows_deleted += conn.execute(
@@ -71,7 +71,7 @@ pub(crate) fn apply_retention_with_connection(
         ).map_err(|e| e.to_string())?;
     }
 
-    // 按空间上限执行 30% 滑动窗口尾部淘汰
+    // Perform 30% sliding window tail elimination based on space upper limit
     let budget = policy.budget_bytes();
     if budget > 0 && disk_bytes(conn).unwrap_or(0) > budget {
         let (evicted, _) = evict_sliding_window(conn, budget)?;
@@ -140,16 +140,16 @@ pub fn get_proxy_db_disk_bytes() -> Result<u64, String> {
     disk_bytes(&conn)
 }
 
-/// 滑动窗口尾部淘汰机制：
-/// 当日志数据库达到或即将超过预算上限时，自动清理最尾部（最早）的日志，
-/// 一次性挤出最大存储空间的 30%（即让体积回落到 <= 70% 预算内），
-/// 并记录日志，随后返回清理的记录数与释放字节数。
+/// Sliding window tail elimination mechanism:
+/// When the log database reaches or is about to exceed the budget limit, the tailmost (earliest) logs are automatically cleaned.
+/// Squeeze out 30% of the maximum storage space at once (i.e., let the volume fall back to <= 70% of the budget),
+/// And record the log, and then return the number of cleaned records and the number of released bytes.
 pub fn evict_sliding_window(conn: &Connection, budget: u64) -> Result<(usize, u64), String> {
     if budget == 0 {
         return Ok((0, 0));
     }
     let before_bytes = disk_bytes(conn)?;
-    // 一次挤出最大空间的 30% (即目标保留 <= 70% 的最大上限)
+    // Squeeze out 30% of the maximum space at a time (i.e. target retention <= 70% of the maximum limit)
     let evict_quota = (budget as f64 * 0.30) as u64;
     let target_bytes = budget.saturating_sub(evict_quota);
 
@@ -158,7 +158,7 @@ pub fn evict_sliding_window(conn: &Connection, budget: u64) -> Result<(usize, u6
     }
 
     let mut total_deleted: usize = 0;
-    // 循环按批次从最尾部（最早记录，timestamp ASC）清理
+    // Loop cleans from the end of the batch (earliest record, timestamp ASC)
     for _ in 0..100 {
         let deleted = conn
             .execute(
@@ -237,7 +237,7 @@ pub(crate) fn make_room(conn: &Connection, budget: u64, log_bytes: u64) -> Resul
         return Err("legacy proxy log database cannot shrink within budget".to_string());
     }
 
-    // 优先触发 30% 滑动窗口机制清理最尾部历史日志
+    // Prioritize triggering the 30% sliding window mechanism to clean up the last historical logs
     let (evicted, _) = evict_sliding_window(conn, budget)?;
     if evicted > 0 {
         reclaim_space(conn)?;

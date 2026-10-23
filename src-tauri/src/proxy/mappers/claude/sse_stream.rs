@@ -84,7 +84,7 @@ where
                         }
                     }
                 }
-                Ok(None) => break, // Stream 正常结束
+                Ok(None) => break, // Stream ends normally
                 Err(_) => {
                     // [FIX #Bug1] Timeout - send keepalive ping but track consecutive count
                     consecutive_pings += 1;
@@ -221,7 +221,7 @@ where
     })
 }
 
-/// 处理单行 SSE 数据
+/// Processing a single row of SSE data
 pub(crate) fn process_sse_line(
     line: &str,
     state: &mut StreamingState,
@@ -245,7 +245,7 @@ pub(crate) fn process_sse_line(
         return Some(chunks);
     }
 
-    // 解析 JSON
+    // Parse JSON
     let json_value: serde_json::Value = match serde_json::from_str(data_str) {
         Ok(v) => v,
         Err(_) => return None,
@@ -253,18 +253,18 @@ pub(crate) fn process_sse_line(
 
     let mut chunks = Vec::new();
 
-    // 解包 response 字段 (如果存在)
+    // Unpack response field (if present)
     let raw_json = json_value.get("response").unwrap_or(&json_value);
 
-    // 发送 message_start
+    // send message_start
     if !state.message_start_sent {
         chunks.push(state.emit_message_start(raw_json));
     }
 
-    // 捕获 groundingMetadata (Web Search)
+    // Capturing groundingMetadata (Web Search)
     if let Some(candidate) = raw_json.get("candidates").and_then(|c| c.get(0)) {
         if let Some(grounding) = candidate.get("groundingMetadata") {
-            // 提取搜索词
+            // Extract search terms
             if let Some(query) = grounding
                 .get("webSearchQueries")
                 .and_then(|v| v.as_array())
@@ -274,7 +274,7 @@ pub(crate) fn process_sse_line(
                 state.web_search_query = Some(query.to_string());
             }
 
-            // 提取结果块
+            // Extract result block
             if let Some(chunks_arr) = grounding.get("groundingChunks").and_then(|v| v.as_array()) {
                 state.grounding_chunks = Some(chunks_arr.clone());
             } else if let Some(chunks_arr) = grounding
@@ -287,7 +287,7 @@ pub(crate) fn process_sse_line(
         }
     }
 
-    // 处理所有 parts
+    // Handle all parts
     if let Some(parts) = raw_json
         .get("candidates")
         .and_then(|c| c.get(0))
@@ -321,7 +321,7 @@ pub(crate) fn process_sse_line(
     }
     */
 
-    // 检查是否结束
+    // Check if it is finished
     if let Some(finish_reason) = raw_json
         .get("candidates")
         .and_then(|c| c.get(0))
@@ -362,7 +362,7 @@ pub(crate) fn process_sse_line(
     }
 }
 
-/// 发送强制结束事件
+/// Send force end event
 pub fn emit_force_stop(state: &mut StreamingState) -> Vec<Bytes> {
     if !state.message_stop_sent {
         let mut chunks = state.emit_finish(None, None);

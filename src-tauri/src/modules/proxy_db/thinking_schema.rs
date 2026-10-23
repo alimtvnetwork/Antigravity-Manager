@@ -25,7 +25,7 @@ pub(crate) fn init_thinking_schema(conn: &Connection) -> Result<(), String> {
     )
     .map_err(|e| e.to_string())?;
 
-    // 动态升级：增加 primary_tool_id 列用于旧版兼容点查
+    // Dynamic upgrade: Add primary_tool_id column for old version compatibility check
     // Justification: idempotent schema migration; failure is expected when the column already exists
     crate::error::record_ignored(
         conn.execute(
@@ -35,7 +35,7 @@ pub(crate) fn init_thinking_schema(conn: &Connection) -> Result<(), String> {
         "add primary_tool_id column migration",
     );
 
-    // 动态升级：增加 causal_tool_id 列用于确定性因果伪哈希 ID 极速穿透点查
+    // Dynamic upgrade: Add causal_tool_id column for deterministic causal pseudo-hash ID extremely fast penetration enumeration
     // Justification: idempotent schema migration; failure is expected when the column already exists
     crate::error::record_ignored(
         conn.execute(
@@ -45,7 +45,7 @@ pub(crate) fn init_thinking_schema(conn: &Connection) -> Result<(), String> {
         "add causal_tool_id column migration",
     );
 
-    // 1. 覆盖 load_thinking_records 的正向序列扫描 (ORDER BY id ASC)，同时完美承接逆序扫描 (ORDER BY id DESC)
+    // 1. Covers the forward sequence scan (ORDER BY id ASC) of load_thinking_records and perfectly accepts the reverse sequence scan (ORDER BY id DESC).
     // Justification: lookup index is a performance accelerator; queries work without it
     crate::error::record_ignored(
         conn.execute(
@@ -54,7 +54,7 @@ pub(crate) fn init_thinking_schema(conn: &Connection) -> Result<(), String> {
     ),
         "create idx_thinking_rec_seq index",
     );
-    // 2. 覆盖基于 causal_tool_id 的快速穿透点查 (极简 Partial Index，极致纳秒响应)
+    // 2. Cover fast penetration enumeration based on causal_tool_id (minimalist Partial Index, ultimate nanosecond response)
     // Justification: lookup index is a performance accelerator; queries work without it
     crate::error::record_ignored(
         conn.execute(
@@ -63,7 +63,7 @@ pub(crate) fn init_thinking_schema(conn: &Connection) -> Result<(), String> {
     ),
         "create idx_thinking_rec_causal index",
     );
-    // 3. 覆盖基于 primary_tool_id 的快速穿透点查 (兼容旧版数据)
+    // 3. Cover the fast penetration enumeration based on primary_tool_id (compatible with old version data)
     // Justification: lookup index is a performance accelerator; queries work without it
     crate::error::record_ignored(
         conn.execute(
@@ -72,7 +72,7 @@ pub(crate) fn init_thinking_schema(conn: &Connection) -> Result<(), String> {
     ),
         "create idx_thinking_rec_tool index",
     );
-    // 4. 覆盖基于 fingerprint 的指纹点查
+    // 4. Cover fingerprint-based fingerprint enumeration
     // Justification: lookup index is a performance accelerator; queries work without it
     crate::error::record_ignored(
         conn.execute(
@@ -81,7 +81,7 @@ pub(crate) fn init_thinking_schema(conn: &Connection) -> Result<(), String> {
     ),
         "create idx_thinking_rec_fp index",
     );
-    // 5. 覆盖历史清理时间索引
+    // 5. Overwrite historical cleanup time index
     // Justification: lookup index is a performance accelerator; queries work without it
     crate::error::record_ignored(
         conn.execute(
@@ -90,7 +90,7 @@ pub(crate) fn init_thinking_schema(conn: &Connection) -> Result<(), String> {
     ),
         "create idx_thinking_rec_accessed index",
     );
-    // 6. 覆盖基于 signature 的精准穿透点查 (极简 Partial Index，WHERE signature IS NOT NULL)
+    // 6. Cover precise penetration checking based on signature (minimalist Partial Index, WHERE signature IS NOT NULL)
     // Justification: lookup index is a performance accelerator; queries work without it
     crate::error::record_ignored(
         conn.execute(
@@ -100,7 +100,7 @@ pub(crate) fn init_thinking_schema(conn: &Connection) -> Result<(), String> {
         "create idx_thinking_rec_sig index",
     );
 
-    // 7. 索引大瘦身：安全清理物理冗余的重复索引，削减写放大开销
+    // 7. Index downsizing: safely clean up physically redundant duplicate indexes and reduce write amplification overhead
     // Justification: removes a redundant legacy index; failure leaves a harmless duplicate
     crate::error::record_ignored(
         conn.execute("DROP INDEX IF EXISTS idx_thinking_rec_latest", []),

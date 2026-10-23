@@ -1,49 +1,49 @@
-# 修复 Opus 4.6 调用报错 & UserToken 显示优化
+# Fix Opus 4.6 call error & UserToken display optimization
 
-## 问题
+## question
 
-号池混着 Pro 和 Ultra 账号。Pro 没有 Opus 4.6 权限，Ultra 有。
+The account pool is a mix of Pro and Ultra accounts. Pro doesn't have Opus 4.6 access, Ultra does.
 
-之前轮询按配额高低选账号，不管订阅等级。用户调 Opus 4.6 时，系统可能选到 Pro 账号，直接报错。
+Previously, polling selected accounts based on quotas, regardless of subscription level. When users adjust Opus 4.6, the system may select the Pro account and directly report an error.
 
-## 改动
+## change
 
-### 1. Ultra 优先调度
+### 1. Ultra priority scheduling
 
-调 Opus 4.6/4.5 时，先按订阅等级排序：
+When adjusting Opus 4.6/4.5, first sort by subscription level:
 
 ```
 Ultra > Pro > Free
 ```
 
-同等级再按配额排。其他模型还是老逻辑，配额优先。
+Those at the same level will be ranked according to quota. Other models still use the old logic, with quota priority.
 
-匹配规则：模型名包含 `claude-opus-4-6`、`claude-opus-4-5` 或 `opus` 就走 Ultra 优先。
+Matching rules: If the model name contains `claude-opus-4-6`, `claude-opus-4-5` or `opus`, Ultra will be given priority.
 
-### 2. UserToken 编辑数据不显示
+### 2. UserToken editing data is not displayed
 
-点编辑 Token 时，IP 限制和宵禁时间显示空的。
+When clicking Edit Token, the IP restrictions and curfew times are empty.
 
-问题：
-- 前端传参用 `undefined`，Rust 需要 `null`
-- 读取用 `||`，0 和空字符串被吃掉了，改成 `??`
+question:
+- The front-end uses `undefined` to pass parameters, and Rust requires `null`
+- Use `||` to read, 0 and empty strings are eaten, changed to `??`
 
-### 3. 自定义过期时间
+### 3. Customize expiration time
 
-创建 Token 多了个 Custom 选项，选日期时间，精确到小时。
+There is an additional Custom option when creating a Token. Select the date and time, accurate to the hour.
 
-## 文件
+## document
 
 ```
-src-tauri/src/proxy/token_manager.rs      # 排序逻辑
-src-tauri/src/proxy/tests/mod.rs          # 测试模块
-src-tauri/src/proxy/tests/ultra_priority_tests.rs  # Ultra 优先测试
-src-tauri/src/commands/user_token.rs      # 自定义过期参数
-src-tauri/src/modules/user_token_db.rs    # 数据库
-src/pages/UserToken.tsx                   # 前端
+src-tauri/src/proxy/token_manager.rs # Sorting logic
+src-tauri/src/proxy/tests/mod.rs # Test module
+src-tauri/src/proxy/tests/ultra_priority_tests.rs # Ultra priority testing
+src-tauri/src/commands/user_token.rs # Custom expiration parameters
+src-tauri/src/modules/user_token_db.rs # Database
+src/pages/UserToken.tsx # Front-end
 ```
 
-## 验证
+## verify
 
-1. 调 Opus 4.6，看日志确认走的是 Ultra 账号
-2. 创建 Token 设置 IP 限制和宵禁，编辑时确认数据正常回显
+1. Adjust Opus 4.6 and check the logs to confirm that you are using an Ultra account.
+2. Create Token, set IP restrictions and curfew, and confirm that the data is echoed normally when editing.

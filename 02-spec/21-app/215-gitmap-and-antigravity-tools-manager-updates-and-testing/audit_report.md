@@ -81,7 +81,7 @@ Analysis of recent commits across sequences 208 to 215 in Antigravity-Manager hi
 
 ### E. Governance & Contributor Authorship Guard (`17e510b3`, `05e902fc`)
 - Enforced strict contributor attribution in release workflows and changelogs: attributing solely `@aukgit` (`(Thanks to @aukgit)`).
-- Synchronized release summaries across `README.md` ("## 📝 更新日志") and `README_EN.md` ("## 📝 Changelog").
+- Synchronized release summaries across `README.md` ("## 📝 Changelog") and `README_EN.md` ("## 📝 Changelog").
 
 ---
 

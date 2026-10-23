@@ -35,7 +35,7 @@ export function getQuotaColor(percentage: number): string {
 export function parseFlexibleDate(dateStr: string | undefined | null): Date | null {
     if (!dateStr || dateStr.trim() === '') return null;
     const trimmed = dateStr.trim();
-    // 兼容纯数字 Unix 时间戳（秒或毫秒）
+    // Compatible with purely numeric Unix timestamps (seconds or milliseconds)
     if (/^\d+$/.test(trimmed)) {
         const num = parseInt(trimmed, 10);
         return new Date(trimmed.length <= 10 ? num * 1000 : num);
@@ -73,13 +73,13 @@ export function getTimeRemainingColor(dateStr: string | undefined): string {
     const now = new Date();
     const diffMs = targetDate.getTime() - now.getTime();
 
-    if (diffMs <= 0) return 'success'; // 已经过期的也算成功（即将重置或已重置）
+    if (diffMs <= 0) return 'success'; // Expired ones are also considered successful (will be reset soon or have been reset)
 
     const diffHrs = diffMs / (1000 * 60 * 60);
 
-    if (diffHrs < 1) return 'success';   // < 1h: 绿色 (快重置了)
-    if (diffHrs < 6) return 'warning';   // 1-6h: 琥珀色 (等待中)
-    return 'neutral';                   // > 6h: 灰色 (长等待)
+    if (diffHrs < 1) return 'success';   // < 1h: Green (near reset)
+    if (diffHrs < 6) return 'warning';   // 1-6h: Amber (waiting)
+    return 'neutral';                   // > 6h: gray (long wait)
 }
 
 export function formatDate(timestamp: string | number | undefined | null): string | null {

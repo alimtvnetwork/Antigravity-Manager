@@ -35,7 +35,7 @@ pub async fn handle_messages(
             PrepOutcome::Retry => continue,
             PrepOutcome::Proceed(call) => {
                 if call.status.is_success() {
-                    // [智能限流] 请求成功，重置该账号的连续失败计数
+                    // [Intelligent current limit] If the request is successful, the account’s consecutive failure count will be reset.
                     st.token_manager.mark_account_success(&call.email);
                     if call.actual_stream {
                         match handle_stream_success(&mut st, call, attempt).await {
@@ -88,7 +88,7 @@ pub async fn handle_list_models(State(state): State<AppState>) -> impl IntoRespo
     }))
 }
 
-/// 计算 tokens (占位符)
+/// Calculate tokens (placeholders)
 pub async fn handle_count_tokens(
     State(state): State<AppState>,
     headers: HeaderMap,

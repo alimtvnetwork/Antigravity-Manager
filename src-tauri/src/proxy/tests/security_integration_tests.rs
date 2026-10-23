@@ -1,7 +1,7 @@
 //! IP Security Integration Tests
-//! IP 安全功能的集成测试
+//! Integration testing of IP security functions
 //!
-//! 这些测试需要启动完整的代理服务器来验证端到端的功能
+//! These tests require starting a full proxy server to verify end-to-end functionality
 
 #[cfg(test)]
 mod integration_tests;

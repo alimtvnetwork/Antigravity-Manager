@@ -1,4 +1,4 @@
-// Claude 协议处理器
+// Claude protocol handler
 
 use axum::{
     body::Body,

@@ -2,7 +2,7 @@
 //!
 //! Enforces release documentation discipline per AGENTS.md:
 //! - For stable releases, you MUST update the release summary in both `README.md`
-//!   (under '## 📝 更新日志') and `README_EN.md` (under '## 📝 Changelog').
+//!   (under '## 📝 Changelog') and `README_EN.md` (under '## 📝 Changelog').
 //! - Pre-release / beta versions remain exclusively in changelogs; stable releases
 //!   require full synchronization across both README files.
 

@@ -1,16 +1,16 @@
-// 模型输出 Token 限额管理 (DEPRECATED: 逻辑已迁移至 crate::proxy::model_specs)
-// 为了兼容性，保留此入口并重定向到 model_specs。
+// Model output Token quota management (DEPRECATED: logic has been migrated to crate::proxy::model_specs)
+// For compatibility, this entry is retained and redirected to model_specs.
 
 use crate::proxy::model_specs;
 
-/// 获取模型的输出 Token 限额
+/// Get the output token limit of the model
 ///
-/// # 参数
-/// - `model_name`: 映射后的模型名
-/// - `dynamic_limit`: 如果已知动态限额则传入（已废弃，建议直接传入 ProxyToken 到 model_specs）
+/// # Parameters
+/// - `model_name`: mapped model name
+/// - `dynamic_limit`: passed in if the dynamic limit is known (deprecated, it is recommended to pass the ProxyToken directly to model_specs)
 #[allow(dead_code)]
 pub fn get_model_output_limit(model_name: &str, dynamic_limit: Option<u64>) -> u64 {
-    // 兼容逻辑：如果没有 dynamic_limit，则调用 model_specs 获取（目前不传入 token）
+    // Compatible logic: If there is no dynamic_limit, call model_specs to obtain it (no token is currently passed in)
     if let Some(limit) = dynamic_limit {
         limit
     } else {

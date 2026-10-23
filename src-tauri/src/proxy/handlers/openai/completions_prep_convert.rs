@@ -136,7 +136,7 @@ pub(crate) fn completions_convert_payload(
                             .and_then(Value::as_str)
                             .map(str::to_string);
 
-                        // 若为 assistant 角色且没有任何实际正文、图像或思考元数据，属于纯空占位消息，予以过滤
+                        // If it is an assistant role and does not have any actual text, images or thought metadata, it is a pure empty placeholder message and will be filtered.
                         if role == "assistant"
                             && joined_text.trim().is_empty()
                             && image_parts.is_empty()
@@ -146,7 +146,7 @@ pub(crate) fn completions_convert_payload(
                             continue;
                         }
 
-                        // 构造消息内容：如果有图像则使用数组格式
+                        // Construct message content: if there is an image, use array format
                         let mut message = if image_parts.is_empty() {
                             let content = prefix_with_step_marker(step_marker, joined_text);
                             json!({

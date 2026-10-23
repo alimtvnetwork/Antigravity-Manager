@@ -326,7 +326,7 @@ mod tests {
                 {
                     "type": "message",
                     "role": "user",
-                    "content": [{"type": "input_text", "text": "检查系统故障"}]
+                    "content": [{"type": "input_text", "text": "Check for system failure"}]
                 },
                 {
                     "type": "message",
@@ -340,7 +340,7 @@ mod tests {
                     "id": "msg_comm_123",
                     "role": "assistant",
                     "phase": "commentary",
-                    "content": [{"type": "output_text", "text": "概览显示 HTTP 502，接下来检查网关连接。"}]
+                    "content": [{"type": "output_text", "text": "Overview shows HTTP 502, next check the gateway connection."}]
                 },
                 {
                     "type": "function_call",
@@ -354,23 +354,23 @@ mod tests {
         let converted = convert_codex_to_openai_request(input);
         let messages = converted["messages"].as_array().expect("messages array");
 
-        // 验证：user 消息存在
+        // Verification: user message exists
         assert_eq!(messages[0]["role"], "user");
-        assert_eq!(messages[0]["content"], "检查系统故障");
+        assert_eq!(messages[0]["content"], "Check for system failure");
 
-        // 验证：私有思考 msg_thought_123 被成功过滤，未进入 messages
+        // Verification: Private thought msg_thought_123 was successfully filtered and did not enter messages
         assert!(messages
             .iter()
             .all(|m| m.get("content").and_then(Value::as_str) != Some("private thought")));
 
-        // 验证：普通进度 commentary 消息被成功保留
+        // Verification: Normal progress commentary messages are successfully retained
         assert_eq!(messages[1]["role"], "assistant");
         assert_eq!(
             messages[1]["content"],
-            "概览显示 HTTP 502，接下来检查网关连接。"
+            "Overview shows HTTP 502, next check the gateway connection."
         );
 
-        // 验证：工具调用正常跟随
+        // Verification: Tool calls follow normally
         assert_eq!(messages[2]["role"], "assistant");
         assert_eq!(
             messages[2]["tool_calls"][0]["function"]["name"],

@@ -1,14 +1,14 @@
 use super::*;
 
 // ============================================================================
-// 测试类别 2: IP 黑名单基本操作
+// Test Category 2: Basic Operation of IP Blacklist
 // ============================================================================
 
 #[test]
 fn test_blacklist_add_and_check() {
     let _lock = setup_test();
 
-    // 添加 IP 到黑名单
+    // Add IP to blacklist
     let result = add_to_blacklist("192.168.1.100", Some("Test block"), None, "test");
     assert!(
         result.is_ok(),
@@ -16,12 +16,12 @@ fn test_blacklist_add_and_check() {
         result.err()
     );
 
-    // 验证 IP 在黑名单中
+    // Verify IP is in blacklist
     let is_blocked = is_ip_in_blacklist("192.168.1.100");
     assert!(is_blocked.is_ok());
     assert!(is_blocked.unwrap(), "IP should be in blacklist");
 
-    // 验证其他 IP 不在黑名单中
+    // Verify other IPs are not in the blacklist
     let is_other_blocked = is_ip_in_blacklist("192.168.1.101");
     assert!(is_other_blocked.is_ok());
     assert!(
@@ -36,17 +36,17 @@ fn test_blacklist_add_and_check() {
 fn test_blacklist_remove() {
     let _lock = setup_test();
 
-    // 添加 IP
+    // Add IP
     let entry = add_to_blacklist("10.0.0.5", Some("Temp block"), None, "test").unwrap();
 
-    // 验证存在
+    // Verify existence
     assert!(is_ip_in_blacklist("10.0.0.5").unwrap());
 
-    // 移除
+    // Remove
     let remove_result = remove_from_blacklist(&entry.id);
     assert!(remove_result.is_ok());
 
-    // 验证已移除
+    // Verification removed
     assert!(!is_ip_in_blacklist("10.0.0.5").unwrap());
 
     cleanup_test_data();
@@ -56,19 +56,19 @@ fn test_blacklist_remove() {
 fn test_blacklist_get_entry_details() {
     let _lock = setup_test();
 
-    // 添加带有详细信息的条目
+    // Add entry with details
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(
         add_to_blacklist(
             "172.16.0.50",
             Some("Abuse detected"),
-            Some(now_timestamp() + 3600), // 1小时后过期
+            Some(now_timestamp() + 3600), // Expires in 1 hour
             "admin",
         ),
         "add_to_blacklist",
     );
 
-    // 获取条目详情
+    // Get item details
     let entry_result = get_blacklist_entry_for_ip("172.16.0.50");
     assert!(entry_result.is_ok());
 

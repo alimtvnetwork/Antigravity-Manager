@@ -1,6 +1,6 @@
 use super::*;
 
-/// 会话管理器工具
+/// Session manager tool
 pub struct SessionManager;
 
 /// Clean system prompt noise from user messages (<system-reminder>, <environment>, [System...])
@@ -42,18 +42,18 @@ pub fn sanitize_user_text_for_fingerprint(raw: &str) -> String {
 }
 
 impl SessionManager {
-    /// 根据 Claude 请求生成稳定的会话指纹 (Session Fingerprint)
+    /// Generate stable session fingerprint according to Claude request (Session Fingerprint)
     ///
-    /// 设计理念:
-    /// - 只哈希第一条用户消息内容,不混入模型名称或时间戳
-    /// - 确保同一对话的所有轮次使用相同的 session_id
-    /// - 最大化 prompt caching 的命中率
+    /// Design concept:
+    /// - Only the first user message content is hashed, no model names or timestamps are mixed in
+    /// - Ensure all rounds of the same conversation use the same session_id
+    /// - Maximize prompt caching hit rate
     ///
-    /// 优先级:
-    /// 1. metadata.user_id (客户端显式提供)
-    /// 2. 第一条用户消息的 SHA256 哈希
+    /// Priority:
+    /// 1. metadata.user_id (explicitly provided by the client)
+    /// 2. SHA256 hash of first user message
     pub fn extract_session_id(request: &ClaudeRequest) -> String {
-        // 1. 优先使用 metadata 中的 user_id
+        // 1. Prioritize using user_id in metadata
         if let Some(metadata) = &request.metadata {
             if let Some(user_id) = &metadata.user_id {
                 if !user_id.is_empty() && !user_id.contains("session-") {
@@ -63,7 +63,7 @@ impl SessionManager {
             }
         }
 
-        // 2. 备选方案：基于第一条用户消息的 SHA256 哈希
+        // 2. Alternative: SHA256 hash based on first user message
         let mut hasher = Sha256::new();
 
         let mut content_found = false;
@@ -90,7 +90,7 @@ impl SessionManager {
             if clean_text.len() >= 2 {
                 hasher.update(clean_text.as_bytes());
                 content_found = true;
-                break; // 始终锚定第一条有效用户消息
+                break; // Always anchor to the first valid user message
             }
         }
 
@@ -159,7 +159,7 @@ impl SessionManager {
         sid
     }
 
-    /// 根据 OpenAI 请求生成稳定的会话指纹
+    /// Generate stable session fingerprints based on OpenAI requests
     pub fn extract_openai_session_id(request: &OpenAIRequest) -> String {
         if let Some(explicit) = request.session_id.as_ref() {
             let trimmed = explicit.trim();
@@ -271,7 +271,7 @@ impl SessionManager {
         sid
     }
 
-    /// 根据 Gemini 原生请求 (JSON) 生成稳定的会话指纹
+    /// Generate stable session fingerprints based on Gemini native requests (JSON)
     pub fn extract_gemini_session_id(request: &Value, _model_name: &str) -> String {
         if let Some(explicit) = request.get("session_id").and_then(|v| v.as_str()) {
             let trimmed = explicit.trim();
@@ -308,7 +308,7 @@ impl SessionManager {
         }
 
         if !content_found {
-            // 兜底：对整个 Body 的首个 user part 进行摘要
+            // Bottom line: summarize the first user part of the entire Body
             hasher.update(request.to_string().as_bytes());
         }
 
