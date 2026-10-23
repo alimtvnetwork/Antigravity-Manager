@@ -192,7 +192,8 @@ pub async fn switch_account_to_instance(
     if source_instance_id != instance.id {
         if let Ok(conn) = crate::modules::repo_db::connect_db() {
             let now = chrono::Utc::now().timestamp();
-            let is_source_default = source_instance_id == "default" || source_instance_id == "__default__";
+            let is_source_default =
+                source_instance_id == "default" || source_instance_id == "__default__";
             // Justification: prompt re-attribution to target instance during switch
             if is_source_default {
                 crate::error::record_ignored(
@@ -219,7 +220,8 @@ pub async fn switch_account_to_instance(
     // backups recorded under the source instance.
     if source_instance_id != instance.id {
         if let Ok(conn) = crate::modules::backup_prompts_db::connect_db() {
-            let is_source_default = source_instance_id == "default" || source_instance_id == "__default__";
+            let is_source_default =
+                source_instance_id == "default" || source_instance_id == "__default__";
             // Justification: prompt re-attribution to target instance during switch
             if is_source_default {
                 crate::error::record_ignored(
@@ -666,13 +668,18 @@ pub async fn switch_account_to_instance(
     let target_inst_id = instance.id.clone();
     let target_backed_up = crate::modules::repo_db::count_backed_up_prompts(&target_inst_id);
     let total_pending_restore = backed_up_count.max(target_backed_up);
-    let has_unrestored_backups = crate::modules::backup_prompts_db::list_prompt_backups(Some(&target_inst_id), None)
-        .map(|list| list.iter().any(|r| !r.is_restored))
-        .unwrap_or(false)
-        || crate::modules::backup_prompts_db::count_unrestored_prompts_for_other_instances(&target_inst_id, None)
+    let has_unrestored_backups =
+        crate::modules::backup_prompts_db::list_prompt_backups(Some(&target_inst_id), None)
+            .map(|list| list.iter().any(|r| !r.is_restored))
+            .unwrap_or(false)
+            || crate::modules::backup_prompts_db::count_unrestored_prompts_for_other_instances(
+                &target_inst_id,
+                None,
+            )
             .map(|c| c > 0)
             .unwrap_or(false);
-    let channel_wait = crate::modules::repo_db::needs_prompt_channel_wait(total_pending_restore) || has_unrestored_backups;
+    let channel_wait = crate::modules::repo_db::needs_prompt_channel_wait(total_pending_restore)
+        || has_unrestored_backups;
     if channel_wait {
         crate::modules::logger::log_info(&format!(
             "[INSTANCE_SWITCH:STAGE_5_RESTORE] Scheduling prompt restore for instance '{}' after the IDE is up ({} backed up, unrestored available: {})",

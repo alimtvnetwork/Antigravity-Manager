@@ -28,7 +28,10 @@ fn test_restore_outcome_honesty_struct_and_accessors() {
     assert_eq!(outcome.dispatched, 4);
     assert_eq!(outcome.failed_count(), 1);
     assert_eq!(outcome.failed, 1);
-    assert!(!outcome.is_success(), "Outcome with failures must not be reported as success");
+    assert!(
+        !outcome.is_success(),
+        "Outcome with failures must not be reported as success"
+    );
 
     outcome.record_restored();
     assert_eq!(outcome.restored_count(), 6);
@@ -117,9 +120,13 @@ fn test_scoped_restore_fallback_when_scoped_returns_zero_and_other_exists() {
     }
 
     // Verify other count probe
-    let other_count = count_unrestored_prompts_for_other_instances("inst-target", Some(custom_file))
-        .expect("Must count other instance unrestored prompts");
-    assert_eq!(other_count, 2, "inst-target must see 2 records under other instances");
+    let other_count =
+        count_unrestored_prompts_for_other_instances("inst-target", Some(custom_file))
+            .expect("Must count other instance unrestored prompts");
+    assert_eq!(
+        other_count, 2,
+        "inst-target must see 2 records under other instances"
+    );
 
     // Scoped restore with fallback for "inst-target" should fall back to unscoped restore
     let (records, outcome) = restore_running_prompts_scoped_with_fallback_with_outcome(
@@ -129,7 +136,11 @@ fn test_scoped_restore_fallback_when_scoped_returns_zero_and_other_exists() {
     )
     .expect("Fallback restore should succeed");
 
-    assert_eq!(records.len(), 2, "Must return 2 restored records via fallback");
+    assert_eq!(
+        records.len(),
+        2,
+        "Must return 2 restored records via fallback"
+    );
     assert_eq!(records[0].prompt_id, "prompt-fb-1");
     assert_eq!(records[1].prompt_id, "prompt-fb-2");
     assert_eq!(outcome.restored_count(), 2);
@@ -140,10 +151,8 @@ fn test_scoped_restore_fallback_when_scoped_returns_zero_and_other_exists() {
 
 #[test]
 fn test_reattribution_of_unrestored_prompt_backups_during_switch() {
-    let temp_dir = std::env::temp_dir().join(format!(
-        "agm_test_reattribute_{}",
-        Uuid::new_v4().simple()
-    ));
+    let temp_dir =
+        std::env::temp_dir().join(format!("agm_test_reattribute_{}", Uuid::new_v4().simple()));
     let db_path = temp_dir.join("test-reattribute.db");
     let custom_file = db_path.to_str().unwrap();
 
@@ -172,29 +181,35 @@ fn test_reattribution_of_unrestored_prompt_backups_during_switch() {
     .expect("Must insert prompt backup");
 
     // Execute re-attribution query: only unrestored records (is_restored = 0) are re-attributed
-    let changed = conn.execute(
-        "UPDATE prompt_backups SET instance_id = ?1 WHERE instance_id = ?2 AND is_restored = 0",
-        params!["inst-new", "inst-old"],
-    )
-    .expect("Must update instance_id");
+    let changed = conn
+        .execute(
+            "UPDATE prompt_backups SET instance_id = ?1 WHERE instance_id = ?2 AND is_restored = 0",
+            params!["inst-new", "inst-old"],
+        )
+        .expect("Must update instance_id");
 
     assert_eq!(changed, 1, "Only unrestored row should be re-attributed");
 
-    let new_inst: String = conn.query_row(
-        "SELECT instance_id FROM prompt_backups WHERE id = 'r-old-1'",
-        [],
-        |row| row.get(0),
-    )
-    .expect("Must query row 1");
+    let new_inst: String = conn
+        .query_row(
+            "SELECT instance_id FROM prompt_backups WHERE id = 'r-old-1'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("Must query row 1");
     assert_eq!(new_inst, "inst-new");
 
-    let old_inst: String = conn.query_row(
-        "SELECT instance_id FROM prompt_backups WHERE id = 'r-old-2'",
-        [],
-        |row| row.get(0),
-    )
-    .expect("Must query row 2");
-    assert_eq!(old_inst, "inst-old", "Already restored row remains on inst-old");
+    let old_inst: String = conn
+        .query_row(
+            "SELECT instance_id FROM prompt_backups WHERE id = 'r-old-2'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("Must query row 2");
+    assert_eq!(
+        old_inst, "inst-old",
+        "Already restored row remains on inst-old"
+    );
 
     crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove temp dir");
 }
