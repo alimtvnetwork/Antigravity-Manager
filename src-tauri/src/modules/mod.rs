@@ -26,6 +26,7 @@ pub mod fleet_sync;
 pub mod git_info;
 pub mod instance;
 pub mod json_envelope;
+pub mod release_gate;
 
 #[allow(dead_code)]
 pub mod http_api;

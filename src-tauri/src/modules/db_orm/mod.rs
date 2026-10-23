@@ -142,6 +142,8 @@ pub mod tests_db_size_watchdog;
 pub mod tests_deadlock_detector;
 #[cfg(test)]
 pub mod tests_compile_options;
+#[cfg(test)]
+pub mod tests_vacuum_stepper;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;

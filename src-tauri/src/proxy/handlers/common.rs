@@ -73,6 +73,10 @@ pub mod tests_compression_negotiator;
 pub mod tests_stream_flusher;
 #[cfg(test)]
 pub mod tests_stream_early_abort_sentinel;
+#[cfg(test)]
+pub mod tests_sse_chunk_coalescer;
+#[cfg(test)]
+pub mod tests_sse_comment_filter;
 
 pub use abort_sentinel::*;
 pub use boundary_normalizer::StreamBoundaryNormalizer;

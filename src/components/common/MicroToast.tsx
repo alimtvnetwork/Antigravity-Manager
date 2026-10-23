@@ -1,4 +1,4 @@
-import React, { useEffect, ReactNode } from 'react';
+import React, { useEffect, ReactNode, useRef } from 'react';
 import { CheckCircle2, AlertTriangle, AlertCircle, Info, X } from 'lucide-react';
 
 export type ToastVariant = 'success' | 'warning' | 'error' | 'info';
@@ -20,55 +20,91 @@ export const MicroToast: React.FC<MicroToastProps> = ({
   onDismiss,
   className = '',
 }) => {
-  useEffect(() => {
-    if (durationMs <= 0) return;
-    const timer = setTimeout(() => {
-      onDismiss();
-    }, durationMs);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const remainingTimeRef = useRef<number>(durationMs);
+  const startTimeRef = useRef<number>(Date.now());
 
-    return () => clearTimeout(timer);
-  }, [durationMs, onDismiss]);
+  const startTimer = (ms: number) => {
+    if (ms <= 0) return;
+    startTimeRef.current = Date.now();
+    timerRef.current = setTimeout(() => {
+      onDismiss();
+    }, ms);
+  };
+
+  const clearTimer = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const handleMouseEnter = () => {
+    if (durationMs > 0 && timerRef.current) {
+      const elapsed = Date.now() - startTimeRef.current;
+      remainingTimeRef.current = Math.max(0, remainingTimeRef.current - elapsed);
+      clearTimer();
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (durationMs > 0 && remainingTimeRef.current > 0) {
+      startTimer(remainingTimeRef.current);
+    }
+  };
+
+  useEffect(() => {
+    startTimer(durationMs);
+    return () => clearTimer();
+  }, [durationMs]);
 
   const getVariantStyles = () => {
     switch (variant) {
       case 'success':
         return {
           border: 'border-emerald-500/40',
-          bg: 'bg-emerald-950/80',
+          bg: 'bg-emerald-950/85 backdrop-blur-md',
           text: 'text-emerald-200',
-          icon: <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />,
+          icon: <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" aria-hidden="true" />,
         };
       case 'warning':
         return {
           border: 'border-amber-500/40',
-          bg: 'bg-amber-950/80',
+          bg: 'bg-amber-950/85 backdrop-blur-md',
           text: 'text-amber-200',
-          icon: <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />,
+          icon: <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" aria-hidden="true" />,
         };
       case 'error':
         return {
           border: 'border-rose-500/40',
-          bg: 'bg-rose-950/80',
+          bg: 'bg-rose-950/85 backdrop-blur-md',
           text: 'text-rose-200',
-          icon: <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />,
+          icon: <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" aria-hidden="true" />,
         };
       case 'info':
       default:
         return {
           border: 'border-sky-500/40',
-          bg: 'bg-slate-900/90',
+          bg: 'bg-slate-900/90 backdrop-blur-md',
           text: 'text-sky-200',
-          icon: <Info className="w-4 h-4 text-sky-400 shrink-0" />,
+          icon: <Info className="w-4 h-4 text-sky-400 shrink-0" aria-hidden="true" />,
         };
     }
   };
 
   const styles = getVariantStyles();
+  const isAlert = variant === 'error';
 
   return (
     <div
-      role="status"
-      className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border shadow-xl backdrop-blur-md animate-in fade-in-0 slide-in-from-top-2 duration-200 select-none ${styles.border} ${styles.bg} ${styles.text} ${className}`}
+      role={isAlert ? 'alert' : 'status'}
+      aria-live={isAlert ? 'assertive' : 'polite'}
+      aria-atomic="true"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onFocus={handleMouseEnter}
+      onBlur={handleMouseLeave}
+      className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border shadow-xl animate-in fade-in-0 slide-in-from-top-2 duration-200 select-none ${styles.border} ${styles.bg} ${styles.text} ${className}`}
     >
       {icon ? icon : styles.icon}
       <span className="text-xs md:text-sm font-medium">{message}</span>
@@ -76,9 +112,11 @@ export const MicroToast: React.FC<MicroToastProps> = ({
       <button
         type="button"
         onClick={onDismiss}
-        className="p-0.5 ml-1 text-slate-400 hover:text-slate-200 rounded hover:bg-white/10 transition-colors"
+        aria-label="Dismiss notification"
+        title="Dismiss notification"
+        className="p-1 ml-1 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500/60 transition-colors"
       >
-        <X className="w-3.5 h-3.5" />
+        <X className="w-3.5 h-3.5" aria-hidden="true" />
       </button>
     </div>
   );

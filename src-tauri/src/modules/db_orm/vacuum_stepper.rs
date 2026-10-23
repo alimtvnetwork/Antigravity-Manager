@@ -10,7 +10,7 @@ pub const DEFAULT_VACUUM_CHUNK_SIZE: i64 = 100;
 pub const DEFAULT_MAX_PAGES_PER_PASS: i64 = 1000;
 
 /// Report detailing freelist status and incremental vacuum pages reclaimed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct IncrementalVacuumReport {
     pub freelist_before: i64,
     pub freelist_after: i64,

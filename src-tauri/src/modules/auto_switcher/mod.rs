@@ -131,6 +131,8 @@ pub mod tests_candidate_dedup;
 #[cfg(test)]
 pub mod tests_rotation_brake;
 #[cfg(test)]
+pub mod tests_switch_settling_timer;
+#[cfg(test)]
 pub(crate) use crate::models::account::Account;
 #[cfg(test)]
 pub(crate) use tests_a::make_test_account;
