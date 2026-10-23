@@ -13,7 +13,7 @@ Can you please run GitMap PA first to get all the updates? And then I want you t
 
 ## Subtasks
 1. `01-gitmap-pa-audit-and-fleet-sync.md`: GitMap PA Fleet State & Coding Guidelines Ingestion (`Imp-730`) — `IN_PROGRESS`
-2. `02-prompt-restore-reconnect-sweep-engine.md`: Prompt Restore Reconnect Sweep & Quota Interruption Recovery (`Imp-731`) — `PENDING`
+2. `02-prompt-restore-reconnect-sweep-engine.md`: Prompt Restore Reconnect Sweep & Quota Interruption Recovery (`Imp-731`) — `COMPLETED`
 3. `03-rerun-randomizer-history-and-anti-repeat.md`: Rerun Randomizer UX & Multi-Turn Anti-Repeat Engine (`Imp-732`) — `PENDING`
 4. `04-gitmap-code-quality-cmdpull-modularization.md`: GitMap cmdpull Modularization & 8-Pillars Clean Architecture (`Imp-733`) — `PENDING`
 5. `05-master-deferred-e2e-plan-and-verification.md`: Master Deferred E2E Plan & Final Live Verification Execution (`Imp-734`) — `PENDING`

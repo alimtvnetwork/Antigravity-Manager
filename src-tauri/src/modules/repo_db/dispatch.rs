@@ -41,7 +41,7 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
         .prepare(
             "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
              FROM active_prompts 
-             WHERE status = 'backed_up'
+             WHERE status IN ('backed_up', 'pending', 'in_progress')
              ORDER BY created_at ASC, id ASC",
         )
         .map_err(|e| format!("Failed to prepare dispatch query: {}", e))?;
@@ -171,7 +171,10 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
 
     for prompt in prompts {
         let sig = format!("{}:{}", prompt.repo_path, prompt.prompt_content.trim());
-        let already_dispatched = if prompt.status == "backed_up" {
+        let already_dispatched = if prompt.status == "backed_up"
+            || prompt.status == "pending"
+            || prompt.status == "in_progress"
+        {
             false
         } else {
             let mut cache = match get_dispatched_prompts_cache().lock() {

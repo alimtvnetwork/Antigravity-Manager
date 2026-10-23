@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::modules::repo_db::{self, ActivePrompt};
 use chrono::Utc;
 use rusqlite::{params, Connection};
@@ -5,6 +6,9 @@ use std::fs;
 use std::path::Path;
 
 use super::*;
+
+/// Type alias for SQLite database connection / pool used across restore routines
+pub type SqlitePool = Connection;
 
 /// Backward compatible wrapper with instance support
 pub fn restore_running_prompts(
@@ -321,6 +325,10 @@ fn reinject_single_record(
         rec.instance_id.as_deref().unwrap_or(target_inst)
     };
     let restored_status = prompt_status_after_restore(&rec.status);
+    tracing::info!(
+        "[PROMPT_RESTORE] Restoring prompt {} for instance '{}' (original status: '{}', has_images: {}) -> restored status: '{}'",
+        rec.prompt_id, eff_inst, rec.status, rec.has_images, restored_status
+    );
     crate::modules::logger::log_info(&format!(
         "[PROMPT_RESTORE] Restoring prompt {} for instance '{}' (has_images: {}) -> status: {}",
         rec.prompt_id, eff_inst, rec.has_images, restored_status
@@ -359,9 +367,21 @@ fn reinject_single_record(
     }
 
     match repo_db::save_or_requeue_prompt(&active_p) {
-        Ok(()) => outcome.record_restored(),
+        Ok(()) => {
+            outcome.record_restored();
+            tracing::info!(
+                "[PROMPT_RESTORE] Recovered prompt {} on instance '{}' with status '{}' (FIFO created_at: {})",
+                rec.prompt_id, eff_inst, restored_status, active_p.created_at
+            );
+        }
         Err(e) => {
             outcome.record_failed(Some(e.clone()));
+            tracing::error!(
+                "[PROMPT_RESTORE] Failed to re-inject prompt {} on instance '{}': {}",
+                rec.prompt_id,
+                eff_inst,
+                e
+            );
             crate::modules::logger::log_error(&format!(
                 "[BackupDB] Restore failed to re-inject prompt {} on {}: {}",
                 rec.prompt_id, eff_inst, e
@@ -478,13 +498,14 @@ fn rearm_restored_goals(
     }
 }
 
-/// Queued stays queued. A running, dispatched, or already backed-up prompt is
-/// marked backed_up so the dispatcher sends it again.
+/// Restore protocol: prompts that were running or in-progress are restored to 'in_progress'
+/// so the execution engine can resume them; queued stays 'queued'; all other backed-up / interrupted
+/// prompts are transitioned to 'pending' so they leave 'backed_up' and become immediately eligible for dispatch.
 pub(crate) fn prompt_status_after_restore(saved: &str) -> &'static str {
-    if saved == "queued" {
-        "queued"
-    } else {
-        "backed_up"
+    match saved {
+        "running" | "in_progress" => "in_progress",
+        "queued" => "queued",
+        _ => "pending",
     }
 }
 
@@ -559,12 +580,115 @@ pub fn reattribute_unrestored_prompt_backups(
     }
     .map_err(|e| format!("Failed to reattribute prompt backups: {}", e))?;
 
+    // Also sweep and reattribute any orphaned backed_up records to target instance
+    crate::error::record_ignored(
+        sweep_and_reattribute_orphaned_backups(&conn, to_instance).map_err(|e| e.to_string()),
+        "sweep_and_reattribute_orphaned_backups in reattribute_unrestored_prompt_backups",
+    );
+
     crate::modules::logger::log_info(&format!(
         "[BackupDB] Re-attributed {} unrestored prompt backups (from: {:?}) to target instance '{}'",
         count, from_instance, to_instance
     ));
 
     Ok(count)
+}
+
+/// Sweeps unrestored prompt backups that were orphaned or assigned to an inactive / different instance
+/// and reattributes them to `current_instance_id` in strict FIFO order (`ORDER BY created_at ASC, id ASC`).
+///
+/// Preserves the original `created_at` timestamp so the true chronological queue sequence is maintained.
+pub fn sweep_and_reattribute_orphaned_backups(
+    pool: &SqlitePool,
+    current_instance_id: &str,
+) -> Result<usize, AppError> {
+    let is_curr_default = current_instance_id == "default" || current_instance_id == "__default__";
+
+    let select_sql = if is_curr_default {
+        "SELECT id, prompt_id, created_at, instance_id, status FROM prompt_backups
+         WHERE is_restored = 0
+           AND (status = 'backed_up' OR status = 'pending' OR status = 'in_progress' OR status = 'queued')
+           AND instance_id IS NOT NULL
+           AND instance_id NOT IN ('', 'default', '__default__')
+         ORDER BY created_at ASC, id ASC"
+    } else {
+        "SELECT id, prompt_id, created_at, instance_id, status FROM prompt_backups
+         WHERE is_restored = 0
+           AND (status = 'backed_up' OR status = 'pending' OR status = 'in_progress' OR status = 'queued')
+           AND (instance_id IS NULL OR instance_id != ?1)
+         ORDER BY created_at ASC, id ASC"
+    };
+
+    let mut stmt = pool.prepare(select_sql)?;
+
+    struct OrphanRecord {
+        id: String,
+        prompt_id: String,
+        created_at: i64,
+        old_instance: Option<String>,
+        status: String,
+    }
+
+    let orphans: Vec<OrphanRecord> = if is_curr_default {
+        stmt.query_map([], |row| {
+            Ok(OrphanRecord {
+                id: row.get(0)?,
+                prompt_id: row.get(1)?,
+                created_at: row.get(2)?,
+                old_instance: row.get(3)?,
+                status: row.get(4)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?
+    } else {
+        stmt.query_map(params![current_instance_id], |row| {
+            Ok(OrphanRecord {
+                id: row.get(0)?,
+                prompt_id: row.get(1)?,
+                created_at: row.get(2)?,
+                old_instance: row.get(3)?,
+                status: row.get(4)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?
+    };
+
+    if orphans.is_empty() {
+        tracing::info!(
+            "[PROMPT_RESTORE_SWEEP] No orphaned backed-up prompts found for instance '{}'",
+            current_instance_id
+        );
+        return Ok(0);
+    }
+
+    let count = orphans.len();
+    for rec in &orphans {
+        pool.execute(
+            "UPDATE prompt_backups SET instance_id = ?1 WHERE id = ?2",
+            params![current_instance_id, rec.id],
+        )?;
+
+        tracing::info!(
+            "[PROMPT_RESTORE_SWEEP] Reattributed orphaned prompt backup '{}' (prompt_id: '{}', status: '{}', old_instance: '{:?}', created_at: {}) -> current_instance: '{}'",
+            rec.id, rec.prompt_id, rec.status, rec.old_instance, rec.created_at, current_instance_id
+        );
+    }
+
+    tracing::info!(
+        "[PROMPT_RESTORE_SWEEP] Completed sweep: reattributed {} orphaned backup(s) in strict FIFO order to active instance '{}'",
+        count, current_instance_id
+    );
+
+    Ok(count)
+}
+
+/// Convenience helper to run `sweep_and_reattribute_orphaned_backups` with a custom or default backup DB file.
+pub fn sweep_and_reattribute_orphaned_backups_with_file(
+    current_instance_id: &str,
+    custom_file: Option<&str>,
+) -> Result<usize, AppError> {
+    let conn = connect_backup_db(custom_file).map_err(AppError::Unknown)?;
+    sweep_and_reattribute_orphaned_backups(&conn, current_instance_id)
 }
 
 /// Count unrestored backup records for a given instance (or all unrestored if None).

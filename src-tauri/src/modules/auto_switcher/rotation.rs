@@ -325,6 +325,17 @@ pub async fn execute_profile_rotation_with_context(
             ),
             "reattribute_unrestored_prompt_backups in auto-switcher",
         );
+        if let Ok(conn) = crate::modules::backup_prompts_db::connect_backup_db(None) {
+            // Justification: sweep and reattribute orphaned backups during cross-instance switch; failure logged
+            crate::error::record_ignored(
+                crate::modules::backup_prompts_db::sweep_and_reattribute_orphaned_backups(
+                    &conn,
+                    &target.instance_id,
+                )
+                .map_err(|e| e.to_string()),
+                "sweep_and_reattribute_orphaned_backups in cross-instance rotation",
+            );
+        }
         for ws in &active_workspaces {
             // Justification: best-effort call; failure logged without changing control flow
             crate::error::record_ignored(
@@ -481,6 +492,30 @@ pub async fn execute_profile_rotation_with_context(
         verified_running,
         proj_names_clone,
     );
+
+    // Restore handover: sweep and reattribute any orphaned backups to target instance
+    if let Ok(conn) = crate::modules::backup_prompts_db::connect_backup_db(None) {
+        match crate::modules::backup_prompts_db::sweep_and_reattribute_orphaned_backups(
+            &conn,
+            &target_inst_id_clone,
+        ) {
+            Ok(swept) => {
+                if swept > 0 {
+                    logger::log_info(&format!(
+                        "[AutoSwitcher] Restore handover swept and reattributed {} orphaned prompt backup(s) to target instance '{}'",
+                        swept, target_inst_id_clone
+                    ));
+                }
+            }
+            Err(e) => {
+                // Justification: best-effort sweep during rotation handover; failure logged
+                crate::error::record_ignored(
+                    Err::<(), _>(e.to_string()),
+                    "sweep_and_reattribute_orphaned_backups in auto-switcher handover",
+                );
+            }
+        }
+    }
 
     // Schedule post-switch prompt restore on target instance if auto_reopen_on_switch is enabled
     // or if backed-up prompts exist for the target instance

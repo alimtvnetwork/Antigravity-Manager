@@ -1150,6 +1150,12 @@ export const RERUN_RANDOM_MESSAGE_SET: ReadonlyArray<string> = [
     'Are all pending plans completed and verified?',
     'Please confirm when the task is fully finished and ready.',
     'What is the current status of the implementation?',
+    'Are you confident?',
+    'Did all tests pass?',
+    'Is the verification green?',
+    'Are edge cases covered?',
+    'Is documentation updated?',
+    'Is the build passing cleanly?',
 ];
 
 export const RERUN_FIXED_MESSAGES: Record<Exclude<RerunMessageOption, 'randomized'>, string> = {
@@ -1268,19 +1274,72 @@ export function savePersistedRerunCount(count: number): void {
     }
 }
 
+/** Maximum recent turns tracked for anti-repeat filtering. */
+export const RERUN_HISTORY_WINDOW = 5;
+
+/**
+ * Picks a diverse, actionable rerun nudge from the random message set while
+ * excluding recently used questions in history (up to 5 turns).
+ *
+ * If the history covers every option or candidates are exhausted, it falls back
+ * to sampling from the remaining options excluding the single most recent nudge (or full set).
+ */
+export function pickDiverseRerunNudge(history?: string[] | null): string {
+    const historyList = history || [];
+    const recent = historyList.slice(-RERUN_HISTORY_WINDOW);
+    const recentSet = new Set(recent);
+
+    let candidates = RERUN_RANDOM_MESSAGE_SET.filter((msg) => !recentSet.has(msg));
+
+    if (candidates.length === 0) {
+        // Fallback: exclude only the most recent question if possible
+        const lastUsed = recent[recent.length - 1];
+        candidates = RERUN_RANDOM_MESSAGE_SET.filter((msg) => msg !== lastUsed);
+        if (candidates.length === 0) {
+            candidates = [...RERUN_RANDOM_MESSAGE_SET];
+        }
+    }
+
+    const randomIndex = Math.floor(Math.random() * candidates.length);
+    return candidates[randomIndex];
+}
+
+/**
+ * Testable generator function for retrieving a randomized rerun nudge with anti-repeat history.
+ */
+export function getRandomRerunNudge(history?: string[]): string {
+    return pickDiverseRerunNudge(history);
+}
+
 /** Resolve the actual message text for one rerun dispatch. */
 export function resolveRerunMessage(
     option: RerunMessageOption,
-    excludeIndices?: Set<number> | number[]
+    excludeIndices?: Set<number> | number[] | string[] | Set<string>
 ): { message: string; pickedIndex: number | null } {
     if (option === 'randomized') {
-        const excluded = excludeIndices instanceof Set
-            ? excludeIndices
-            : new Set(excludeIndices || []);
+        const excludedIndices = new Set<number>();
+        const excludedMessages = new Set<string>();
+
+        if (excludeIndices) {
+            for (const item of excludeIndices as Iterable<number | string>) {
+                if (typeof item === 'number') {
+                    excludedIndices.add(item);
+                    if (RERUN_RANDOM_MESSAGE_SET[item]) {
+                        excludedMessages.add(RERUN_RANDOM_MESSAGE_SET[item]);
+                    }
+                } else if (typeof item === 'string') {
+                    excludedMessages.add(item);
+                    const idx = RERUN_RANDOM_MESSAGE_SET.indexOf(item);
+                    if (idx >= 0) {
+                        excludedIndices.add(idx);
+                    }
+                }
+            }
+        }
 
         const availableIndices: number[] = [];
         for (let idx = 0; idx < RERUN_RANDOM_MESSAGE_SET.length; idx++) {
-            if (!excluded.has(idx)) {
+            if (!excludedIndices.has(idx) && !excludedMessages.has(RERUN_RANDOM_MESSAGE_SET[idx])) {
                 availableIndices.push(idx);
             }
         }
@@ -1312,6 +1371,8 @@ export interface RerunDispatchContext {
     source?: string;
     /** Media attachment paths to forward to instance and clipboard */
     mediaPaths?: string[];
+    /** Recent history of nudges (up to 5 turns) to prevent repeating questions across consecutive dispatches. */
+    history?: string[];
 }
 
 export interface RerunDispatchResult {
@@ -1319,6 +1380,7 @@ export interface RerunDispatchResult {
     dispatched: number;
     failed: number;
     messages?: string[];
+    history?: string[];
 }
 
 /**
@@ -1333,7 +1395,7 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
         Math.max(RERUN_MIN_COUNT, Math.floor(ctx.count) || RERUN_DEFAULT_COUNT)
     );
     const source = ctx.source ?? 'DetailHeader.rerunSection';
-    const result: RerunDispatchResult = { requested, dispatched: 0, failed: 0, messages: [] };
+    const result: RerunDispatchResult = { requested, dispatched: 0, failed: 0, messages: [], history: [] };
     const auditBase = {
         actor: 'user' as const,
         methodName: 'prompt_tree_rerun_dispatch',
@@ -1342,11 +1404,23 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
         trigger: 'click' as const,
     };
     const usedIndices = new Set<number>();
+    const recentHistory: string[] = [...(ctx.history || [])];
+
+    // Pre-populate used indices from recent history (up to RERUN_HISTORY_WINDOW turns)
+    // so consecutive rerun calls never pick the same question.
+    for (const priorMsg of recentHistory.slice(-RERUN_HISTORY_WINDOW)) {
+        const priorIdx = RERUN_RANDOM_MESSAGE_SET.indexOf(priorMsg);
+        if (priorIdx >= 0) {
+            usedIndices.add(priorIdx);
+        }
+    }
+
     for (let i = 0; i < requested; i += 1) {
         const { message: rawMessage, pickedIndex } = resolveRerunMessage(ctx.messageOption, usedIndices);
         if (pickedIndex !== null) {
             usedIndices.add(pickedIndex);
         }
+        recentHistory.push(rawMessage);
         const richPrompt = buildRerunPrompt({
             prompt: ctx.originalPrompt,
             originalPrompt: ctx.originalPrompt,
@@ -1442,6 +1516,7 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
             await new Promise((r) => setTimeout(r, 300));
         }
     }
+    result.history = recentHistory;
     return result;
 }
 
@@ -1457,6 +1532,8 @@ export interface HandleRerunConversationOptions {
     mediaPaths?: string[];
     source?: string;
     targetConvId?: string;
+    /** Recent history of nudges to avoid repeats. */
+    history?: string[];
 }
 
 /**
@@ -1530,6 +1607,7 @@ export async function handleRerunConversation(
         originalPrompt,
         source: options.source ?? 'handleRerunConversation',
         mediaPaths: convMedia,
+        history: options.history,
     });
 }
 // END RERUN SECTION (Task-04)

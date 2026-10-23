@@ -18,6 +18,8 @@ pub mod models;
 
 pub mod modules;
 
+pub mod prompts;
+
 mod proxy; // Proxy service module
 
 pub mod utils;

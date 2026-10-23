@@ -149,6 +149,18 @@ pub(crate) fn push_backed_up_prompts_after_channel(instance_id: &str) -> usize {
         ));
     }
     let before = crate::modules::repo_db::count_backed_up_prompts(instance_id);
+    // Sweep and reattribute any orphaned backups before restoring
+    if let Ok(conn) = crate::modules::backup_prompts_db::connect_backup_db(None) {
+        // Justification: sweep orphaned prompt backups to target instance on channel ready; failure logged
+        crate::error::record_ignored(
+            crate::modules::backup_prompts_db::sweep_and_reattribute_orphaned_backups(
+                &conn,
+                instance_id,
+            )
+            .map_err(|e| e.to_string()),
+            "sweep_and_reattribute_orphaned_backups in push_backed_up_prompts_after_channel",
+        );
+    }
     // Rehydrate the snapshot first with scoped-restore fallback: if target instance
     // finds 0 records, it falls back to unrestored records under other instances.
     // The outcome counts are real (RC-3): a failed restore or dispatch is

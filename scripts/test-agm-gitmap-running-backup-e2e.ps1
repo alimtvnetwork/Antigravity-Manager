@@ -353,6 +353,23 @@ if ($null -ne $allActiveRows -and @($allActiveRows).Count -gt 1) {
 }
 Assert-Condition "Gate 5.4: Strict FIFO queue order enforced (ORDER BY created_at ASC, id ASC)" $isFifoOrdered "FIFO ordering violated in active_prompts"
 
+# Verify orphaned backup sweep and reattribution
+$orphanUnique = (Get-Random -Minimum 100000000 -Maximum 999999999)
+$orphanPromptId = "prompt-orphan-$orphanUnique"
+$insertOrphanSql = "INSERT INTO prompt_backups (id, backup_batch_id, prompt_id, project_id, instance_id, prompt_text, has_images, is_restored, status, created_at, updated_at) VALUES ('bk-$orphanUnique', 'batch-$orphanUnique', '$orphanPromptId', 'Antigravity-Manager', 'inst-crashed-$orphanUnique', 'Orphaned prompt to sweep', 0, 0, 'backed_up', $now, $now)"
+$null = Invoke-SqlitePython -DbPath $backupDbPath -Query $insertOrphanSql
+
+$sweepRestoreRaw = & $agm restore running default --json 2>&1
+$queryOrphanRestored = "SELECT id, instance_id, is_restored, status FROM prompt_backups WHERE id = 'bk-$orphanUnique'"
+$orphanRow = Invoke-SqlitePython -DbPath $backupDbPath -Query $queryOrphanRestored
+$isOrphanReattributed = ($null -ne $orphanRow -and @($orphanRow).Count -ge 1 -and [int]$orphanRow[0].is_restored -eq 1)
+Assert-Condition "Gate 5.5: Orphaned backup from crashed instance reattributed and restored into active instance" $isOrphanReattributed "Orphaned backup was not reattributed and restored"
+
+$cleanOrphanSql = "DELETE FROM prompt_backups WHERE id = 'bk-$orphanUnique'"
+$null = Invoke-SqlitePython -DbPath $backupDbPath -Query $cleanOrphanSql
+$cleanOrphanActiveSql = "DELETE FROM active_prompts WHERE id = '$orphanPromptId'"
+$null = Invoke-SqlitePython -DbPath $repoDbPath -Query $cleanOrphanActiveSql
+
 # -------------------------------------------------------------------------
 # Gate 6: Verify GitMap command parity
 # -------------------------------------------------------------------------
@@ -385,6 +402,27 @@ $gitmapRestoreExit = $LASTEXITCODE
 $gitmapRestoreStr = ($gitmapRestoreHelp -join "`n")
 $hasGitmapRestoreParity = ($gitmapRestoreExit -eq 0) -and ($gitmapRestoreStr -match "Running Prompts" -or $gitmapRestoreStr -match "running-prompts" -or $gitmapRestoreStr -match "restore")
 Assert-Condition "Gate 6.4: gitmap ag restore rp delegation command supported" $hasGitmapRestoreParity "gitmap restore rp failed with code $gitmapRestoreExit"
+
+# 5. GitMap cmdpull 8-Pillars file length compliance (all files <= 300 lines)
+$cmdPullDir = "d:\work\gitmap\cli\cmdpull"
+$oversizedFiles = @()
+if (Test-Path $cmdPullDir) {
+    $goFiles = Get-ChildItem -Path $cmdPullDir -Filter "*.go" -File
+    foreach ($gf in $goFiles) {
+        $lineCount = (Get-Content $gf.FullName).Count
+        if ($lineCount -gt 300) {
+            $oversizedFiles += "$($gf.Name): $lineCount lines"
+        }
+    }
+}
+$isCmdPullCompliant = ($oversizedFiles.Count -eq 0)
+Assert-Condition "Gate 6.5: GitMap cmdpull package conforms to 8-Pillars (all files <= 300 lines)" $isCmdPullCompliant "Oversized files found: $($oversizedFiles -join ', ')"
+
+# 6. Rerun randomizer multi-turn diversity anti-repeat compliance
+$rerunHookPath = Join-Path $RootDir "src\components\instances\PromptTreeView\usePromptTreePromptActions.ts"
+$rerunHookContent = if (Test-Path $rerunHookPath) { Get-Content $rerunHookPath -Raw } else { "" }
+$hasAntiRepeatEngine = ($rerunHookContent.Contains("pickDiverseRerunNudge") -and $rerunHookContent.Contains("RERUN_HISTORY_WINDOW") -and $rerunHookContent.Contains("getRandomRerunNudge"))
+Assert-Condition "Gate 6.6: Rerun randomizer anti-repeat history engine implemented" $hasAntiRepeatEngine "Anti-repeat engine missing from usePromptTreePromptActions.ts"
 
 # -------------------------------------------------------------------------
 # Gate 7: Verify caller IDE session protection (default-copy-5597, PID 11588)

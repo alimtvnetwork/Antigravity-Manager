@@ -75,6 +75,8 @@ import {
     RERUN_COUNT_STORAGE_KEY,
     RERUN_RANDOM_MESSAGE_SET,
     resolveRerunMessage,
+    pickDiverseRerunNudge,
+    getRandomRerunNudge,
     loadPersistedRerunMessageOption,
     savePersistedRerunMessageOption,
     loadPersistedRerunCount,
@@ -335,6 +337,120 @@ await test('verifies dispatchRerunMessages handles errors gracefully without cra
     assertEqual(result.messages!.length, 1);
 
     mockInvokeFailCmd = null;
+});
+
+await test('verifies all 10 diverse actionable questions are present in RERUN_RANDOM_MESSAGE_SET', () => {
+    const requiredActionableQuestions = [
+        'Is it finished?',
+        'Is it released?',
+        'Is it completed?',
+        'Are you confident?',
+        'Did all tests pass?',
+        'Are all requirements satisfied?',
+        'Is the verification green?',
+        'Are edge cases covered?',
+        'Is documentation updated?',
+        'Is the build passing cleanly?',
+    ];
+    for (const q of requiredActionableQuestions) {
+        assertTrue(
+            RERUN_RANDOM_MESSAGE_SET.includes(q),
+            `Expected RERUN_RANDOM_MESSAGE_SET to include "${q}"`
+        );
+    }
+});
+
+await test('verifies pickDiverseRerunNudge and getRandomRerunNudge never repeat across 5 successive calls with history', () => {
+    const history: string[] = [];
+    for (let i = 0; i < 5; i++) {
+        const nudge = pickDiverseRerunNudge(history);
+        assertTrue(typeof nudge === 'string' && nudge.length > 0);
+        assertTrue(RERUN_RANDOM_MESSAGE_SET.includes(nudge));
+        assertFalse(
+            history.includes(nudge),
+            `Turn ${i + 1} repeated nudge "${nudge}" already present in recent history: [${history.join(', ')}]`
+        );
+        history.push(nudge);
+    }
+    assertEqual(history.length, 5);
+    assertEqual(new Set(history).size, 5);
+
+    // Verify getRandomRerunNudge behaves identically and respects history
+    const aliasNudge = getRandomRerunNudge(history);
+    assertTrue(typeof aliasNudge === 'string' && aliasNudge.length > 0);
+    assertFalse(
+        history.includes(aliasNudge),
+        `getRandomRerunNudge repeated recent nudge "${aliasNudge}"`
+    );
+});
+
+await test('verifies pickDiverseRerunNudge fallback correctly samples from remaining options when pool is saturated', () => {
+    // Saturated history containing all messages
+    const fullHistory = [...RERUN_RANDOM_MESSAGE_SET];
+    const fallbackPick = pickDiverseRerunNudge(fullHistory);
+    assertTrue(RERUN_RANDOM_MESSAGE_SET.includes(fallbackPick));
+    // The fallback should avoid the very last item in fullHistory if possible
+    const lastItem = fullHistory[fullHistory.length - 1];
+    assertTrue(
+        fallbackPick !== lastItem || RERUN_RANDOM_MESSAGE_SET.length === 1,
+        'Fallback should avoid the immediate last used question'
+    );
+});
+
+await test('verifies dispatchRerunMessages carries history and enforces anti-repeat across consecutive runs', async () => {
+    mockInvokeCalls.length = 0;
+    mockInvokeFailCmd = null;
+
+    const run1 = await dispatchRerunMessages({
+        targetInstId: 'inst-multi-1',
+        repoPath: '/work/test-repo',
+        convId: 'conv-multi-1',
+        count: 3,
+        messageOption: 'randomized',
+        originalPrompt: 'Multi-turn task execution',
+        source: 'testRunner',
+        history: [],
+    });
+
+    assertEqual(run1.requested, 3);
+    assertEqual(run1.dispatched, 3);
+    assertEqual(run1.messages!.length, 3);
+
+    // Run 2 passes run1 messages as history
+    const run2 = await dispatchRerunMessages({
+        targetInstId: 'inst-multi-1',
+        repoPath: '/work/test-repo',
+        convId: 'conv-multi-1',
+        count: 2,
+        messageOption: 'randomized',
+        originalPrompt: 'Multi-turn task execution',
+        source: 'testRunner',
+        history: run1.messages,
+    });
+
+    assertEqual(run2.requested, 2);
+    assertEqual(run2.dispatched, 2);
+    assertEqual(run2.messages!.length, 2);
+
+    // Verify no overlaps between run1 (3 messages) and run2 (2 messages) since total = 5 <= RERUN_HISTORY_WINDOW (5)
+    for (const m of run2.messages!) {
+        assertFalse(run1.messages!.includes(m), `run2 message "${m}" was repeated from run1 history`);
+    }
+
+    // Combined 5 messages should be all distinct
+    const combined = [...run1.messages!, ...run2.messages!];
+    assertEqual(new Set(combined).size, 5);
+
+    // Verify Round 1 of each run was send_prompt_now and Round 2..N were enqueue_prompt
+    const promptCalls = mockInvokeCalls.filter((c) => c.cmd === 'send_prompt_now' || c.cmd === 'enqueue_prompt');
+    const run1Calls = promptCalls.slice(0, 3);
+    assertEqual(run1Calls[0].cmd, 'send_prompt_now');
+    assertEqual(run1Calls[1].cmd, 'enqueue_prompt');
+    assertEqual(run1Calls[2].cmd, 'enqueue_prompt');
+
+    const run2Calls = promptCalls.slice(3, 5);
+    assertEqual(run2Calls[0].cmd, 'send_prompt_now');
+    assertEqual(run2Calls[1].cmd, 'enqueue_prompt');
 });
 
 // ===========================================================================

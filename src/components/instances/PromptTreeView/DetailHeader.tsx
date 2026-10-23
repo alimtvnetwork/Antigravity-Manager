@@ -93,6 +93,8 @@ export interface DetailHeaderProps {
     onEnqueue: () => void;
     /** Optional repo path used as the rerun dispatch target (falls back to ''). */
     rerunRepoPath?: string;
+    rerunHistory?: string[];
+    onRerunHistoryChange?: (history: string[]) => void;
     onOpenInspector: (conv: AgmConversationNode) => void;
     onRenameConversation?: (conversationId: string, newTitle: string, instId?: string) => Promise<void>;
     selectedTurnNumber?: number | null;
@@ -120,7 +122,9 @@ export function DetailHeader(props: DetailHeaderProps) {
         formatDuration, elapsedSeconds,
         onCopyAllWithRichImages, onCopyCleanText, onCopyImageAsText,
         onCopyImageForOneNoteOrIde, onCopySingleImagePng,
-        onCopyWithImages, onSaveImages, onExport, onFocusIde, onResend, onEnqueue, rerunRepoPath, onOpenInspector,
+        onCopyWithImages, onSaveImages, onExport, onFocusIde, onResend, onEnqueue, rerunRepoPath,
+        rerunHistory: propRerunHistory, onRerunHistoryChange,
+        onOpenInspector,
         onRenameConversation,
         selectedTurnNumber: _selectedTurnNumber,
         setActionMsg,
@@ -250,6 +254,9 @@ export function DetailHeader(props: DetailHeaderProps) {
     // resetting on every mount.
     const [rerunCount, setRerunCount] = useState<number>(() => loadPersistedRerunCount());
     const [rerunMessageOption, setRerunMessageOption] = useState<RerunMessageOption>(() => loadPersistedRerunMessageOption());
+    const [localRerunHistory, setLocalRerunHistory] = useState<string[]>([]);
+    const rerunHistory = propRerunHistory ?? localRerunHistory;
+    const setRerunHistory = onRerunHistoryChange ?? setLocalRerunHistory;
 
     // Persist rerun picker choices; the conversation context menu reads the
     // same persisted values for its rerun action.
@@ -270,10 +277,12 @@ export function DetailHeader(props: DetailHeaderProps) {
     } | null>(null);
     const [isAttachingImage, setIsAttachingImage] = useState(false);
 
-    // Drop a stale attachment when the user switches conversations.
+    // Drop a stale attachment and clear rerun history when the user switches conversations.
     useEffect(() => {
         setAttachedImage(null);
-    }, [selectedConversation.conversation_id]);
+        setLocalRerunHistory([]);
+        onRerunHistoryChange?.([]);
+    }, [selectedConversation.conversation_id, onRerunHistoryChange]);
 
     const handleAttachRerunImage = async (): Promise<void> => {
         if (isAttachingImage) return;
@@ -377,6 +386,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                 originalPrompt: promptWithImage,
                 source: 'DetailHeader.rerunSection',
                 mediaPaths: rerunMediaList,
+                history: rerunHistory,
             });
             if (result.failed > 0) {
                 // Each failed rerun already landed in the error module via
@@ -391,6 +401,10 @@ export function DetailHeader(props: DetailHeaderProps) {
                 setActionMsg?.(`Rerun ×${result.dispatched} dispatched successfully!${previewMsg}`);
                 setTimeout(() => setRerunFlash(null), 2500);
                 setAttachedImage(null);
+                if (result.messages && result.messages.length > 0) {
+                    const nextHistory = [...rerunHistory, ...result.messages].slice(-10);
+                    setRerunHistory(nextHistory);
+                }
             }
         } catch (err) {
             reportPromptActionError(err, 'DetailHeader.rerunSection');
@@ -1004,7 +1018,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             data-ui-id={`prompt-rerun-${selectedConversation.conversation_id}`}
                             className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold text-sky-700 dark:text-sky-300 hover:bg-sky-100/80 dark:hover:bg-sky-950/40 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
                             title={`Rerun (${rerunMessageOption}): Dispatches auto-picked completion/release nudge (Hotkey: R)`}
-                            aria-label="Rerun: Dispatches auto-picked completion/release nudge"
+                            aria-label={`Rerun (${rerunMessageOption}): Dispatches auto-picked completion or release nudge${rerunCount > 1 ? ` ${rerunCount} times` : ''}`}
                         >
                             <Repeat className={cn('w-3 h-3 text-sky-500 shrink-0', isRerunning && 'animate-spin')} />
                             <span>{isRerunning ? 'Rerunning…' : (rerunFlash ?? `Rerun ×${rerunCount}`)}</span>
@@ -1414,6 +1428,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                                 });
                                             }}
                                             disabled={isRerunning}
+                                            aria-label={`Rerun ×${rerunCount} Now: Dispatches ${rerunMessageOption} completion or release nudge`}
                                             className="w-full flex items-center justify-center gap-2 py-1.5 px-3 bg-sky-500/15 hover:bg-sky-500/25 text-sky-700 dark:text-sky-300 border border-sky-500/30 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
                                         >
                                             <Repeat className={cn('w-3.5 h-3.5 text-sky-500', isRerunning && 'animate-spin')} />
