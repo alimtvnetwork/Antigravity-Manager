@@ -1,7 +1,8 @@
 //! Unit tests for Local Commit Convergence & Noise Elimination Auditor.
 
 use crate::modules::release_gate::commit_convergence_auditor::{
-    audit_commit_history, classify_commit, CommitEntry, NoiseClassification,
+    audit_commit_history, classify_commit, CommitConvergenceReport, CommitEntry,
+    NoiseClassification,
 };
 
 #[test]
@@ -259,7 +260,6 @@ fn test_serde_serialization_roundtrip() {
     }]);
 
     let json = serde_json::to_string(&report).unwrap();
-    let deserialized: super::super::commit_convergence_auditor::CommitConvergenceReport =
-        serde_json::from_str(&json).unwrap();
+    let deserialized: CommitConvergenceReport = serde_json::from_str(&json).unwrap();
     assert_eq!(report, deserialized);
 }

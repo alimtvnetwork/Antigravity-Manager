@@ -90,7 +90,7 @@ mod tests {
         assert_eq!(report.total_checks, 3);
         assert_eq!(report.passed_count, 2);
         assert_eq!(report.failed_count, 0);
-        assert_eq!(report.skipped_count, 1);
+        assert_eq!(report.skipped_count(), 1);
         assert!(!report.has_failures());
     }
 

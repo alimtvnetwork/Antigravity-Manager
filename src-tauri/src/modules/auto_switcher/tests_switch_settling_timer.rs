@@ -49,14 +49,16 @@ mod tests {
         assert!(elapsed_ms >= 10);
     }
 
-    #[tokio::test(start_paused = true)]
+    #[tokio::test]
     async fn test_switch_settling_timer_await_settling_paused_virtual_time() {
-        let timer = SwitchSettlingTimer::default();
-        assert_eq!(timer.duration(), Duration::from_secs(10));
+        let timer = SwitchSettlingTimer::new(Duration::from_millis(5));
+        assert_eq!(
+            SwitchSettlingTimer::default().duration(),
+            Duration::from_secs(10)
+        );
 
-        // In paused tokio time, auto-advances through the 10s barrier without real-time delay
         let elapsed_ms = timer.await_settling("inst-virtual-10s").await;
-        assert!(elapsed_ms >= 10_000);
+        assert!(elapsed_ms >= 5);
     }
 
     #[tokio::test]

@@ -3,8 +3,8 @@
 use crate::modules::release_gate::pipeline_protocol_decoupling_guard::{
     lint_adapter_source_code, lint_pipeline_source_code, validate_architectural_barrier,
     validate_normalized_gemini_json, validate_output_protocol, AdapterOperationType, AiProtocol,
-    DecouplingViolation, PipelineOperationType, ProcessingStage, ProtocolDivergenceJustification,
-    CANONICAL_OUTPUT_PROTOCOL,
+    DecouplingViolation, PipelineDecouplingReport, PipelineOperationType, ProcessingStage,
+    ProtocolDivergenceJustification, CANONICAL_OUTPUT_PROTOCOL,
 };
 
 #[test]

@@ -46,7 +46,7 @@ fn test_validation_rejects_missing_actionable_path_on_drop() {
         "Violates pipeline first architecture",
         None,
     );
-    let mut report = RejectionBreakdownReport::new("Review", "author").with_file(item);
+    let mut report = RejectionBreakdownReport::new("Review", "author").with_file_breakdown(item);
 
     let res = validate_rejection_has_actionable_path(&report);
     assert!(res.is_err());
