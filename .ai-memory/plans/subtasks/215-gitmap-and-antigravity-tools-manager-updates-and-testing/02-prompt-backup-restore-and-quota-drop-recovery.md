@@ -1,7 +1,7 @@
 # Subtask 02: Prompt Backup Restore & Quota Drop Recovery
 Sequence: 215
 Step: 287
-Status: IN_PROGRESS
+Status: COMPLETED
 Module: `src-tauri/src/modules/backup_prompts_db/restore.rs`, `src-tauri/src/modules/instance/switch.rs`, `src-tauri/src/modules/repo_db/backup.rs`
 
 ## Description
