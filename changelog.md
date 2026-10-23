@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.253.1] - 2026-10-23
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.250.11] - 2026-10-22
 
 ### Added
@@ -1157,7 +1164,6 @@
                 - **Windows Kernel32 FFI & Fast-Forward Rotation Remediation**: Repaired process vitality probes and child process termination to link directly against Windows `kernel32` (`OpenProcess`, `GetExitCodeProcess`, `TerminateProcess`, `CloseHandle`) without unlinked external dependencies; harmonized `smartRotateProfileAccount` with backend `fastForwardInstance` delegation; and expanded rerun nudge detection templates. (Thanks to @aukgit)
                 - **Consolidated Wave Summary**: v4.253.0 is the first published release of today's combined improvement wave, shipped all together — the v4.251.0 prompt backup & restore rebuild and rerun randomizer, the v4.252.0 pipeline/FIFO/capsule/release-governance guard wave, and the sequences 213–218 hardening detailed in the entries below — released after a full compile and CI repair campaign cleared 18 pre-existing TypeScript errors and the accumulated Rust test-target compile debt, with `cargo check --tests`, `cargo clippy --all-targets`, `cargo fmt --check`, `tsc --noEmit`, and the frontend build all verified green and a completed green CI run for the tagged commit. The earlier v4.251.0 and v4.252.0 tags were held back by the release gate on red CI and are superseded by this release. (Thanks to @aukgit)
 
-
     *   **v4.252.0 (2026-10-23)**:
         -   **[Pipeline Decoupling, FIFO Queue Invariants, Caller IDE Self-Preservation, UI Capsules & Release Governance] Pipeline response header sanitizer, protocol adapter divergence auditor, thinking block backfill & headroom budget evaluator, unified context alternating alignment guard, FIFO dead-letter spillover guard, multi-table FIFO restore transaction coordinator, FIFO batch drain monotonicity verifier, caller process ancestry tree scanner, caller IDE exit code 2 enforcer & heartbeat watchdog, transient test sandbox verifier, multi-stage launcher dispatcher, window control capsule formatter, truncation omission banner formatter, prompt tree 4-tier hierarchy formatter, and GitHub release notes parity guard (Thanks to @aukgit)**:
             -   **Description**: Successfully implemented and verified 25 architectural improvements across reverse proxy pipelines, database queue invariants, multi-instance process management, UI/UX desktop styling, and release compliance gates:
@@ -1167,11 +1173,9 @@
                 - **UI Capsules, Hierarchy & Truncation Formatter (`src-tauri/src/modules/instance/`)**: Implemented `window_control_capsule_formatter` wrapping Minimize, Maximize/Restore, and Close actions into contiguous segmented pill capsules (`rounded-full`, shared border, dark-glass backdrop, subtle dividers) with hover-danger styling; added `capsule_segmented_control_validator` enforcing transparent borderless styling for nested dropdowns; added `truncation_omission_banner_formatter` parsing raw truncation callouts into interactive dark-glass omission banners; and added `prompt_tree_branch_hierarchy_formatter` discriminating across 4 distinct origin tiers (`USER_PROMPT`, `SUBAGENT_INSTRUCTION`, `SYSTEM_MESSAGE`, `TOOL_OUTPUT`) with branch glyphs (`↳`, `└──`).
                 - **Release Governance & Attribution Gate (`src-tauri/src/modules/release_gate/`)**: Implemented `github_release_notes_parity_guard` verifying GitHub release notes strictly attribute `@aukgit`, reject third-party handles, enforce strictly relative Git paths, and match `CHANGELOG.md` headings; added `individually_revertable_commit_guard` auditing commit boundaries; and enforced the no-silent-errors rule via `no_silent_errors_justification_auditor`. (Thanks to @aukgit)
 
-
     *   **v4.251.0 (2026-10-23)**:
         -   **[Prompt Backup & Restore Reliability, Rerun Auto-Pick, and Release Integrity] Incomplete-prompt sweep on quota switch, truthful restore reporting, FIFO restore drain, persisted post-switch resume, shared GUI/CLI backup database, randomized rerun by default with persisted choice, skipped-version update reporting, email dedupe and supabase push-settings CLI commands, configurable PID refresh, and CI release gating (Thanks to @aukgit)**:
             -   **Description**: Rebuilt prompt backup and restore so quota-driven account switches no longer lose long-running prompts: a new incomplete-prompt sweep in `backup.rs` captures every running, in-flight, or dispatched prompt at switch time regardless of age, replacing the previous 120-second cutoff that silently dropped longer work, the backup cap now prunes only already-restored rows, and queued rows are exempt from the freshness filter; manual instance switches re-attribute unrestored prompt backups to the incoming account (parity with the rotation path), restore returns real restored, dispatched, failed, and skipped-live counts instead of unconditional success, a live-status probe prevents duplicate re-injection of prompts that already finished, multi-prompt restore drains the full FIFO queue in order instead of one prompt per repository per pass, post-switch resume tasks are persisted to disk and re-armed after an application restart, and the GUI and CLI resolve one shared backup database in the application data directory (migrating any legacy working-directory database); rerun now defaults to the randomized message option with an expanded message set and a default batch of four, and the chosen option and count persist across restarts in the detail header, the conversation context menu, the prompt tree context menu, and the tree view modal; the update checker explains why candidate versions were skipped (draft, prerelease, or no installable platform asset) instead of silently offering nothing, with matching skipped-version lines in `agm update`; added `agm email dedupe` (dry-run by default, timestamped database backup before applying) and `agm supabase push-settings` with vault-path support, plus a configurable PID refresh interval in Settings and `agm auto-switch pid-refresh`; CI workflows are pinned to Ubuntu 24.04 with current action versions, main-branch runs can no longer be cancelled mid-flight, and the release workflow refuses to tag unless CI is green for that exact commit. (Thanks to @aukgit)
-
 
     *   **v4.250.0 (2026-10-21)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
