@@ -263,7 +263,7 @@ const TARGET_FILES = [
         name: 'src-tauri/Cargo.lock',
         relPath: 'src-tauri/Cargo.lock',
         replace: (content) => content.replace(
-            /(\[\[package\]\]\r?\nname = "(?:agm-alim|antigravity-tools)"\r?\n)version = "[^"]+"(\r?\n)(?:version = "[^"]+"\r?\n)*/,
+            /(\[\[package\]\]\r?\nname = "(?:agm-ui|agm-alim|antigravity-tools)"\r?\n)version = "[^"]+"(\r?\n)(?:version = "[^"]+"\r?\n)*/,
             `$1version = "${newVersion}"$2`
         ),
     },

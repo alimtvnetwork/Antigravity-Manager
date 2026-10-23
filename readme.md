@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.251.0-3B82F6?style=flat-square" alt="Version v4.251.0">
+    <img src="https://img.shields.io/badge/Version-v4.252.0-3B82F6?style=flat-square" alt="Version v4.252.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,7 +116,7 @@ irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/ins
 ```
 
 <<<<<<< HEAD
-**Bar 2: Version-Based Installation (v4.251.0)**
+**Bar 2: Version-Based Installation (v4.252.0)**
 =======
 **Bar 2: Version-Based Installation (v4.245.0)**
 >>>>>>> 054af6ca (Feature: telegram-fleet - backup prompt tree terminal indentation fleet caching and w1 lead alignment)
@@ -474,6 +474,13 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 ---
 
 ## 🔄 What's New
+
+- **v4.252.0** (2026-10-23):
+  - **Pipeline Protocol Decoupling & SSE Response Sanitization**: Implemented `pipeline_response_header_sanitizer` normalizing Gemini SSE response headers (`text/event-stream; charset=utf-8`, `cache-control: no-cache`, `connection: keep-alive`) while stripping upstream server telemetry (`server`, `alt-svc`, `set-cookie`, `x-goog-safety-ratings`, `x-goog-ratelimit-remaining`, `via`, `x-powered-by`); integrated `protocol_adapter_divergence_auditor` strictly decoupling inbound protocol adapters from uniform pipeline stages. (Thanks to @aukgit)
+  - **FIFO Database & Dead-Letter Queue Invariants**: Implemented `fifo_dead_letter_queue_spillover_guard` safely quarantining unrecoverable prompts into dead-letter storage while strictly enforcing `ORDER BY created_at ASC, id ASC` and preserving original `created_at` lineage; added `fifo_queue_drain_monotonicity_verifier` and `fifo_restore_transaction_coordinator` enforcing multi-table atomic transactions. (Thanks to @aukgit)
+  - **Caller IDE Self-Preservation & Process Ancestry**: Implemented `caller_process_ancestry_tree_scanner` traversing process PPID lineage upward up to 16 levels to detect caller IDE instances and prevent terminating the active developer workspace session; established `caller_ide_exit_code_enforcer` enforcing fail-fast exit code 2 on lifecycle commands (`stop`, `rm`, `switch`) targeting the caller instance without `--force`. (Thanks to @aukgit)
+  - **Desktop Window Control Capsules & UI Styling**: Implemented `window_control_capsule_formatter` wrapping Minimize, Maximize/Restore, and Close actions into contiguous segmented pill capsules (`rounded-full`, shared border, dark-glass backdrop, subtle dividers) with hover-danger styling; added `capsule_segmented_control_validator` enforcing transparent borderless styling for nested dropdowns; and added `truncation_omission_banner_formatter` parsing raw truncation callouts into interactive dark-glass omission banners. (Thanks to @aukgit)
+  - **Release Governance & Attribution Enforcement**: Implemented `github_release_notes_parity_guard` verifying GitHub release notes strictly attribute `@aukgit`, reject third-party handles, enforce strictly relative Git paths, and match `CHANGELOG.md` headings; enforced no-silent-errors rule across Rust and TypeScript. (Thanks to @aukgit)
 
 - **v4.236.0** (2026-10-19):
   - **Collapsible Session Overview Card with Memory**: Converted the session overview dashboard in `src/components/instances/PromptTreeView/PromptInstructionView.tsx` to be collapsed by default into a sleek single-line summary bar (~36px); added subtle low-profile purple expander trigger (`ChevronDown`/`ChevronUp`); persisted collapse/expand state in `localStorage` (`agm_prompt_overview_expanded`) across sessions; removed redundant title, sequence badge (`C211`), and conversation ID repetitions from inside the overview card. (Thanks to @aukgit)
