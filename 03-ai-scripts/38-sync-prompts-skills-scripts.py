@@ -89,6 +89,7 @@ def get_sync_dirs() -> list[tuple[str, str, bool]]:
     """Build dynamic sync directory mappings including shared specs 01 to 20."""
     dirs: list[tuple[str, str, bool]] = [
         ("01-prompts", "01-prompts", False),
+        # Skills update from the canonical set. Local-only skill folders are kept.
         (".agents/skills", ".agents/skills", False),
         (".cursor/skills", ".cursor/skills", False),
         ("03-ai-scripts", "03-ai-scripts", True),
@@ -130,6 +131,7 @@ EXCLUDE_NAMES = {
     ".DS_Store",
     "06-archive",
     "06-old-prompts",
+    "v4",
     "21-app",
     "21-app-issues",
     "21-app-db",
@@ -346,6 +348,14 @@ def copy_single_file(
         if dst_file.exists():
             return 0
 
+    # Fast-Path: If destination exists and matches source size & bytes, skip immediately
+    if dst_file.exists():
+        try:
+            if src_file.stat().st_size == dst_file.stat().st_size and src_file.read_bytes() == dst_file.read_bytes():
+                return 0
+        except Exception:
+            pass
+
     # Boundary 2: Additive-Only AI Scripts with repo modification checks
     if is_additive_only:
         if dst_file.exists():
@@ -370,6 +380,31 @@ def copy_single_file(
             else:
                 return 0
 
+    # Regression Protection for Skills & Prompts:
+    # If dst_file exists and is a markdown file, check if dst_file was modified in the target repo
+    # by a non-sync commit AND contains sections/headings that are missing in src_file.
+    # Never overwrite and destroy sections added by the target repository!
+    if dst_file.exists() and dst_file.suffix.lower() in (".md", ".markdown"):
+        if repo_root is not None:
+            try:
+                rel_to_repo = dst_file.relative_to(repo_root)
+                code_log, out_log, _ = run_cmd(["git", "log", "-n", "1", "--format=%s", "--", rel_to_repo.as_posix()], repo_root)
+
+                if code_log == 0 and out_log.strip():
+                    last_commit = out_log.strip().lower()
+
+                    if "sync" not in last_commit:
+                        dst_text = dst_file.read_text(encoding="utf-8", errors="replace")
+                        src_text = src_file.read_text(encoding="utf-8", errors="replace")
+                        dst_headings = {line.strip() for line in dst_text.splitlines() if re.match(r"^#{1,6}\s+", line.strip())}
+                        src_headings = {line.strip() for line in src_text.splitlines() if re.match(r"^#{1,6}\s+", line.strip())}
+                        missing_in_src = dst_headings - src_headings
+
+                        if missing_in_src:
+                            return 0
+            except Exception:
+                pass
+
     is_copy_needed = False
 
     if not dst_file.exists():
@@ -393,6 +428,12 @@ def copy_single_file(
     return 0
 
 
+def keeps_local_skill_dirs(dst: Path) -> bool:
+    """True for the two skill roots. Canonical skills still update. Target-only skills stay."""
+    norm = str(dst).replace("\\", "/").rstrip("/").lower()
+    return norm.endswith("/.agents/skills") or norm.endswith("/.cursor/skills")
+
+
 def mirror_directory(
     src: Path,
     dst: Path,
@@ -407,6 +448,9 @@ def mirror_directory(
       - Existing scripts modified by repo are NEVER overwritten.
       - Unmodified scripts have upstream prioritized.
       - New scripts from src are added.
+
+    Skill roots (`.agents/skills`, `.cursor/skills`) update canonical skills and
+    never delete a skill folder that exists only in the target repository.
 
     Memory & plans protection (Boundary 4):
       - Never delete or overwrite target repo memory or plans.
@@ -430,53 +474,12 @@ def mirror_directory(
     if not is_dry_run:
         dst.mkdir(parents=True, exist_ok=True)
 
-    # 1. Clean stale files/dirs in dst that are no longer in src (SKIPPED in additive mode)
-    if not is_additive_only:
-        if dst.exists():
-            for root, dirs, files in os.walk(dst, topdown=False):
-                rel_root = Path(root).relative_to(dst)
-                src_root = src / rel_root
+    # 1. Clean stale files/dirs in dst that are no longer in src.
+    # User Mandate & Non-Destructive Invariant: Under NO circumstances should any additional file
+    # created or updated by the target repository on its own be removed. The sync engine must be
+    # strictly non-destructive for repo-owned files: only update/replace canonical assets and add
+    # new canonical assets. Stale file deletion in target repositories is strictly disabled.
 
-                for f in files:
-                    dst_file = Path(root) / f
-                    src_file = src_root / f
-
-                    if f in EXCLUDE_NAMES:
-                        continue
-
-                    if dst_file.suffix.lower() in EXCLUDE_EXTS:
-                        continue
-
-                    if is_spec_21(dst_file):
-                        continue
-
-                    if is_protected_memory_or_plan(dst_file):
-                        continue
-
-                    if not src_file.exists():
-                        if not is_dry_run:
-                            dst_file.unlink(missing_ok=True)
-
-                        removed += 1
-
-                for d in dirs:
-                    dst_dir = Path(root) / d
-                    src_dir = src_root / d
-
-                    if d in EXCLUDE_NAMES:
-                        continue
-
-                    if is_spec_21(dst_dir):
-                        continue
-
-                    if is_protected_memory_or_plan(dst_dir):
-                        continue
-
-                    if not src_dir.exists():
-                        if not is_dry_run:
-                            shutil.rmtree(dst_dir, ignore_errors=True)
-
-                        removed += 1
 
     # 2. Copy files from src to dst
     for root, dirs, files in os.walk(src):
@@ -567,7 +570,7 @@ def mirror_conditional_guidelines(target: Path, is_dry_run: bool = False) -> tup
     return copied, removed
 
 
-def ensure_pre_release(target: Path, current_ver: str, is_dry_run: bool, is_no_push: bool) -> str:
+def ensure_pre_release(target: Path, current_ver: str, is_dry_run: bool, is_push_disabled: bool) -> str:
     """Ensure a pre-change release tag and release branch exist and are pushed for current HEAD."""
     _, head_tags, _ = run_cmd("git tag --points-at HEAD", target)
     existing_ver_tags = [
@@ -594,14 +597,14 @@ def ensure_pre_release(target: Path, current_ver: str, is_dry_run: bool, is_no_p
     if not is_dry_run:
         run_cmd(f"git branch -f {pre_rel_branch} HEAD", target)
 
-        if not is_no_push:
+        if not is_push_disabled:
             run_cmd(f"git push -u origin {pre_rel_branch}", target)
             run_cmd(f"git push origin {pre_tag}", target)
 
     return pre_tag
 
 
-def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) -> dict[str, object]:
+def sync_repo(target: Path, is_dry_run: bool = False, is_push_disabled: bool = False, is_force: bool = False) -> dict[str, object]:
     result: dict[str, object] = {
         "repo": target.name,
         "path": str(target),
@@ -633,6 +636,28 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
         run_cmd(f"git checkout {base_branch}", target)
         run_cmd(f"git pull origin {base_branch} --no-rebase", target)
 
+    # 1b. Daily-sync guard: at most one feat(sync) commit per repo per day.
+    # The first run of the day lands the canonical sync; later same-day runs
+    # return as no-ops, so the sync arrives as a single squashed daily commit
+    # instead of one commit per run. Pass --force to override.
+    if not is_dry_run and not is_force:
+        today_start = datetime.now().strftime("%Y-%m-%d 00:00")
+        _, log_out, _ = run_cmd(
+            f'git log --since="{today_start}" --format=%h%x09%s', target
+        )
+
+        for log_line in log_out.splitlines():
+            log_parts = log_line.split("\t", 1)
+
+            if len(log_parts) == 2 and log_parts[1].startswith("feat(sync)"):
+                print(
+                    f"[SKIP] {target.name:<32} | already synced today "
+                    f"({log_parts[0]}); daily-sync guard, use --force to override"
+                )
+                result["skipped"] = f"daily-sync guard: already synced today ({log_parts[0]})"
+
+                return result
+
     # 2. Create and push pre-change backup branch from HEAD, then return to base branch
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     backup_branch = f"backup/sync-{timestamp}"
@@ -641,7 +666,7 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
     if not is_dry_run:
         run_cmd(f"git checkout -b {backup_branch}", target)
 
-        if not is_no_push:
+        if not is_push_disabled:
             run_cmd(f"git push -u origin {backup_branch}", target)
 
         run_cmd(f"git checkout {base_branch}", target)
@@ -652,7 +677,7 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
         target,
         current_ver,
         is_dry_run=is_dry_run,
-        is_no_push=is_no_push,
+        is_push_disabled=is_push_disabled,
     )
     result["pre_release_tag"] = pre_tag
     current_ver = pre_tag.lstrip("v")
@@ -674,6 +699,52 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
             if dep_path.exists():
                 try:
                     dep_path.unlink()
+                except Exception:
+                    pass
+
+        # Purge deprecated Muse prompts consolidated into 01-muse-master-prompt.md
+        for dep_muse in (
+            "01-prompts/27-muse-prompts/02-muse-execute-in-a-step.md",
+            "01-prompts/27-muse-prompts/03-muse-master-with-repos.md",
+            "01-prompts/27-muse-prompts/04-muse-master-with-repos-v2.md",
+            "01-prompts/27-muse-prompts/05-muse-master-prompt-v2.md",
+        ):
+            dep_path = target / dep_muse
+            if dep_path.exists():
+                try:
+                    dep_path.unlink()
+                except Exception:
+                    pass
+
+        # Purge deprecated 100-improvements prompts superseded by next-100 suite
+        for dep_prompt in (
+            "01-prompts/30-improvements/01-find-100-improvements-in-ui-level.md",
+            "01-prompts/30-improvements/02-find-100-improvements-in-code-base.md",
+            "01-prompts/30-improvements/03-find-100-improvements-in-whole-system.md",
+            "01-prompts/30-improvements/04-detail-plans-and-improvements-for-review.md",
+        ):
+            dep_path = target / dep_prompt
+            if dep_path.exists():
+                try:
+                    dep_path.unlink()
+                except Exception:
+                    pass
+
+        # Purge deprecated 100-improvements skill directories superseded by next-100 suite
+        for dep_skill_dir in (
+            ".agents/skills/find-100-improvements-in-ui-level",
+            ".agents/skills/find-100-improvements-in-code-base",
+            ".agents/skills/find-100-improvements-in-whole-system",
+            ".agents/skills/detail-plans-and-improvements-for-review",
+            ".cursor/skills/find-100-improvements-in-ui-level",
+            ".cursor/skills/find-100-improvements-in-code-base",
+            ".cursor/skills/find-100-improvements-in-whole-system",
+            ".cursor/skills/detail-plans-and-improvements-for-review",
+        ):
+            dep_dir_path = target / dep_skill_dir
+            if dep_dir_path.exists():
+                try:
+                    shutil.rmtree(dep_dir_path, ignore_errors=True)
                 except Exception:
                     pass
 
@@ -705,6 +776,10 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
         has_dry_changes = (total_copied + total_removed) > 0
         result["changed"] = has_dry_changes
         result["release_tag"] = f"v{bump_patch_version(current_ver)}" if has_dry_changes else pre_tag
+        print(
+            f"[DRY-RUN] {target.name:<30} | Pre: {pre_tag:<9} | Post: {result['release_tag']:<9} | +{total_copied}/-{total_removed}",
+            flush=True,
+        )
 
         return result
 
@@ -714,7 +789,7 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
     if not out.strip():
         result["changed"] = False
         result["release_tag"] = pre_tag
-        result["pushed"] = not is_no_push
+        result["pushed"] = not is_push_disabled
 
         return result
 
@@ -723,7 +798,7 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
     # 6. Commit changes on base branch and push
     run_cmd("git add -A", target)
     commit_msg = (
-        "feat(sync): sync canonical prompts, skills, gitmap agent standards, and purge deprecated 46 task manager"
+        "feat(sync) - sync canonical v6 execute suite, gitmap heatmap telemetry, skills, and prompts"
     )
     code, out, err = run_cmd(f'git commit -m "{commit_msg}"', target)
 
@@ -734,7 +809,7 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
 
     result["committed"] = True
 
-    if not is_no_push:
+    if not is_push_disabled:
         run_cmd(f"git push -u origin {base_branch}", target)
 
     # 7. Post-change release ceremony: Bump patch version, create release branch & tag, and push
@@ -794,22 +869,22 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
 
     if is_ver_updated:
         run_cmd("git add -A", target)
-        run_cmd(f'git commit -m "chore(version): bump to {release_tag}"', target)
+        run_cmd(f'git commit -m "chore(version) - bump to {release_tag}"', target)
 
     run_cmd(
         f'git tag -a {release_tag} -m "Release {release_tag} - Synchronize prompts, skills, AI scripts, and coding guidelines"',
         target,
     )
 
-    if not is_no_push:
+    if not is_push_disabled:
         run_cmd(f"git push -u origin {release_branch}", target)
         run_cmd(f"git push origin {release_tag}", target)
 
     # Merge back into base branch and push
     run_cmd(f"git checkout {base_branch}", target)
-    run_cmd(f'git merge {release_branch} -m "chore(release): merge {release_tag} [skip ci]"', target)
+    run_cmd(f'git merge {release_branch} -m "chore(release) - merge {release_tag} [skip ci]"', target)
 
-    if not is_no_push:
+    if not is_push_disabled:
         p_code, p_out, p_err = run_cmd(f"git push origin {base_branch}", target)
 
         if p_code == 0:
@@ -818,7 +893,8 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
             result["error"] = f"Push failed: {p_err or p_out}"
 
     print(
-        f"[OK] {target.name:<32} | Pre: {pre_tag:<9} | Post: {release_tag:<9} | +{total_copied}/-{total_removed}"
+        f"[OK] {target.name:<32} | Pre: {pre_tag:<9} | Post: {release_tag:<9} | +{total_copied}/-{total_removed}",
+        flush=True,
     )
 
     return result
@@ -830,10 +906,12 @@ def main() -> None:
     parser.add_argument("--workers", "-w", type=int, default=6, help="Parallel worker count (default: 6)")
     parser.add_argument("--dry-run", action="store_true", help="Preview changes without committing or releasing")
     parser.add_argument("--no-push", action="store_true", help="Commit and create branches/tags locally without pushing")
+    parser.add_argument("--force", action="store_true", help="Bypass the once-per-day sync guard and sync even if a feat(sync) commit already landed today")
     args = parser.parse_args()
 
     is_dry_run = bool(args.dry_run)
-    is_no_push = bool(args.no_push)
+    is_push_disabled = bool(args.no_push)
+    is_force = bool(args.force)
 
     if args.repo:
         matching = [p for p in TARGET_REPOS if p.name.lower() == args.repo.lower()]
@@ -849,7 +927,8 @@ def main() -> None:
     print(f"Target count      : {len(targets)}")
     print(f"Workers           : {args.workers}")
     print(f"Dry run           : {is_dry_run}")
-    print(f"No push           : {is_no_push}")
+    print(f"No push           : {is_push_disabled}")
+    print(f"Force             : {is_force}")
     print("=" * 95)
 
     summary = []
@@ -858,7 +937,7 @@ def main() -> None:
     if has_parallel_pool:
         with ThreadPoolExecutor(max_workers=args.workers) as pool:
             future_map = {
-                pool.submit(sync_repo, t, is_dry_run, is_no_push): t for t in targets
+                pool.submit(sync_repo, t, is_dry_run, is_push_disabled, is_force): t for t in targets
             }
 
             for fut in as_completed(future_map):
@@ -881,7 +960,7 @@ def main() -> None:
                 summary.append(res)
     else:
         for t in targets:
-            res = sync_repo(t, is_dry_run=is_dry_run, is_no_push=is_no_push)
+            res = sync_repo(t, is_dry_run=is_dry_run, is_push_disabled=is_push_disabled, is_force=is_force)
             summary.append(res)
 
     summary.sort(key=lambda x: str(x["repo"]).lower())

@@ -570,7 +570,7 @@ def mirror_conditional_guidelines(target: Path, is_dry_run: bool = False) -> tup
     return copied, removed
 
 
-def ensure_pre_release(target: Path, current_ver: str, is_dry_run: bool, is_no_push: bool) -> str:
+def ensure_pre_release(target: Path, current_ver: str, is_dry_run: bool, is_push_disabled: bool) -> str:
     """Ensure a pre-change release tag and release branch exist and are pushed for current HEAD."""
     _, head_tags, _ = run_cmd("git tag --points-at HEAD", target)
     existing_ver_tags = [
@@ -597,14 +597,14 @@ def ensure_pre_release(target: Path, current_ver: str, is_dry_run: bool, is_no_p
     if not is_dry_run:
         run_cmd(f"git branch -f {pre_rel_branch} HEAD", target)
 
-        if not is_no_push:
+        if not is_push_disabled:
             run_cmd(f"git push -u origin {pre_rel_branch}", target)
             run_cmd(f"git push origin {pre_tag}", target)
 
     return pre_tag
 
 
-def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) -> dict[str, object]:
+def sync_repo(target: Path, is_dry_run: bool = False, is_push_disabled: bool = False, is_force: bool = False) -> dict[str, object]:
     result: dict[str, object] = {
         "repo": target.name,
         "path": str(target),
@@ -636,6 +636,28 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
         run_cmd(f"git checkout {base_branch}", target)
         run_cmd(f"git pull origin {base_branch} --no-rebase", target)
 
+    # 1b. Daily-sync guard: at most one feat(sync) commit per repo per day.
+    # The first run of the day lands the canonical sync; later same-day runs
+    # return as no-ops, so the sync arrives as a single squashed daily commit
+    # instead of one commit per run. Pass --force to override.
+    if not is_dry_run and not is_force:
+        today_start = datetime.now().strftime("%Y-%m-%d 00:00")
+        _, log_out, _ = run_cmd(
+            f'git log --since="{today_start}" --format=%h%x09%s', target
+        )
+
+        for log_line in log_out.splitlines():
+            log_parts = log_line.split("\t", 1)
+
+            if len(log_parts) == 2 and log_parts[1].startswith("feat(sync)"):
+                print(
+                    f"[SKIP] {target.name:<32} | already synced today "
+                    f"({log_parts[0]}); daily-sync guard, use --force to override"
+                )
+                result["skipped"] = f"daily-sync guard: already synced today ({log_parts[0]})"
+
+                return result
+
     # 2. Create and push pre-change backup branch from HEAD, then return to base branch
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     backup_branch = f"backup/sync-{timestamp}"
@@ -644,7 +666,7 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
     if not is_dry_run:
         run_cmd(f"git checkout -b {backup_branch}", target)
 
-        if not is_no_push:
+        if not is_push_disabled:
             run_cmd(f"git push -u origin {backup_branch}", target)
 
         run_cmd(f"git checkout {base_branch}", target)
@@ -655,7 +677,7 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
         target,
         current_ver,
         is_dry_run=is_dry_run,
-        is_no_push=is_no_push,
+        is_push_disabled=is_push_disabled,
     )
     result["pre_release_tag"] = pre_tag
     current_ver = pre_tag.lstrip("v")
@@ -767,7 +789,7 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
     if not out.strip():
         result["changed"] = False
         result["release_tag"] = pre_tag
-        result["pushed"] = not is_no_push
+        result["pushed"] = not is_push_disabled
 
         return result
 
@@ -787,7 +809,7 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
 
     result["committed"] = True
 
-    if not is_no_push:
+    if not is_push_disabled:
         run_cmd(f"git push -u origin {base_branch}", target)
 
     # 7. Post-change release ceremony: Bump patch version, create release branch & tag, and push
@@ -854,7 +876,7 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
         target,
     )
 
-    if not is_no_push:
+    if not is_push_disabled:
         run_cmd(f"git push -u origin {release_branch}", target)
         run_cmd(f"git push origin {release_tag}", target)
 
@@ -862,7 +884,7 @@ def sync_repo(target: Path, is_dry_run: bool = False, is_no_push: bool = False) 
     run_cmd(f"git checkout {base_branch}", target)
     run_cmd(f'git merge {release_branch} -m "chore(release) - merge {release_tag} [skip ci]"', target)
 
-    if not is_no_push:
+    if not is_push_disabled:
         p_code, p_out, p_err = run_cmd(f"git push origin {base_branch}", target)
 
         if p_code == 0:
@@ -884,10 +906,12 @@ def main() -> None:
     parser.add_argument("--workers", "-w", type=int, default=6, help="Parallel worker count (default: 6)")
     parser.add_argument("--dry-run", action="store_true", help="Preview changes without committing or releasing")
     parser.add_argument("--no-push", action="store_true", help="Commit and create branches/tags locally without pushing")
+    parser.add_argument("--force", action="store_true", help="Bypass the once-per-day sync guard and sync even if a feat(sync) commit already landed today")
     args = parser.parse_args()
 
     is_dry_run = bool(args.dry_run)
-    is_no_push = bool(args.no_push)
+    is_push_disabled = bool(args.no_push)
+    is_force = bool(args.force)
 
     if args.repo:
         matching = [p for p in TARGET_REPOS if p.name.lower() == args.repo.lower()]
@@ -903,7 +927,8 @@ def main() -> None:
     print(f"Target count      : {len(targets)}")
     print(f"Workers           : {args.workers}")
     print(f"Dry run           : {is_dry_run}")
-    print(f"No push           : {is_no_push}")
+    print(f"No push           : {is_push_disabled}")
+    print(f"Force             : {is_force}")
     print("=" * 95)
 
     summary = []
@@ -912,7 +937,7 @@ def main() -> None:
     if has_parallel_pool:
         with ThreadPoolExecutor(max_workers=args.workers) as pool:
             future_map = {
-                pool.submit(sync_repo, t, is_dry_run, is_no_push): t for t in targets
+                pool.submit(sync_repo, t, is_dry_run, is_push_disabled, is_force): t for t in targets
             }
 
             for fut in as_completed(future_map):
@@ -935,7 +960,7 @@ def main() -> None:
                 summary.append(res)
     else:
         for t in targets:
-            res = sync_repo(t, is_dry_run=is_dry_run, is_no_push=is_no_push)
+            res = sync_repo(t, is_dry_run=is_dry_run, is_push_disabled=is_push_disabled, is_force=is_force)
             summary.append(res)
 
     summary.sort(key=lambda x: str(x["repo"]).lower())
