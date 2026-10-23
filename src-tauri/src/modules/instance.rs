@@ -284,6 +284,11 @@ pub mod tests_sandboxed_storage_cleaner;
 pub mod tests_sandbox_purger;
 #[path = "instance/terminate_fallback_ladder.rs"]
 pub mod terminate_fallback_ladder;
+#[path = "instance/transient_sandbox_manager.rs"]
+pub mod transient_sandbox_manager;
+#[cfg(test)]
+#[path = "instance/tests_transient_sandbox_manager.rs"]
+pub mod tests_transient_sandbox_manager;
 #[path = "instance/tuning.rs"]
 pub mod tuning;
 #[path = "instance/vitality_scanner.rs"]
@@ -518,3 +523,4 @@ pub use profile_state_hasher::*;
 pub use binary_execution_probe::*;
 pub use remote_port_guard::*;
 pub use directory_permission_guard::*;
+pub use transient_sandbox_manager::*;

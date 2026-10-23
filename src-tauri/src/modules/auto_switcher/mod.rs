@@ -1,4 +1,5 @@
 pub mod account_staleness_detector;
+pub mod account_switch_audit_emitter;
 pub mod account_tier_filter;
 pub mod active_instance_prober;
 pub mod audit_enricher;
@@ -139,6 +140,8 @@ pub mod tests_quota_exhaustion_predictor;
 #[cfg(test)]
 pub mod tests_candidate_dynamic_scorer;
 #[cfg(test)]
+pub mod tests_account_switch_audit_emitter;
+#[cfg(test)]
 pub(crate) use crate::models::account::Account;
 #[cfg(test)]
 pub(crate) use tests_a::make_test_account;
@@ -153,6 +156,7 @@ pub mod velocity_spike_dampener;
 pub mod weekly_headroom_ratio;
 
 pub use account_staleness_detector::*;
+pub use account_switch_audit_emitter::*;
 pub use account_tier_filter::*;
 pub use active_instance_prober::*;
 pub use audit_enricher::*;

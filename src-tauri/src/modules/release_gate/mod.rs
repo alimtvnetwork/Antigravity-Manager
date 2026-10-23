@@ -36,6 +36,7 @@ pub mod preflight_gate_runner;
 pub mod profile_duplication_parity_guard;
 pub mod pr_scope_cohesion_verifier;
 pub mod pr_template_compliance_linter;
+pub mod rejection_breakdown_generator;
 pub mod remote_branch_base_verifier;
 pub mod risky_path_fallback_guard;
 pub mod rollback_ref_guard;
@@ -89,6 +90,8 @@ pub mod tests_pr_scope_cohesion;
 #[cfg(test)]
 pub mod tests_pr_template_linter;
 #[cfg(test)]
+pub mod tests_rejection_breakdown_generator;
+#[cfg(test)]
 pub mod tests_release_channel_gate;
 #[cfg(test)]
 pub mod tests_relative_path_linter;
@@ -140,6 +143,7 @@ pub use preflight_gate_runner::*;
 pub use profile_duplication_parity_guard::*;
 pub use pr_scope_cohesion_verifier::*;
 pub use pr_template_compliance_linter::*;
+pub use rejection_breakdown_generator::*;
 pub use remote_branch_base_verifier::*;
 pub use risky_path_fallback_guard::*;
 pub use rollback_ref_guard::*;
