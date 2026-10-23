@@ -48,7 +48,7 @@ pub fn verify_parent_child_hierarchy(parent_pid: u32, child_pid: u32) -> bool {
         return false;
     }
     let mut sys = System::new();
-    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
 
     let mut curr_pid = sysinfo::Pid::from_u32(child_pid);
     let target_parent = sysinfo::Pid::from_u32(parent_pid);

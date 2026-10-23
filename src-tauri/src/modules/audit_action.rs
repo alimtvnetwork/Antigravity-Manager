@@ -1,6 +1,7 @@
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuditAction {
+    Unknown = 0,
     AddAccount = 1,
     UpdateAccount = 2,
     SwitchAccount = 3,
@@ -28,6 +29,7 @@ impl AuditAction {
 
     pub fn pascal(self) -> &'static str {
         match self {
+            Self::Unknown => "Unknown",
             Self::AddAccount => "AddAccount",
             Self::UpdateAccount => "UpdateAccount",
             Self::SwitchAccount => "SwitchAccount",
@@ -46,6 +48,7 @@ impl AuditAction {
 
     pub fn title(self) -> &'static str {
         match self {
+            Self::Unknown => "Unknown",
             Self::AddAccount => "Add Account",
             Self::UpdateAccount => "Update Account",
             Self::SwitchAccount => "Switch Account",
@@ -64,6 +67,7 @@ impl AuditAction {
 
     pub fn from_code(code: i32) -> Option<Self> {
         match code {
+            0 => Some(Self::Unknown),
             1 => Some(Self::AddAccount),
             2 => Some(Self::UpdateAccount),
             3 => Some(Self::SwitchAccount),
@@ -84,6 +88,7 @@ impl AuditAction {
     pub fn from_legacy(raw: &str) -> Option<Self> {
         let folded = raw.trim().to_ascii_lowercase().replace([' ', '_', '-'], "");
         match folded.as_str() {
+            "unknown" | "0" => Some(Self::Unknown),
             "addaccount" | "1" => Some(Self::AddAccount),
             "updateaccount" | "2" => Some(Self::UpdateAccount),
             "switchaccount" | "3" => Some(Self::SwitchAccount),

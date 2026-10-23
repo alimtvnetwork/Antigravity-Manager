@@ -1,3 +1,5 @@
+use super::*;
+
 #[cfg(test)]
 mod tests {
     use super::env_token_scrubber::{EnvTokenScrubber, SENSITIVE_TOKEN_KEYS};

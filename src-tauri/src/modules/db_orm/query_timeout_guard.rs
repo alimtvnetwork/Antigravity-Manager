@@ -22,6 +22,6 @@ impl QueryTimeoutGuard {
 
     /// Clears any installed progress handler from the connection.
     pub fn clear_timeout_guard(conn: &Connection) {
-        conn.progress_handler(0, None);
+        conn.progress_handler(0, None::<fn() -> bool>);
     }
 }

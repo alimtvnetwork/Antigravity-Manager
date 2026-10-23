@@ -36,7 +36,7 @@ impl FreePageStepper {
 
         let step = max_step_pages.min(initial_free).max(1);
         conn.execute_batch(&format!("PRAGMA incremental_vacuum({});", step))
-            .map_err(|e| AppError::Database(format!("Incremental vacuum execution failed: {}", e)))?;
+            .map_err(AppError::Database)?;
 
         let final_free = Self::get_freelist_count(conn)?;
         let reclaimed = (initial_free - final_free).max(0);
@@ -52,15 +52,15 @@ impl FreePageStepper {
     fn get_freelist_count(conn: &Connection) -> Result<i64, AppError> {
         let mut stmt = conn
             .prepare("PRAGMA freelist_count;")
-            .map_err(|e| AppError::Database(format!("Prepare freelist_count failed: {}", e)))?;
+            .map_err(AppError::Database)?;
 
         let mut rows = stmt
             .query([])
-            .map_err(|e| AppError::Database(format!("Query freelist_count failed: {}", e)))?;
+            .map_err(AppError::Database)?;
 
         if let Some(row) = rows
             .next()
-            .map_err(|e| AppError::Database(format!("Read freelist_count row failed: {}", e)))?
+            .map_err(AppError::Database)?
         {
             Ok(row.get(0).unwrap_or(0))
         } else {

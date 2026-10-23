@@ -54,7 +54,7 @@ impl ReadinessEvaluator {
             token_valid,
             lease_available,
             quota_sufficient,
-            in_cooldown,
+            in_cooldown: is_cooldown,
             primary_gate_passed,
             rejection_reason,
         }

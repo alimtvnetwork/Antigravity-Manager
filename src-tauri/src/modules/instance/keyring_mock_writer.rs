@@ -35,7 +35,7 @@ impl KeyringMockWriter {
         // Ensure parent directory exists
         if !profile_dir.is_dir() {
             std::fs::create_dir_all(profile_dir)
-                .map_err(|e| AppError::Io(format!("Failed to create profile dir {}: {}", profile_dir.display(), e)))?;
+                .map_err(AppError::Io)?;
         }
 
         let timestamp = std::time::SystemTime::now()
@@ -46,7 +46,7 @@ impl KeyringMockWriter {
         let content = format!("mock-keyring-enabled=true\ncreated_epoch={}\n", timestamp);
 
         std::fs::write(&marker_path, content)
-            .map_err(|e| AppError::Io(format!("Failed to write keyring marker {}: {}", marker_path.display(), e)))?;
+            .map_err(AppError::Io)?;
 
         Ok(KeyringMarkerStatus {
             profile_dir: profile_dir.to_string_lossy().to_string(),

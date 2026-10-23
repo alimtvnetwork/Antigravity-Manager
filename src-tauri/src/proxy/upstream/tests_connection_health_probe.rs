@@ -1,3 +1,5 @@
+use super::*;
+
 #[cfg(test)]
 mod tests {
     use super::connection_health_probe::{ConnectionHealthProbe, ConnectionHealthState};

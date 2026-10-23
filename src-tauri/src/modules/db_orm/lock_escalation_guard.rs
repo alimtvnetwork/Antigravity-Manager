@@ -65,9 +65,14 @@ impl LockEscalationGuard {
             }
         }
 
-        Err(AppError::Database(format!(
-            "SQLite lock escalation failed after {} retries: {:?}",
-            cfg.max_retries, last_err
-        )))
+        match last_err {
+            Some(err) => Err(AppError::Database(err)),
+            // The retry loop always runs at least once, so reaching this
+            // return means an error was recorded; None is defensive only.
+            None => Err(AppError::Config(format!(
+                "SQLite lock escalation failed after {} retries",
+                cfg.max_retries
+            ))),
+        }
     }
 }

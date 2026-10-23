@@ -14,22 +14,22 @@ impl PageCacheAdjuster {
         let pragma_val = -safe_kib;
 
         conn.execute_batch(&format!("PRAGMA cache_size = {};", pragma_val))
-            .map_err(|e| AppError::Database(format!("Failed to set PRAGMA cache_size: {}", e)))
+            .map_err(AppError::Database)
     }
 
     /// Reads the current cache_size setting.
     pub fn get_current_cache_size(conn: &Connection) -> Result<i64, AppError> {
         let mut stmt = conn
             .prepare("PRAGMA cache_size;")
-            .map_err(|e| AppError::Database(format!("Failed to query cache_size: {}", e)))?;
+            .map_err(AppError::Database)?;
 
         let mut rows = stmt
             .query([])
-            .map_err(|e| AppError::Database(format!("Failed to execute cache_size query: {}", e)))?;
+            .map_err(AppError::Database)?;
 
         if let Some(row) = rows
             .next()
-            .map_err(|e| AppError::Database(format!("Failed to read cache_size row: {}", e)))?
+            .map_err(AppError::Database)?
         {
             let val: i64 = row.get(0).unwrap_or(0);
             Ok(val)

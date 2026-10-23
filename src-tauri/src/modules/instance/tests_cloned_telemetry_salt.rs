@@ -1,3 +1,5 @@
+use super::*;
+
 #[cfg(test)]
 mod tests {
     use super::cloned_telemetry_salt::ClonedTelemetrySalt;

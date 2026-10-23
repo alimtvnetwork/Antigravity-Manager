@@ -1,3 +1,5 @@
+use super::*;
+
 #[cfg(test)]
 mod tests {
     use super::cloned_guid_reseeder::{generate_synthetic_uuid, reseed_storage_json};

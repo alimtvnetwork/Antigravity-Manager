@@ -37,7 +37,7 @@ pub fn verify_sqlite_backup_file(path: &Path) -> BackupVerificationOutcome {
 
     let mut header = [0u8; 16];
     if let Err(e) = file.read_exact(&mut header) {
-        return BackupVerificationOutcome::IoError(e.to_string()),
+        return BackupVerificationOutcome::IoError(e.to_string());
     }
 
     if &header != SQLITE3_MAGIC_HEADER {

@@ -11,7 +11,7 @@ impl StateSnapshotRollback {
     /// Creates a timestamped backup copy of a configuration file.
     pub fn create_snapshot(file_path: &Path) -> Result<PathBuf, AppError> {
         if !file_path.is_file() {
-            return Err(AppError::Io(format!(
+            return Err(AppError::Config(format!(
                 "Cannot snapshot non-existent file: {}",
                 file_path.display()
             )));
@@ -23,13 +23,7 @@ impl StateSnapshotRollback {
             .unwrap_or(0);
 
         let backup_path = PathBuf::from(format!("{}.bak.{}", file_path.display(), now_ms));
-        std::fs::copy(file_path, &backup_path).map_err(|e| {
-            AppError::Io(format!(
-                "Failed to create state snapshot for {}: {}",
-                file_path.display(),
-                e
-            ))
-        })?;
+        std::fs::copy(file_path, &backup_path).map_err(AppError::Io)?;
 
         Ok(backup_path)
     }
@@ -37,20 +31,13 @@ impl StateSnapshotRollback {
     /// Restores a configuration file from its backup snapshot.
     pub fn rollback_snapshot(target_path: &Path, snapshot_path: &Path) -> Result<(), AppError> {
         if !snapshot_path.is_file() {
-            return Err(AppError::Io(format!(
+            return Err(AppError::Config(format!(
                 "Snapshot file does not exist: {}",
                 snapshot_path.display()
             )));
         }
 
-        std::fs::copy(snapshot_path, target_path).map_err(|e| {
-            AppError::Io(format!(
-                "Failed to rollback snapshot from {} to {}: {}",
-                snapshot_path.display(),
-                target_path.display(),
-                e
-            ))
-        })?;
+        std::fs::copy(snapshot_path, target_path).map_err(AppError::Io)?;
 
         // Cleanup temporary snapshot
         let _ = std::fs::remove_file(snapshot_path);

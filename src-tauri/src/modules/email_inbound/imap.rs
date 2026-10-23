@@ -317,7 +317,7 @@ pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<Str
     let now = Utc::now().timestamp();
     let effective_lookback = if lookback_seconds <= 0 { 3600 } else { lookback_seconds.max(1800) };
     let cutoff = now - effective_lookback;
-    let mut excluded = Vec::new();
+    let mut excluded: Vec<String> = Vec::new();
 
     for msg in messages {
         let is_json_switch = (msg.subject.contains("[JSON]")
@@ -396,13 +396,13 @@ pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<Str
 /// Imp-71: Send IMAP NOOP Keepalive
 /// Executes a fast IMAP NOOP command across active email accounts to refresh TCP sockets and keep idle connections alive.
 pub async fn send_imap_keepalive() -> usize {
-    let accounts = match email_vault_db::list_accounts() {
+    let accounts = match email_vault_db::list_email_accounts() {
         Ok(accs) => accs,
         Err(_) => return 0,
     };
 
     let mut touched = 0;
-    for acc in accounts.iter().filter(|a| a.is_inbound_enabled) {
+    for acc in accounts.iter().filter(|a| a.is_active) {
         crate::modules::logger::log_info(&format!(
             "[EmailInbound] Dispatched IMAP NOOP keepalive probe for account {}",
             acc.email

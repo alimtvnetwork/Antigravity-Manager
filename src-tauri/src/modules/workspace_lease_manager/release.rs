@@ -28,7 +28,7 @@ pub async fn renew_lease(account_id: &str, ttl_secs: i64) -> Result<bool, AppErr
     });
 
     let query = format!("account_id=eq.{}&node_id=eq.{}", account_id, node_id);
-    let patch_res = client.patch("workspace_leases", &query, payload).await;
+    let patch_res = client.update("workspace_leases", &query, payload).await;
     match patch_res {
         Ok(_) => {
             tracing::debug!("Successfully renewed lease for {account_id} until {new_expires}");

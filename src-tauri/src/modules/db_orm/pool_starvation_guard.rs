@@ -89,7 +89,7 @@ impl PoolStarvationGuard {
             if elapsed > self.warn_threshold {
                 alerts.push(StarvationAlert {
                     db_name: lease.db_name.clone(),
-                    tag: lease.tag.clone(),
+                    checkout_tag: lease.tag.clone(),
                     duration_ms: elapsed.as_millis() as u64,
                 });
             }

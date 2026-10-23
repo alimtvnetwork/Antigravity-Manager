@@ -44,15 +44,15 @@ impl PragmaDiagnosticReporter {
     fn query_string_pragma(conn: &Connection, pragma: &str) -> Result<String, AppError> {
         let mut stmt = conn
             .prepare(&format!("PRAGMA {};", pragma))
-            .map_err(|e| AppError::Database(format!("Pragma query failed for {}: {}", pragma, e)))?;
+            .map_err(AppError::Database)?;
 
         let mut rows = stmt
             .query([])
-            .map_err(|e| AppError::Database(format!("Pragma execute failed for {}: {}", pragma, e)))?;
+            .map_err(AppError::Database)?;
 
         if let Some(row) = rows
             .next()
-            .map_err(|e| AppError::Database(format!("Pragma read failed for {}: {}", pragma, e)))?
+            .map_err(AppError::Database)?
         {
             Ok(row.get(0).unwrap_or_default())
         } else {
@@ -63,15 +63,15 @@ impl PragmaDiagnosticReporter {
     fn query_int_pragma(conn: &Connection, pragma: &str) -> Result<i64, AppError> {
         let mut stmt = conn
             .prepare(&format!("PRAGMA {};", pragma))
-            .map_err(|e| AppError::Database(format!("Pragma query failed for {}: {}", pragma, e)))?;
+            .map_err(AppError::Database)?;
 
         let mut rows = stmt
             .query([])
-            .map_err(|e| AppError::Database(format!("Pragma execute failed for {}: {}", pragma, e)))?;
+            .map_err(AppError::Database)?;
 
         if let Some(row) = rows
             .next()
-            .map_err(|e| AppError::Database(format!("Pragma read failed for {}: {}", pragma, e)))?
+            .map_err(AppError::Database)?
         {
             Ok(row.get(0).unwrap_or(0))
         } else {

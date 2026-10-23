@@ -1,3 +1,5 @@
+use super::*;
+
 #[cfg(test)]
 mod tests {
     use super::lock_contention_watchdog::{LockContentionStatus, LockContentionWatchdog};

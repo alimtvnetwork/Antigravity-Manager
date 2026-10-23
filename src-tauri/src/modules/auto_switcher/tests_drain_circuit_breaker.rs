@@ -1,3 +1,5 @@
+use super::*;
+
 #[cfg(test)]
 mod tests {
     use super::drain_circuit_breaker::{CircuitBreakerState, DrainCircuitBreaker};

@@ -31,18 +31,18 @@ impl ColumnDefaultValidator {
         let sql = format!("PRAGMA table_info('{}');", table_name);
         let mut stmt = conn
             .prepare(&sql)
-            .map_err(|e| AppError::Database(format!("Prepare table_info failed: {}", e)))?;
+            .map_err(AppError::Database)?;
 
         let mut rows = stmt
             .query([])
-            .map_err(|e| AppError::Database(format!("Query table_info failed: {}", e)))?;
+            .map_err(AppError::Database)?;
 
         let mut columns = Vec::new();
         let mut missing_defaults = Vec::new();
 
         while let Some(row) = rows
             .next()
-            .map_err(|e| AppError::Database(format!("Read column row failed: {}", e)))?
+            .map_err(AppError::Database)?
         {
             let cid: i64 = row.get(0).unwrap_or(0);
             let name: String = row.get(1).unwrap_or_default();

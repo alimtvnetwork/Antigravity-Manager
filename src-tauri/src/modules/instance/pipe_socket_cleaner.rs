@@ -17,7 +17,7 @@ impl PipeSocketCleaner {
         let mut cleaned_count = 0usize;
 
         let entries = std::fs::read_dir(runtime_dir)
-            .map_err(|e| AppError::Io(format!("Failed to read runtime directory: {}", e)))?;
+            .map_err(AppError::Io)?;
 
         for entry in entries.flatten() {
             let path = entry.path();

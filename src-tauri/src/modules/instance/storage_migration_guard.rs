@@ -17,7 +17,7 @@ impl StorageMigrationGuard {
         }
 
         let content = std::fs::read_to_string(storage_path)
-            .map_err(|e| AppError::Io(format!("Failed to read storage.json: {}", e)))?;
+            .map_err(AppError::Io)?;
 
         let mut root: Value = serde_json::from_str(&content)
             .unwrap_or_else(|_| json!({}));
@@ -45,7 +45,7 @@ impl StorageMigrationGuard {
                 .map_err(|e| AppError::Config(format!("Failed to serialize migrated storage.json: {}", e)))?;
 
             std::fs::write(storage_path, serialized)
-                .map_err(|e| AppError::Io(format!("Failed to write migrated storage.json: {}", e)))?;
+                .map_err(AppError::Io)?;
         }
 
         Ok(modified)

@@ -1,3 +1,5 @@
+use super::*;
+
 #[cfg(test)]
 mod tests {
     use super::tls_sni_sanitizer::{sanitize_tls_sni, SanitizedSni};

@@ -263,7 +263,7 @@ pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<Activ
             let full_transcript_path = logs_dir.join("transcript_full.jsonl");
             let transcript_file = resolve_transcript_path(&base_dir, &cid);
 
-            let (user_prompt, image_payload) = match transcript_file {
+            let (mut user_prompt, image_payload) = match transcript_file {
                 Some(tf) => match fs::read_to_string(&tf) {
                     Ok(c) => extract_user_prompt_and_media(&c, &full_transcript_path),
                     Err(_) => (None, None),

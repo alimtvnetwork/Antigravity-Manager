@@ -24,19 +24,19 @@ impl HeaderChecksumGuard {
     /// Inspects the first 100 bytes of a SQLite database file on disk.
     pub fn validate_file(db_path: &Path) -> Result<HeaderValidationResult, AppError> {
         if !db_path.is_file() {
-            return Err(AppError::Database(format!(
+            return Err(AppError::Config(format!(
                 "Database file does not exist: {}",
                 db_path.display()
             )));
         }
 
         let mut file = File::open(db_path)
-            .map_err(|e| AppError::Io(format!("Failed to open database file: {}", e)))?;
+            .map_err(AppError::Io)?;
 
         let mut header = [0u8; 100];
         let bytes_read = file
             .read(&mut header)
-            .map_err(|e| AppError::Io(format!("Failed to read database header: {}", e)))?;
+            .map_err(AppError::Io)?;
 
         if bytes_read < 100 {
             return Ok(HeaderValidationResult {

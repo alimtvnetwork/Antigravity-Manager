@@ -30,18 +30,18 @@ impl SplitDbOrphanChecker {
 
         let mut stmt = backup_conn
             .prepare(&sql)
-            .map_err(|e| AppError::Database(format!("Prepare orphan check query failed: {}", e)))?;
+            .map_err(AppError::Database)?;
 
         let mut rows = stmt
             .query([])
-            .map_err(|e| AppError::Database(format!("Query orphan records failed: {}", e)))?;
+            .map_err(AppError::Database)?;
 
         let mut total = 0usize;
         let mut orphans = Vec::new();
 
         while let Some(row) = rows
             .next()
-            .map_err(|e| AppError::Database(format!("Orphan row read error: {}", e)))?
+            .map_err(AppError::Database)?
         {
             let id: String = row.get(0).unwrap_or_default();
             let conv_id: Option<String> = row.get(1).ok();

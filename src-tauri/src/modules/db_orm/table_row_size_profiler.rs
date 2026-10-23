@@ -32,11 +32,11 @@ impl TableRowSizeProfiler {
 
         let mut stmt = conn
             .prepare(&sql)
-            .map_err(|e| AppError::Database(format!("Failed to prepare row size query: {}", e)))?;
+            .map_err(AppError::Database)?;
 
         let mut rows = stmt
             .query([])
-            .map_err(|e| AppError::Database(format!("Failed to execute row size query: {}", e)))?;
+            .map_err(AppError::Database)?;
 
         let mut total_bytes = 0usize;
         let mut max_bytes = 0usize;
@@ -45,7 +45,7 @@ impl TableRowSizeProfiler {
 
         while let Some(row) = rows
             .next()
-            .map_err(|e| AppError::Database(format!("Row iteration error: {}", e)))?
+            .map_err(AppError::Database)?
         {
             let bytes: usize = row.get(0).unwrap_or(0);
             total_bytes += bytes;
