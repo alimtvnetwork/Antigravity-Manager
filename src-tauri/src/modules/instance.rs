@@ -321,6 +321,11 @@ pub mod workspace_storage_continuity_verifier;
 #[cfg(test)]
 #[path = "instance/tests_workspace_storage_continuity_verifier.rs"]
 pub mod tests_workspace_storage_continuity_verifier;
+#[path = "instance/caller_ide_exit_code_enforcer.rs"]
+pub mod caller_ide_exit_code_enforcer;
+#[cfg(test)]
+#[path = "instance/tests_caller_ide_exit_code_enforcer.rs"]
+pub mod tests_caller_ide_exit_code_enforcer;
 #[path = "instance/env_token_scrubber.rs"]
 pub mod env_token_scrubber;
 #[path = "instance/socket_lock_recovery.rs"]
@@ -345,6 +350,11 @@ pub mod binary_execution_probe;
 pub mod remote_port_guard;
 #[path = "instance/directory_permission_guard.rs"]
 pub mod directory_permission_guard;
+#[path = "instance/caller_ide_exit_code_enforcer.rs"]
+pub mod caller_ide_exit_code_enforcer;
+#[cfg(test)]
+#[path = "instance/tests_caller_ide_exit_code_enforcer.rs"]
+pub mod tests_caller_ide_exit_code_enforcer;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use arg_normalizer::*;
@@ -536,3 +546,5 @@ pub use directory_permission_guard::*;
 pub use transient_sandbox_manager::*;
 pub use job_breakaway_process_spawner::*;
 pub use workspace_storage_continuity_verifier::*;
+pub use caller_ide_exit_code_enforcer::*;
+pub use caller_ide_exit_code_enforcer::*;

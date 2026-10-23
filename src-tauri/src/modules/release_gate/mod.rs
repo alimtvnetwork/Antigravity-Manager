@@ -35,9 +35,11 @@ pub mod no_silent_errors_linter;
 pub mod origin_tier_hierarchy_guard;
 pub mod path_hygiene;
 pub mod pipeline_protocol_decoupling_guard;
+pub mod preflight_checks_gate;
 pub mod preflight_gate_runner;
 pub mod profile_duplication_parity_guard;
 pub mod pr_scope_cohesion_verifier;
+pub mod pr_template_compliance_guard;
 pub mod pr_template_compliance_linter;
 pub mod published_tip_rewrite_guard;
 pub mod readme_changelog_sync_gate;
@@ -101,11 +103,15 @@ pub mod tests_origin_tier_hierarchy;
 #[cfg(test)]
 pub mod tests_pipeline_protocol_decoupling;
 #[cfg(test)]
+pub mod tests_preflight_checks_gate;
+#[cfg(test)]
 pub mod tests_preflight_gate;
 #[cfg(test)]
 pub mod tests_profile_duplication_parity;
 #[cfg(test)]
 pub mod tests_pr_scope_cohesion;
+#[cfg(test)]
+pub mod tests_pr_template_compliance_guard;
 #[cfg(test)]
 pub mod tests_pr_template_linter;
 #[cfg(test)]
@@ -181,9 +187,11 @@ pub use no_silent_errors_linter::*;
 pub use origin_tier_hierarchy_guard::*;
 pub use path_hygiene::*;
 pub use pipeline_protocol_decoupling_guard::*;
+pub use preflight_checks_gate::*;
 pub use preflight_gate_runner::*;
 pub use profile_duplication_parity_guard::*;
 pub use pr_scope_cohesion_verifier::*;
+pub use pr_template_compliance_guard::*;
 pub use pr_template_compliance_linter::*;
 pub use published_tip_rewrite_guard::*;
 pub use readme_changelog_sync_gate::*;

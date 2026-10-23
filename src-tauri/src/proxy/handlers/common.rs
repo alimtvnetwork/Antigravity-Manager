@@ -54,6 +54,7 @@ pub mod stream_boundary_guard;
 pub mod stream_drain_guard;
 pub mod stream_early_abort_sentinel;
 pub mod stream_flusher;
+pub mod thinking_budget_filter_pipeline;
 pub mod token_budget_decider;
 pub mod tool_response_formatter;
 pub mod unified_context_structural_aligner;
@@ -105,6 +106,8 @@ pub mod tests_sse_heartbeat_generator;
 #[cfg(test)]
 pub mod tests_token_budget_decider;
 #[cfg(test)]
+pub mod tests_thinking_budget_filter_pipeline;
+#[cfg(test)]
 pub mod tests_prefix_stability_pipeline_guard;
 #[cfg(test)]
 pub mod tests_prefix_stability_sanitizer;
@@ -153,6 +156,7 @@ pub use stream_boundary_guard::*;
 pub use stream_drain_guard::*;
 pub use stream_early_abort_sentinel::*;
 pub use stream_flusher::{StreamFlusher, SSE_KEEPALIVE_BYTES};
+pub use thinking_budget_filter_pipeline::*;
 pub use token_budget_decider::*;
 pub use tool_response_formatter::*;
 pub use unified_context_structural_aligner::*;

@@ -23,6 +23,7 @@ pub mod db_size_watchdog;
 pub mod deadlock_detector;
 pub mod dump;
 pub mod fifo_prompt_queue_coordinator;
+pub mod fifo_prompt_restore_validator;
 pub mod fk_resolver;
 pub mod foreign_key_action_validator;
 pub mod foreign_key_watchdog;
@@ -156,11 +157,14 @@ pub mod tests_page_cache_manager;
 #[cfg(test)]
 pub mod tests_fifo_prompt_queue_coordinator;
 #[cfg(test)]
+pub mod tests_fifo_prompt_restore_validator;
+#[cfg(test)]
 pub mod tests_connection_starvation_watchdog;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;
 pub use fifo_prompt_queue_coordinator::*;
+pub use fifo_prompt_restore_validator::*;
 pub use builder::{Order, QueryBuilder, ViewQueryBuilder};
 pub use busy_handler::*;
 pub use busy_retry::*;
