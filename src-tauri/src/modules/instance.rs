@@ -385,6 +385,11 @@ pub mod prompt_tree_branch_hierarchy_formatter;
 #[cfg(test)]
 #[path = "instance/tests_prompt_tree_branch_hierarchy_formatter.rs"]
 pub mod tests_prompt_tree_branch_hierarchy_formatter;
+#[path = "instance/capsule_segmented_control_validator.rs"]
+pub mod capsule_segmented_control_validator;
+#[cfg(test)]
+#[path = "instance/tests_capsule_segmented_control_validator.rs"]
+pub mod tests_capsule_segmented_control_validator;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use arg_normalizer::*;
@@ -584,3 +589,4 @@ pub use side_effect_order_enforcer::*;
 pub use caller_ide_heartbeat_watchdog::*;
 pub use settings_deep_merge_validator::*;
 pub use prompt_tree_branch_hierarchy_formatter::*;
+pub use capsule_segmented_control_validator::*;

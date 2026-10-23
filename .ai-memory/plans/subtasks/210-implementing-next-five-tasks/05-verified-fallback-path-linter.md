@@ -1,5 +1,5 @@
 # Subtask 05: Verified Fallback Path Linter (`Imp-679`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 210-implementing-next-five-tasks.md
 
 ## Scope & Objective

@@ -1,5 +1,5 @@
 # Subtask 04: FIFO Prompt Restore Concurrency Limiter (`Imp-678`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 210-implementing-next-five-tasks.md
 
 ## Scope & Objective

@@ -44,6 +44,7 @@ pub mod preflight_checks_gate;
 pub mod preflight_clippy_gate;
 pub mod preflight_gate_runner;
 pub mod profile_duplication_parity_guard;
+pub mod pr_problem_classification_linter;
 pub mod pr_scope_cohesion_verifier;
 pub mod pr_template_compliance_guard;
 pub mod pr_template_compliance_linter;
@@ -74,6 +75,7 @@ pub mod transcript_deep_inspection_scanner;
 pub mod transcript_full_log_reverse_scanner;
 pub mod truncation_callout_parser_guard;
 pub mod unverified_paths_disclosure_guard;
+pub mod verified_fallback_path_linter;
 pub mod wildcard_model_routing_guard;
 
 #[cfg(test)]
@@ -132,6 +134,8 @@ pub mod tests_preflight_clippy_gate;
 pub mod tests_preflight_gate;
 #[cfg(test)]
 pub mod tests_profile_duplication_parity;
+#[cfg(test)]
+pub mod tests_pr_problem_classification_linter;
 #[cfg(test)]
 pub mod tests_pr_scope_cohesion;
 #[cfg(test)]
@@ -197,6 +201,8 @@ pub mod tests_truncation_callout_parser;
 #[cfg(test)]
 pub mod tests_unverified_paths_disclosure_guard;
 #[cfg(test)]
+pub mod tests_verified_fallback_path_linter;
+#[cfg(test)]
 pub mod tests_version_manifest_sync;
 #[cfg(test)]
 pub mod tests_wildcard_model_routing;
@@ -232,6 +238,7 @@ pub use preflight_checks_gate::*;
 pub use preflight_clippy_gate::*;
 pub use preflight_gate_runner::*;
 pub use profile_duplication_parity_guard::*;
+pub use pr_problem_classification_linter::*;
 pub use pr_scope_cohesion_verifier::*;
 pub use pr_template_compliance_guard::*;
 pub use pr_template_compliance_linter::*;
@@ -262,4 +269,5 @@ pub use transcript_deep_inspection_scanner::*;
 pub use transcript_full_log_reverse_scanner::*;
 pub use truncation_callout_parser_guard::*;
 pub use unverified_paths_disclosure_guard::*;
+pub use verified_fallback_path_linter::*;
 pub use wildcard_model_routing_guard::*;

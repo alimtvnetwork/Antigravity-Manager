@@ -1,5 +1,5 @@
 # Subtask 02: Capsule Segmented Control Styling Validator (`Imp-676`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 210-implementing-next-five-tasks.md
 
 ## Scope & Objective

@@ -1,5 +1,5 @@
 # Subtask 03: PR Single Problem Scope Classification Linter (`Imp-677`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 210-implementing-next-five-tasks.md
 
 ## Scope & Objective

@@ -63,6 +63,7 @@ pub mod thinking_budget_headroom_evaluator;
 pub mod thinking_budget_proportional_allocator;
 pub mod token_budget_decider;
 pub mod tool_response_formatter;
+pub mod unified_context_alignment_guard;
 pub mod unified_context_structural_aligner;
 pub mod user_agent_normalizer;
 #[cfg(test)]
@@ -130,6 +131,8 @@ pub mod tests_prefix_stability_sanitizer;
 #[cfg(test)]
 pub mod tests_protocol_adapter_divergence_auditor;
 #[cfg(test)]
+pub mod tests_unified_context_alignment_guard;
+#[cfg(test)]
 pub mod tests_unified_context_structural_aligner;
 
 pub use abort_sentinel::*;
@@ -183,6 +186,7 @@ pub use thinking_budget_headroom_evaluator::*;
 pub use thinking_budget_proportional_allocator::*;
 pub use token_budget_decider::*;
 pub use tool_response_formatter::*;
+pub use unified_context_alignment_guard::*;
 pub use unified_context_structural_aligner::*;
 pub use user_agent_normalizer::*;
 
