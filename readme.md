@@ -115,11 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-<<<<<<< HEAD
 **Bar 2: Version-Based Installation (v4.252.0)**
-=======
-**Bar 2: Version-Based Installation (v4.245.0)**
->>>>>>> 054af6ca (Feature: telegram-fleet - backup prompt tree terminal indentation fleet caching and w1 lead alignment)
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
