@@ -62,10 +62,10 @@ fn test_restore_outcome_honesty_struct_and_accessors() {
 }
 
 #[test]
-fn test_live_status_dedup_preserves_running_and_completed_only() {
+fn test_live_status_dedup_preserves_completed_only() {
     assert!(
-        is_live_status_preserved(Some("running")),
-        "Running prompt must be preserved to prevent duplicate execution"
+        !is_live_status_preserved(Some("running")),
+        "Interrupted running prompt must NOT be preserved so it re-executes on rotated account"
     );
     assert!(
         is_live_status_preserved(Some("completed")),

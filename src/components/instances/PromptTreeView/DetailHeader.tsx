@@ -366,12 +366,13 @@ export function DetailHeader(props: DetailHeaderProps) {
                 ...(attachedImage ? [attachedImage.dataUri, attachedImage.path] : []),
             ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
 
+            const effectiveOption: RerunMessageOption = rerunMessageOption || 'randomized';
             const result = await dispatchRerunMessages({
                 targetInstId,
                 repoPath: effectiveRepoPath,
                 convId: targetConvId,
                 count: rerunCount,
-                messageOption: rerunMessageOption,
+                messageOption: effectiveOption,
                 originalPrompt: promptWithImage,
                 source: 'DetailHeader.rerunSection',
                 mediaPaths: rerunMediaList,

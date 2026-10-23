@@ -13,14 +13,18 @@ impl ProcessVitalityProbe {
 
         #[cfg(target_os = "windows")]
         {
-            use windows_sys::Win32::Foundation::CloseHandle;
-            use windows_sys::Win32::System::Threading::{
-                GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
-            };
+            #[link(name = "kernel32")]
+            extern "system" {
+                fn OpenProcess(access: u32, inherit: i32, pid: u32) -> *mut std::ffi::c_void;
+                fn GetExitCodeProcess(handle: *mut std::ffi::c_void, code: *mut u32) -> i32;
+                fn CloseHandle(handle: *mut std::ffi::c_void) -> i32;
+            }
+            const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+            const STILL_ACTIVE: u32 = 259;
 
             unsafe {
                 let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
-                if handle == 0 {
+                if handle.is_null() {
                     return false;
                 }
 
@@ -29,7 +33,7 @@ impl ProcessVitalityProbe {
                 CloseHandle(handle);
 
                 // STILL_ACTIVE is 259
-                success != 0 && exit_code == 259
+                success != 0 && exit_code == STILL_ACTIVE
             }
         }
 

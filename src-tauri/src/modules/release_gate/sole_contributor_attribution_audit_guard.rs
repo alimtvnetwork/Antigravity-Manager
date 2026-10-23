@@ -82,7 +82,10 @@ impl fmt::Display for AttributionFinding {
                 write!(f, "Unauthorized third-party handle detected: '{h}'")
             }
             Self::MissingAttributionTrailer => {
-                write!(f, "Missing standard attribution trailer: '(Thanks to @aukgit)'")
+                write!(
+                    f,
+                    "Missing standard attribution trailer: '(Thanks to @aukgit)'"
+                )
             }
         }
     }
@@ -131,10 +134,16 @@ impl fmt::Display for SilentErrorFinding {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::BareResultDiscarded { file, line } => {
-                write!(f, "Bare result discarded without error routing at {file}:{line}")
+                write!(
+                    f,
+                    "Bare result discarded without error routing at {file}:{line}"
+                )
             }
             Self::BareCatchWithoutTracking { file, line } => {
-                write!(f, "Bare catch block without error tracking at {file}:{line}")
+                write!(
+                    f,
+                    "Bare catch block without error tracking at {file}:{line}"
+                )
             }
             Self::DocumentedIgnoredResult => {
                 write!(f, "Documented best-effort ignore with valid justification")
@@ -327,7 +336,9 @@ pub fn audit_silent_error_patterns(source_code: &str, file_name: &str) -> Vec<Si
         }
 
         // 3. Rust: bare `.ok();` discarding error without propagation
-        if trimmed.ends_with(".ok();") || (trimmed.contains(".ok();") && !trimmed.contains(".ok()?")) {
+        if trimmed.ends_with(".ok();")
+            || (trimmed.contains(".ok();") && !trimmed.contains(".ok()?"))
+        {
             if has_justification_comment(&lines, idx) {
                 findings.push(SilentErrorFinding::DocumentedIgnoredResult);
             } else {
@@ -364,7 +375,9 @@ pub fn audit_silent_error_patterns(source_code: &str, file_name: &str) -> Vec<Si
 
         // 5. TypeScript: bare catch block
         if is_ts
-            && (trimmed.contains("catch {") || trimmed.contains("catch (") || trimmed.contains("catch("))
+            && (trimmed.contains("catch {")
+                || trimmed.contains("catch (")
+                || trimmed.contains("catch("))
         {
             if trimmed.ends_with("{}") || trimmed.ends_with("{ }") {
                 findings.push(SilentErrorFinding::BareCatchWithoutTracking {

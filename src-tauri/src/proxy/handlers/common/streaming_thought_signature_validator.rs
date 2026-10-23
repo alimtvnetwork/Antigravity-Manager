@@ -234,10 +234,10 @@ pub fn validate_thought_stream_chunk(
     let mut findings = Vec::new();
     let mut total_thought_bytes: usize = 0;
 
-    let has_explicit_thought_true = sanitized.contains(r#""thought":true"#)
-        || sanitized.contains(r#""thought": true"#);
-    let has_explicit_thought_false = sanitized.contains(r#""thought":false"#)
-        || sanitized.contains(r#""thought": false"#);
+    let has_explicit_thought_true =
+        sanitized.contains(r#""thought":true"#) || sanitized.contains(r#""thought": true"#);
+    let has_explicit_thought_false =
+        sanitized.contains(r#""thought":false"#) || sanitized.contains(r#""thought": false"#);
 
     let has_open_tag = sanitized.contains(THOUGHT_TAG_OPEN);
     let has_close_tag = sanitized.contains(THOUGHT_TAG_CLOSE);
@@ -368,7 +368,13 @@ pub fn repair_truncated_thought_block(text: &str) -> String {
 
     // Check for partial closing tag truncated at the end
     let partial_closing_prefixes = [
-        "</thought", "</thoug", "</thou", "</tho", "</th", "</t", "</",
+        "</thought",
+        "</thoug",
+        "</thou",
+        "</tho",
+        "</th",
+        "</t",
+        "</",
     ];
 
     for prefix in &partial_closing_prefixes {
@@ -381,9 +387,7 @@ pub fn repair_truncated_thought_block(text: &str) -> String {
     }
 
     // Check for partial opening tag truncated at the end
-    let partial_opening_prefixes = [
-        "<thought", "<thoug", "<thou", "<tho", "<th", "<t", "<",
-    ];
+    let partial_opening_prefixes = ["<thought", "<thoug", "<thou", "<tho", "<th", "<t", "<"];
     for prefix in &partial_opening_prefixes {
         if repaired.ends_with(prefix) && !repaired.ends_with(THOUGHT_TAG_OPEN) {
             let trim_len = repaired.len() - prefix.len();

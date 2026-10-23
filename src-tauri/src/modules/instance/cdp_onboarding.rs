@@ -645,7 +645,16 @@ pub fn submit_prompt_via_cdp_for_instance(
             super::storage::get_default_antigravity_data_dir()
         };
 
-    let ports = read_active_ports(&data_dir);
+    let mut ports = read_active_ports(&data_dir);
+    if ports.is_empty() {
+        for _ in 0..4 {
+            std::thread::sleep(std::time::Duration::from_millis(400));
+            ports = read_active_ports(&data_dir);
+            if !ports.is_empty() {
+                break;
+            }
+        }
+    }
     if ports.is_empty() {
         return Err(format!(
             "No active DevTools port found for instance '{}' (data_dir: {:?})",

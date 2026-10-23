@@ -401,6 +401,56 @@ pub fn select_candidate_profiles(
         }
     }
 
+    // 3b. Emergency Fallback: If no candidate met quota > threshold, fall back to any healthy account with headroom (> 5.0%)
+    if available_pool.is_empty() && cooldown_pool.is_empty() {
+        for acc in &all_accounts {
+            if seen_account_ids.contains(&acc.id) {
+                continue;
+            }
+            if is_account_excluded(&effective_exclusions, &acc.id, &acc.email) {
+                continue;
+            }
+            if acc.disabled || acc.proxy_disabled || is_account_validation_blocked(acc, now_sec) {
+                continue;
+            }
+            if is_account_rate_limited(acc, target_model, now_sec) {
+                continue;
+            }
+            if crate::modules::workspace_lease_manager::is_account_or_email_leased_by_other(
+                &acc.id, &acc.email,
+            ) {
+                continue;
+            }
+            if is_account_bound_to_running_sibling(
+                &registry,
+                current_instance_id,
+                &acc.id,
+                &acc.email,
+            ) {
+                continue;
+            }
+            let quota = calculate_candidate_quota(acc, target_model).unwrap_or(0.0);
+            if quota > 5.0 {
+                let score = score_candidate_account_fallback(acc, target_model, now_sec);
+                if score > 0.0 {
+                    seen_account_ids.insert(acc.id.clone());
+                    let candidate = ProfileCandidate {
+                        instance_id: current_instance_id.to_string(),
+                        account_id: acc.id.clone(),
+                        email: acc.email.clone(),
+                        quota_percent: quota,
+                        score,
+                    };
+                    if is_in_cooldown(acc) {
+                        cooldown_pool.push((candidate, acc.last_used));
+                    } else {
+                        available_pool.push(candidate);
+                    }
+                }
+            }
+        }
+    }
+
     // 4. Graceful Fallback Logic:
     // If available pool is not empty, use ONLY the available pool.
     // If and ONLY IF available pool is completely empty (all healthy accounts are in cooldown),
@@ -581,6 +631,8 @@ pub async fn select_and_verify_next_best_profile(
 
     let mut best_fallback: Option<ProfileCandidate> = None;
     let mut highest_fallback_quota: f64 = 0.0;
+    let mut best_emergency_fallback: Option<ProfileCandidate> = None;
+    let mut highest_emergency_quota: f64 = 0.0;
     let (node_alias, _) = crate::modules::email_sender::get_local_node_identity();
     let m_name = crate::modules::email_watcher::detect_machine_name();
     let m_ip = crate::modules::email_watcher::detect_local_ip();
@@ -686,7 +738,7 @@ pub async fn select_and_verify_next_best_profile(
             continue;
         }
 
-        // Imp-06: Pre-Switch Live Refresh Timeout Guard (bounded 5000ms)
+        // Imp-06: Pre-Switch Live Refresh Timeout Guard (bounded 5000ms) with cached quota fallback
         let fetch_res = match tokio::time::timeout(
             std::time::Duration::from_millis(5000),
             account::fetch_quota_with_retry(&mut cand_acc),
@@ -695,11 +747,12 @@ pub async fn select_and_verify_next_best_profile(
         {
             Ok(res) => res,
             Err(_) => {
+                let cached_q = calculate_candidate_quota(&cand_acc, target_model).unwrap_or(0.0);
                 logger::log_warn(&format!(
-                    "[AutoSwitcher] Live quota refresh timed out after 5000ms for candidate '{}'. Skipping...",
-                    masked_email
+                    "[AutoSwitcher] Live quota refresh timed out after 5000ms for candidate '{}'. Using cached quota: {:.1}%",
+                    masked_email, cached_q
                 ));
-                continue;
+                Ok(cand_acc.quota.clone().unwrap_or_default())
             }
         };
         let fresh_4h_quota = match fetch_res {
@@ -715,13 +768,18 @@ pub async fn select_and_verify_next_best_profile(
                 q_val
             }
             Err(e) => {
+                let cached_q = calculate_candidate_quota(&cand_acc, target_model).unwrap_or(0.0);
                 logger::log_warn(&format!(
-                    "[AutoSwitcher] Failed to refresh live quota from Google API for candidate '{}': {}. Skipping...",
-                    masked_email, e
+                    "[AutoSwitcher] Failed to refresh live quota from Google API for candidate '{}': {}. Using cached quota: {:.1}%",
+                    masked_email, e, cached_q
                 ));
-                continue;
+                cached_q
             }
         };
+
+        if fresh_4h_quota <= 0.0 {
+            continue;
+        }
 
         // Strict 100% requirement for 4-hour window:
         if fresh_4h_quota >= 100.0 {
@@ -773,11 +831,21 @@ pub async fn select_and_verify_next_best_profile(
                     quota_percent: fresh_4h_quota,
                     score: candidate.score,
                 });
+            } else if fresh_4h_quota > 5.0 && fresh_4h_quota > highest_emergency_quota {
+                highest_emergency_quota = fresh_4h_quota;
+                best_emergency_fallback = Some(ProfileCandidate {
+                    instance_id: candidate.instance_id,
+                    account_id: candidate.account_id,
+                    email: candidate.email,
+                    quota_percent: fresh_4h_quota,
+                    score: candidate.score,
+                });
             }
         }
     }
 
-    if let Some(fallback) = best_fallback {
+    let effective_fallback = best_fallback.or(best_emergency_fallback);
+    if let Some(fallback) = effective_fallback {
         let fallback_masked = crate::modules::logger::mask_email(&fallback.email);
         logger::log_info(&format!(
             "[AutoSwitcher] No 100.0% quota profile found; selecting best available candidate '{}' with {:.1}% quota.",

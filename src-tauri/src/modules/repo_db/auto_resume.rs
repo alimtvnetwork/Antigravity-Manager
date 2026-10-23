@@ -87,9 +87,9 @@ pub fn auto_resume_recent_prompts(
             .prepare(
                 "SELECT id, prompt_content, model, image_payload 
                  FROM active_prompts 
-                 WHERE status IN ('queued', 'pending', 'backed_up')
+                 WHERE status IN ('queued', 'pending', 'backed_up', 'running', 'in_flight', 'dispatched', 'blocked')
                    AND (project_id = ?1 OR repo_path = ?2 OR project_id LIKE ?3)
-                   AND (instance_id = ?4 OR (?4 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))
+                   AND (instance_id = ?4 OR (?4 = 'default' AND (instance_id IN ('default', '__default__', '') OR instance_id IS NULL)))
                  ORDER BY created_at ASC, id ASC LIMIT 1",
             )
             .map_err(|e| format!("Failed to prepare prompt query: {}", e))?;
@@ -117,7 +117,11 @@ pub fn auto_resume_recent_prompts(
                         let task_status = v.get("status").and_then(|s| s.as_str()).unwrap_or("");
                         let is_pending_status = task_status == "queued"
                             || task_status == "pending"
-                            || task_status == "backed_up";
+                            || task_status == "backed_up"
+                            || task_status == "running"
+                            || task_status == "in_flight"
+                            || task_status == "dispatched"
+                            || task_status == "blocked";
                         if is_pending_status {
                             if let Some(txt) = v.get("prompt_content").and_then(|t| t.as_str()) {
                                 if !txt.trim().is_empty() {

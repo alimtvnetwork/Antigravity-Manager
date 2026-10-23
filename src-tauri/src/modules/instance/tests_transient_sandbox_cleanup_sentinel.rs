@@ -128,11 +128,8 @@ mod tests {
             "dev-session-active",
             "profiles/dev-session-active",
         );
-        let verdict_detected = evaluate_sandbox_eviction_safety(
-            &target_descriptor,
-            Some("dev-session-active"),
-            false,
-        );
+        let verdict_detected =
+            evaluate_sandbox_eviction_safety(&target_descriptor, Some("dev-session-active"), false);
         assert_eq!(
             verdict_detected,
             SandboxEvictionVerdict::TargetIsCallerIdeFailFast { exit_code: 2 }
@@ -148,7 +145,8 @@ mod tests {
         let verdict = evaluate_sandbox_eviction_safety(&caller_descriptor, None, true);
         assert_eq!(verdict, SandboxEvictionVerdict::SafeToPurge);
 
-        let target_descriptor = SandboxInstanceDescriptor::transient("my-session", "profiles/my-session");
+        let target_descriptor =
+            SandboxInstanceDescriptor::transient("my-session", "profiles/my-session");
         let verdict_detected =
             evaluate_sandbox_eviction_safety(&target_descriptor, Some("my-session"), true);
         assert_eq!(verdict_detected, SandboxEvictionVerdict::SafeToPurge);
@@ -160,12 +158,12 @@ mod tests {
             "agm-test-sandbox-55",
             "temp/sandboxes/agm-test-sandbox-55",
         );
-        let verdict = evaluate_sandbox_eviction_safety(&normal_sandbox, Some("other-caller"), false);
+        let verdict =
+            evaluate_sandbox_eviction_safety(&normal_sandbox, Some("other-caller"), false);
         assert_eq!(verdict, SandboxEvictionVerdict::SafeToPurge);
 
         // Empty directory indicates already cleaned
-        let empty_dir_sandbox =
-            SandboxInstanceDescriptor::transient("agm-test-sandbox-empty", "");
+        let empty_dir_sandbox = SandboxInstanceDescriptor::transient("agm-test-sandbox-empty", "");
         let verdict_empty = evaluate_sandbox_eviction_safety(&empty_dir_sandbox, None, false);
         assert_eq!(verdict_empty, SandboxEvictionVerdict::AlreadyCleaned);
 
@@ -211,7 +209,8 @@ mod tests {
 
     #[test]
     fn test_plan_transient_sandbox_cleanup_with_tracked_pids_and_force() {
-        let caller = SandboxInstanceDescriptor::caller_ide("caller-session-forced", "profiles/forced");
+        let caller =
+            SandboxInstanceDescriptor::caller_ide("caller-session-forced", "profiles/forced");
         let tracked_pids = vec![9001, 9002];
 
         let report = plan_transient_sandbox_cleanup_with_options(
@@ -223,7 +222,10 @@ mod tests {
 
         assert!(report.is_fully_purged);
         assert_eq!(report.verdict, SandboxEvictionVerdict::SafeToPurge);
-        assert_eq!(report.directories_removed, vec!["profiles/forced".to_string()]);
+        assert_eq!(
+            report.directories_removed,
+            vec!["profiles/forced".to_string()]
+        );
         assert_eq!(report.processes_terminated, vec![9001, 9002]);
     }
 

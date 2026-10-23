@@ -834,6 +834,48 @@ export function buildRerunPrompt(
         let totalRounds = 1;
         let customNudge = '';
 
+        const isNudgeText = (text: string): boolean => {
+            const clean = text.toLowerCase().trim();
+            return (
+                clean === 'is it done?' ||
+                clean === 'is it published?' ||
+                clean === 'is it finished?' ||
+                clean === 'is it released?' ||
+                clean === 'is it completed?' ||
+                clean === 'done?' ||
+                clean === 'published?' ||
+                clean === 'finished?' ||
+                clean === 'released?' ||
+                clean === 'completed?' ||
+                clean.startsWith('is it done') ||
+                clean.startsWith('is it published') ||
+                clean.startsWith('is it finished') ||
+                clean.startsWith('is it released') ||
+                clean.startsWith('is it completed') ||
+                clean.startsWith('quick status check') ||
+                clean.startsWith('has this been') ||
+                clean.startsWith('can you check') ||
+                clean.startsWith('please verify') ||
+                clean.startsWith('did all tests') ||
+                clean.startsWith('are all requirements') ||
+                clean.startsWith('please confirm') ||
+                clean.startsWith('checking in') ||
+                clean.startsWith('status update') ||
+                clean.startsWith('# 🔄 rerun execution nudge') ||
+                clean.includes('status check') ||
+                clean.includes('progress update') ||
+                clean.includes('ping me when') ||
+                (clean.length <= 120 && (
+                    clean.endsWith('?') ||
+                    clean.includes('done') ||
+                    clean.includes('published') ||
+                    clean.includes('finished') ||
+                    clean.includes('released') ||
+                    clean.includes('completed')
+                ))
+            );
+        };
+
         if (typeof promptOrContext === 'object' && promptOrContext !== null) {
             originalPrompt = promptOrContext.originalPrompt || promptOrContext.prompt || '';
             currentRound = promptOrContext.round || round || 1;
@@ -844,21 +886,7 @@ export function buildRerunPrompt(
             currentRound = round ?? 1;
             totalRounds = total ?? 1;
 
-            const lower = rawStr.toLowerCase();
-            const isNudge =
-                lower === 'is it done?' ||
-                lower === 'is it published?' ||
-                lower === 'done?' ||
-                lower === 'published?' ||
-                lower.startsWith('is it done') ||
-                lower.startsWith('is it published') ||
-                lower.startsWith('quick status check') ||
-                lower.includes('status check') ||
-                lower.includes('progress update') ||
-                lower.includes('ping me when') ||
-                (rawStr.length <= 120 && (rawStr.endsWith('?') || lower.includes('done') || lower.includes('published')));
-
-            if (isNudge) {
+            if (isNudgeText(rawStr)) {
                 customNudge = rawStr;
                 originalPrompt = '';
             } else {
@@ -866,20 +894,34 @@ export function buildRerunPrompt(
             }
         }
 
-        // If customNudge is still empty and originalPrompt looks like a nudge message, shift it
-        if (!customNudge && originalPrompt) {
-            const lower = originalPrompt.toLowerCase().trim();
-            if (
-                lower === 'is it done?' ||
-                lower === 'is it published?' ||
-                lower === 'done?' ||
-                lower === 'published?' ||
-                lower.startsWith('is it done') ||
-                lower.startsWith('is it published')
-            ) {
-                customNudge = originalPrompt.trim();
-                originalPrompt = '';
+        // Clean up recursively nested rerun delimiters and headers
+        if (originalPrompt.includes('<<<ORIGINAL_TASK_PROMPT_START>>>')) {
+            const startMarker = '<<<ORIGINAL_TASK_PROMPT_START>>>';
+            const endMarker = '<<<ORIGINAL_TASK_PROMPT_END>>>';
+            const startIdx = originalPrompt.indexOf(startMarker);
+            const endIdx = originalPrompt.indexOf(endMarker);
+            if (startIdx !== -1 && endIdx > startIdx) {
+                originalPrompt = originalPrompt.substring(startIdx + startMarker.length, endIdx).trim();
             }
+        } else if (originalPrompt.trim().startsWith('# 🔄 RERUN EXECUTION NUDGE')) {
+            originalPrompt = '';
+        }
+
+        // If customNudge is still empty and originalPrompt looks like a nudge message, shift it
+        if (!customNudge && originalPrompt && isNudgeText(originalPrompt)) {
+            customNudge = originalPrompt.trim();
+            originalPrompt = '';
+        }
+
+        // If still no custom nudge, pick a lively default randomized completion check
+        if (!customNudge) {
+            const fallbackNudges = [
+                'Is it finished?',
+                'Is it released?',
+                'Is it completed?',
+                'Please verify and finish the remaining items.',
+            ];
+            customNudge = fallbackNudges[Math.floor(Math.random() * fallbackNudges.length)];
         }
 
         const trimmedPrompt = originalPrompt.trim();

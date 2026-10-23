@@ -16,14 +16,17 @@ impl ChildTerminationGuard {
 
         #[cfg(target_os = "windows")]
         {
-            use windows_sys::Win32::Foundation::CloseHandle;
-            use windows_sys::Win32::System::Threading::{
-                OpenProcess, TerminateProcess, PROCESS_TERMINATE,
-            };
+            #[link(name = "kernel32")]
+            extern "system" {
+                fn OpenProcess(access: u32, inherit: i32, pid: u32) -> *mut std::ffi::c_void;
+                fn TerminateProcess(handle: *mut std::ffi::c_void, exit_code: u32) -> i32;
+                fn CloseHandle(handle: *mut std::ffi::c_void) -> i32;
+            }
+            const PROCESS_TERMINATE: u32 = 0x0001;
 
             unsafe {
                 let handle = OpenProcess(PROCESS_TERMINATE, 0, pid);
-                if handle == 0 {
+                if handle.is_null() {
                     return Ok(false); // Process likely already terminated
                 }
 
@@ -48,6 +51,7 @@ impl ChildTerminationGuard {
                 std::thread::sleep(Duration::from_millis(grace_period_ms.min(500)));
                 libc::kill(pid as i32, libc::SIGKILL);
             }
+
             Ok(true)
         }
     }

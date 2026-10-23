@@ -116,7 +116,34 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
             const cur = get().instances.find(i => i.config.id === instId);
             const instanceName = cur?.config.name || instId;
 
-            // 1. Discover accounts (always fetch fresh from backend to prevent stale state)
+            // Primary: Execute unified backend Fast-Forward rotation
+            try {
+                await instanceService.fastForwardInstance(instId);
+                const { useAccountStore } = await import('../useAccountStore');
+                await Promise.all([
+                    get().fetchInstances(true),
+                    useAccountStore.getState().fetchAccounts(),
+                    useAccountStore.getState().fetchCurrentAccount(),
+                ]);
+                const finalInst = get().instances.find(i => i.config.id === instId);
+                const finalEmail = finalInst?.config.bound_email || useAccountStore.getState().currentAccount?.email || '';
+                const resolvedInstanceName = finalInst?.config.name || instanceName;
+                set({ activeInstanceId: instId, isLoading: false });
+                return {
+                    accountEmail: finalEmail,
+                    instanceName: resolvedInstanceName,
+                    daysUntilRefill: 0,
+                    resumedProjectsCount: 1,
+                    skippedProjectsCount: 0,
+                };
+            } catch (backendFfErr: unknown) {
+                useErrorStore.getState().trackWarning(backendFfErr, {
+                    source: 'useInstanceStore.smartRotateProfileAccount',
+                    triggerAction: 'fast_forward_backend_delegation_fallback',
+                });
+            }
+
+            // Fallback: Discover accounts (always fetch fresh from backend to prevent stale state)
             const { useAccountStore } = await import('../useAccountStore');
             await useAccountStore.getState().fetchAccounts();
             const accounts = useAccountStore.getState().accounts;
@@ -310,20 +337,8 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
 
             const targetCandidate = verifiedCandidate as Account & { instanceId?: string };
 
-            // Detect if the target candidate belongs to another instance
-            const candidateBoundInstance = get().instances.find(
-                i => i.config.bound_account_id === targetCandidate.id
-            );
-            const candidateInstanceId =
-                targetCandidate.instanceId || candidateBoundInstance?.config.id;
-
-            if (candidateInstanceId && candidateInstanceId !== instId) {
-                // Gracefully close the depleted instance first
-                await get().closeInstance(instId);
-                await instanceService.setActiveInstance(candidateInstanceId);
-            }
-
-            const effectiveInstanceId = candidateInstanceId || instId;
+            // Invariant: Fast-Forward rotates the requested instance in place; never hijack or switch to another instance
+            const effectiveInstanceId = instId;
 
             // 7. Delegate execution directly to proven switchAccount command (Button 2 delegation)
             let targetIdeParam: string | undefined;

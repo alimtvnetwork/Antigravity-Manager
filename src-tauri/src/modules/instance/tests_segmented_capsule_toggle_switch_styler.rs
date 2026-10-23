@@ -39,9 +39,13 @@ fn test_format_segmented_capsule_toggle_three_options() {
     // Verify markup structure
     assert!(formatting.formatted_markup.contains("role=\"radiogroup\""));
     assert!(formatting.formatted_markup.contains("id=\"tab-chat\""));
-    assert!(formatting.formatted_markup.contains("aria-checked=\"true\""));
+    assert!(formatting
+        .formatted_markup
+        .contains("aria-checked=\"true\""));
     assert!(formatting.formatted_markup.contains("id=\"tab-code\""));
-    assert!(formatting.formatted_markup.contains("aria-checked=\"false\""));
+    assert!(formatting
+        .formatted_markup
+        .contains("aria-checked=\"false\""));
     assert!(formatting.formatted_markup.contains("id=\"tab-docs\""));
 
     // Verify 2 dividers between 3 options

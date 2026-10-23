@@ -75,6 +75,9 @@ pub fn get_active_in_use_account_ids() -> Vec<String> {
     let mut in_use = Vec::new();
     for inst in instances {
         let is_running = instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
+        if !is_running {
+            continue;
+        }
         if is_instance_binding_stale_or_exhausted(
             &inst,
             is_running,
@@ -106,17 +109,20 @@ pub fn get_active_in_use_account_ids() -> Vec<String> {
         }
     }
     if let Ok(Some(current_id)) = account::get_current_account_id() {
-        if let Ok(cur_acc) = account::load_account(&current_id) {
-            let cur_q =
-                calculate_4h_window_quota(&cur_acc, &switcher_cfg.target_model).unwrap_or(100.0);
-            let is_cur_stale = cur_acc.last_used > 0
-                && (now_sec - cur_acc.last_used)
-                    > (switcher_cfg.stale_binding_timeout_hours.clamp(1, 24) as i64) * 3600;
-            if cur_q > 0.0 && !is_cur_stale && !in_use.contains(&current_id) {
+        let is_default_running = instance::is_instance_running("default", "", None);
+        if is_default_running {
+            if let Ok(cur_acc) = account::load_account(&current_id) {
+                let cur_q = calculate_4h_window_quota(&cur_acc, &switcher_cfg.target_model)
+                    .unwrap_or(100.0);
+                let is_cur_stale = cur_acc.last_used > 0
+                    && (now_sec - cur_acc.last_used)
+                        > (switcher_cfg.stale_binding_timeout_hours.clamp(1, 24) as i64) * 3600;
+                if cur_q > 0.0 && !is_cur_stale && !in_use.contains(&current_id) {
+                    in_use.push(current_id);
+                }
+            } else if !in_use.contains(&current_id) {
                 in_use.push(current_id);
             }
-        } else if !in_use.contains(&current_id) {
-            in_use.push(current_id);
         }
     }
     in_use

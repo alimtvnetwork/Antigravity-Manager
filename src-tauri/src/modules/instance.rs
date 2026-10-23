@@ -586,8 +586,8 @@ pub use remote_debugging_port_allocator::*;
 pub use remote_port_guard::*;
 pub use runtime_crash_counter::*;
 pub use sandboxed_storage_cleaner::*;
-pub use session_cleanup_worker::*;
 pub use segmented_capsule_toggle_switch_styler::*;
+pub use session_cleanup_worker::*;
 pub use session_file_reclaimer::*;
 pub use session_trace_uuid::*;
 pub use settings::{

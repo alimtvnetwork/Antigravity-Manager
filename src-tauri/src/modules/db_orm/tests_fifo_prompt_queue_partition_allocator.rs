@@ -47,8 +47,12 @@ fn test_priority_band_display_rank_and_loose_parsing() {
 
 #[test]
 fn test_queue_partition_bucket_construction_and_getters() {
-    let bucket =
-        QueuePartitionBucket::new("part_urgent_01", "worker_node_a", QueuePriorityBand::Urgent, 25);
+    let bucket = QueuePartitionBucket::new(
+        "part_urgent_01",
+        "worker_node_a",
+        QueuePriorityBand::Urgent,
+        25,
+    );
     assert_eq!(bucket.partition_id(), "part_urgent_01");
     assert_eq!(bucket.instance_id(), "worker_node_a");
     assert_eq!(bucket.priority(), QueuePriorityBand::Urgent);
@@ -92,7 +96,9 @@ fn test_build_partition_query_sql_urgent_and_normal() {
 
     let custom_sql = build_partition_query_sql_for_table("prompt_backups", &normal_bucket)
         .expect("Failed to build custom table SQL");
-    assert!(custom_sql.starts_with("SELECT id, created_at, prompt_text, priority, partition_id FROM prompt_backups"));
+    assert!(custom_sql.starts_with(
+        "SELECT id, created_at, prompt_text, priority, partition_id FROM prompt_backups"
+    ));
     assert!(custom_sql.contains(CANONICAL_FIFO_ORDER_BY));
 }
 
@@ -143,7 +149,9 @@ fn test_validate_partition_query_sql_rejects_inverted_lifo_orderings() {
         let res = validate_partition_query_sql(query);
         match res {
             Err(PartitionAllocationError::InvertedLifoOrderingDetected) => {}
-            other => panic!("Expected InvertedLifoOrderingDetected for query '{query}', got: {other:?}"),
+            other => {
+                panic!("Expected InvertedLifoOrderingDetected for query '{query}', got: {other:?}")
+            }
         }
     }
 }
@@ -154,7 +162,7 @@ fn test_validate_partition_query_sql_rejects_missing_tiebreaker() {
         "SELECT * FROM active_prompts ORDER BY created_at ASC",
         "SELECT * FROM active_prompts ORDER BY created_at ASC, id", // Missing explicit ASC
         "SELECT * FROM prompt_backups ORDER BY created_at ASC, status ASC",
-        "SELECT * FROM active_prompts WHERE id = 10",               // Missing ORDER BY
+        "SELECT * FROM active_prompts WHERE id = 10", // Missing ORDER BY
     ];
 
     for query in missing_tiebreaker_queries {
@@ -193,30 +201,84 @@ fn test_verify_allocated_partition_monotonicity_iso8601() {
 
     // 4. Strictly increasing timestamps pass
     let valid_seq = vec![
-        AllocatedPromptItem::new(1, "2026-10-23T09:00:00Z", "A", QueuePriorityBand::Urgent, "p1"),
-        AllocatedPromptItem::new(2, "2026-10-23T09:05:00Z", "B", QueuePriorityBand::Urgent, "p1"),
-        AllocatedPromptItem::new(3, "2026-10-23T09:10:00Z", "C", QueuePriorityBand::Urgent, "p1"),
+        AllocatedPromptItem::new(
+            1,
+            "2026-10-23T09:00:00Z",
+            "A",
+            QueuePriorityBand::Urgent,
+            "p1",
+        ),
+        AllocatedPromptItem::new(
+            2,
+            "2026-10-23T09:05:00Z",
+            "B",
+            QueuePriorityBand::Urgent,
+            "p1",
+        ),
+        AllocatedPromptItem::new(
+            3,
+            "2026-10-23T09:10:00Z",
+            "C",
+            QueuePriorityBand::Urgent,
+            "p1",
+        ),
     ];
     assert!(verify_allocated_partition_monotonicity(&valid_seq));
 
     // 5. Equal timestamps with strictly increasing id pass
     let equal_ts_valid = vec![
-        AllocatedPromptItem::new(10, "2026-10-23T09:00:00Z", "A", QueuePriorityBand::Normal, "p1"),
-        AllocatedPromptItem::new(11, "2026-10-23T09:00:00Z", "B", QueuePriorityBand::Normal, "p1"),
+        AllocatedPromptItem::new(
+            10,
+            "2026-10-23T09:00:00Z",
+            "A",
+            QueuePriorityBand::Normal,
+            "p1",
+        ),
+        AllocatedPromptItem::new(
+            11,
+            "2026-10-23T09:00:00Z",
+            "B",
+            QueuePriorityBand::Normal,
+            "p1",
+        ),
     ];
     assert!(verify_allocated_partition_monotonicity(&equal_ts_valid));
 
     // 6. Inverted timestamp fails
     let inverted_ts = vec![
-        AllocatedPromptItem::new(1, "2026-10-23T09:10:00Z", "A", QueuePriorityBand::Urgent, "p1"),
-        AllocatedPromptItem::new(2, "2026-10-23T09:00:00Z", "B", QueuePriorityBand::Urgent, "p1"),
+        AllocatedPromptItem::new(
+            1,
+            "2026-10-23T09:10:00Z",
+            "A",
+            QueuePriorityBand::Urgent,
+            "p1",
+        ),
+        AllocatedPromptItem::new(
+            2,
+            "2026-10-23T09:00:00Z",
+            "B",
+            QueuePriorityBand::Urgent,
+            "p1",
+        ),
     ];
     assert!(!verify_allocated_partition_monotonicity(&inverted_ts));
 
     // 7. Equal timestamp with inverted id fails
     let inverted_id = vec![
-        AllocatedPromptItem::new(20, "2026-10-23T09:00:00Z", "A", QueuePriorityBand::Urgent, "p1"),
-        AllocatedPromptItem::new(19, "2026-10-23T09:00:00Z", "B", QueuePriorityBand::Urgent, "p1"),
+        AllocatedPromptItem::new(
+            20,
+            "2026-10-23T09:00:00Z",
+            "A",
+            QueuePriorityBand::Urgent,
+            "p1",
+        ),
+        AllocatedPromptItem::new(
+            19,
+            "2026-10-23T09:00:00Z",
+            "B",
+            QueuePriorityBand::Urgent,
+            "p1",
+        ),
     ];
     assert!(!verify_allocated_partition_monotonicity(&inverted_id));
 }
@@ -224,15 +286,45 @@ fn test_verify_allocated_partition_monotonicity_iso8601() {
 #[test]
 fn test_verify_allocated_partition_monotonicity_numeric_epoch() {
     let epoch_valid = vec![
-        AllocatedPromptItem::new(1, "1761234000", "Epoch A", QueuePriorityBand::Background, "p2"),
-        AllocatedPromptItem::new(2, "1761234500", "Epoch B", QueuePriorityBand::Background, "p2"),
-        AllocatedPromptItem::new(3, "1761234500", "Epoch C", QueuePriorityBand::Background, "p2"),
+        AllocatedPromptItem::new(
+            1,
+            "1761234000",
+            "Epoch A",
+            QueuePriorityBand::Background,
+            "p2",
+        ),
+        AllocatedPromptItem::new(
+            2,
+            "1761234500",
+            "Epoch B",
+            QueuePriorityBand::Background,
+            "p2",
+        ),
+        AllocatedPromptItem::new(
+            3,
+            "1761234500",
+            "Epoch C",
+            QueuePriorityBand::Background,
+            "p2",
+        ),
     ];
     assert!(verify_allocated_partition_monotonicity(&epoch_valid));
 
     let epoch_inverted = vec![
-        AllocatedPromptItem::new(1, "1761234900", "Epoch A", QueuePriorityBand::Background, "p2"),
-        AllocatedPromptItem::new(2, "1761234100", "Epoch B", QueuePriorityBand::Background, "p2"),
+        AllocatedPromptItem::new(
+            1,
+            "1761234900",
+            "Epoch A",
+            QueuePriorityBand::Background,
+            "p2",
+        ),
+        AllocatedPromptItem::new(
+            2,
+            "1761234100",
+            "Epoch B",
+            QueuePriorityBand::Background,
+            "p2",
+        ),
     ];
     assert!(!verify_allocated_partition_monotonicity(&epoch_inverted));
 }
@@ -240,11 +332,41 @@ fn test_verify_allocated_partition_monotonicity_numeric_epoch() {
 #[test]
 fn test_allocate_items_to_partitions_flow() {
     let raw_items = vec![
-        AllocatedPromptItem::new(1, "2026-10-23T09:00:00Z", "P1", QueuePriorityBand::Urgent, ""),
-        AllocatedPromptItem::new(2, "2026-10-23T09:05:00Z", "P2", QueuePriorityBand::Normal, ""),
-        AllocatedPromptItem::new(3, "2026-10-23T09:10:00Z", "P3", QueuePriorityBand::Urgent, ""),
-        AllocatedPromptItem::new(4, "2026-10-23T09:15:00Z", "P4", QueuePriorityBand::Normal, ""),
-        AllocatedPromptItem::new(5, "2026-10-23T09:20:00Z", "P5", QueuePriorityBand::Urgent, ""),
+        AllocatedPromptItem::new(
+            1,
+            "2026-10-23T09:00:00Z",
+            "P1",
+            QueuePriorityBand::Urgent,
+            "",
+        ),
+        AllocatedPromptItem::new(
+            2,
+            "2026-10-23T09:05:00Z",
+            "P2",
+            QueuePriorityBand::Normal,
+            "",
+        ),
+        AllocatedPromptItem::new(
+            3,
+            "2026-10-23T09:10:00Z",
+            "P3",
+            QueuePriorityBand::Urgent,
+            "",
+        ),
+        AllocatedPromptItem::new(
+            4,
+            "2026-10-23T09:15:00Z",
+            "P4",
+            QueuePriorityBand::Normal,
+            "",
+        ),
+        AllocatedPromptItem::new(
+            5,
+            "2026-10-23T09:20:00Z",
+            "P5",
+            QueuePriorityBand::Urgent,
+            "",
+        ),
     ];
 
     let buckets = vec![
@@ -274,8 +396,20 @@ fn test_allocate_items_to_partitions_flow() {
 #[test]
 fn test_allocate_items_to_partitions_detects_inverted_raw_items() {
     let inverted_raw = vec![
-        AllocatedPromptItem::new(10, "2026-10-23T09:20:00Z", "Later", QueuePriorityBand::Urgent, ""),
-        AllocatedPromptItem::new(11, "2026-10-23T09:10:00Z", "Earlier", QueuePriorityBand::Urgent, ""),
+        AllocatedPromptItem::new(
+            10,
+            "2026-10-23T09:20:00Z",
+            "Later",
+            QueuePriorityBand::Urgent,
+            "",
+        ),
+        AllocatedPromptItem::new(
+            11,
+            "2026-10-23T09:10:00Z",
+            "Earlier",
+            QueuePriorityBand::Urgent,
+            "",
+        ),
     ];
 
     let buckets = vec![QueuePartitionBucket::new(
@@ -322,7 +456,9 @@ fn test_partition_allocation_error_display_and_conversion() {
     assert!(err1.to_string().contains("Inverted LIFO ordering detected"));
 
     let err2 = PartitionAllocationError::MissingTieBreakerId;
-    assert!(err2.to_string().contains("Missing mandatory tie-breaker 'id ASC'"));
+    assert!(err2
+        .to_string()
+        .contains("Missing mandatory tie-breaker 'id ASC'"));
 
     let err3 = PartitionAllocationError::InvalidPartitionLimit;
     assert!(err3.to_string().contains("Invalid partition limit"));

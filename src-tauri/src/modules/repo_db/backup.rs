@@ -446,7 +446,7 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
         .unwrap_or(0)
     } else if is_all_or_default {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched', 'pending', 'queued', 'blocked') AND instance_id IN ('default', '__default__')",
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched', 'pending', 'queued', 'blocked') AND (instance_id IN ('default', '__default__', '') OR instance_id IS NULL)",
             params![now],
         )
         .unwrap_or(0)
@@ -463,7 +463,9 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
             for p in map.values_mut() {
                 let matches_inst = instance_id == "all"
                     || (is_all_or_default
-                        && (p.instance_id == "default" || p.instance_id == "__default__"))
+                        && (p.instance_id.is_empty()
+                            || p.instance_id == "default"
+                            || p.instance_id == "__default__"))
                     || p.instance_id == instance_id;
                 let is_inflight_status = p.status == "running"
                     || p.status == "in_flight"

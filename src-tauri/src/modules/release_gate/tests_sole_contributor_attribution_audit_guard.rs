@@ -43,7 +43,9 @@ mod tests {
         assert_eq!(findings[0], AttributionFinding::MissingAttributionTrailer);
         assert!(!findings[0].is_valid());
         assert!(!findings[0].is_unauthorized());
-        assert!(findings[0].to_string().contains("Missing standard attribution trailer"));
+        assert!(findings[0]
+            .to_string()
+            .contains("Missing standard attribution trailer"));
     }
 
     #[test]
@@ -223,10 +225,7 @@ try {
     useErrorStore.getState().trackWarning(err, { source: 'Settings' });
 }
 ";
-        let code_sources = [
-            (rust_code, "src/profile.rs"),
-            (ts_code, "src/settings.ts"),
-        ];
+        let code_sources = [(rust_code, "src/profile.rs"), (ts_code, "src/settings.ts")];
 
         let report = generate_governance_report(changelog, &code_sources);
         assert!(report.is_compliant);
@@ -257,15 +256,20 @@ fn delete_temp(p: &Path) {
         assert!(report.has_absolute_path_violations());
         assert_eq!(report.absolute_path_count, 1);
         assert!(report.summary.contains("❌ NON-COMPLIANT"));
-        assert!(report.summary.contains("Unauthorized third-party handle detected: '@charlie'"));
-        assert!(report.summary.contains("Missing standard attribution trailer"));
+        assert!(report
+            .summary
+            .contains("Unauthorized third-party handle detected: '@charlie'"));
+        assert!(report
+            .summary
+            .contains("Missing standard attribution trailer"));
     }
 
     #[test]
     fn test_serde_roundtrip_governance_models() {
         let finding = AttributionFinding::UnauthorizedHandle("@external".to_string());
         let ser = serde_json::to_string(&finding).expect("serialize attribution finding");
-        let de: AttributionFinding = serde_json::from_str(&ser).expect("deserialize attribution finding");
+        let de: AttributionFinding =
+            serde_json::from_str(&ser).expect("deserialize attribution finding");
         assert_eq!(finding, de);
 
         let silent_finding = SilentErrorFinding::BareResultDiscarded {

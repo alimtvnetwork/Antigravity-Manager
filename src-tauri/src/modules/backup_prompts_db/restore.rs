@@ -345,11 +345,12 @@ fn live_prompt_status(
     .ok()
 }
 
-/// RC-6: a live row that is already `running` or `completed` must never be
+/// RC-6: a live row that is already `completed` must never be
 /// overwritten by a backup re-injection (`save_or_requeue_prompt` upserts
-/// with INSERT OR REPLACE).
+/// with INSERT OR REPLACE). Interrupted `running` prompts are restored
+/// and requeued so they re-execute on the newly rotated account.
 pub(crate) fn is_live_status_preserved(status: Option<&str>) -> bool {
-    matches!(status, Some("running") | Some("completed"))
+    matches!(status, Some("completed"))
 }
 
 /// Count unrestored backup records recorded under instance ids other than
