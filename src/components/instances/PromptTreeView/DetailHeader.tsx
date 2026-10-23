@@ -965,7 +965,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                     </div>
 
                     {/* Capsule B: Unified Dispatch Capsule [ Send (Preempt) | Enqueue (FIFO) | v (Options) ] */}
-                    <div className="relative flex items-center rounded-lg bg-slate-100/90 dark:bg-[var(--ui-canvas,#090611)]/90 backdrop-blur-md border border-slate-200/80 dark:border-[var(--ui-border-subtle,rgba(255,255,255,0.12))] p-0.5 divide-x divide-slate-200/70 dark:divide-[var(--ui-border-subtle,rgba(255,255,255,0.08))] shadow-2xs shrink-0">
+                    <div className="relative flex items-center rounded-lg bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
                         {/* 1. Send (Preempt): Cancels any running task and executes immediately */}
                         <button
                             type="button"
@@ -977,13 +977,13 @@ export function DetailHeader(props: DetailHeaderProps) {
                             disabled={isResending}
                             data-ui-name="prompt-send-preempt-btn"
                             data-ui-id={`prompt-send-preempt-${selectedConversation.conversation_id}`}
-                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-md text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/80 dark:hover:bg-emerald-950/40 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-md text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/20 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
                             title="Send (Preempt): Cancels any running task to execute immediately (Hotkey: N)"
                             aria-label="Send (Preempt): Cancels any running task to execute immediately (Hotkey: N)"
                         >
-                            <RotateCw className={cn('w-3 h-3 text-emerald-500 shrink-0', isResending && 'animate-spin')} />
+                            <RotateCw className={cn('w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0', isResending && 'animate-spin')} />
                             <span>{isResending ? 'Sending…' : 'Send'}</span>
-                            <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded text-[8.5px] font-mono font-bold">N</kbd>
+                            <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded text-[8.5px] font-mono font-bold">N</kbd>
                         </button>
 
                         {/* 2. Enqueue (FIFO): Stages prompt into background FIFO queue without cancelling active task */}
@@ -997,11 +997,11 @@ export function DetailHeader(props: DetailHeaderProps) {
                             disabled={isEnqueueing}
                             data-ui-name="prompt-enqueue-fifo-btn"
                             data-ui-id={`prompt-enqueue-fifo-${selectedConversation.conversation_id}`}
-                            className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-100/80 dark:hover:bg-amber-950/40 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 dark:hover:bg-amber-500/20 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
                             title="Enqueue (FIFO): Queues prompt behind active task in IDE without interrupting"
                             aria-label="Enqueue (FIFO): Queues prompt behind active task in IDE without interrupting"
                         >
-                            <ListPlus className={cn('w-3 h-3 text-amber-500 dark:text-amber-400 shrink-0', isEnqueueing && 'animate-pulse')} />
+                            <ListPlus className={cn('w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0', isEnqueueing && 'animate-pulse')} />
                             <span>{isEnqueueing ? 'Queueing…' : 'Enqueue'}</span>
                         </button>
 
@@ -1016,11 +1016,11 @@ export function DetailHeader(props: DetailHeaderProps) {
                             disabled={isRerunning}
                             data-ui-name="prompt-rerun-btn"
                             data-ui-id={`prompt-rerun-${selectedConversation.conversation_id}`}
-                            className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold text-sky-700 dark:text-sky-300 hover:bg-sky-100/80 dark:hover:bg-sky-950/40 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold text-sky-700 dark:text-sky-400 hover:bg-sky-500/10 dark:hover:bg-sky-500/20 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
                             title={`Rerun (${rerunMessageOption}): Dispatches auto-picked completion/release nudge (Hotkey: R)`}
                             aria-label={`Rerun (${rerunMessageOption}): Dispatches auto-picked completion or release nudge${rerunCount > 1 ? ` ${rerunCount} times` : ''}`}
                         >
-                            <Repeat className={cn('w-3 h-3 text-sky-500 shrink-0', isRerunning && 'animate-spin')} />
+                            <Repeat className={cn('w-3 h-3 text-sky-600 dark:text-sky-400 shrink-0', isRerunning && 'animate-spin')} />
                             <span>{isRerunning ? 'Rerunning…' : (rerunFlash ?? `Rerun ×${rerunCount}`)}</span>
                         </button>
 
@@ -1030,7 +1030,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             onClick={handleToggleDispatchMenu}
                             data-ui-name="prompt-dispatch-options-btn"
                             data-ui-id={`prompt-dispatch-options-${selectedConversation.conversation_id}`}
-                            className="flex items-center justify-center px-1.5 py-1 rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center justify-center px-1.5 py-1 rounded-r-md text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             aria-label="Unified dispatch configuration popover"
                             title="Dispatch options & Rerun settings"
                         >
@@ -1054,7 +1054,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
                                         Mode:
                                     </span>
-                                    <div className="inline-flex rounded-lg bg-slate-100 dark:bg-[var(--ui-canvas,rgba(0,0,0,0.3))] p-0.5 border border-slate-200/80 dark:border-[var(--ui-border-subtle,rgba(255,255,255,0.1))] text-[11px]">
+                                    <div className="inline-flex rounded-lg bg-slate-100 dark:bg-slate-950/80 p-0.5 border border-slate-200/80 dark:border-purple-500/20 text-[11px]">
                                         <button
                                              type="button"
                                              onClick={() => handleSwitchDispatchMode('send')}
@@ -1062,7 +1062,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                              className={cn(
                                                  "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                  primaryDispatchAction === 'send'
-                                                     ? "bg-white dark:bg-[var(--ui-surface-hover,rgba(255,255,255,0.1))] text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
+                                                     ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
                                                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 dark:hover:bg-slate-800/80"
                                              )}
                                          >
@@ -1075,7 +1075,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                              className={cn(
                                                  "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                  primaryDispatchAction === 'enqueue'
-                                                     ? "bg-white dark:bg-[var(--ui-surface-hover,rgba(255,255,255,0.1))] text-amber-600 dark:text-amber-400 shadow-2xs font-semibold"
+                                                     ? "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-2xs font-semibold"
                                                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 dark:hover:bg-slate-800/80"
                                              )}
                                          >
@@ -1087,7 +1087,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                              className={cn(
                                                  "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                  primaryDispatchAction === 'rerun'
-                                                     ? "bg-white dark:bg-[var(--ui-surface-hover,rgba(255,255,255,0.1))] text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
+                                                     ? "bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
                                                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 dark:hover:bg-slate-800/80"
                                              )}
                                          >
