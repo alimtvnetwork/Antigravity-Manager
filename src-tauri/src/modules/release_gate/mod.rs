@@ -17,11 +17,13 @@ pub mod agent_prompt_sanitizer_guard;
 pub mod attribution_verifier;
 pub mod batch_file_spawn_guard;
 pub mod bounded_matcher_timeout_guard;
+pub mod bounded_matcher_timeout_verifier;
 pub mod branch_release_channel_gate;
 pub mod caller_ide_preservation_guard;
 pub mod capsule_dropdown_styling_guard;
 pub mod channel_gate;
 pub mod changelog_structure_validator;
+pub mod changelog_tag_monotonic_gate;
 pub mod coauthor_attribution_verifier;
 pub mod commit_convergence_auditor;
 pub mod contributor_cost_disclosure_linter;
@@ -79,6 +81,8 @@ pub mod tests_batch_file_spawn_guard;
 #[cfg(test)]
 pub mod tests_bounded_matcher_timeout;
 #[cfg(test)]
+pub mod tests_bounded_matcher_timeout_verifier;
+#[cfg(test)]
 pub mod tests_branch_release_channel_gate;
 #[cfg(test)]
 pub mod tests_caller_ide_guard;
@@ -86,6 +90,8 @@ pub mod tests_caller_ide_guard;
 pub mod tests_capsule_dropdown_styling;
 #[cfg(test)]
 pub mod tests_changelog_structure;
+#[cfg(test)]
+pub mod tests_changelog_tag_monotonic_gate;
 #[cfg(test)]
 pub mod tests_coauthor_attribution;
 #[cfg(test)]
@@ -187,11 +193,13 @@ pub use agent_prompt_sanitizer_guard::*;
 pub use attribution_verifier::*;
 pub use batch_file_spawn_guard::*;
 pub use bounded_matcher_timeout_guard::*;
+pub use bounded_matcher_timeout_verifier::*;
 pub use branch_release_channel_gate::*;
 pub use caller_ide_preservation_guard::*;
 pub use capsule_dropdown_styling_guard::*;
 pub use channel_gate::*;
 pub use changelog_structure_validator::*;
+pub use changelog_tag_monotonic_gate::*;
 pub use coauthor_attribution_verifier::*;
 pub use commit_convergence_auditor::*;
 pub use contributor_cost_disclosure_linter::*;

@@ -1,5 +1,5 @@
 # Subtask 03: Changelog Heading & Tag Monotonic Progression Gate (`Imp-662`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 207-implementing-next-five-tasks.md
 
 ## Scope & Objective

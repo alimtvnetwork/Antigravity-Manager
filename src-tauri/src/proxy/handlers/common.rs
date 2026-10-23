@@ -11,6 +11,7 @@ use tokio::time::{sleep, Duration};
 use tracing::{debug, info};
 
 pub mod abort_sentinel;
+pub mod agent_prompt_sanitization_regex_engine;
 pub mod boundary_normalizer;
 pub mod canonical_role_mapper;
 pub mod chunk_boundary_validator;
@@ -62,6 +63,8 @@ pub mod token_budget_decider;
 pub mod tool_response_formatter;
 pub mod unified_context_structural_aligner;
 pub mod user_agent_normalizer;
+#[cfg(test)]
+pub mod tests_agent_prompt_sanitization_regex_engine;
 #[cfg(test)]
 pub mod tests_request_gzip_sniffer;
 #[cfg(test)]
@@ -124,6 +127,7 @@ pub mod tests_prefix_stability_sanitizer;
 pub mod tests_unified_context_structural_aligner;
 
 pub use abort_sentinel::*;
+pub use agent_prompt_sanitization_regex_engine::*;
 pub use boundary_normalizer::StreamBoundaryNormalizer;
 pub use canonical_role_mapper::*;
 pub use chunk_boundary_validator::*;

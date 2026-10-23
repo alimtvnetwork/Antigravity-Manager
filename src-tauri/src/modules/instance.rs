@@ -370,6 +370,11 @@ pub mod side_effect_order_enforcer;
 #[cfg(test)]
 #[path = "instance/tests_side_effect_order_enforcer.rs"]
 pub mod tests_side_effect_order_enforcer;
+#[path = "instance/caller_ide_heartbeat_watchdog.rs"]
+pub mod caller_ide_heartbeat_watchdog;
+#[cfg(test)]
+#[path = "instance/tests_caller_ide_heartbeat_watchdog.rs"]
+pub mod tests_caller_ide_heartbeat_watchdog;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use arg_normalizer::*;
@@ -566,3 +571,4 @@ pub use transient_sandbox_lifecycle_verifier::*;
 pub use multi_stage_launcher_dispatcher::*;
 pub use multi_stage_launcher_engine::*;
 pub use side_effect_order_enforcer::*;
+pub use caller_ide_heartbeat_watchdog::*;

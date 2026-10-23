@@ -1,5 +1,5 @@
 # Subtask 05: Bounded Matcher & Wait Timeout Verifier (`Imp-664`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 207-implementing-next-five-tasks.md
 
 ## Scope & Objective

@@ -1,5 +1,5 @@
 # Subtask 02: Caller IDE Vitality Heartbeat & Eviction Watchdog (`Imp-661`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 207-implementing-next-five-tasks.md
 
 ## Scope & Objective
