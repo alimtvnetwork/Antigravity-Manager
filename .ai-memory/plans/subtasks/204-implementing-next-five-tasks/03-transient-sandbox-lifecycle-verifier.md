@@ -1,5 +1,5 @@
 # Subtask 03: Transient Sandbox Lifecycle & Zero-Remnants Verifier (`Imp-647`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 204-implementing-next-five-tasks.md
 
 ## Scope & Objective

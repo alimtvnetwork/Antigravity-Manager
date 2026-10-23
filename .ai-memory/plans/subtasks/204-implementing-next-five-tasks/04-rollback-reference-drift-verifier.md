@@ -1,5 +1,5 @@
 # Subtask 04: Rollback Reference & Content Drift Verifier (`Imp-648`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 204-implementing-next-five-tasks.md
 
 ## Scope & Objective

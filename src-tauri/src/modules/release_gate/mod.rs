@@ -36,11 +36,13 @@ pub mod origin_tier_hierarchy_guard;
 pub mod path_hygiene;
 pub mod pipeline_protocol_decoupling_guard;
 pub mod preflight_checks_gate;
+pub mod preflight_clippy_gate;
 pub mod preflight_gate_runner;
 pub mod profile_duplication_parity_guard;
 pub mod pr_scope_cohesion_verifier;
 pub mod pr_template_compliance_guard;
 pub mod pr_template_compliance_linter;
+pub mod pr_unverified_paths_linter;
 pub mod published_tip_rewrite_guard;
 pub mod readme_changelog_sync_gate;
 pub mod readme_changelog_synchronizer;
@@ -48,12 +50,14 @@ pub mod rejection_breakdown_generator;
 pub mod remote_branch_base_verifier;
 pub mod risky_path_fallback_guard;
 pub mod rollback_ref_guard;
+pub mod rollback_reference_drift_verifier;
 pub mod semver_monotonic_validator;
 pub mod settings_deep_merge_synchronizer;
 pub mod side_effect_ordering_guard;
 pub mod sole_contributor_attribution_enforcer;
 pub mod sole_contributor_attribution_guard;
 pub mod staging_protocol_guard;
+pub mod strictly_relative_git_paths_guard;
 pub mod tag_changelog_heading_matcher;
 pub mod tag_changelog_heading_matcher_gate;
 pub mod test_sandbox_lifecycle_verifier;
@@ -105,6 +109,8 @@ pub mod tests_pipeline_protocol_decoupling;
 #[cfg(test)]
 pub mod tests_preflight_checks_gate;
 #[cfg(test)]
+pub mod tests_preflight_clippy_gate;
+#[cfg(test)]
 pub mod tests_preflight_gate;
 #[cfg(test)]
 pub mod tests_profile_duplication_parity;
@@ -114,6 +120,8 @@ pub mod tests_pr_scope_cohesion;
 pub mod tests_pr_template_compliance_guard;
 #[cfg(test)]
 pub mod tests_pr_template_linter;
+#[cfg(test)]
+pub mod tests_pr_unverified_paths_linter;
 #[cfg(test)]
 pub mod tests_published_tip_rewrite;
 #[cfg(test)]
@@ -133,6 +141,8 @@ pub mod tests_risky_path_fallback;
 #[cfg(test)]
 pub mod tests_rollback_ref_guard;
 #[cfg(test)]
+pub mod tests_rollback_reference_drift_verifier;
+#[cfg(test)]
 pub mod tests_sandbox_lifecycle;
 #[cfg(test)]
 pub mod tests_semver_monotonic;
@@ -146,6 +156,8 @@ pub mod tests_sole_contributor_attribution_enforcer;
 pub mod tests_sole_contributor_attribution_guard;
 #[cfg(test)]
 pub mod tests_staging_protocol;
+#[cfg(test)]
+pub mod tests_strictly_relative_git_paths_guard;
 #[cfg(test)]
 pub mod tests_tag_changelog_heading_matcher;
 #[cfg(test)]
@@ -188,11 +200,13 @@ pub use origin_tier_hierarchy_guard::*;
 pub use path_hygiene::*;
 pub use pipeline_protocol_decoupling_guard::*;
 pub use preflight_checks_gate::*;
+pub use preflight_clippy_gate::*;
 pub use preflight_gate_runner::*;
 pub use profile_duplication_parity_guard::*;
 pub use pr_scope_cohesion_verifier::*;
 pub use pr_template_compliance_guard::*;
 pub use pr_template_compliance_linter::*;
+pub use pr_unverified_paths_linter::*;
 pub use published_tip_rewrite_guard::*;
 pub use readme_changelog_sync_gate::*;
 pub use readme_changelog_synchronizer::*;
@@ -200,12 +214,14 @@ pub use rejection_breakdown_generator::*;
 pub use remote_branch_base_verifier::*;
 pub use risky_path_fallback_guard::*;
 pub use rollback_ref_guard::*;
+pub use rollback_reference_drift_verifier::*;
 pub use semver_monotonic_validator::*;
 pub use settings_deep_merge_synchronizer::*;
 pub use side_effect_ordering_guard::*;
 pub use sole_contributor_attribution_enforcer::*;
 pub use sole_contributor_attribution_guard::*;
 pub use staging_protocol_guard::*;
+pub use strictly_relative_git_paths_guard::*;
 pub use tag_changelog_heading_matcher::*;
 pub use tag_changelog_heading_matcher_gate::*;
 pub use test_sandbox_lifecycle_verifier::*;

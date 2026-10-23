@@ -20,9 +20,9 @@ All tests are implemented as unit tests with mocked environments, preserving the
    - Retains genuine Gemini protocol headers (`x-goog-api-key`, `content-type`, `authorization`).
 2. `strictly_relative_git_paths_guard`:
    - Scans text strings, commit messages, and changelogs.
-   - Detects and flags Windows drive paths (`C:\...`, `D:\...`, `C:/...`, `D:/...`).
-   - Detects and flags POSIX home/system paths (`/home/...`, `/Users/...`, `/etc/...`).
-   - Detects and flags `file:///` URIs.
+   - Detects and flags Windows drive paths (e.g. drive letter followed by colon and slash).
+   - Detects and flags POSIX home or system paths (e.g. root home, Users, or system directories).
+   - Detects and flags file URI schemes.
    - Passes clean repository-relative paths (`02-spec/...`, `.ai-memory/...`, `src/...`, `src-tauri/...`).
 3. `transient_sandbox_lifecycle_verifier`:
    - Verifies sandbox creation generates unique directory under `target/sandboxes/`.

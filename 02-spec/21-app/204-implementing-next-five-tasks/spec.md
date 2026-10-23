@@ -8,7 +8,7 @@ All tasks originate directly from the non-negotiable architectural invariants co
 1. **Task 1 (`Imp-645`)**: `src-tauri/src/proxy/handlers/common/pipeline_request_header_sanitizer.rs` & `tests_pipeline_request_header_sanitizer.rs`
    - Enforce AGENTS.md request header sanitization within the pipeline: uniformly handles converted Gemini payloads, sanitizing risky headers, stripping unauthorized metadata, filtering Hop-by-Hop headers, and preserving authenticated Gemini pipeline headers.
 2. **Task 2 (`Imp-646`)**: `src-tauri/src/modules/release_gate/strictly_relative_git_paths_guard.rs` & `tests_strictly_relative_git_paths_guard.rs`
-   - Enforce AGENTS.md strictly relative Git paths invariant: audits commit messages, changelogs, release notes, and markdown documentation, strictly blocking absolute OS filesystem paths (`C:\`, `D:\`, `/home/`, `/Users/`) and `file:///` URIs.
+   - Enforce AGENTS.md strictly relative Git paths invariant: audits commit messages, changelogs, release notes, and markdown documentation, strictly blocking absolute OS filesystem paths (Windows drive letters, POSIX home/system directories) and file URI schemes.
 3. **Task 3 (`Imp-647`)**: `src-tauri/src/modules/instance/transient_sandbox_lifecycle_verifier.rs` & `tests_transient_sandbox_lifecycle_verifier.rs`
    - Enforce AGENTS.md caller IDE self-preservation & test sandboxing invariant: verifies isolated test sandbox lifecycles (`agm instances test-create` and `test-clean`), validating that transient test instances leave zero orphan processes or filesystem remnants.
 4. **Task 4 (`Imp-648`)**: `src-tauri/src/modules/release_gate/rollback_reference_drift_verifier.rs` & `tests_rollback_reference_drift_verifier.rs`

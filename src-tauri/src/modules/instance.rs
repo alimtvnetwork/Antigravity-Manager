@@ -321,11 +321,6 @@ pub mod workspace_storage_continuity_verifier;
 #[cfg(test)]
 #[path = "instance/tests_workspace_storage_continuity_verifier.rs"]
 pub mod tests_workspace_storage_continuity_verifier;
-#[path = "instance/caller_ide_exit_code_enforcer.rs"]
-pub mod caller_ide_exit_code_enforcer;
-#[cfg(test)]
-#[path = "instance/tests_caller_ide_exit_code_enforcer.rs"]
-pub mod tests_caller_ide_exit_code_enforcer;
 #[path = "instance/env_token_scrubber.rs"]
 pub mod env_token_scrubber;
 #[path = "instance/socket_lock_recovery.rs"]
@@ -355,6 +350,21 @@ pub mod caller_ide_exit_code_enforcer;
 #[cfg(test)]
 #[path = "instance/tests_caller_ide_exit_code_enforcer.rs"]
 pub mod tests_caller_ide_exit_code_enforcer;
+#[path = "instance/transient_sandbox_lifecycle_verifier.rs"]
+pub mod transient_sandbox_lifecycle_verifier;
+#[cfg(test)]
+#[path = "instance/tests_transient_sandbox_lifecycle_verifier.rs"]
+pub mod tests_transient_sandbox_lifecycle_verifier;
+#[path = "instance/multi_stage_launcher_dispatcher.rs"]
+pub mod multi_stage_launcher_dispatcher;
+#[cfg(test)]
+#[path = "instance/tests_multi_stage_launcher_dispatcher.rs"]
+pub mod tests_multi_stage_launcher_dispatcher;
+#[path = "instance/multi_stage_launcher_engine.rs"]
+pub mod multi_stage_launcher_engine;
+#[cfg(test)]
+#[path = "instance/tests_multi_stage_launcher_engine.rs"]
+pub mod tests_multi_stage_launcher_engine;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use arg_normalizer::*;
@@ -547,4 +557,6 @@ pub use transient_sandbox_manager::*;
 pub use job_breakaway_process_spawner::*;
 pub use workspace_storage_continuity_verifier::*;
 pub use caller_ide_exit_code_enforcer::*;
-pub use caller_ide_exit_code_enforcer::*;
+pub use transient_sandbox_lifecycle_verifier::*;
+pub use multi_stage_launcher_dispatcher::*;
+pub use multi_stage_launcher_engine::*;

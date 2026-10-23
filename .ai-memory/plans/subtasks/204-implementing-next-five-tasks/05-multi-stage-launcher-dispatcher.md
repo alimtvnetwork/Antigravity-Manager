@@ -1,5 +1,5 @@
 # Subtask 05: Multi-Stage Launcher Fallback & Batch File Guard (`Imp-649`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 204-implementing-next-five-tasks.md
 
 ## Scope & Objective

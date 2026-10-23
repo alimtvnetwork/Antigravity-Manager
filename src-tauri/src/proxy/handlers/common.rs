@@ -25,6 +25,7 @@ mod handle_detect_model;
 pub mod header_allowlist_filter;
 pub mod header_anonymizer;
 pub mod json_payload_sanitizer;
+pub mod pipeline_request_header_sanitizer;
 pub mod prefix_stability_pipeline_guard;
 pub mod prefix_stability_sanitizer;
 pub mod request_cancellation_watcher;
@@ -55,6 +56,7 @@ pub mod stream_drain_guard;
 pub mod stream_early_abort_sentinel;
 pub mod stream_flusher;
 pub mod thinking_budget_filter_pipeline;
+pub mod thinking_budget_headroom_evaluator;
 pub mod token_budget_decider;
 pub mod tool_response_formatter;
 pub mod unified_context_structural_aligner;
@@ -102,11 +104,15 @@ pub mod tests_json_payload_sanitizer;
 #[cfg(test)]
 pub mod tests_payload_length_negotiator;
 #[cfg(test)]
+pub mod tests_pipeline_request_header_sanitizer;
+#[cfg(test)]
 pub mod tests_sse_heartbeat_generator;
 #[cfg(test)]
 pub mod tests_token_budget_decider;
 #[cfg(test)]
 pub mod tests_thinking_budget_filter_pipeline;
+#[cfg(test)]
+pub mod tests_thinking_budget_headroom_evaluator;
 #[cfg(test)]
 pub mod tests_prefix_stability_pipeline_guard;
 #[cfg(test)]
@@ -128,6 +134,7 @@ pub use frame_length_clamper::*;
 pub use header_allowlist_filter::*;
 pub use header_anonymizer::anonymize_forwarded_headers;
 pub use json_payload_sanitizer::*;
+pub use pipeline_request_header_sanitizer::*;
 pub use prefix_stability_pipeline_guard::*;
 pub use prefix_stability_sanitizer::*;
 pub use request_cancellation_watcher::*;
@@ -157,6 +164,7 @@ pub use stream_drain_guard::*;
 pub use stream_early_abort_sentinel::*;
 pub use stream_flusher::{StreamFlusher, SSE_KEEPALIVE_BYTES};
 pub use thinking_budget_filter_pipeline::*;
+pub use thinking_budget_headroom_evaluator::*;
 pub use token_budget_decider::*;
 pub use tool_response_formatter::*;
 pub use unified_context_structural_aligner::*;
