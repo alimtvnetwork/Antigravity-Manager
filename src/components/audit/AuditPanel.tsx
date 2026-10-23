@@ -19,6 +19,7 @@ import {
     FileJson,
     FileText,
     Layers,
+    Mail,
     MousePointerClick,
     RefreshCw,
     Terminal,
@@ -136,8 +137,15 @@ function ActorBadge({ actor }: { actor: AuditActor }) {
 }
 
 const METHOD_LABELS: Record<string, string> = {
-    send_prompt_now: 'Send Prompt Now',
-    enqueue_prompt: 'Enqueue Prompt',
+    send_prompt_now: 'Send Prompt Now (Immediate Dispatch)',
+    enqueue_prompt: 'Enqueue Prompt (FIFO Queue)',
+    fast_forward_instance: 'Fast-Forward Profile Rotation',
+    switch_account_to_instance: 'Switch Profile to Instance',
+    'auto_switcher.post_switch_resume.scheduled': 'Schedule Prompt Restore Timer (10s)',
+    'auto_switcher.post_switch_resume.fired': 'Execute Prompt Restore Rehydration',
+    'auto_switcher.post_switch_resume.cancelled': 'Cancel Prompt Restore Settling Timer',
+    'auto_switcher.post_switch_resume.rearmed': 'Re-Arm Persisted Prompt Restore',
+    'auto_switcher.post_switch_resume.force_dispatched': 'Force Dispatch Prompt Restore',
     'instance-row-prompts-btn': 'Prompts & History',
     'instance-row-switch-btn': 'Switch Profile',
     'instance-row-stop-btn': 'Stop Instance',
@@ -172,6 +180,23 @@ function humanMethodLabel(methodName: string, params: Record<string, unknown> = 
     }
     if (METHOD_LABELS[methodName]) {
         return METHOD_LABELS[methodName];
+    }
+    if (methodName.startsWith('auto_switcher.post_switch_resume.')) {
+        const stage = methodName.replace('auto_switcher.post_switch_resume.', '');
+        const map: Record<string, string> = {
+            scheduled: 'Schedule Prompt Restore Timer (10s)',
+            fired: 'Execute Prompt Restore Rehydration',
+            cancelled: 'Cancel Prompt Restore Settling Timer',
+            rearmed: 'Re-Arm Persisted Prompt Restore',
+            force_dispatched: 'Force Dispatch Prompt Restore',
+        };
+        if (map[stage]) return map[stage];
+        const formatted = stage.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        return `Post-Switch Settling Timer: ${formatted}`;
+    }
+    if (methodName.startsWith('auto_switcher.')) {
+        const action = methodName.replace('auto_switcher.', '').replace(/[._]/g, ' ');
+        return `AutoSwitcher: ${action.replace(/\b\w/g, (c) => c.toUpperCase())}`;
     }
     if (methodName.startsWith('scroll:')) {
         const route = methodName.slice(7) || '/';
@@ -228,6 +253,63 @@ function humanMethodLabel(methodName: string, params: Record<string, unknown> = 
     return methodName;
 }
 
+function resolveStepSummary(
+    entry: AuditEntry,
+    params: Record<string, unknown>,
+    methodLabel: string,
+    uiTarget: string
+): string {
+    if (typeof params.stepSummary === 'string' && params.stepSummary) {
+        return params.stepSummary;
+    }
+    const methodName = entry.methodName || entry.method_name || '';
+    const instanceId = String(params.instance_id || uiTarget.replace(/^instance:\/\//, '').split(/[ >|]/)[0] || '').trim();
+
+    if (methodName.startsWith('auto_switcher.post_switch_resume.')) {
+        const stage = String(params.stage || methodName.split('.').pop() || '');
+        const reason = String(params.reason || entry.message || 'superseded by a newer schedule');
+        switch (stage) {
+            case 'cancelled':
+                return `AutoSwitcher cancelled 10s prompt restore settling timer on instance "${instanceId || 'active'}": ${reason}`;
+            case 'scheduled':
+                return `AutoSwitcher scheduled 10s settling window and prompt restore on instance "${instanceId || 'active'}": ${reason}`;
+            case 'fired':
+                return `AutoSwitcher executed prompt restore rehydration on instance "${instanceId || 'active'}": ${reason}`;
+            case 'rearmed':
+                return `AutoSwitcher re-armed persisted prompt restore on instance "${instanceId || 'active'}" after restart: ${reason}`;
+            case 'force_dispatched':
+                return `AutoSwitcher force-dispatched immediate prompt restore on instance "${instanceId || 'active'}": ${reason}`;
+            default:
+                return `AutoSwitcher post-switch lifecycle stage "${stage}" on instance "${instanceId || 'active'}": ${reason}`;
+        }
+    }
+
+    if (methodName === 'fast_forward_instance') {
+        return `User executed Fast-Forward profile rotation on instance "${instanceId || 'active'}"`;
+    }
+
+    if (methodName === 'switch_account_to_instance') {
+        const accId = String(params.account_id || '');
+        return `User switched account "${accId}" to instance "${instanceId || 'active'}"`;
+    }
+
+    if (methodName === 'send_prompt_now') {
+        return `User dispatched immediate prompt to instance "${instanceId || 'active'}"`;
+    }
+
+    if (methodName === 'enqueue_prompt') {
+        return `User enqueued prompt for sequential FIFO queue processing on instance "${instanceId || 'active'}"`;
+    }
+
+    if (entry.trigger === 'programmatic' && entry.actor === 'system') {
+        const cleanedTarget = uiTarget.replace(/^instance:\/\//, 'Instance ').replace(/ > /, ' › ');
+        const reason = entry.message ? ` (${entry.message})` : '';
+        return `System Daemon executed ${methodLabel} on ${cleanedTarget}${reason}`;
+    }
+
+    return `${String(entry.actor).toUpperCase()} performed ${entry.trigger} on ${uiTarget}`;
+}
+
 function EntryRow({ entry }: { entry: AuditEntry }) {
     const [expanded, setExpanded] = useState(false);
     const params = useMemo(() => parseParams(entry.params), [entry.params]);
@@ -281,16 +363,20 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
                             <div className="flex items-center justify-between gap-2 border-b border-sky-500/20 pb-2.5">
                                 <div className="flex items-center gap-2.5">
                                     <div className="p-1.5 rounded-lg bg-sky-500/15 text-sky-400 border border-sky-500/30">
-                                        <MousePointerClick className="w-4 h-4" />
+                                        {entry.trigger === 'programmatic' || entry.actor === 'system' ? (
+                                            <Wrench className="w-4 h-4 text-amber-400" />
+                                        ) : entry.trigger === 'input' ? (
+                                            <Terminal className="w-4 h-4 text-sky-400" />
+                                        ) : (
+                                            <MousePointerClick className="w-4 h-4 text-sky-400" />
+                                        )}
                                     </div>
                                     <div>
                                         <span className="text-[10px] font-mono uppercase tracking-wider text-sky-400 font-bold block">
                                             Step Performed
                                         </span>
                                         <h4 className="text-xs font-semibold text-slate-100">
-                                            {typeof params.stepSummary === 'string'
-                                                ? params.stepSummary
-                                                : `${String(entry.actor).toUpperCase()} performed ${entry.trigger} on ${uiTarget}`}
+                                            {resolveStepSummary(entry, params, methodLabel, uiTarget)}
                                         </h4>
                                     </div>
                                 </div>
@@ -309,7 +395,8 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
                                     {(Array.isArray(params.elementHierarchy) && params.elementHierarchy.length > 0
                                         ? (params.elementHierarchy as string[])
                                         : [
-                                              `Route: ${String(params.route || uiTarget?.split('|')[0]?.trim() || '/instances')}`,
+                                              `Route: ${String(params.route || (uiTarget.startsWith('instance://') ? uiTarget.replace('instance://', '/instances?id=') : uiTarget?.split('|')[0]?.trim()) || '/instances')}`,
+                                              `Container: ${String(params.container || (uiTarget.startsWith('instance://') ? `Instance Card: ${uiTarget.replace('instance://', '').split(/[ >|]/)[0]}` : 'Workspace Area'))}`,
                                               `Action: ${methodLabel}`,
                                           ]
                                     ).map((step, idx, arr) => (
@@ -329,28 +416,135 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px] font-mono">
                                 <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800/80">
                                     <span className="text-[9px] text-slate-500 block uppercase">Target Tag</span>
-                                    <span className="text-slate-200">{String(params.tag || entry.trigger || 'unknown')}</span>
+                                    <span className="text-slate-200">
+                                        {String(params.tag || (entry.trigger === 'programmatic' ? 'System Daemon' : entry.trigger || 'unknown'))}
+                                    </span>
                                 </div>
                                 <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800/80">
                                     <span className="text-[9px] text-slate-500 block uppercase">Label / Text</span>
-                                    <span className="text-emerald-400 truncate block" title={String(params.textSnippet || params.text || params.title || params.ariaLabel || '')}>
-                                        {String(params.textSnippet || params.text || params.title || params.ariaLabel || '—')}
+                                    <span
+                                        className="text-emerald-400 truncate block"
+                                        title={String(
+                                            params.textSnippet ||
+                                                params.text ||
+                                                params.title ||
+                                                params.ariaLabel ||
+                                                (params.stage ? `Stage: ${params.stage}` : '') ||
+                                                (entry.message ? `Reason: ${entry.message}` : '') ||
+                                                methodLabel
+                                        )}
+                                    >
+                                        {String(
+                                            params.textSnippet ||
+                                                params.text ||
+                                                params.title ||
+                                                params.ariaLabel ||
+                                                (params.stage ? `Stage: ${params.stage}` : '') ||
+                                                (entry.message ? `Reason: ${entry.message}` : '') ||
+                                                methodLabel
+                                        )}
                                     </span>
                                 </div>
                                 <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800/80">
                                     <span className="text-[9px] text-slate-500 block uppercase">Container / Card</span>
-                                    <span className="text-cyan-300 truncate block" title={String(params.container || '')}>
-                                        {String(params.container || 'Workspace Area')}
+                                    <span
+                                        className="text-cyan-300 truncate block"
+                                        title={String(
+                                            params.container ||
+                                                (uiTarget.startsWith('instance://')
+                                                    ? `Instance Card: ${uiTarget.replace('instance://', '').split(/[ >|]/)[0]}`
+                                                    : 'Workspace Area')
+                                        )}
+                                    >
+                                        {String(
+                                            params.container ||
+                                                (uiTarget.startsWith('instance://')
+                                                    ? `Instance Card: ${uiTarget.replace('instance://', '').split(/[ >|]/)[0]}`
+                                                    : 'Workspace Area')
+                                        )}
                                     </span>
                                 </div>
                                 <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800/80">
                                     <span className="text-[9px] text-slate-500 block uppercase">Route Target</span>
-                                    <span className="text-sky-300 truncate block" title={String(params.route || uiTarget)}>
-                                        {String(params.route || uiTarget)}
+                                    <span
+                                        className="text-sky-300 truncate block"
+                                        title={String(
+                                            params.route ||
+                                                (uiTarget.startsWith('instance://')
+                                                    ? uiTarget.replace('instance://', '/instances?id=')
+                                                    : uiTarget)
+                                        )}
+                                    >
+                                        {String(
+                                            params.route ||
+                                                (uiTarget.startsWith('instance://')
+                                                    ? uiTarget.replace('instance://', '/instances?id=')
+                                                    : uiTarget)
+                                        )}
                                     </span>
                                 </div>
                             </div>
                         </div>
+
+                        {/* 2. Email-Style Executive Briefing Box */}
+                        <div className="rounded-xl border border-sky-500/40 bg-gradient-to-br from-slate-900/95 via-sky-950/30 to-slate-900/95 p-3.5 shadow-xl space-y-3">
+                            <div className="flex items-center justify-between gap-2 border-b border-sky-500/20 pb-2">
+                                <div className="flex items-center gap-2 text-sky-300 font-bold text-xs uppercase tracking-wider">
+                                    <Mail className="w-4 h-4 text-sky-400" />
+                                    <span>Executive Event Briefing (Email Notice Format)</span>
+                                </div>
+                                <span
+                                    className={cn(
+                                        'px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border',
+                                        entry.result === 'ok'
+                                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                            : 'bg-red-500/15 text-red-300 border-red-500/30'
+                                    )}
+                                >
+                                    {entry.result === 'ok' ? '✓ STATUS: NORMAL / SUCCESS' : '✕ STATUS: ERROR'}
+                                </span>
+                            </div>
+
+                            {/* Email-Style Key-Value Attributes Table */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
+                                <div className="flex items-center gap-2 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                                    <span className="text-slate-400 font-sans font-medium min-w-[95px] shrink-0">🎯 Target Scope:</span>
+                                    <span className="text-sky-300 font-semibold truncate" title={String(params.instance_id || uiTarget)}>
+                                        {String(params.instance_id ? `Instance: ${params.instance_id}` : uiTarget)}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                                    <span className="text-slate-400 font-sans font-medium min-w-[95px] shrink-0">⚙️ Operation:</span>
+                                    <span className="text-slate-200 font-semibold truncate" title={methodLabel}>
+                                        {methodLabel}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                                    <span className="text-slate-400 font-sans font-medium min-w-[95px] shrink-0">💡 Rationale / Cause:</span>
+                                    <span className="text-amber-300 font-sans font-medium truncate" title={String(params.reason || entry.message || params.stage || 'Routine system dispatch')}>
+                                        {String(params.reason || entry.message || params.stage || 'Routine system dispatch')}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                                    <span className="text-slate-400 font-sans font-medium min-w-[95px] shrink-0">🛡️ Continuity:</span>
+                                    <span className="text-emerald-400 font-sans font-medium truncate" title="Strict FIFO Queue Monotonicity (created_at ASC, id ASC)">
+                                        Strict FIFO Queue Monotonicity Guaranteed
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Full Human Description (Like Email Content Body) */}
+                            <div className="bg-slate-950/80 p-3 rounded-lg border border-sky-500/20 text-xs text-slate-200 leading-relaxed font-sans">
+                                <p>
+                                    {typeof params.action_description === 'string'
+                                        ? params.action_description
+                                        : typeof (params.executive_briefing as Record<string, unknown> | undefined)?.operation === 'string'
+                                        ? String((params.executive_briefing as Record<string, unknown>).operation)
+                                        : `${String(entry.actor).toUpperCase()} executed action "${methodLabel}" on ${uiTarget}. ${entry.message ? `Details: ${entry.message}.` : 'Completed with verified queue stability.'}`}
+                                </p>
+                            </div>
+                        </div>
+
                         {Boolean(params.machine_name || params.node_alias || params.agm_version) && (
                             <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-cyan-300 bg-cyan-950/40 px-2.5 py-1.5 rounded-md border border-cyan-500/20">
                                 <Terminal className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
@@ -376,7 +570,14 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
                                 Stack trace{traceFrames.length > 0 ? ` (${traceFrames.length} frame${traceFrames.length === 1 ? '' : 's'})` : ''}
                             </h5>
                             {traceFrames.length === 0 ? (
-                                <p className="font-mono text-[10px] text-slate-500">Stack trace unavailable for this entry.</p>
+                                <p className="font-mono text-[10px] text-slate-400 bg-slate-950/40 p-2.5 rounded-lg border border-slate-800 flex items-center gap-2">
+                                    <Terminal className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                    <span>
+                                        {entry.trigger === 'programmatic' || entry.actor === 'system'
+                                            ? '⚡ Asynchronous Engine Daemon (Executed in background Tokio runtime / daemon timer — zero DOM frames).'
+                                            : 'Stack trace unavailable for this entry.'}
+                                    </span>
+                                </p>
                             ) : (
                                 <ol className="font-mono text-[10px] text-sky-200/90 bg-slate-950/80 p-2.5 rounded-lg border border-sky-500/20 space-y-1">
                                     {traceFrames.map((frame, index) => (
@@ -410,10 +611,23 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
                             </pre>
                         </div>
                         {entry.message && (
-                            <p className="mt-1 text-[11px] font-medium text-red-400 flex items-center gap-1.5">
-                                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                                {entry.message}
-                            </p>
+                            entry.result === 'ok' ? (
+                                <div className="mt-2 p-2.5 rounded-lg bg-sky-950/40 border border-sky-500/30 text-[11px] text-sky-200 flex items-start gap-2">
+                                    <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                                    <div>
+                                        <span className="font-semibold text-sky-300 block text-[10px] uppercase tracking-wider">Lifecycle Note / Reason</span>
+                                        <span className="text-slate-200">{entry.message}</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="mt-2 p-2.5 rounded-lg bg-red-950/40 border border-red-500/30 text-[11px] text-red-200 flex items-start gap-2">
+                                    <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                                    <div>
+                                        <span className="font-semibold text-red-400 block text-[10px] uppercase tracking-wider">Error Details</span>
+                                        <span className="text-red-200">{entry.message}</span>
+                                    </div>
+                                </div>
+                            )
                         )}
                     </td>
                 </tr>

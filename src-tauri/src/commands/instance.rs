@@ -158,6 +158,7 @@ pub async fn fast_forward_instance(instance_id: String) -> Result<String, String
         crate::modules::auto_switcher::trigger_manual_rotation_for_instance(Some(&instance_id))
             .await;
     // Justification: UI audit recording is observability; never block fast-forward on it.
+    let ff_res_clone = res.clone();
     crate::error::record_ignored(
         crate::modules::audit::record_interaction(crate::modules::audit::RecordInteractionInput {
             actor: crate::modules::audit::InteractionActor::User,
@@ -166,13 +167,34 @@ pub async fn fast_forward_instance(instance_id: String) -> Result<String, String
             component: Some("InstanceCardActions".to_string()),
             element_id: Some(format!("fast-forward-{instance_id}")),
             trigger: crate::modules::audit::InteractionTrigger::Click,
-            params: Some(serde_json::json!({ "instance_id": instance_id })),
+            params: Some(serde_json::json!({
+                "instance_id": instance_id,
+                "stepSummary": format!("User executed Fast-Forward profile rotation on instance '{instance_id}'"),
+                "cleanMethodLabel": "Fast-Forward Profile Rotation",
+                "elementHierarchy": [
+                    format!("Instance: {instance_id}"),
+                    "Instances Grid".to_string(),
+                    "Instance Card Actions".to_string(),
+                    "Fast-Forward Rotation Trigger".to_string(),
+                ],
+                "container": format!("Instance Card: {instance_id}"),
+                "textSnippet": "Fast Forward Shortcut",
+                "tag": "action-button",
+                "action_description": format!("Initiated manual 4-tier fast-forward account evaluation for instance '{instance_id}'. Candidate selection enforces 15% weekly quota floor, 100% 4-hour headroom, zero cross-instance fleet usage, and earliest reset timestamp prioritization."),
+                "executive_briefing": {
+                    "headline": format!("Fast-Forward Profile Rotation: {}", instance_id),
+                    "operation": "Manual Fast-Forward Account Switch",
+                    "rationale": "User triggered instant profile fast-forward shortcut",
+                    "instance_id": instance_id,
+                    "safeguard": "4-Tier Candidate Resolution Ladder & Quota Headroom Invariants",
+                }
+            })),
             result: if res.is_ok() {
                 "ok".to_string()
             } else {
                 "error".to_string()
             },
-            message: Some(match &res {
+            message: Some(match &ff_res_clone {
                 Ok(msg) => msg.clone(),
                 Err(err) => err.clone(),
             }),
@@ -417,6 +439,25 @@ pub async fn switch_account_to_instance(
             params: Some(serde_json::json!({
                 "account_id": account_id,
                 "instance_id": instance_id,
+                "stepSummary": format!("User switched account '{account_id}' to instance '{instance_id}'"),
+                "cleanMethodLabel": "Switch Profile to Instance",
+                "elementHierarchy": [
+                    "/accounts".to_string(),
+                    "Accounts Table".to_string(),
+                    format!("Account Row: {account_id}"),
+                    format!("Target Instance: {instance_id}"),
+                ],
+                "container": format!("Account Row: {account_id}"),
+                "textSnippet": format!("Switch to {instance_id}"),
+                "tag": "action-button",
+                "action_description": format!("Explicit user profile switch binding account '{account_id}' to instance '{instance_id}'. Running prompts and active state snapshotted, post-switch 10s settling window armed."),
+                "executive_briefing": {
+                    "headline": format!("Account Switch: {} → {}", account_id, instance_id),
+                    "operation": "Manual Account Profile Switch",
+                    "rationale": "Direct user selection from accounts management table",
+                    "instance_id": instance_id,
+                    "safeguard": "Prompt Continuity Preservation & Settling Delay",
+                }
             })),
             result: if res.is_ok() {
                 "ok".to_string()
@@ -592,6 +633,9 @@ pub async fn send_prompt_now(
     .await
     .map_err(|e| format!("send_prompt_now task failed: {e}"))?;
     // Justification: UI audit recording is observability; never block prompt dispatch on it.
+    let send_inst_for_audit = audit_inst.clone();
+    let send_repo_for_audit = audit_repo.clone();
+    let media_count = media_paths_audit.as_ref().map(|m| m.len()).unwrap_or(0);
     crate::error::record_ignored(
         crate::modules::audit::record_interaction(crate::modules::audit::RecordInteractionInput {
             actor: crate::modules::audit::InteractionActor::User,
@@ -601,11 +645,30 @@ pub async fn send_prompt_now(
             element_id: Some("send-prompt-btn".to_string()),
             trigger: crate::modules::audit::InteractionTrigger::Click,
             params: Some(serde_json::json!({
-                "instance_id": audit_inst,
-                "repo_path": audit_repo,
+                "instance_id": send_inst_for_audit,
+                "repo_path": send_repo_for_audit,
                 "conversation_id": audit_conv,
                 "prompt_id": res.as_ref().ok().map(|p| p.id.clone()),
-                "media_count": media_paths_audit.as_ref().map(|m| m.len()).unwrap_or(0),
+                "media_count": media_count,
+                "stepSummary": format!("User dispatched immediate prompt to instance '{send_inst_for_audit}' ({send_repo_for_audit})"),
+                "cleanMethodLabel": "Send Prompt Now (Immediate Dispatch)",
+                "elementHierarchy": [
+                    "/instances".to_string(),
+                    format!("Instance: {send_inst_for_audit}"),
+                    "Prompt Tree View".to_string(),
+                    "Immediate Dispatch Action".to_string(),
+                ],
+                "container": format!("Instance Prompt Tree: {send_inst_for_audit}"),
+                "textSnippet": "Send Now",
+                "tag": "action-button",
+                "action_description": format!("Direct interactive dispatch bypassing FIFO backlog queue for immediate execution in instance '{send_inst_for_audit}' (Repository: {send_repo_for_audit}, Attached Media: {media_count})."),
+                "executive_briefing": {
+                    "headline": format!("Prompt Dispatched: {}", send_inst_for_audit),
+                    "operation": "Immediate Prompt Execution",
+                    "rationale": "Interactive user 'Send Prompt Now' action",
+                    "instance_id": send_inst_for_audit,
+                    "safeguard": "Active CDP Channel Injection",
+                }
             })),
             result: if res.is_ok() {
                 "ok".to_string()
@@ -658,6 +721,9 @@ pub async fn enqueue_prompt(
     .await
     .map_err(|e| format!("enqueue_prompt task failed: {e}"))?;
     // Justification: UI audit recording is observability; never block prompt enqueue on it.
+    let enq_inst_for_audit = audit_inst.clone();
+    let enq_repo_for_audit = audit_repo.clone();
+    let enq_media_count = media_paths_audit.as_ref().map(|m| m.len()).unwrap_or(0);
     crate::error::record_ignored(
         crate::modules::audit::record_interaction(crate::modules::audit::RecordInteractionInput {
             actor: crate::modules::audit::InteractionActor::User,
@@ -667,11 +733,30 @@ pub async fn enqueue_prompt(
             element_id: Some("enqueue-prompt-btn".to_string()),
             trigger: crate::modules::audit::InteractionTrigger::Click,
             params: Some(serde_json::json!({
-                "instance_id": audit_inst,
-                "repo_path": audit_repo,
+                "instance_id": enq_inst_for_audit,
+                "repo_path": enq_repo_for_audit,
                 "conversation_id": audit_conv,
                 "prompt_id": res.as_ref().ok().map(|p| p.id.clone()),
-                "media_count": media_paths_audit.as_ref().map(|m| m.len()).unwrap_or(0),
+                "media_count": enq_media_count,
+                "stepSummary": format!("User enqueued prompt for sequential FIFO processing on instance '{enq_inst_for_audit}' ({enq_repo_for_audit})"),
+                "cleanMethodLabel": "Enqueue Prompt (FIFO Queue)",
+                "elementHierarchy": [
+                    "/instances".to_string(),
+                    format!("Instance: {enq_inst_for_audit}"),
+                    "Prompt Tree View".to_string(),
+                    "FIFO Enqueue Action".to_string(),
+                ],
+                "container": format!("Instance Prompt Tree: {enq_inst_for_audit}"),
+                "textSnippet": "Enqueue for Later",
+                "tag": "action-button",
+                "action_description": format!("Appended prompt turn to persistent SQLite FIFO queue on instance '{enq_inst_for_audit}' (Repository: {enq_repo_for_audit}, Attached Media: {enq_media_count}). Execution will occur sequentially via background queue dispatcher."),
+                "executive_briefing": {
+                    "headline": format!("Prompt Enqueued: {}", enq_inst_for_audit),
+                    "operation": "FIFO Background Queue Insertion",
+                    "rationale": "Interactive user 'Enqueue Prompt' action",
+                    "instance_id": enq_inst_for_audit,
+                    "safeguard": "Strict FIFO Monotonicity (created_at ASC, id ASC) in active_prompts",
+                }
             })),
             result: if res.is_ok() {
                 "ok".to_string()

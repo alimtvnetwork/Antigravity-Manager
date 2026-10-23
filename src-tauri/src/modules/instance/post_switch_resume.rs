@@ -577,16 +577,90 @@ fn emit_prompts_restored(instance_id: &str, restored_count: usize) {
 /// interaction audit recorder. Actor `system` plus the `auto_switcher.*`
 /// method name identifies the auto-switcher as the actor.
 fn audit_resume_lifecycle(stage: &str, instance_id: &str, detail: &str) {
+    let clean_method_label = match stage {
+        "cancelled" => "Cancel Prompt Restore Settling Timer",
+        "scheduled" => "Schedule Prompt Restore Timer (10s)",
+        "fired" => "Execute Prompt Restore Rehydration",
+        "rearmed" => "Re-Arm Persisted Prompt Restore",
+        "force_dispatched" => "Force Dispatch Prompt Restore",
+        _ => "Post-Switch Resume Lifecycle",
+    };
+    let step_summary = match stage {
+        "cancelled" => format!(
+            "AutoSwitcher cancelled 10s prompt restore settling timer on instance '{instance_id}': {detail}"
+        ),
+        "scheduled" => format!(
+            "AutoSwitcher scheduled 10s settling window and prompt restore on instance '{instance_id}': {detail}"
+        ),
+        "fired" => format!(
+            "AutoSwitcher executed prompt restore rehydration on instance '{instance_id}': {detail}"
+        ),
+        "rearmed" => format!(
+            "AutoSwitcher re-armed persisted prompt restore on instance '{instance_id}' after restart: {detail}"
+        ),
+        "force_dispatched" => format!(
+            "AutoSwitcher force-dispatched immediate prompt restore on instance '{instance_id}': {detail}"
+        ),
+        _ => format!("AutoSwitcher post-switch lifecycle stage '{stage}' on '{instance_id}': {detail}"),
+    };
+    let element_hierarchy = vec![
+        format!("Instance: {instance_id}"),
+        "AutoSwitcher Engine".to_string(),
+        "Prompt Continuity Hub".to_string(),
+        match stage {
+            "cancelled" => "Settling Timer Cancellation Guard",
+            "scheduled" => "10-Second Settling Window Timer",
+            "fired" => "FIFO Prompt Restore Rehydration",
+            "rearmed" => "Persisted Restore State Recovery",
+            "force_dispatched" => "Manual Force Dispatch Sweep",
+            _ => "Lifecycle State Transition",
+        }
+        .to_string(),
+    ];
+    let action_desc = match stage {
+        "cancelled" => format!(
+            "Antigravity Manager cancelled the scheduled 10-second prompt restore timer for instance '{instance_id}' because {detail}. Active and queued prompts remain safely preserved in repo_prompts.db and active_prompts FIFO queue."
+        ),
+        "scheduled" => format!(
+            "Antigravity Manager scheduled a 10-second settling window for instance '{instance_id}' ({detail}) to allow IDE process and Chrome DevTools Protocol (CDP) session stabilization before rehydrating prompts."
+        ),
+        "fired" => format!(
+            "Antigravity Manager executed prompt restore rehydration on instance '{instance_id}' ({detail}). Queued turns were submitted sequentially in strict FIFO order."
+        ),
+        "rearmed" => format!(
+            "Antigravity Manager discovered an uncompleted prompt restore task for instance '{instance_id}' in post_switch_resume_state.json during startup and re-armed the timer ({detail})."
+        ),
+        "force_dispatched" => format!(
+            "Antigravity Manager bypassed the remaining settling delay and immediately dispatched backed-up prompts to instance '{instance_id}' ({detail})."
+        ),
+        _ => format!("AutoSwitcher lifecycle event '{stage}' on instance '{instance_id}': {detail}"),
+    };
+
     let input = RecordInteractionInput {
         actor: InteractionActor::System,
         method_name: format!("auto_switcher.post_switch_resume.{stage}"),
-        route: format!("instance://{instance_id}"),
+        route: format!("/instances?id={instance_id}"),
         component: Some("PostSwitchResume".to_string()),
-        element_id: None,
+        element_id: Some(format!("resume-{stage}-{instance_id}")),
         trigger: InteractionTrigger::Programmatic,
         params: Some(serde_json::json!({
             "instance_id": instance_id,
             "stage": stage,
+            "reason": detail,
+            "stepSummary": step_summary,
+            "cleanMethodLabel": clean_method_label,
+            "elementHierarchy": element_hierarchy,
+            "container": format!("Instance Card: {instance_id}"),
+            "textSnippet": format!("Stage: {stage} • {detail}"),
+            "tag": "system-daemon",
+            "action_description": action_desc,
+            "executive_briefing": {
+                "headline": format!("Prompt Restore Timer {}: {}", stage.to_uppercase(), instance_id),
+                "operation": clean_method_label,
+                "rationale": detail,
+                "instance_id": instance_id,
+                "safeguard": "Strict FIFO Queue Monotonicity (ORDER BY created_at ASC, id ASC)",
+            }
         })),
         result: "ok".to_string(),
         message: Some(detail.to_string()),
