@@ -415,6 +415,16 @@ pub mod inline_select_dropdown_styler;
 #[cfg(test)]
 #[path = "instance/tests_inline_select_dropdown_styler.rs"]
 pub mod tests_inline_select_dropdown_styler;
+#[path = "instance/capsule_segmented_button_group_styler.rs"]
+pub mod capsule_segmented_button_group_styler;
+#[cfg(test)]
+#[path = "instance/tests_capsule_segmented_button_group_styler.rs"]
+pub mod tests_capsule_segmented_button_group_styler;
+#[path = "instance/batch_file_execution_interceptor.rs"]
+pub mod batch_file_execution_interceptor;
+#[cfg(test)]
+#[path = "instance/tests_batch_file_execution_interceptor.rs"]
+pub mod tests_batch_file_execution_interceptor;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use arg_normalizer::*;
@@ -620,3 +630,5 @@ pub use truncation_omission_banner_formatter::*;
 pub use window_control_capsule_formatter::*;
 pub use caller_process_ancestry_tree_scanner::*;
 pub use inline_select_dropdown_styler::*;
+pub use capsule_segmented_button_group_styler::*;
+pub use batch_file_execution_interceptor::*;

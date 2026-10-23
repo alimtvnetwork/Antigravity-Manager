@@ -27,6 +27,7 @@ pub mod changelog_tag_monotonic_gate;
 pub mod coauthor_attribution_verifier;
 pub mod coauthor_trailer_alignment_guard;
 pub mod commit_convergence_auditor;
+pub mod contributor_authorship_preservation_guard;
 pub mod contributor_cost_disclosure_linter;
 pub mod cross_platform_compat_guard;
 pub mod docker_sync_verifier;
@@ -107,6 +108,8 @@ pub mod tests_coauthor_attribution;
 pub mod tests_coauthor_trailer_alignment_guard;
 #[cfg(test)]
 pub mod tests_commit_convergence;
+#[cfg(test)]
+pub mod tests_contributor_authorship_preservation_guard;
 #[cfg(test)]
 pub mod tests_contributor_cost_disclosure;
 #[cfg(test)]
@@ -230,6 +233,7 @@ pub use changelog_tag_monotonic_gate::*;
 pub use coauthor_attribution_verifier::*;
 pub use coauthor_trailer_alignment_guard::*;
 pub use commit_convergence_auditor::*;
+pub use contributor_authorship_preservation_guard::*;
 pub use contributor_cost_disclosure_linter::*;
 pub use cross_platform_compat_guard::*;
 pub use docker_sync_verifier::*;

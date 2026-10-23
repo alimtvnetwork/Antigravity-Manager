@@ -1,15 +1,15 @@
 # Plan 214: Implementing Next Five Tasks (Steps 281–285)
-Status: IN_PROGRESS
+Status: COMPLETED
 Sequence: 214
 Total Steps in Batch: 5
 Remaining Backlog after Batch: 0
 
 ## Subtasks
-1. `01-streaming-payload-accumulator.md`: Streaming Payload Accumulator (`Imp-695`) — `IN_PROGRESS`
-2. `02-capsule-segmented-button-group-styler.md`: Capsule Segmented Button Group Styler (`Imp-696`) — `IN_PROGRESS`
-3. `03-fifo-prompt-restore-cursor-stepper.md`: FIFO Prompt Restore Cursor Stepper (`Imp-697`) — `IN_PROGRESS`
-4. `04-batch-file-execution-interceptor.md`: Batch File Execution Interceptor (`Imp-698`) — `IN_PROGRESS`
-5. `05-contributor-authorship-preservation-guard.md`: Contributor Authorship Preservation Guard (`Imp-699`) — `IN_PROGRESS`
+1. `01-streaming-payload-accumulator.md`: Streaming Payload Accumulator (`Imp-695`) — `COMPLETED`
+2. `02-capsule-segmented-button-group-styler.md`: Capsule Segmented Button Group Styler (`Imp-696`) — `COMPLETED`
+3. `03-fifo-prompt-restore-cursor-stepper.md`: FIFO Prompt Restore Cursor Stepper (`Imp-697`) — `COMPLETED`
+4. `04-batch-file-execution-interceptor.md`: Batch File Execution Interceptor (`Imp-698`) — `COMPLETED`
+5. `05-contributor-authorship-preservation-guard.md`: Contributor Authorship Preservation Guard (`Imp-699`) — `COMPLETED`
 
 ## Execution Invariants
 - Zero builds and zero tests during implementation.
