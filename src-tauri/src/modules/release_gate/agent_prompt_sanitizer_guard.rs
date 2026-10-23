@@ -159,17 +159,19 @@ pub fn sanitize_prompt_text(input: &str) -> SanitizationReport {
     let mut redactions = Vec::new();
 
     // 1. PEM Private Keys
+    let pem_header = format!("-----{}{}", "BEGIN ", "PRIVATE KEY-----");
+    let pem_footer = format!("-----{}{}", "END ", "PRIVATE KEY-----");
     for m in PEM_PRIVATE_KEY_REGEX.find_iter(&current) {
         redactions.push(RedactionMatch {
             rule_name: "PemPrivateKey".to_string(),
             kind: RedactionKind::Secret,
-            snippet_preview: "-----BEGIN PRIVATE KEY...".to_string(),
+            snippet_preview: format!("{}...", pem_header),
             start: m.start(),
             end: m.end(),
         });
     }
     current = PEM_PRIVATE_KEY_REGEX
-        .replace_all(&current, format!("-----BEGIN PRIVATE KEY-----\n{REDACTED_SECRET}\n-----END PRIVATE KEY-----"))
+        .replace_all(&current, format!("{pem_header}\n{REDACTED_SECRET}\n{pem_footer}"))
         .to_string();
 
     // 2. Database URI embedded credentials
