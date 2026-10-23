@@ -36,6 +36,7 @@ pub mod headless_cli_parity_guard;
 pub mod job_breakaway_fallback_ladder;
 pub mod manifest_sync;
 pub mod no_silent_errors_linter;
+pub mod no_silent_errors_justification_auditor;
 pub mod origin_tier_hierarchy_guard;
 pub mod path_hygiene;
 pub mod pipeline_protocol_decoupling_guard;
@@ -70,6 +71,7 @@ pub mod thinking_cache_invalidation_controller;
 pub mod thinking_cache_invalidation_guard;
 pub mod thinking_cache_target_version_guard;
 pub mod transcript_deep_inspection_scanner;
+pub mod transcript_full_log_reverse_scanner;
 pub mod truncation_callout_parser_guard;
 pub mod unverified_paths_disclosure_guard;
 pub mod wildcard_model_routing_guard;
@@ -116,6 +118,8 @@ pub mod tests_headless_cli_parity;
 pub mod tests_job_breakaway_fallback;
 #[cfg(test)]
 pub mod tests_no_silent_errors_linter;
+#[cfg(test)]
+pub mod tests_no_silent_errors_justification_auditor;
 #[cfg(test)]
 pub mod tests_origin_tier_hierarchy;
 #[cfg(test)]
@@ -187,6 +191,8 @@ pub mod tests_thinking_cache_target_version_guard;
 #[cfg(test)]
 pub mod tests_transcript_deep_inspection;
 #[cfg(test)]
+pub mod tests_transcript_full_log_reverse_scanner;
+#[cfg(test)]
 pub mod tests_truncation_callout_parser;
 #[cfg(test)]
 pub mod tests_unverified_paths_disclosure_guard;
@@ -218,6 +224,7 @@ pub use headless_cli_parity_guard::*;
 pub use job_breakaway_fallback_ladder::*;
 pub use manifest_sync::*;
 pub use no_silent_errors_linter::*;
+pub use no_silent_errors_justification_auditor::*;
 pub use origin_tier_hierarchy_guard::*;
 pub use path_hygiene::*;
 pub use pipeline_protocol_decoupling_guard::*;
@@ -252,6 +259,7 @@ pub use thinking_cache_invalidation_controller::*;
 pub use thinking_cache_invalidation_guard::*;
 pub use thinking_cache_target_version_guard::*;
 pub use transcript_deep_inspection_scanner::*;
+pub use transcript_full_log_reverse_scanner::*;
 pub use truncation_callout_parser_guard::*;
 pub use unverified_paths_disclosure_guard::*;
 pub use wildcard_model_routing_guard::*;

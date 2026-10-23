@@ -1,5 +1,5 @@
 # Subtask 02: Prompt Tree Branch Hierarchy Formatter (`Imp-671`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 209-implementing-next-five-tasks.md
 
 ## Scope & Objective

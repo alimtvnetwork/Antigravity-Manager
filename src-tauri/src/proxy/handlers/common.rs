@@ -29,6 +29,7 @@ pub mod json_payload_sanitizer;
 pub mod pipeline_request_header_sanitizer;
 pub mod prefix_stability_pipeline_guard;
 pub mod prefix_stability_sanitizer;
+pub mod protocol_adapter_divergence_auditor;
 pub mod request_cancellation_watcher;
 pub mod request_content_encoding_negotiator;
 pub mod request_content_length_validator;
@@ -127,6 +128,8 @@ pub mod tests_prefix_stability_pipeline_guard;
 #[cfg(test)]
 pub mod tests_prefix_stability_sanitizer;
 #[cfg(test)]
+pub mod tests_protocol_adapter_divergence_auditor;
+#[cfg(test)]
 pub mod tests_unified_context_structural_aligner;
 
 pub use abort_sentinel::*;
@@ -147,6 +150,7 @@ pub use json_payload_sanitizer::*;
 pub use pipeline_request_header_sanitizer::*;
 pub use prefix_stability_pipeline_guard::*;
 pub use prefix_stability_sanitizer::*;
+pub use protocol_adapter_divergence_auditor::*;
 pub use request_cancellation_watcher::*;
 pub use request_content_encoding_negotiator::*;
 pub use request_content_length_validator::*;

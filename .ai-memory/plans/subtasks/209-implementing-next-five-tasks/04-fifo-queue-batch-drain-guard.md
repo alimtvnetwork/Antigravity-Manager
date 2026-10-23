@@ -1,5 +1,5 @@
 # Subtask 04: FIFO Queue Batch Drain Guard (`Imp-673`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 209-implementing-next-five-tasks.md
 
 ## Scope & Objective

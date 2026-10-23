@@ -26,6 +26,7 @@ pub mod fifo_prompt_order_enforcer;
 pub mod fifo_prompt_queue_coordinator;
 pub mod fifo_prompt_restore_transaction_guard;
 pub mod fifo_prompt_restore_validator;
+pub mod fifo_queue_batch_drain_guard;
 pub mod fifo_queue_index_analyzer;
 pub mod fifo_restore_transaction_coordinator;
 pub mod fk_resolver;
@@ -167,6 +168,8 @@ pub mod tests_fifo_prompt_restore_validator;
 #[cfg(test)]
 pub mod tests_fifo_prompt_restore_transaction_guard;
 #[cfg(test)]
+pub mod tests_fifo_queue_batch_drain_guard;
+#[cfg(test)]
 pub mod tests_fifo_queue_index_analyzer;
 #[cfg(test)]
 pub mod tests_fifo_restore_transaction_coordinator;
@@ -179,6 +182,7 @@ pub use fifo_prompt_order_enforcer::*;
 pub use fifo_prompt_queue_coordinator::*;
 pub use fifo_prompt_restore_transaction_guard::*;
 pub use fifo_prompt_restore_validator::*;
+pub use fifo_queue_batch_drain_guard::*;
 pub use fifo_queue_index_analyzer::*;
 pub use fifo_restore_transaction_coordinator::*;
 pub use builder::{Order, QueryBuilder, ViewQueryBuilder};
