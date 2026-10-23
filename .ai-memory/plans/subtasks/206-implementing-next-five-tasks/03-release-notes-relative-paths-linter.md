@@ -1,5 +1,5 @@
 # Subtask 03: Release Notes & Changelog Relative Paths Linter (`Imp-657`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 206-implementing-next-five-tasks.md
 
 ## Scope & Objective
@@ -9,6 +9,7 @@ Per AGENTS.md Strictly Relative Git Paths Invariant:
 Implement `src-tauri/src/modules/release_gate/release_notes_relative_paths_linter.rs` and unit tests in `src-tauri/src/modules/release_gate/tests_release_notes_relative_paths_linter.rs`.
 
 ## Requirements
-- Scan text for absolute paths matching Windows (`C:\...`, `D:\...`, `\\...`), Unix (`/home/...`, `/Users/...`, `/etc/...`), or `file:///` URIs.
-- Flag absolute path violations with line number, snippet, and recommended relative path.
-- Emit structured `RelativePathAuditReport`.
+- [x] Scan text for absolute paths matching Windows (`C:\...`, `D:\...`, `\\...`), Unix (`/home/...`, `/Users/...`, `/etc/...`), or `file:///` URIs.
+- [x] Flag absolute path violations with line number, snippet, and recommended relative path.
+- [x] Emit structured `RelativePathAuditReport`.
+- [x] Comprehensive unit tests implemented and registered in `src-tauri/src/modules/release_gate/mod.rs`.

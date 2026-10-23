@@ -1,5 +1,5 @@
 # Subtask 02: Branch Release Channel Separation Gate (`Imp-656`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 206-implementing-next-five-tasks.md
 
 ## Scope & Objective
@@ -12,7 +12,8 @@ Tags must match `CHANGELOG.md` headings character-for-character (including `v` p
 Implement `src-tauri/src/modules/release_gate/branch_release_channel_gate.rs` and unit tests in `src-tauri/src/modules/release_gate/tests_branch_release_channel_gate.rs`.
 
 ## Requirements
-- Validate that stable version tags (`vX.Y.Z`) are rejected on `beta` or feature branches.
-- Validate that pre-release version tags (`vX.Y.Z-beta.N`) are rejected on `main`.
-- Validate exact character-for-character match with `CHANGELOG.md` headings.
-- Emit structured `ReleaseChannelValidationReport`.
+- [x] Validate that stable version tags (`vX.Y.Z`) are rejected on `beta` or feature branches.
+- [x] Validate that pre-release version tags (`vX.Y.Z-beta.N`) are rejected on `main`.
+- [x] Validate exact character-for-character match with `CHANGELOG.md` headings.
+- [x] Emit structured `ReleaseChannelValidationReport`.
+- [x] Comprehensive unit tests implemented and registered in `src-tauri/src/modules/release_gate/mod.rs`.

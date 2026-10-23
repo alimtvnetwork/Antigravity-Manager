@@ -17,6 +17,7 @@ pub mod agent_prompt_sanitizer_guard;
 pub mod attribution_verifier;
 pub mod batch_file_spawn_guard;
 pub mod bounded_matcher_timeout_guard;
+pub mod branch_release_channel_gate;
 pub mod caller_ide_preservation_guard;
 pub mod capsule_dropdown_styling_guard;
 pub mod channel_gate;
@@ -47,6 +48,7 @@ pub mod published_tip_rewrite_guard;
 pub mod readme_changelog_sync_gate;
 pub mod readme_changelog_synchronizer;
 pub mod rejection_breakdown_generator;
+pub mod release_notes_relative_paths_linter;
 pub mod remote_branch_base_verifier;
 pub mod risky_path_fallback_guard;
 pub mod rollback_ref_guard;
@@ -76,6 +78,8 @@ pub mod tests_author_attribution;
 pub mod tests_batch_file_spawn_guard;
 #[cfg(test)]
 pub mod tests_bounded_matcher_timeout;
+#[cfg(test)]
+pub mod tests_branch_release_channel_gate;
 #[cfg(test)]
 pub mod tests_caller_ide_guard;
 #[cfg(test)]
@@ -133,6 +137,8 @@ pub mod tests_rejection_breakdown_generator;
 #[cfg(test)]
 pub mod tests_release_channel_gate;
 #[cfg(test)]
+pub mod tests_release_notes_relative_paths_linter;
+#[cfg(test)]
 pub mod tests_relative_path_linter;
 #[cfg(test)]
 pub mod tests_remote_branch_base;
@@ -181,6 +187,7 @@ pub use agent_prompt_sanitizer_guard::*;
 pub use attribution_verifier::*;
 pub use batch_file_spawn_guard::*;
 pub use bounded_matcher_timeout_guard::*;
+pub use branch_release_channel_gate::*;
 pub use caller_ide_preservation_guard::*;
 pub use capsule_dropdown_styling_guard::*;
 pub use channel_gate::*;
@@ -211,6 +218,7 @@ pub use published_tip_rewrite_guard::*;
 pub use readme_changelog_sync_gate::*;
 pub use readme_changelog_synchronizer::*;
 pub use rejection_breakdown_generator::*;
+pub use release_notes_relative_paths_linter::*;
 pub use remote_branch_base_verifier::*;
 pub use risky_path_fallback_guard::*;
 pub use rollback_ref_guard::*;

@@ -365,6 +365,11 @@ pub mod multi_stage_launcher_engine;
 #[cfg(test)]
 #[path = "instance/tests_multi_stage_launcher_engine.rs"]
 pub mod tests_multi_stage_launcher_engine;
+#[path = "instance/side_effect_order_enforcer.rs"]
+pub mod side_effect_order_enforcer;
+#[cfg(test)]
+#[path = "instance/tests_side_effect_order_enforcer.rs"]
+pub mod tests_side_effect_order_enforcer;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use arg_normalizer::*;
@@ -560,3 +565,4 @@ pub use caller_ide_exit_code_enforcer::*;
 pub use transient_sandbox_lifecycle_verifier::*;
 pub use multi_stage_launcher_dispatcher::*;
 pub use multi_stage_launcher_engine::*;
+pub use side_effect_order_enforcer::*;

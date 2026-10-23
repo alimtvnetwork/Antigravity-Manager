@@ -57,6 +57,7 @@ pub mod stream_early_abort_sentinel;
 pub mod stream_flusher;
 pub mod thinking_budget_filter_pipeline;
 pub mod thinking_budget_headroom_evaluator;
+pub mod thinking_budget_proportional_allocator;
 pub mod token_budget_decider;
 pub mod tool_response_formatter;
 pub mod unified_context_structural_aligner;
@@ -114,6 +115,8 @@ pub mod tests_thinking_budget_filter_pipeline;
 #[cfg(test)]
 pub mod tests_thinking_budget_headroom_evaluator;
 #[cfg(test)]
+pub mod tests_thinking_budget_proportional_allocator;
+#[cfg(test)]
 pub mod tests_prefix_stability_pipeline_guard;
 #[cfg(test)]
 pub mod tests_prefix_stability_sanitizer;
@@ -165,6 +168,7 @@ pub use stream_early_abort_sentinel::*;
 pub use stream_flusher::{StreamFlusher, SSE_KEEPALIVE_BYTES};
 pub use thinking_budget_filter_pipeline::*;
 pub use thinking_budget_headroom_evaluator::*;
+pub use thinking_budget_proportional_allocator::*;
 pub use token_budget_decider::*;
 pub use tool_response_formatter::*;
 pub use unified_context_structural_aligner::*;
