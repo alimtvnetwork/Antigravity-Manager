@@ -20,10 +20,8 @@ pub async fn toggle_auto_launch(app: tauri::AppHandle, enable: bool) -> Result<(
                 // On Windows, if registry entry does not exist, disable() returns "The system cannot find the file specified" (os error 2)
                 // This situation should be considered a success because the goal (disabled) has been achieved
                 if err_msg.contains("os error 2")
-                    || err_msg.contains(
-                        "找不到指定的文件"
-                            || err_msg.contains("The system cannot find the file specified"),
-                    )
+                    || err_msg.contains("找不到指定的文件")
+                    || err_msg.contains("The system cannot find the file specified")
                 {
                     crate::modules::logger::log_info("The auto-start item no longer exists and is deemed to be successfully disabled.");
                 } else {
