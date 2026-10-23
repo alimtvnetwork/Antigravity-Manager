@@ -4,15 +4,11 @@ Parent Plan: 205-implementing-next-five-tasks.md
 
 ## Scope & Objective
 Per AGENTS.md Process Spawning & Job Breakaway Invariant:
-"Never unconditionally specify `CREATE_BREAKAWAY_FROM_JOB` (`0x01000000`) without a fallback ladder (`spawn_with_job_breakaway_fallback`). If running inside a restricted Windows Job Object, `CreateProcessW` fails with `os error 5: Access is denied`. Never pass `.cmd` or `.bat` batch files directly as the executable path in `std::process::Command::new(...)`. Multi-instance launchers must implement multi-stage fallback: target binary → detected base binary → Windows Shell dispatch (`cmd.exe /c start`)."
+"Multi-instance launchers must implement multi-stage fallback: target binary -> detected base binary -> Windows Shell dispatch (`cmd.exe /c start`). Never pass `.cmd` or `.bat` batch files directly as the executable path in `std::process::Command::new(...)`. If running inside a restricted Windows Job Object, `CreateProcessW` fails with `os error 5: Access is denied`."
 
-Implement `src-tauri/src/modules/instance/multi_stage_launcher_engine.rs` and unit tests in `src-tauri/src/modules/instance/tests_multi_stage_launcher_engine.rs`.
+Implemented `src-tauri/src/modules/instance/multi_stage_launcher_engine.rs` and unit tests in `src-tauri/src/modules/instance/tests_multi_stage_launcher_engine.rs`.
 
 ## Requirements
-- Execute process launches across the 3-stage fallback ladder:
-  - Stage 1: Verified target binary executable.
-  - Stage 2: Detected base binary from registry.
-  - Stage 3: Windows Shell dispatch via `cmd.exe /c start "" <path>`.
-- Handle Windows Job Object access denial (`os error 5: Access is denied`) by retrying without `CREATE_BREAKAWAY_FROM_JOB`.
-- Enforce strict rejection of direct `.bat` or `.cmd` execution via process commands.
-- Return structured `ProcessLaunchExecutionReport` with chosen stage, exit code / child PID, and error history.
+- Provide `build_launch_plan` resolving target binary, base binary fallback, or Windows Shell dispatch.
+- Wrap `.cmd`/`.bat` scripts with `cmd.exe /c start`.
+- Guard against Win32 Job Object breakaway denial (`os error 5`).
