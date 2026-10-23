@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.252.0)
+> Professional AI Account Management & Protocol Proxy System (v4.253.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.252.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.253.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -505,6 +505,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.253.0**: Streaming Thought Signature Validator, Segmented Capsule Styler, FIFO Queue Partition Allocator, Transient Sandbox Sentinel, Sole Contributor Attribution & Windows FFI Remediation — Implemented `streaming_thought_signature_validator` ensuring balanced `<thought>` / `</thought>` tags, `thought: true` attributes, and delta buffer delimiters across streaming SSE frames without leaking internal markers; added `repair_truncated_thought_block` auto-closing truncated blocks; implemented `segmented_capsule_toggle_switch_styler` and markup linter enforcing `rounded-full`, shared dark-glass container borders, subtle divider lines, and transparent borderless inline select dropdowns (`bg-transparent border-0 focus:ring-0 focus:outline-none`); implemented `fifo_prompt_queue_partition_allocator` allocating prompt partition buckets across SQLite databases with strict First-In-First-Out ordering using `ORDER BY created_at ASC, id ASC`, monotonic timestamp/id verification, and zero LIFO leaks; implemented `transient_sandbox_cleanup_sentinel` tracking test sandbox instances, protecting developer caller IDE sessions with exit code 2 fail-fast protection, and verifying zero-orphan remnant directory purging; implemented `sole_contributor_attribution_audit_guard` enforcing strict sole attribution to `@aukgit` (`(Thanks to @aukgit)`), rejecting unauthorized third-party handles, enforcing strictly relative paths, and auditing source code for the No Silent Errors house rule; repaired process vitality probes and child process termination to link directly against Windows `kernel32` (`OpenProcess`, `GetExitCodeProcess`, `TerminateProcess`, `CloseHandle`) without unlinked external dependencies; harmonized `smartRotateProfileAccount` with backend `fastForwardInstance` delegation; and expanded rerun nudge detection templates. (Thanks to @aukgit)
 
 > Latest version **v4.252.0**: Pipeline Decoupling, FIFO Queue Invariants, Caller IDE Self-Preservation, UI Capsules & Release Governance — Implemented `pipeline_response_header_sanitizer` normalizing Gemini SSE response headers (`text/event-stream; charset=utf-8`, `cache-control: no-cache`, `connection: keep-alive`) while stripping upstream server telemetry (`server`, `alt-svc`, `set-cookie`, `x-goog-safety-ratings`, `x-goog-ratelimit-remaining`, `via`, `x-powered-by`); integrated `protocol_adapter_divergence_auditor` strictly decoupling inbound protocol adapters from uniform pipeline stages; implemented `fifo_dead_letter_queue_spillover_guard` safely quarantining unrecoverable prompts into dead-letter storage while strictly enforcing `ORDER BY created_at ASC, id ASC` and preserving original `created_at` lineage; added `fifo_queue_drain_monotonicity_verifier` and `fifo_restore_transaction_coordinator` enforcing multi-table atomic transactions; implemented `caller_process_ancestry_tree_scanner` traversing process PPID lineage upward up to 16 levels to detect caller IDE instances and prevent terminating the active developer workspace session; established `caller_ide_exit_code_enforcer` enforcing fail-fast exit code 2 on lifecycle commands (`stop`, `rm`, `switch`) targeting the caller instance without `--force`; implemented `window_control_capsule_formatter` wrapping Minimize, Maximize/Restore, and Close actions into contiguous segmented pill capsules (`rounded-full`, shared border, dark-glass backdrop, subtle dividers) with hover-danger styling; added `capsule_segmented_control_validator` enforcing transparent borderless styling for nested dropdowns; added `truncation_omission_banner_formatter` parsing raw truncation callouts into interactive dark-glass omission banners; and added `github_release_notes_parity_guard` verifying GitHub release notes strictly attribute `@aukgit`, reject third-party handles, enforce strictly relative Git paths, and match `CHANGELOG.md` headings. (Thanks to @aukgit)
 

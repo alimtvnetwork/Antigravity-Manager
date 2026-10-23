@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.252.0-3B82F6?style=flat-square" alt="Version v4.252.0">
+    <img src="https://img.shields.io/badge/Version-v4.253.0-3B82F6?style=flat-square" alt="Version v4.253.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.252.0)**
+**Bar 2: Version-Based Installation (v4.253.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -470,6 +470,14 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 ---
 
 ## 🔄 What's New
+
+- **v4.253.0** (2026-10-23):
+  - **Streaming Thought Signature & Delimiter Validator**: Implemented `streaming_thought_signature_validator` ensuring balanced `<thought>` / `</thought>` tags, `thought: true` attributes, and delta buffer delimiters across streaming SSE frames without leaking internal markers; added `repair_truncated_thought_block` auto-closing truncated blocks. (Thanks to @aukgit)
+  - **Segmented Capsule Toggle Switch Styler & Linter**: Implemented `segmented_capsule_toggle_switch_styler` and markup linter enforcing `rounded-full`, shared dark-glass container borders, subtle divider lines, and transparent borderless inline select dropdowns (`bg-transparent border-0 focus:ring-0 focus:outline-none`). (Thanks to @aukgit)
+  - **FIFO Prompt Queue Partition & Priority Allocator**: Implemented `fifo_prompt_queue_partition_allocator` allocating prompt partition buckets across SQLite databases with strict First-In-First-Out ordering using `ORDER BY created_at ASC, id ASC`, monotonic timestamp/id verification, and zero LIFO leaks. (Thanks to @aukgit)
+  - **Transient Sandbox Lifecycle & Cleanup Sentinel**: Implemented `transient_sandbox_cleanup_sentinel` tracking test sandbox instances, protecting developer caller IDE sessions with exit code 2 fail-fast protection, and verifying zero-orphan remnant directory purging. (Thanks to @aukgit)
+  - **Sole Contributor Attribution & No Silent Errors Audit Guard**: Implemented `sole_contributor_attribution_audit_guard` enforcing strict sole attribution to `@aukgit` (`(Thanks to @aukgit)`), rejecting unauthorized third-party handles, enforcing strictly relative paths, and auditing source code for the No Silent Errors house rule. (Thanks to @aukgit)
+  - **Windows Kernel32 FFI & Fast-Forward Rotation Remediation**: Repaired process vitality probes and child process termination to link directly against Windows `kernel32` (`OpenProcess`, `GetExitCodeProcess`, `TerminateProcess`, `CloseHandle`) without unlinked external dependencies; harmonized `smartRotateProfileAccount` with backend `fastForwardInstance` delegation; and expanded rerun nudge detection templates. (Thanks to @aukgit)
 
 - **v4.252.0** (2026-10-23):
   - **Pipeline Protocol Decoupling & SSE Response Sanitization**: Implemented `pipeline_response_header_sanitizer` normalizing Gemini SSE response headers (`text/event-stream; charset=utf-8`, `cache-control: no-cache`, `connection: keep-alive`) while stripping upstream server telemetry (`server`, `alt-svc`, `set-cookie`, `x-goog-safety-ratings`, `x-goog-ratelimit-remaining`, `via`, `x-powered-by`); integrated `protocol_adapter_divergence_auditor` strictly decoupling inbound protocol adapters from uniform pipeline stages. (Thanks to @aukgit)
