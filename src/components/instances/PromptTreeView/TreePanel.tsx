@@ -156,7 +156,7 @@ export function TreePanel(props: TreePanelProps) {
 
             const flatConvs: { conv: AgmConversationNode; proj: AgmProjectTreeNode }[] = [];
             for (const proj of activeProjects) {
-                if (expandedProjects[proj.id] !== false) {
+                if (expandedProjects[proj.project_id] !== false) {
                     for (const conv of proj.conversations) {
                         flatConvs.push({ conv, proj });
                     }

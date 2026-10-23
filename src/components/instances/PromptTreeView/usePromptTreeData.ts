@@ -307,6 +307,7 @@ export function usePromptTreeData({
     initialSelectedProjectId,
 }: UsePromptTreeDataProps): PromptTreeData {
     const {
+        treeData,
         setTreeData,
         setIsLoading,
         setIsAutoSyncing,

@@ -73,9 +73,6 @@ export function buildStructuredTurnsMarkdown(conv: AgmConversationNode, promptBo
         for (const turn of conv.prompts) {
             parts.push(`## Turn ${turn.turn_number}${turn.is_running ? ' (RUNNING)' : ''}`);
             parts.push(`\n**Prompt:**\n\n${turn.prompt_text || '*(empty)*'}\n`);
-            if (turn.response_text) {
-                parts.push(`**Response:**\n\n${turn.response_text}\n`);
-            }
         }
     } else {
         const body = promptBody || resolvePromptBody(conv);
@@ -1368,9 +1365,9 @@ export async function handleRerunConversation(
         if (!originalPrompt) {
             originalPrompt = (conv.full_prompt_text || conv.prompt_preview_200w || '').trim();
         }
-        // Imp-17: 3-Tier Fallback: turn summary -> root prompt title/summary -> ledger
+        // Imp-17: 3-Tier Fallback: turn summary -> root prompt title -> ledger
         if (!originalPrompt) {
-            originalPrompt = (conv.summary || conv.title || '').trim();
+            originalPrompt = (conv.title || '').trim();
         }
     }
 

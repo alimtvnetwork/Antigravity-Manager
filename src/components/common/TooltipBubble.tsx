@@ -18,7 +18,7 @@ export const TooltipBubble: React.FC<TooltipBubbleProps> = ({
   className = '',
 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tooltipId = useId();
 
   const show = () => {

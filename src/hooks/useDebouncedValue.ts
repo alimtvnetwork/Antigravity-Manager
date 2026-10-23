@@ -8,7 +8,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  */
 export function useDebouncedValue<T>(value: T, delayMs = 250): [T, { flush: () => void; cancel: () => void }] {
   const [debouncedValue, setDebouncedValue] = useState<T>(value);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestValueRef = useRef<T>(value);
   latestValueRef.current = value;
 

@@ -3,9 +3,17 @@ import { createPortal } from 'react-dom';
 
 export type TooltipPosition = 'top' | 'bottom' | 'left' | 'right';
 
+export interface TooltipTriggerProps {
+  onMouseEnter?: React.MouseEventHandler<HTMLElement>;
+  onMouseLeave?: React.MouseEventHandler<HTMLElement>;
+  onFocus?: React.FocusEventHandler<HTMLElement>;
+  onBlur?: React.FocusEventHandler<HTMLElement>;
+  ref?: React.Ref<HTMLElement>;
+}
+
 export interface TooltipPortalProps {
   content: ReactNode;
-  children: ReactElement;
+  children: ReactElement<TooltipTriggerProps>;
   position?: TooltipPosition;
   delayMs?: number;
   className?: string;
@@ -24,7 +32,7 @@ export const TooltipPortal: React.FC<TooltipPortalProps> = ({
   const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const triggerRef = useRef<HTMLElement | null>(null);
   const tooltipRef = useRef<HTMLDivElement | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const calculatePosition = () => {
     if (!triggerRef.current || !tooltipRef.current) return;
@@ -100,26 +108,33 @@ export const TooltipPortal: React.FC<TooltipPortalProps> = ({
     };
   }, []);
 
+  // React elements carry their original ref on the element object itself at
+  // runtime; the public ReactElement type does not expose it, so read it via
+  // this structural shape to forward the node to the child's own ref as well.
+  const childRef = (children as ReactElement<TooltipTriggerProps> & { ref?: React.Ref<HTMLElement> | null }).ref;
+
   const childWithProps = cloneElement(children, {
     ref: (node: HTMLElement | null) => {
       triggerRef.current = node;
-      const { ref } = children as any;
-      if (typeof ref === 'function') ref(node);
-      else if (ref && typeof ref === 'object') (ref as any).current = node;
+      if (typeof childRef === 'function') {
+        childRef(node);
+      } else if (childRef && typeof childRef === 'object') {
+        childRef.current = node;
+      }
     },
-    onMouseEnter: (e: React.MouseEvent) => {
+    onMouseEnter: (e: React.MouseEvent<HTMLElement>) => {
       handleMouseEnter();
       children.props.onMouseEnter?.(e);
     },
-    onMouseLeave: (e: React.MouseEvent) => {
+    onMouseLeave: (e: React.MouseEvent<HTMLElement>) => {
       handleMouseLeave();
       children.props.onMouseLeave?.(e);
     },
-    onFocus: (e: React.FocusEvent) => {
+    onFocus: (e: React.FocusEvent<HTMLElement>) => {
       handleMouseEnter();
       children.props.onFocus?.(e);
     },
-    onBlur: (e: React.FocusEvent) => {
+    onBlur: (e: React.FocusEvent<HTMLElement>) => {
       handleMouseLeave();
       children.props.onBlur?.(e);
     },

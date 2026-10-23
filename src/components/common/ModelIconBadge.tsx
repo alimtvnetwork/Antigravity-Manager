@@ -12,7 +12,7 @@ export interface ModelIconBadgeProps {
 
 export function detectModelFamily(modelId: string): ModelFamily {
     const lower = modelId.trim().toLowerCase();
-    if (lower.contains ? lower.includes('gemini') : lower.indexOf('gemini') !== -1) {
+    if (lower.includes('gemini')) {
         return 'gemini';
     }
     if (lower.includes('claude') || lower.includes('sonnet') || lower.includes('opus')) {

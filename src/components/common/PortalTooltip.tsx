@@ -4,11 +4,19 @@ import { cn } from '../../utils/cn';
 
 export type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right';
 
+export interface TooltipTriggerProps {
+    onMouseEnter?: React.MouseEventHandler<HTMLElement>;
+    onMouseLeave?: React.MouseEventHandler<HTMLElement>;
+    onFocus?: React.FocusEventHandler<HTMLElement>;
+    onBlur?: React.FocusEventHandler<HTMLElement>;
+    ref?: React.Ref<HTMLElement>;
+}
+
 export interface PortalTooltipProps {
     content: React.ReactNode;
     placement?: TooltipPlacement;
     delayMs?: number;
-    children: React.ReactElement;
+    children: React.ReactElement<TooltipTriggerProps>;
     className?: string;
     disabled?: boolean;
 }
@@ -24,7 +32,7 @@ export function PortalTooltip({
     const [isVisible, setIsVisible] = useState(false);
     const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
     const triggerRef = useRef<HTMLElement | null>(null);
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const updatePosition = () => {
         if (!triggerRef.current) return;
