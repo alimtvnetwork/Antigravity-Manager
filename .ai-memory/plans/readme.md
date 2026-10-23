@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [215-gitmap-and-antigravity-tools-manager-updates-and-testing.md](./pending/215-gitmap-and-antigravity-tools-manager-updates-and-testing.md) | `IN_PROGRESS` | Execution of 5 tasks: GitMap PA updates, prompt restore & quota drop recovery, rerun randomizer auto-pick, GitMap CG execute, and master E2E verification (Steps 286–290). |
 | [214-implementing-next-five-tasks.md](./completed/214-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test streaming payload accumulator, capsule segmented button group styler, FIFO prompt restore cursor stepper, batch file execution interceptor, and contributor authorship preservation guard (Steps 281–285). |
 | [213-implementing-next-five-tasks.md](./completed/213-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test streaming event frame parser, inline select dropdown styler, FIFO queue compaction guard, caller IDE exit code 2 enforcer, and transient test sandbox lifecycle guard (Steps 276–280). |
 | [212-implementing-next-five-tasks.md](./completed/212-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test pipeline response header sanitizer, window control capsule formatter, FIFO dead letter queue spillover guard, caller process ancestry tree scanner, and GitHub release notes parity guard (Steps 271–275). |
