@@ -1,5 +1,5 @@
 # Subtask 04: Tag & Changelog Heading Matcher
-Status: IN PROGRESS
+Status: COMPLETED
 Sequence: 201
 Owner: Worker-2
 Target Module: `src-tauri/src/modules/release_gate/tag_changelog_heading_matcher.rs`

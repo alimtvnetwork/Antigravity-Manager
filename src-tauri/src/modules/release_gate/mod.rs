@@ -177,6 +177,7 @@ pub use profile_duplication_parity_guard::*;
 pub use pr_scope_cohesion_verifier::*;
 pub use pr_template_compliance_linter::*;
 pub use published_tip_rewrite_guard::*;
+pub use readme_changelog_synchronizer::*;
 pub use rejection_breakdown_generator::*;
 pub use remote_branch_base_verifier::*;
 pub use risky_path_fallback_guard::*;
