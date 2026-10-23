@@ -63,13 +63,7 @@ fn test_restore_outcome_honesty_struct_and_accessors() {
     assert_eq!(clean.skipped_live_count(), 0);
 
     // Detailed outcome constructor
-    let detailed = RestoreOutcome::with_details(
-        10,
-        8,
-        2,
-        3,
-        Some("connection reset".to_string()),
-    );
+    let detailed = RestoreOutcome::with_details(10, 8, 2, 3, Some("connection reset".to_string()));
     assert_eq!(detailed.restored_count(), 10);
     assert_eq!(detailed.dispatched_count(), 8);
     assert_eq!(detailed.failed_count(), 2);
@@ -234,8 +228,7 @@ fn test_reattribution_of_unrestored_prompt_backups_during_switch() {
 
 #[test]
 fn test_incomplete_prompt_sweep_selection_and_status_transition() {
-    let temp_dir =
-        std::env::temp_dir().join(format!("agm_test_sweep_{}", Uuid::new_v4().simple()));
+    let temp_dir = std::env::temp_dir().join(format!("agm_test_sweep_{}", Uuid::new_v4().simple()));
     // Justification: test cleanup of temporary directory
     crate::error::record_ignored(fs::create_dir_all(&temp_dir), "create test temp dir");
     let db_path = temp_dir.join("test-sweep.db");
