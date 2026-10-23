@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.253.3)
+> Professional AI Account Management & Protocol Proxy System (v4.254.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.253.3-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.254.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -505,6 +505,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.254.0**: Fast Forward 4-Tier Selection Ladder, Weekly Floor Exclusion & Headroom Invariants — Refactored `fast_forward_target_resolver.rs` to enforce the full 4-tier decision ladder: accounts with weekly quota < 15% (configurable via slider) are treated as 0 credits and skipped; candidate accounts in the Primary tier must possess 100% 4-hour credit and zero activity across local or fleet instances (SSH, Email, Telegram, GitMap) in the last 4 hours; primary accounts are sorted by closest reset/expiry time to maximize window efficiency before reset; when no 100% 4-hour candidate exists, the algorithm safely falls back to highest combined weekly and 4-hour credits weighted by subscription tier multipliers (Ultra ×4.0, Pro ×2.0, Free ×1.0); added UI slider in `ScoringAlgorithm.tsx` for `min_weekly_quota_percent` (0–50%, default 15%); synchronized backend config models in `src-tauri/src/models/config.rs`; and added comprehensive unit test suite in `tests_fast_forward_target_resolver.rs`. (Thanks to @aukgit)
 
 > Latest version **v4.253.3**: Release Pipeline & CI Dynamic Polling Gate, Atomic Version Sync, Prompt Restore & CLI Rerun Hardening — Resolved GitHub Actions release pipeline failure where concurrent tag pushes caused premature release gate exits due to in-progress CI runs; implemented an asynchronous polling wait loop up to 45 minutes in `.github/workflows/release.yml` with post-release asset count verification; synchronized all 14 repository version manifests (`package.json`, `package-lock.json`, `version.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.lock`, `releases-manifest.json`, etc.) to eliminate version drift; and integrated prompt restore sweep engine with diverse rerun anti-repeat buffer and top-level CLI command routing. (Thanks to @aukgit)
 

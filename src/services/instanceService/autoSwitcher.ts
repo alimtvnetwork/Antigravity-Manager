@@ -22,6 +22,7 @@ export interface AutoProfileSwitcherConfig {
     fast_forward_shortcut?: string;
     stale_binding_timeout_hours?: number;
     account_lockout_window_minutes?: number;
+    min_weekly_quota_percent?: number;
 }
 
 export function isInstanceBindingStale(

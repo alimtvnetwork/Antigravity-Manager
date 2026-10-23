@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.253.3-3B82F6?style=flat-square" alt="Version v4.253.3">
+    <img src="https://img.shields.io/badge/Version-v4.254.0-3B82F6?style=flat-square" alt="Version v4.254.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.253.3)**
+**Bar 2: Version-Based Installation (v4.254.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -603,6 +603,8 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
 ## 📝 Changelog
+
+> Latest version **v4.254.0**: Fast Forward 4-Tier Selection Ladder, Weekly Floor Exclusion & Headroom Invariants — Refactored `fast_forward_target_resolver.rs` to enforce the full 4-tier decision ladder: accounts with weekly quota < 15% (configurable via slider) are treated as 0 credits and skipped; candidate accounts in the Primary tier must possess 100% 4-hour credit and zero activity across local or fleet instances (SSH, Email, Telegram, GitMap) in the last 4 hours; primary accounts are sorted by closest reset/expiry time to maximize window efficiency before reset; when no 100% 4-hour candidate exists, the algorithm safely falls back to highest combined weekly and 4-hour credits weighted by subscription tier multipliers (Ultra ×4.0, Pro ×2.0, Free ×1.0); added UI slider in `ScoringAlgorithm.tsx` for `min_weekly_quota_percent` (0–50%, default 15%); synchronized backend config models in `src-tauri/src/models/config.rs`; and added comprehensive unit test suite in `tests_fast_forward_target_resolver.rs`. (Thanks to @aukgit)
 
 > Latest version **v4.250.11**: UI & Prompt Tree View Corrections: Explicit Send (Preempt) & Enqueue (FIFO) Action Capsule, Continuously Resizable Splitter Tree, Live IDE Conversation Title Rename Sync, Theme Adaptability (One Dark Pro), Non-Displacing Card Hover, and Scoreboard Tooltip Collision Guard — Replaced hidden mode switcher with side-by-side Send and Enqueue buttons within Capsule B in `DetailHeader.tsx` and `usePromptTreePromptActions.ts`; `Send` immediately cancels any actively running task on the target instance (terminating `agy` workers, stopping goal workers, and executing CDP active task preemption in `cdp_onboarding.rs` and `agy.rs`) to execute the chosen prompt right now (Hotkey: `N`), while `Enqueue` safely stages prompts into the background SQLite FIFO queue without interrupting current execution; implemented dynamic draggable vertical splitter divider (`cursor-col-resize`) in `PromptTreeViewModal.tsx` allowing users to expand or reduce the left-hand Prompt Tree column width between 220px and 680px at any time, with persistent state stored in `localStorage` under `agm_prompt_tree_width`; wired double-click inline conversation title renaming directly to Antigravity's live filesystem watcher via `<gemini_dir>/annotations/<conversation_id>.pbtxt` and updated `conversation_summaries.db` (`title` and `preview` columns in `sequences.rs`), enabling instant real-time title reflection inside the Antigravity IDE without requiring IDE restart; removed hardcoded purple hex values across the middle Prompt Tree panels (`PromptTreeDetail.tsx`, `App.css`) and synchronized `--ui-*` design tokens (`--ui-canvas`, `--ui-surface-1`, `--ui-surface-hover`, `--ui-border-subtle`, `--ui-interactive`) in `ThemeManager.tsx` whenever non-purple themes (such as One Dark Pro, VS Code Dark+, Tokyo Night, Nordic Mint) are selected, allowing the middle portion and hover accents to seamlessly adapt to the active theme palette; eliminated layout displacement jitter (`hover:-translate-y-0.5` and `scale-x-95`) in `InstanceCard.tsx`, replacing positional movement with a smooth 0.3s CSS3 color and contrast transition (`hover:bg-slate-50/90 dark:hover:bg-[var(--ui-surface-hover)]`, `hover:border-gray-300/80 dark:hover:border-[var(--ui-interactive-40)]`, `hover:shadow-md`); and portaled the candidate score breakdown tooltip to `document.body` via React `createPortal` in `AlgorithmScoreCell.tsx` with dynamic boundary collision detection (`spaceAbove >= TOOLTIP_HEIGHT + 16`), preventing the popover from getting stuck against or overlapping the sticky table header. (Thanks to @aukgit)
 

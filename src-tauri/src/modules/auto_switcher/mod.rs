@@ -142,6 +142,8 @@ pub mod tests_switch_settling_timer;
 #[cfg(test)]
 pub mod tests_weekly_headroom_ratio;
 #[cfg(test)]
+pub mod tests_fast_forward_target_resolver;
+#[cfg(test)]
 pub(crate) use crate::models::account::Account;
 #[cfg(test)]
 pub(crate) use tests_a::make_test_account;

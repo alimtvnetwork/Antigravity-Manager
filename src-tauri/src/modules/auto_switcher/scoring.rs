@@ -105,7 +105,7 @@ pub fn is_gemini_weekly_bucket(window: &str, bucket_id: &str) -> bool {
 /// - Formula: `Score = (tier_multiplier * weekly_effective_score) / 100.0`
 ///   where weekly_effective_score = effective_weekly_pct * remaining_hours (or 168.0 * 100.0 on reset).
 /// - Sorting direction: DESCENDING (highest score = freshly reset 100% account = selected first).
-/// - Weekly quota < 8% treated as 0 (below viable threshold for Gemini).
+/// - Weekly quota < floor threshold (default 15%, user configurable) treated as 0 (below viable threshold for Gemini).
 /// - Claude/3p buckets are excluded.
 pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
     if !is_account_active_and_enabled(acc) {
@@ -139,7 +139,7 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
     };
 
     const TOTAL_WEEK_HOURS: f64 = 168.0;
-    const WEEKLY_ZERO_THRESHOLD: f64 = 8.0;
+    let weekly_zero_threshold: f64 = switcher_cfg.min_weekly_quota_percent.max(0.0);
 
     let mut weekly_effective_score = 0.0_f64;
 
@@ -160,7 +160,7 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
                         continue;
                     }
                     let pct = (b.remaining_fraction * 100.0).round();
-                    let eff_pct = if pct < WEEKLY_ZERO_THRESHOLD {
+                    let eff_pct = if pct < weekly_zero_threshold {
                         0.0
                     } else {
                         pct
@@ -185,7 +185,7 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
                 .find(|m| is_model_matching_target(&m.name, target_model))
                 .map(|m| m.percentage as f64);
             let eff_pct = match target_pct {
-                Some(pct) if pct < WEEKLY_ZERO_THRESHOLD => 0.0,
+                Some(pct) if pct < weekly_zero_threshold => 0.0,
                 Some(pct) => pct,
                 None => {
                     let valid_models: Vec<_> = quota_data
@@ -196,7 +196,7 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
                     if !valid_models.is_empty() {
                         let sum: i32 = valid_models.iter().map(|m| m.percentage).sum();
                         let avg_pct = (sum as f64 / valid_models.len() as f64).round();
-                        if avg_pct < WEEKLY_ZERO_THRESHOLD {
+                        if avg_pct < weekly_zero_threshold {
                             0.0
                         } else {
                             avg_pct

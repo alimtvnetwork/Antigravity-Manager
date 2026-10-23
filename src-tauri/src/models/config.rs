@@ -386,8 +386,14 @@ pub struct AutoProfileSwitcherConfig {
     pub pro_tier_multiplier: f64,
     #[serde(default = "default_free_tier_multiplier")]
     pub free_tier_multiplier: f64,
+    #[serde(default = "default_min_weekly_quota_percent")]
+    pub min_weekly_quota_percent: f64,
     #[serde(default = "default_max_backup_prompts_u32")]
     pub max_backup_prompts: u32,
+}
+
+fn default_min_weekly_quota_percent() -> f64 {
+    15.0
 }
 
 fn default_max_backup_prompts_u32() -> u32 {
@@ -421,6 +427,7 @@ impl Default for AutoProfileSwitcherConfig {
             ultra_tier_multiplier: 4.0,
             pro_tier_multiplier: 2.0,
             free_tier_multiplier: 1.0,
+            min_weekly_quota_percent: 15.0,
             max_backup_prompts: 100,
         }
     }
