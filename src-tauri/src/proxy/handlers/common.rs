@@ -27,6 +27,7 @@ pub mod header_allowlist_filter;
 pub mod header_anonymizer;
 pub mod json_payload_sanitizer;
 pub mod pipeline_request_header_sanitizer;
+pub mod pipeline_response_header_sanitizer;
 pub mod prefix_stability_pipeline_guard;
 pub mod prefix_stability_sanitizer;
 pub mod protocol_adapter_divergence_auditor;
@@ -114,6 +115,8 @@ pub mod tests_payload_length_negotiator;
 #[cfg(test)]
 pub mod tests_pipeline_request_header_sanitizer;
 #[cfg(test)]
+pub mod tests_pipeline_response_header_sanitizer;
+#[cfg(test)]
 pub mod tests_sse_heartbeat_generator;
 #[cfg(test)]
 pub mod tests_token_budget_decider;
@@ -154,6 +157,7 @@ pub use header_allowlist_filter::*;
 pub use header_anonymizer::anonymize_forwarded_headers;
 pub use json_payload_sanitizer::*;
 pub use pipeline_request_header_sanitizer::*;
+pub use pipeline_response_header_sanitizer::*;
 pub use prefix_stability_pipeline_guard::*;
 pub use prefix_stability_sanitizer::*;
 pub use protocol_adapter_divergence_auditor::*;

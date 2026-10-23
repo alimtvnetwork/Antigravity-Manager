@@ -400,6 +400,16 @@ pub mod truncation_omission_banner_formatter;
 #[cfg(test)]
 #[path = "instance/tests_truncation_omission_banner_formatter.rs"]
 pub mod tests_truncation_omission_banner_formatter;
+#[path = "instance/window_control_capsule_formatter.rs"]
+pub mod window_control_capsule_formatter;
+#[cfg(test)]
+#[path = "instance/tests_window_control_capsule_formatter.rs"]
+pub mod tests_window_control_capsule_formatter;
+#[path = "instance/caller_process_ancestry_tree_scanner.rs"]
+pub mod caller_process_ancestry_tree_scanner;
+#[cfg(test)]
+#[path = "instance/tests_caller_process_ancestry_tree_scanner.rs"]
+pub mod tests_caller_process_ancestry_tree_scanner;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use arg_normalizer::*;
@@ -602,3 +612,5 @@ pub use prompt_tree_branch_hierarchy_formatter::*;
 pub use capsule_segmented_control_validator::*;
 pub use windows_shell_dispatch_argument_escaper::*;
 pub use truncation_omission_banner_formatter::*;
+pub use window_control_capsule_formatter::*;
+pub use caller_process_ancestry_tree_scanner::*;

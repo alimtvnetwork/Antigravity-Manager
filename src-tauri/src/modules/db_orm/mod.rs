@@ -22,6 +22,7 @@ pub mod database_snapshot_manifest;
 pub mod db_size_watchdog;
 pub mod deadlock_detector;
 pub mod dump;
+pub mod fifo_dead_letter_queue_spillover_guard;
 pub mod fifo_prompt_order_enforcer;
 pub mod fifo_prompt_queue_coordinator;
 pub mod fifo_prompt_restore_transaction_guard;
@@ -168,6 +169,8 @@ pub mod tests_fifo_prompt_queue_coordinator;
 #[cfg(test)]
 pub mod tests_fifo_prompt_restore_validator;
 #[cfg(test)]
+pub mod tests_fifo_dead_letter_queue_spillover_guard;
+#[cfg(test)]
 pub mod tests_fifo_prompt_restore_concurrency_limiter;
 #[cfg(test)]
 pub mod tests_fifo_prompt_restore_transaction_guard;
@@ -184,6 +187,7 @@ pub mod tests_connection_starvation_watchdog;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;
+pub use fifo_dead_letter_queue_spillover_guard::*;
 pub use fifo_prompt_order_enforcer::*;
 pub use fifo_prompt_queue_coordinator::*;
 pub use fifo_prompt_restore_transaction_guard::*;

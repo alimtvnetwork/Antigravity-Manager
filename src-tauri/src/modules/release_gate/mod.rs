@@ -32,6 +32,7 @@ pub mod cross_platform_compat_guard;
 pub mod docker_sync_verifier;
 pub mod fifo_queue_ordering_guard;
 pub mod generic_fix_preference_guard;
+pub mod github_release_notes_parity_guard;
 pub mod individually_revertable_commit_guard;
 pub mod headless_cli_parity_guard;
 pub mod job_breakaway_fallback_ladder;
@@ -115,6 +116,8 @@ pub mod tests_docker_tag_sync;
 pub mod tests_fifo_queue_ordering;
 #[cfg(test)]
 pub mod tests_generic_fix_preference;
+#[cfg(test)]
+pub mod tests_github_release_notes_parity_guard;
 #[cfg(test)]
 pub mod tests_headless_cli_parity;
 #[cfg(test)]
@@ -229,6 +232,7 @@ pub use cross_platform_compat_guard::*;
 pub use docker_sync_verifier::*;
 pub use fifo_queue_ordering_guard::*;
 pub use generic_fix_preference_guard::*;
+pub use github_release_notes_parity_guard::*;
 pub use individually_revertable_commit_guard::*;
 pub use headless_cli_parity_guard::*;
 pub use job_breakaway_fallback_ladder::*;
