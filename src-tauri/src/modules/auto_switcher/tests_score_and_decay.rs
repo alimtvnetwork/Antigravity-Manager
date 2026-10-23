@@ -9,11 +9,23 @@ mod tests {
 
     #[test]
     fn test_score_percentile_normalizer_single() {
-        assert_eq!(ScorePercentileNormalizer::normalize_score(50.0, 100.0), 500.0);
-        assert_eq!(ScorePercentileNormalizer::normalize_score(100.0, 100.0), 1000.0);
+        assert_eq!(
+            ScorePercentileNormalizer::normalize_score(50.0, 100.0),
+            500.0
+        );
+        assert_eq!(
+            ScorePercentileNormalizer::normalize_score(100.0, 100.0),
+            1000.0
+        );
         assert_eq!(ScorePercentileNormalizer::normalize_score(0.0, 100.0), 0.0);
-        assert_eq!(ScorePercentileNormalizer::normalize_score(-10.0, 100.0), 0.0);
-        assert_eq!(ScorePercentileNormalizer::normalize_score(150.0, 100.0), 1000.0); // Clamped
+        assert_eq!(
+            ScorePercentileNormalizer::normalize_score(-10.0, 100.0),
+            0.0
+        );
+        assert_eq!(
+            ScorePercentileNormalizer::normalize_score(150.0, 100.0),
+            1000.0
+        ); // Clamped
     }
 
     #[test]

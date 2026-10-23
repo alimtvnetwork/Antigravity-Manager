@@ -41,7 +41,10 @@ fn test_error_5_fallback_removes_breakaway_flag() {
 
     assert_eq!(decision.executable_path, "antigravity.exe");
     assert_eq!(decision.creation_flags, 0);
-    assert_eq!(decision.stage, SpawnFallbackLadderStage::NoBreakawayFallback);
+    assert_eq!(
+        decision.stage,
+        SpawnFallbackLadderStage::NoBreakawayFallback
+    );
     assert!(!decision.has_breakaway_flag());
     assert!(!decision.is_shell_wrapped);
     assert_eq!(decision.target_kind, SpawnerTargetKind::DirectBinary);
@@ -62,7 +65,10 @@ fn test_batch_file_fallback_to_base_binary() {
     assert_eq!(decision_bat.executable_path, detected_base);
     assert_eq!(decision_bat.args, args);
     assert_eq!(decision_bat.creation_flags, CREATE_BREAKAWAY_FROM_JOB);
-    assert_eq!(decision_bat.stage, SpawnFallbackLadderStage::BreakawayAttempt);
+    assert_eq!(
+        decision_bat.stage,
+        SpawnFallbackLadderStage::BreakawayAttempt
+    );
     assert!(!decision_bat.is_shell_wrapped);
     assert_eq!(decision_bat.target_kind, SpawnerTargetKind::DirectBinary);
 
@@ -121,7 +127,10 @@ fn test_non_batch_binary_preserves_direct_invocation() {
     assert_eq!(decision.executable_path, "custom_binary.exe");
     assert_eq!(decision.args, args);
     assert_eq!(decision.creation_flags, 0);
-    assert_eq!(decision.stage, SpawnFallbackLadderStage::NoBreakawayFallback);
+    assert_eq!(
+        decision.stage,
+        SpawnFallbackLadderStage::NoBreakawayFallback
+    );
     assert!(!decision.is_shell_wrapped);
     assert_eq!(decision.target_kind, SpawnerTargetKind::DirectBinary);
 }
@@ -179,7 +188,10 @@ fn test_access_denied_with_base_binary_clears_breakaway() {
 
     assert_eq!(decision.executable_path, detected_base);
     assert_eq!(decision.creation_flags, 0);
-    assert_eq!(decision.stage, SpawnFallbackLadderStage::NoBreakawayFallback);
+    assert_eq!(
+        decision.stage,
+        SpawnFallbackLadderStage::NoBreakawayFallback
+    );
     assert_eq!(decision.target_kind, SpawnerTargetKind::DirectBinary);
 }
 
@@ -207,7 +219,6 @@ fn test_serde_roundtrip() {
 
     let kind = SpawnerTargetKind::WindowsBatchScript;
     let s_kind = serde_json::to_string(&kind).expect("serialize kind");
-    let d_kind: SpawnerTargetKind =
-        serde_json::from_str(&s_kind).expect("deserialize kind");
+    let d_kind: SpawnerTargetKind = serde_json::from_str(&s_kind).expect("deserialize kind");
     assert_eq!(kind, d_kind);
 }

@@ -2,15 +2,18 @@
 
 use super::http2_flow_controller::{
     tune_http2_flow_control, DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
-    DEFAULT_INITIAL_STREAM_WINDOW_SIZE, DEFAULT_MAX_CONCURRENT_STREAMS,
-    MAX_STREAM_WINDOW_SIZE, MIN_STREAM_WINDOW_SIZE,
+    DEFAULT_INITIAL_STREAM_WINDOW_SIZE, DEFAULT_MAX_CONCURRENT_STREAMS, MAX_STREAM_WINDOW_SIZE,
+    MIN_STREAM_WINDOW_SIZE,
 };
 
 #[test]
 fn test_tune_http2_flow_control_default() {
     let cfg = tune_http2_flow_control(None, None);
     assert_eq!(cfg.stream_window_size, DEFAULT_INITIAL_STREAM_WINDOW_SIZE);
-    assert_eq!(cfg.connection_window_size, DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+    assert_eq!(
+        cfg.connection_window_size,
+        DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE
+    );
     assert_eq!(cfg.max_concurrent_streams, DEFAULT_MAX_CONCURRENT_STREAMS);
     assert!(cfg.adaptive_tuning);
 }
@@ -19,7 +22,10 @@ fn test_tune_http2_flow_control_default() {
 fn test_tune_http2_flow_control_small_payload() {
     let cfg = tune_http2_flow_control(Some(10 * 1024), None);
     assert_eq!(cfg.stream_window_size, 128 * 1024);
-    assert_eq!(cfg.connection_window_size, DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+    assert_eq!(
+        cfg.connection_window_size,
+        DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE
+    );
 }
 
 #[test]

@@ -35,7 +35,9 @@ pub fn step_incremental_vacuum(
     }
 
     let chunk = chunk_size.unwrap_or(DEFAULT_VACUUM_CHUNK_SIZE).max(1);
-    let limit = max_pages.unwrap_or(DEFAULT_MAX_PAGES_PER_PASS).min(freelist_before);
+    let limit = max_pages
+        .unwrap_or(DEFAULT_MAX_PAGES_PER_PASS)
+        .min(freelist_before);
 
     let mut remaining = limit;
     let mut steps_executed = 0;

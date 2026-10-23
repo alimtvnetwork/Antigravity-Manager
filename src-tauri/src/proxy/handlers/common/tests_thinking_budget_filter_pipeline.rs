@@ -89,7 +89,10 @@ mod tests {
         assert!(!report.is_active());
         assert_eq!(report.effective_budget(), None);
         assert!(report.decision().is_no_thinking());
-        assert_eq!(*report.decision(), ThinkingFilterDecision::NoThinkingConfigured);
+        assert_eq!(
+            *report.decision(),
+            ThinkingFilterDecision::NoThinkingConfigured
+        );
     }
 
     #[test]
@@ -121,7 +124,9 @@ mod tests {
     #[test]
     fn test_wildcard_model_pattern_matching() {
         // Thinking models
-        assert!(is_model_thinking_capable("gemini-2.0-flash-thinking-exp-01-21"));
+        assert!(is_model_thinking_capable(
+            "gemini-2.0-flash-thinking-exp-01-21"
+        ));
         assert!(is_model_thinking_capable("gemini-2.5-flash-thinking"));
         assert!(is_model_thinking_capable("deepseek-reasoning-v1"));
         assert!(is_model_thinking_capable("custom-reasoning-agent"));
@@ -134,7 +139,9 @@ mod tests {
         assert!(is_model_thinking_capable("azure/o3-mini"));
         assert!(is_model_thinking_capable("claude-3-7-sonnet"));
         assert!(is_model_thinking_capable("claude-3-7-sonnet-20250219"));
-        assert!(is_model_thinking_capable("anthropic/claude-3-7-sonnet-thought"));
+        assert!(is_model_thinking_capable(
+            "anthropic/claude-3-7-sonnet-thought"
+        ));
 
         // Non-thinking models
         assert!(!is_model_thinking_capable("gpt-4o"));

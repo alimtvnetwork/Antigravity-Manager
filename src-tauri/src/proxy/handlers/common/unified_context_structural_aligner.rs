@@ -204,10 +204,7 @@ fn push_or_merge_turn(
 }
 
 /// Enforces that the conversation context begins with a user turn.
-fn enforce_initial_user_turn(
-    turns: &mut Vec<RoleTurn>,
-    violations: &mut Vec<AlignmentViolation>,
-) {
+fn enforce_initial_user_turn(turns: &mut Vec<RoleTurn>, violations: &mut Vec<AlignmentViolation>) {
     if let Some(first) = turns.first() {
         if first.role != "user" {
             violations.push(AlignmentViolation::InvalidRoleSequence {
@@ -234,8 +231,12 @@ pub fn align_context_turns(turns: &[RoleTurn]) -> (Vec<RoleTurn>, ContextAlignme
     for (idx, turn) in turns.iter().enumerate() {
         let canonical = canonicalize_role(&turn.role);
         validate_role_canonicality(&turn.role, canonical, idx, &mut violations);
-        let clean_parts =
-            clean_turn_parts(&turn.parts, idx, &mut empty_parts_pruned_count, &mut violations);
+        let clean_parts = clean_turn_parts(
+            &turn.parts,
+            idx,
+            &mut empty_parts_pruned_count,
+            &mut violations,
+        );
         let cleaned_turn = RoleTurn::new(canonical, clean_parts);
         push_or_merge_turn(
             cleaned_turn,

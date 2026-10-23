@@ -22,17 +22,16 @@ pub(crate) fn normalize_cmd_callback_payload(data: &str) -> String {
 }
 
 /// Immediately answer callback query so Telegram client dismisses button spinner without waiting
-pub(crate) async fn answer_callback_query(
-    client: &reqwest::Client,
-    token: &str,
-    cb_id: &str,
-) {
+pub(crate) async fn answer_callback_query(client: &reqwest::Client, token: &str, cb_id: &str) {
     let clean_token = token.trim();
     let clean_cb = cb_id.trim();
     if clean_token.is_empty() || clean_cb.is_empty() {
         return;
     }
-    let ans_url = format!("https://api.telegram.org/bot{}/answerCallbackQuery", clean_token);
+    let ans_url = format!(
+        "https://api.telegram.org/bot{}/answerCallbackQuery",
+        clean_token
+    );
     // Justification: best-effort callback query answer to dismiss button spinners immediately; failure logged without changing control flow
     crate::error::record_ignored(
         client
@@ -797,7 +796,12 @@ pub fn start_telegram_daemon() {
 
                                         if chat_id != 0 && !data.is_empty() {
                                             // Immediately answer callback query so Telegram button spinners dismiss instantly
-                                            answer_callback_query(&http_client, &clean_token, cb_id).await;
+                                            answer_callback_query(
+                                                &http_client,
+                                                &clean_token,
+                                                cb_id,
+                                            )
+                                            .await;
 
                                             if deliver_send_flow_callback(
                                                 &clean_token,
@@ -824,7 +828,13 @@ pub fn start_telegram_daemon() {
                                             if let Some(allowed) = config.allowed_chat_id {
                                                 if chat_id == allowed {
                                                     // Send "typing" action to indicate command dispatch
-                                                    send_chat_action(&http_client, &clean_token, chat_id, "typing").await;
+                                                    send_chat_action(
+                                                        &http_client,
+                                                        &clean_token,
+                                                        chat_id,
+                                                        "typing",
+                                                    )
+                                                    .await;
 
                                                     // Same unified pipeline the one-shot poller
                                                     // uses, so `cmd:` buttons behave identically on
@@ -903,7 +913,13 @@ pub fn start_telegram_daemon() {
                                     }
 
                                     // Send "typing" chat action immediately when command or message is received
-                                    send_chat_action(&http_client, &config.bot_token, chat_id, "typing").await;
+                                    send_chat_action(
+                                        &http_client,
+                                        &config.bot_token,
+                                        chat_id,
+                                        "typing",
+                                    )
+                                    .await;
 
                                     {
                                         let mut st = LAST_TELEGRAM_STATUS.write().await;
@@ -919,7 +935,10 @@ pub fn start_telegram_daemon() {
                                     )
                                     .await;
                                     if delivered_opt.is_none() {
-                                        tracing::debug!("deliver_ui_or_command produced no reply for chat {}", chat_id);
+                                        tracing::debug!(
+                                            "deliver_ui_or_command produced no reply for chat {}",
+                                            chat_id
+                                        );
                                     }
                                 }
                             }

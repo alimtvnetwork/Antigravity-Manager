@@ -26,11 +26,7 @@ impl Default for H2PingScheduler {
 }
 
 impl H2PingScheduler {
-    pub fn new(
-        interval: Option<u64>,
-        timeout: Option<u64>,
-        max_unack: Option<u32>,
-    ) -> Self {
+    pub fn new(interval: Option<u64>, timeout: Option<u64>, max_unack: Option<u32>) -> Self {
         Self {
             ping_interval_secs: interval.unwrap_or(DEFAULT_H2_PING_INTERVAL_SECS),
             ping_timeout_secs: timeout.unwrap_or(DEFAULT_H2_PING_TIMEOUT_SECS),

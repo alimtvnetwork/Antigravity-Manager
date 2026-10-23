@@ -53,10 +53,7 @@ pub enum MonotonicityViolation {
         curr_id: i64,
     },
     /// The same item ID appeared more than once in the drain sequence.
-    DuplicateItemId {
-        table_name: String,
-        id: i64,
-    },
+    DuplicateItemId { table_name: String, id: i64 },
 }
 
 impl fmt::Display for MonotonicityViolation {
@@ -104,7 +101,9 @@ pub struct MonotonicityAuditReport {
 }
 
 /// Verifies that a slice of queue item records strictly adheres to FIFO ordering.
-pub fn verify_queue_items_monotonicity(items: &[QueueItemRecord]) -> Result<MonotonicityAuditReport, MonotonicityViolation> {
+pub fn verify_queue_items_monotonicity(
+    items: &[QueueItemRecord],
+) -> Result<MonotonicityAuditReport, MonotonicityViolation> {
     if items.is_empty() {
         return Ok(MonotonicityAuditReport {
             is_strictly_monotonic: true,

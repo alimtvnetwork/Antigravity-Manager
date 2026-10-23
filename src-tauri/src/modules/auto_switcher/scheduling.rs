@@ -63,7 +63,9 @@ pub fn calculate_next_interval_seconds(
 /// - <= 20% and > 10%: 30 seconds (caution status)
 /// - <= 10%: 15 seconds (critical threshold emergency polling)
 /// - None: 45 seconds (default balanced baseline)
-pub fn calculate_adaptive_polling_interval(lowest_quota_percent: Option<f64>) -> std::time::Duration {
+pub fn calculate_adaptive_polling_interval(
+    lowest_quota_percent: Option<f64>,
+) -> std::time::Duration {
     match lowest_quota_percent {
         Some(q) if q > 50.0 => std::time::Duration::from_secs(60),
         Some(q) if q > 20.0 => std::time::Duration::from_secs(45),

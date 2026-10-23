@@ -72,7 +72,10 @@ impl ProcessSpawnLadder {
             }
             match shell_cmd.spawn() {
                 Ok(child) => {
-                    info!(stage = "ShellDispatch", "Spawned process via Windows Shell dispatch fallback");
+                    info!(
+                        stage = "ShellDispatch",
+                        "Spawned process via Windows Shell dispatch fallback"
+                    );
                     return Ok((child, SpawnStage::ShellDispatch));
                 }
                 Err(e) => {

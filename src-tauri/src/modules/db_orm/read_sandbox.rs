@@ -35,7 +35,9 @@ pub fn validate_readonly_query(raw_sql: &str) -> ReadSandboxCheck {
         return ReadSandboxCheck {
             is_safe: false,
             sanitized_sql: stripped.to_string(),
-            violation_reason: Some("Multiple SQL statements delimited by semicolon are forbidden".to_string()),
+            violation_reason: Some(
+                "Multiple SQL statements delimited by semicolon are forbidden".to_string(),
+            ),
         };
     }
 

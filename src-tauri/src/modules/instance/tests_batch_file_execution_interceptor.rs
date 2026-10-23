@@ -149,11 +149,14 @@ mod tests {
         assert!(!result.was_batch_intercepted);
         assert!(result.is_direct());
         assert_eq!(result.resolved_executable, target);
-        assert_eq!(result.resolved_args, vec![
-            "--user-data-dir=C:\\Data",
-            "--inspect=9222"
-        ]);
-        assert_eq!(result.strategy, LaunchResolutionStrategy::TargetBinaryDirect);
+        assert_eq!(
+            result.resolved_args,
+            vec!["--user-data-dir=C:\\Data", "--inspect=9222"]
+        );
+        assert_eq!(
+            result.strategy,
+            LaunchResolutionStrategy::TargetBinaryDirect
+        );
         assert_eq!(result.strategy.as_str(), "target_binary_direct");
         assert!(result.notes[0].contains("resolved without batch interception"));
     }
@@ -269,10 +272,7 @@ mod tests {
         let result = resolve_executable_launch(target, &[], None);
         assert_eq!(result.command_line_preview(), "direct.exe");
         assert!(result.is_direct());
-        assert_eq!(
-            format!("{}", result.strategy),
-            "TargetBinaryDirect"
-        );
+        assert_eq!(format!("{}", result.strategy), "TargetBinaryDirect");
 
         let kind = ExecutionTargetKind::WindowsBatchScript("test.bat".to_string());
         assert_eq!(format!("{}", kind), "WindowsBatchScript(test.bat)");

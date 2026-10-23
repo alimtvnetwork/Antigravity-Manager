@@ -70,12 +70,7 @@ mod tests {
     #[test]
     fn test_all_four_origin_tiers_badge_props_and_icons() {
         let tiers = [
-            (
-                PromptOriginTier::UserPrompt,
-                "USER_PROMPT",
-                "sky",
-                "User",
-            ),
+            (PromptOriginTier::UserPrompt, "USER_PROMPT", "sky", "User"),
             (
                 PromptOriginTier::SubagentInstruction,
                 "SUBAGENT_INSTRUCTION",
@@ -234,7 +229,10 @@ mod tests {
         let rows = format_prompt_tree(&nodes);
         assert_eq!(rows.len(), 6);
 
-        assert_eq!(rows[0].formatted_line, "[USER_PROMPT] Diagnose memory spike");
+        assert_eq!(
+            rows[0].formatted_line,
+            "[USER_PROMPT] Diagnose memory spike"
+        );
         assert_eq!(
             rows[1].formatted_line,
             "↳ [SYSTEM_MESSAGE] Context injected: 10 commits"

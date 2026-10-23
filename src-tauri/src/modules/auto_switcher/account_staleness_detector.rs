@@ -37,7 +37,12 @@ impl AccountStalenessDetector {
     }
 
     /// Evaluates staleness of an account given the last synchronization timestamp.
-    pub fn evaluate_staleness(&self, account_id: &str, last_synced: u64, current_epoch: u64) -> AccountStalenessReport {
+    pub fn evaluate_staleness(
+        &self,
+        account_id: &str,
+        last_synced: u64,
+        current_epoch: u64,
+    ) -> AccountStalenessReport {
         let elapsed = current_epoch.saturating_sub(last_synced);
         let is_stale = elapsed >= self.staleness_threshold_secs;
         let requires_force_refresh = elapsed >= (self.staleness_threshold_secs * 2);

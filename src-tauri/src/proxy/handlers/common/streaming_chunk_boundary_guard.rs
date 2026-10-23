@@ -48,9 +48,7 @@ pub enum ChunkBoundaryViolation {
     /// Chunk data is completely empty.
     EmptyChunk,
     /// Terminal stream chunk ended abruptly without proper SSE boundary completion.
-    UnclosedStreamFrame {
-        trailing_bytes: usize,
-    },
+    UnclosedStreamFrame { trailing_bytes: usize },
 }
 
 impl fmt::Display for ChunkBoundaryViolation {

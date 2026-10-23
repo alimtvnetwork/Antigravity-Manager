@@ -4,24 +4,36 @@ mod tests {
         conforming_inline_select_classes, conforming_segmented_capsule_classes,
         conforming_window_controls_capsule_classes, has_dark_glass_styling, has_rounded_full,
         has_shared_border, has_subtle_dividers, lint_ui_markup_for_capsules_and_dropdowns,
-        sanitize_dropdown_classes, validate_capsule_with_dropdown,
-        validate_inline_select_classes, validate_segmented_capsule_classes,
-        CapsuleStylingViolation, DropdownStylingViolation, MANDATORY_DROPDOWN_CLASSES,
+        sanitize_dropdown_classes, validate_capsule_with_dropdown, validate_inline_select_classes,
+        validate_segmented_capsule_classes, CapsuleStylingViolation, DropdownStylingViolation,
+        MANDATORY_DROPDOWN_CLASSES,
     };
 
     #[test]
     fn test_conforming_classes_are_valid() {
         let capsule = conforming_segmented_capsule_classes();
         let violations = validate_segmented_capsule_classes(capsule, "capsule");
-        assert!(violations.is_empty(), "Conforming capsule should have no violations: {:?}", violations);
+        assert!(
+            violations.is_empty(),
+            "Conforming capsule should have no violations: {:?}",
+            violations
+        );
 
         let window_capsule = conforming_window_controls_capsule_classes();
         let violations = validate_segmented_capsule_classes(window_capsule, "window_capsule");
-        assert!(violations.is_empty(), "Conforming window capsule should have no violations: {:?}", violations);
+        assert!(
+            violations.is_empty(),
+            "Conforming window capsule should have no violations: {:?}",
+            violations
+        );
 
         let select = conforming_inline_select_classes();
         let violations = validate_inline_select_classes(select, "<select>");
-        assert!(violations.is_empty(), "Conforming select should have no violations: {:?}", violations);
+        assert!(
+            violations.is_empty(),
+            "Conforming select should have no violations: {:?}",
+            violations
+        );
     }
 
     #[test]
@@ -29,10 +41,14 @@ mod tests {
         assert!(has_rounded_full("rounded-full border divide-x"));
         assert!(!has_rounded_full("rounded-md border divide-x"));
 
-        assert!(has_shared_border("rounded-full border border-white/10 divide-x"));
+        assert!(has_shared_border(
+            "rounded-full border border-white/10 divide-x"
+        ));
         assert!(!has_shared_border("rounded-full border-0 divide-x"));
 
-        assert!(has_subtle_dividers("rounded-full border divide-x divide-white/10"));
+        assert!(has_subtle_dividers(
+            "rounded-full border divide-x divide-white/10"
+        ));
         assert!(!has_subtle_dividers("rounded-full border shadow-sm"));
 
         assert!(has_dark_glass_styling("backdrop-blur-md bg-zinc-900/60"));
@@ -45,28 +61,38 @@ mod tests {
     fn test_capsule_missing_rounded_full() {
         let classes = "inline-flex border border-white/10 bg-zinc-900/60 backdrop-blur-md divide-x divide-white/10";
         let violations = validate_segmented_capsule_classes(classes, "capsule");
-        assert!(violations.iter().any(|v| matches!(v, CapsuleStylingViolation::MissingRoundedFull { .. })));
+        assert!(violations
+            .iter()
+            .any(|v| matches!(v, CapsuleStylingViolation::MissingRoundedFull { .. })));
     }
 
     #[test]
     fn test_capsule_missing_shared_border() {
-        let classes = "inline-flex rounded-full bg-zinc-900/60 backdrop-blur-md divide-x divide-white/10";
+        let classes =
+            "inline-flex rounded-full bg-zinc-900/60 backdrop-blur-md divide-x divide-white/10";
         let violations = validate_segmented_capsule_classes(classes, "capsule");
-        assert!(violations.iter().any(|v| matches!(v, CapsuleStylingViolation::MissingSharedBorder { .. })));
+        assert!(violations
+            .iter()
+            .any(|v| matches!(v, CapsuleStylingViolation::MissingSharedBorder { .. })));
     }
 
     #[test]
     fn test_capsule_missing_subtle_dividers() {
-        let classes = "inline-flex rounded-full border border-white/10 bg-zinc-900/60 backdrop-blur-md";
+        let classes =
+            "inline-flex rounded-full border border-white/10 bg-zinc-900/60 backdrop-blur-md";
         let violations = validate_segmented_capsule_classes(classes, "capsule");
-        assert!(violations.iter().any(|v| matches!(v, CapsuleStylingViolation::MissingSubtleDividers { .. })));
+        assert!(violations
+            .iter()
+            .any(|v| matches!(v, CapsuleStylingViolation::MissingSubtleDividers { .. })));
     }
 
     #[test]
     fn test_capsule_missing_dark_glass() {
         let classes = "inline-flex rounded-full border border-white/10 divide-x divide-white/10";
         let violations = validate_segmented_capsule_classes(classes, "capsule");
-        assert!(violations.iter().any(|v| matches!(v, CapsuleStylingViolation::MissingDarkGlassStyling { .. })));
+        assert!(violations
+            .iter()
+            .any(|v| matches!(v, CapsuleStylingViolation::MissingDarkGlassStyling { .. })));
     }
 
     #[test]
@@ -74,15 +100,25 @@ mod tests {
         let classes = "text-xs text-white";
         let violations = validate_inline_select_classes(classes, "<select>");
         assert_eq!(violations.len(), 4);
-        assert!(violations.iter().any(|v| matches!(v, DropdownStylingViolation::MissingTransparentBackground { .. })));
-        assert!(violations.iter().any(|v| matches!(v, DropdownStylingViolation::MissingBorderZero { .. })));
-        assert!(violations.iter().any(|v| matches!(v, DropdownStylingViolation::MissingFocusRingZero { .. })));
-        assert!(violations.iter().any(|v| matches!(v, DropdownStylingViolation::MissingFocusOutlineNone { .. })));
+        assert!(violations.iter().any(|v| matches!(
+            v,
+            DropdownStylingViolation::MissingTransparentBackground { .. }
+        )));
+        assert!(violations
+            .iter()
+            .any(|v| matches!(v, DropdownStylingViolation::MissingBorderZero { .. })));
+        assert!(violations
+            .iter()
+            .any(|v| matches!(v, DropdownStylingViolation::MissingFocusRingZero { .. })));
+        assert!(violations
+            .iter()
+            .any(|v| matches!(v, DropdownStylingViolation::MissingFocusOutlineNone { .. })));
     }
 
     #[test]
     fn test_dropdown_nested_pill_defect() {
-        let classes = "bg-transparent border-0 focus:ring-0 focus:outline-none rounded-full bg-white";
+        let classes =
+            "bg-transparent border-0 focus:ring-0 focus:outline-none rounded-full bg-white";
         let violations = validate_inline_select_classes(classes, "<select>");
         assert!(violations.iter().any(|v| matches!(v, DropdownStylingViolation::NestedPillVisualDefect { offending_class, .. } if offending_class == "rounded-full")));
         assert!(violations.iter().any(|v| matches!(v, DropdownStylingViolation::NestedPillVisualDefect { offending_class, .. } if offending_class == "bg-white")));
@@ -115,7 +151,11 @@ mod tests {
         assert!(!tokens.contains(&"ring-2"));
 
         let violations = validate_inline_select_classes(&cleaned, "<select>");
-        assert!(violations.is_empty(), "Sanitized dropdown classes should have no violations: {:?}", violations);
+        assert!(
+            violations.is_empty(),
+            "Sanitized dropdown classes should have no violations: {:?}",
+            violations
+        );
     }
 
     #[test]

@@ -31,7 +31,11 @@ mod tests {
             }
         "#;
         let report = lint_rust_code(code);
-        assert!(report.is_clean, "Expected clean report, got: {:?}", report.violations);
+        assert!(
+            report.is_clean,
+            "Expected clean report, got: {:?}",
+            report.violations
+        );
         assert_eq!(report.best_effort_recorded_count, 1);
     }
 
@@ -93,7 +97,11 @@ mod tests {
             }
         "#;
         let report = lint_rust_code(code);
-        assert!(report.is_clean, "ok_or_else should not be flagged: {:?}", report.violations);
+        assert!(
+            report.is_clean,
+            "ok_or_else should not be flagged: {:?}",
+            report.violations
+        );
     }
 
     #[test]
@@ -105,7 +113,11 @@ mod tests {
             }
         "#;
         let report = lint_rust_code(code);
-        assert!(report.is_clean, "Proper error propagation should be clean: {:?}", report.violations);
+        assert!(
+            report.is_clean,
+            "Proper error propagation should be clean: {:?}",
+            report.violations
+        );
     }
 
     #[test]
@@ -184,7 +196,11 @@ mod tests {
             }
         "#;
         let report = lint_typescript_code(code);
-        assert!(report.is_clean, "Proper error store trackWarning should be clean: {:?}", report.violations);
+        assert!(
+            report.is_clean,
+            "Proper error store trackWarning should be clean: {:?}",
+            report.violations
+        );
         assert_eq!(report.best_effort_recorded_count, 1);
     }
 
@@ -218,7 +234,11 @@ mod tests {
             }
         "#;
         let report = lint_rust_code(code);
-        assert!(report.is_clean, "Comments containing bad examples should not trigger violations: {:?}", report.violations);
+        assert!(
+            report.is_clean,
+            "Comments containing bad examples should not trigger violations: {:?}",
+            report.violations
+        );
     }
 
     #[test]

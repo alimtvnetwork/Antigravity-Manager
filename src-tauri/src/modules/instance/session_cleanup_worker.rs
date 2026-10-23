@@ -25,7 +25,9 @@ pub const VOLATILE_DIR_NAMES: &[&str] = &[
 ];
 
 /// Sweeps volatile transient cache directories within an instance profile directory.
-pub fn clean_instance_session_caches(instance_data_dir: &Path) -> Result<SessionCleanupReport, std::io::Error> {
+pub fn clean_instance_session_caches(
+    instance_data_dir: &Path,
+) -> Result<SessionCleanupReport, std::io::Error> {
     let mut report = SessionCleanupReport::default();
 
     if !instance_data_dir.exists() || !instance_data_dir.is_dir() {

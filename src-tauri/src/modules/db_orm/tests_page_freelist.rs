@@ -143,15 +143,18 @@ mod tests {
 
         let large_blob = vec![0u8; 8192];
         for _ in 0..100 {
-            conn.execute("INSERT INTO temp_blobs (content) VALUES (?1);", [&large_blob])
-                .expect("Insert blob must succeed");
+            conn.execute(
+                "INSERT INTO temp_blobs (content) VALUES (?1);",
+                [&large_blob],
+            )
+            .expect("Insert blob must succeed");
         }
 
         conn.execute("DELETE FROM temp_blobs;", [])
             .expect("Delete all rows must succeed");
 
-        let initial_report = PageFreelistAnalyzer::inspect_freelist(&conn, Some(1))
-            .expect("Inspect must succeed");
+        let initial_report =
+            PageFreelistAnalyzer::inspect_freelist(&conn, Some(1)).expect("Inspect must succeed");
         let initial_free = initial_report.freelist_pages;
         assert!(
             initial_free >= 10,
@@ -179,6 +182,9 @@ mod tests {
     fn test_execute_incremental_vacuum_in_memory_safe_noop() {
         let conn = Connection::open_in_memory().expect("In-memory DB must open");
         let res = PageFreelistAnalyzer::execute_incremental_vacuum(&conn, 5);
-        assert!(res.is_ok(), "Incremental vacuum on in-memory db must succeed safely");
+        assert!(
+            res.is_ok(),
+            "Incremental vacuum on in-memory db must succeed safely"
+        );
     }
 }

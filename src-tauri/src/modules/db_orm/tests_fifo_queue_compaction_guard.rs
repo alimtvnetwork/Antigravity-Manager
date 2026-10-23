@@ -10,8 +10,14 @@ use super::fifo_queue_compaction_guard::*;
 
 #[test]
 fn test_compaction_table_mappings() {
-    assert_eq!(CompactionTable::ActivePrompts.table_name(), "active_prompts");
-    assert_eq!(CompactionTable::PromptBackups.table_name(), "prompt_backups");
+    assert_eq!(
+        CompactionTable::ActivePrompts.table_name(),
+        "active_prompts"
+    );
+    assert_eq!(
+        CompactionTable::PromptBackups.table_name(),
+        "prompt_backups"
+    );
     assert_eq!(CompactionTable::RepoPrompts.table_name(), "repo_prompts");
 
     assert_eq!(
@@ -66,7 +72,10 @@ fn test_validate_compaction_query_sql_empty() {
 fn test_validate_compaction_query_sql_missing_order_by() {
     let sql = "SELECT * FROM active_prompts WHERE status = 'pending'";
     let res = validate_compaction_query_sql(sql);
-    assert!(matches!(res, Err(CompactionViolation::MissingOrderByClause { .. })));
+    assert!(matches!(
+        res,
+        Err(CompactionViolation::MissingOrderByClause { .. })
+    ));
 }
 
 #[test]
@@ -74,24 +83,36 @@ fn test_validate_compaction_query_sql_inverted_lifo_desc() {
     // created_at DESC
     let sql1 = "SELECT * FROM active_prompts ORDER BY created_at DESC, id ASC";
     let res1 = validate_compaction_query_sql(sql1);
-    assert!(matches!(res1, Err(CompactionViolation::InvertedLifoOrder { .. })));
+    assert!(matches!(
+        res1,
+        Err(CompactionViolation::InvertedLifoOrder { .. })
+    ));
 
     // updated_at DESC (typical inverted LIFO query)
     let sql2 = "SELECT * FROM prompt_backups ORDER BY updated_at DESC";
     let res2 = validate_compaction_query_sql(sql2);
-    assert!(matches!(res2, Err(CompactionViolation::InvertedLifoOrder { .. })));
+    assert!(matches!(
+        res2,
+        Err(CompactionViolation::InvertedLifoOrder { .. })
+    ));
 
     // id DESC
     let sql3 = "SELECT * FROM repo_prompts ORDER BY created_at ASC, id DESC";
     let res3 = validate_compaction_query_sql(sql3);
-    assert!(matches!(res3, Err(CompactionViolation::InvertedLifoOrder { .. })));
+    assert!(matches!(
+        res3,
+        Err(CompactionViolation::InvertedLifoOrder { .. })
+    ));
 }
 
 #[test]
 fn test_validate_compaction_query_sql_missing_id_tie_breaker() {
     let sql = "SELECT * FROM active_prompts ORDER BY created_at ASC";
     let res = validate_compaction_query_sql(sql);
-    assert!(matches!(res, Err(CompactionViolation::MissingIdTieBreaker { .. })));
+    assert!(matches!(
+        res,
+        Err(CompactionViolation::MissingIdTieBreaker { .. })
+    ));
 }
 
 #[test]

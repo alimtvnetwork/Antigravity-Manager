@@ -16,7 +16,10 @@ impl MmapTuner {
 
     /// Applies the recommended mmap_size to an open SQLite connection.
     pub fn apply_mmap_size(conn: &Connection) -> Result<i64, rusqlite::Error> {
-        conn.execute_batch(&format!("PRAGMA mmap_size = {};", Self::RECOMMENDED_MMAP_BYTES))?;
+        conn.execute_batch(&format!(
+            "PRAGMA mmap_size = {};",
+            Self::RECOMMENDED_MMAP_BYTES
+        ))?;
         Self::query_current_mmap_size(conn)
     }
 

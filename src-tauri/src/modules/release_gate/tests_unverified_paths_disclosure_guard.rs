@@ -174,12 +174,16 @@ Rewrite of the process spawning subsystem.
     let report = audit_cost_disclosure(markdown, true);
     assert!(!report.is_compliant);
     assert_eq!(report.findings.len(), 2);
-    assert!(report.findings.contains(&DisclosureFinding::MissingRequiredSection {
-        section: CostDisclosureSection::AffectedExistingBehaviors,
-    }));
-    assert!(report.findings.contains(&DisclosureFinding::MissingRequiredSection {
-        section: CostDisclosureSection::UnverifiedPaths,
-    }));
+    assert!(report
+        .findings
+        .contains(&DisclosureFinding::MissingRequiredSection {
+            section: CostDisclosureSection::AffectedExistingBehaviors,
+        }));
+    assert!(report
+        .findings
+        .contains(&DisclosureFinding::MissingRequiredSection {
+            section: CostDisclosureSection::UnverifiedPaths,
+        }));
 }
 
 #[test]

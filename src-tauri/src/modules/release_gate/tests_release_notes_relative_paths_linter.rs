@@ -74,7 +74,10 @@ mod tests {
 
     #[test]
     fn test_posix_home_paths_detected() {
-        let linux_home = format!("{}/runner/work/Antigravity-Manager/src-tauri/src/lib.rs", "/home");
+        let linux_home = format!(
+            "{}/runner/work/Antigravity-Manager/src-tauri/src/lib.rs",
+            "/home"
+        );
         let mac_home = format!("{}/developer/project/02-spec/21-app/spec.md", "/Users");
         let content = format!("Line 1: {linux_home}\nLine 2: {mac_home}");
 
@@ -82,13 +85,19 @@ mod tests {
         assert!(!report.is_clean());
         assert_eq!(report.violation_count(), 2);
 
-        assert_eq!(report.violations[0].category, AbsolutePathCategory::PosixHome);
+        assert_eq!(
+            report.violations[0].category,
+            AbsolutePathCategory::PosixHome
+        );
         assert_eq!(
             report.violations[0].recommended_relative_path,
             "src-tauri/src/lib.rs"
         );
 
-        assert_eq!(report.violations[1].category, AbsolutePathCategory::PosixHome);
+        assert_eq!(
+            report.violations[1].category,
+            AbsolutePathCategory::PosixHome
+        );
         assert_eq!(
             report.violations[1].recommended_relative_path,
             "02-spec/21-app/spec.md"
@@ -136,34 +145,22 @@ mod tests {
         let v = &report.violations[0];
         assert_eq!(v.category, AbsolutePathCategory::FileUri);
         assert_eq!(v.raw_path, file_uri);
-        assert_eq!(
-            v.recommended_relative_path,
-            ".ai-memory/plans/plan.md"
-        );
+        assert_eq!(v.recommended_relative_path, ".ai-memory/plans/plan.md");
     }
 
     #[test]
     fn test_suggest_relative_path_canonical() {
         // Windows drive with src-tauri
         let win_tauri = format!("{}:\\repo\\src-tauri\\src\\lib.rs", "C");
-        assert_eq!(
-            suggest_relative_path(&win_tauri),
-            "src-tauri/src/lib.rs"
-        );
+        assert_eq!(suggest_relative_path(&win_tauri), "src-tauri/src/lib.rs");
 
         // Windows drive with src
         let win_src = format!("{}:/repo/src/components/Button.tsx", "D");
-        assert_eq!(
-            suggest_relative_path(&win_src),
-            "src/components/Button.tsx"
-        );
+        assert_eq!(suggest_relative_path(&win_src), "src/components/Button.tsx");
 
         // File URI with 02-spec
         let file_spec = format!("{}C:/project/02-spec/21-app/spec.md", "file:///");
-        assert_eq!(
-            suggest_relative_path(&file_spec),
-            "02-spec/21-app/spec.md"
-        );
+        assert_eq!(suggest_relative_path(&file_spec), "02-spec/21-app/spec.md");
 
         // Top level file CHANGELOG.md
         let changelog = format!("{}:/work/Antigravity-Manager/CHANGELOG.md", "D");

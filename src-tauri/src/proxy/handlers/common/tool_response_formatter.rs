@@ -16,7 +16,11 @@ pub struct ToolExecutionOutcome {
 
 impl ToolExecutionOutcome {
     /// Constructs a success tool outcome.
-    pub fn success(tool_call_id: impl Into<String>, tool_name: impl Into<String>, output: Value) -> Self {
+    pub fn success(
+        tool_call_id: impl Into<String>,
+        tool_name: impl Into<String>,
+        output: Value,
+    ) -> Self {
         Self {
             tool_call_id: tool_call_id.into(),
             tool_name: tool_name.into(),
@@ -26,7 +30,11 @@ impl ToolExecutionOutcome {
     }
 
     /// Constructs an error tool outcome.
-    pub fn error(tool_call_id: impl Into<String>, tool_name: impl Into<String>, error_message: impl Into<String>) -> Self {
+    pub fn error(
+        tool_call_id: impl Into<String>,
+        tool_name: impl Into<String>,
+        error_message: impl Into<String>,
+    ) -> Self {
         Self {
             tool_call_id: tool_call_id.into(),
             tool_name: tool_name.into(),

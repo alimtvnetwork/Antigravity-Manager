@@ -45,8 +45,22 @@ fn test_inactive_account_rejected() {
 
 #[test]
 fn test_thinking_capability_required() {
-    let acc_no_thinking = create_test_account("acc-2", "standard", true, false, true, &["claude-3-5-sonnet"]);
-    let acc_with_thinking = create_test_account("acc-3", "standard", true, true, true, &["claude-3-5-sonnet"]);
+    let acc_no_thinking = create_test_account(
+        "acc-2",
+        "standard",
+        true,
+        false,
+        true,
+        &["claude-3-5-sonnet"],
+    );
+    let acc_with_thinking = create_test_account(
+        "acc-3",
+        "standard",
+        true,
+        true,
+        true,
+        &["claude-3-5-sonnet"],
+    );
 
     let req = ModelCapabilityRequirement {
         target_model: "claude-3-5-sonnet".to_string(),
@@ -62,7 +76,8 @@ fn test_thinking_capability_required() {
 #[test]
 fn test_vision_capability_required() {
     let acc_no_vision = create_test_account("acc-4", "pro", true, true, false, &["gemini-1.5-pro"]);
-    let acc_with_vision = create_test_account("acc-5", "pro", true, true, true, &["gemini-1.5-pro"]);
+    let acc_with_vision =
+        create_test_account("acc-5", "pro", true, true, true, &["gemini-1.5-pro"]);
 
     let req = ModelCapabilityRequirement {
         target_model: "gemini-1.5-pro".to_string(),
@@ -77,7 +92,14 @@ fn test_vision_capability_required() {
 
 #[test]
 fn test_model_support_matching() {
-    let acc = create_test_account("acc-6", "pro", true, true, true, &["gemini-2.0-flash", "gpt-4o"]);
+    let acc = create_test_account(
+        "acc-6",
+        "pro",
+        true,
+        true,
+        true,
+        &["gemini-2.0-flash", "gpt-4o"],
+    );
 
     let req_supported = ModelCapabilityRequirement {
         target_model: "gemini-2.0-flash-exp".to_string(),

@@ -28,8 +28,8 @@ pub mod daemon;
 pub mod decision_telemetry_logger;
 pub mod drain_circuit_breaker;
 pub mod dynamic_quota_floor;
-pub mod epoch_drift_compensator;
 pub mod entropy_candidate_shuffler;
+pub mod epoch_drift_compensator;
 pub mod event_history_pruner;
 pub mod failover_ladder;
 pub mod fast_forward_target_resolver;
@@ -64,9 +64,9 @@ pub mod quota_reset_epoch_tracker;
 pub mod quota_ring_buffer;
 pub mod quota_window_align;
 pub mod readiness_evaluator;
-pub mod relaunch_readiness_evaluator;
 pub mod reason_formatter;
 pub mod recovery;
+pub mod relaunch_readiness_evaluator;
 pub mod reset_boundary;
 pub mod reset_phase;
 pub mod rotation;
@@ -96,51 +96,51 @@ pub mod switch_settling_watchdog;
 #[cfg(test)]
 mod tests_a;
 #[cfg(test)]
-mod tests_b;
-#[cfg(test)]
-pub mod tests_consecutive_switch;
-#[cfg(test)]
-pub mod tests_quota_and_cooldown;
-#[cfg(test)]
-pub mod tests_score_and_decay;
-#[cfg(test)]
 pub mod tests_account_staleness;
 #[cfg(test)]
-pub mod tests_headroom_multiplier;
-#[cfg(test)]
-pub mod tests_quota_recovery_forecaster;
-#[cfg(test)]
-pub mod tests_drain_circuit_breaker;
-#[cfg(test)]
-pub mod tests_epoch_drift_compensator;
-#[cfg(test)]
-pub mod tests_hourly_entropy_guard;
-#[cfg(test)]
-pub mod tests_score_variance_guard;
-#[cfg(test)]
-pub mod tests_dynamic_quota_floor;
-#[cfg(test)]
-pub mod tests_quota_acceleration_detector;
-#[cfg(test)]
-pub mod tests_cooldown_decay_stepper;
+pub mod tests_account_switch_audit_emitter;
 #[cfg(test)]
 pub mod tests_account_tier_filter;
 #[cfg(test)]
-pub mod tests_binding_affinity;
+mod tests_b;
 #[cfg(test)]
-pub mod tests_weekly_headroom_ratio;
+pub mod tests_binding_affinity;
 #[cfg(test)]
 pub mod tests_candidate_dedup;
 #[cfg(test)]
-pub mod tests_rotation_brake;
+pub mod tests_candidate_dynamic_scorer;
 #[cfg(test)]
-pub mod tests_switch_settling_timer;
+pub mod tests_consecutive_switch;
+#[cfg(test)]
+pub mod tests_cooldown_decay_stepper;
+#[cfg(test)]
+pub mod tests_drain_circuit_breaker;
+#[cfg(test)]
+pub mod tests_dynamic_quota_floor;
+#[cfg(test)]
+pub mod tests_epoch_drift_compensator;
+#[cfg(test)]
+pub mod tests_headroom_multiplier;
+#[cfg(test)]
+pub mod tests_hourly_entropy_guard;
+#[cfg(test)]
+pub mod tests_quota_acceleration_detector;
+#[cfg(test)]
+pub mod tests_quota_and_cooldown;
 #[cfg(test)]
 pub mod tests_quota_exhaustion_predictor;
 #[cfg(test)]
-pub mod tests_candidate_dynamic_scorer;
+pub mod tests_quota_recovery_forecaster;
 #[cfg(test)]
-pub mod tests_account_switch_audit_emitter;
+pub mod tests_rotation_brake;
+#[cfg(test)]
+pub mod tests_score_and_decay;
+#[cfg(test)]
+pub mod tests_score_variance_guard;
+#[cfg(test)]
+pub mod tests_switch_settling_timer;
+#[cfg(test)]
+pub mod tests_weekly_headroom_ratio;
 #[cfg(test)]
 pub(crate) use crate::models::account::Account;
 #[cfg(test)]
@@ -185,8 +185,8 @@ pub use daemon::*;
 pub use decision_telemetry_logger::*;
 pub use drain_circuit_breaker::*;
 pub use dynamic_quota_floor::*;
-pub use epoch_drift_compensator::*;
 pub use entropy_candidate_shuffler::*;
+pub use epoch_drift_compensator::*;
 pub use event_history_pruner::*;
 pub use failover_ladder::*;
 pub use fast_forward_target_resolver::*;
@@ -221,9 +221,9 @@ pub use quota_reset_epoch_tracker::*;
 pub use quota_ring_buffer::*;
 pub use quota_window_align::*;
 pub use readiness_evaluator::*;
-pub use relaunch_readiness_evaluator::*;
 pub use reason_formatter::*;
 pub use recovery::*;
+pub use relaunch_readiness_evaluator::*;
 pub use reset_boundary::*;
 pub use reset_phase::*;
 pub use rotation::*;

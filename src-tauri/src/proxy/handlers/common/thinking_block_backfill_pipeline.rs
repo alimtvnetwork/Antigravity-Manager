@@ -33,10 +33,7 @@ pub const ANSWER_TRANSITION_MARKERS: &[&str] = &[
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ThinkingPayloadFormat {
     /// Content enclosed within XML-style thought tags (e.g. `<thought>...</thought>`).
-    TaggedThought {
-        tag_open: String,
-        tag_close: String,
-    },
+    TaggedThought { tag_open: String, tag_close: String },
     /// JSON part with candidate `"thought": true` flag.
     CandidatePartThoughtFlag,
     /// Raw un-tagged reasoning content.

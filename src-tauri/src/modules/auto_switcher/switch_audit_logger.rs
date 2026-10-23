@@ -45,7 +45,18 @@ impl SwitchAuditLogger {
     }
 
     /// Converts the audit entry to an SQLite-compatible parameter tuple.
-    pub fn to_sql_params(entry: &SwitchAuditEntry) -> (String, String, String, String, i64, i32, Option<String>, i64) {
+    pub fn to_sql_params(
+        entry: &SwitchAuditEntry,
+    ) -> (
+        String,
+        String,
+        String,
+        String,
+        i64,
+        i32,
+        Option<String>,
+        i64,
+    ) {
         (
             entry.instance_id.clone(),
             entry.previous_account_id.clone(),

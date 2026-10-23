@@ -213,7 +213,11 @@ pub async fn execute_and_report_command(
             crate::modules::audit_action::AuditAction::Unknown,
             &format!("cmd_offline_{}", cmd.id),
             final_status.as_str(),
-            &format!("Exit code {}: {}", exit_code, stdout.chars().take(200).collect::<String>()),
+            &format!(
+                "Exit code {}: {}",
+                exit_code,
+                stdout.chars().take(200).collect::<String>()
+            ),
             None,
         );
     }

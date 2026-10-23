@@ -29,7 +29,10 @@ fn test_validate_profile_directory_not_a_directory() {
     std::fs::write(&file_path, "not a directory").expect("write file");
 
     let res = validate_profile_directory(&file_path, base_temp.path());
-    assert!(matches!(res, Err(ProfileDirValidationError::NotADirectory(_))));
+    assert!(matches!(
+        res,
+        Err(ProfileDirValidationError::NotADirectory(_))
+    ));
 }
 
 #[test]

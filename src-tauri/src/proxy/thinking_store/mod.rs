@@ -60,6 +60,7 @@ pub use session_extract::{
     extract_session_from_query_str, is_session_semantic_header, sanitize_session_id,
 };
 pub use session_scope::{EndSessionResult, SessionScope};
+pub use signature_validator::*;
 pub use signatures::{
     ensure_google_claude_thought_signature, ensure_raw_claude_thought_signature,
     is_claude_signature, is_likely_gemini_signature, is_real_signature,
@@ -71,7 +72,6 @@ pub use thought_parts::{
     is_thought_part, place_turn_signature,
 };
 pub use turn_accumulator::TurnAccumulator;
-pub use signature_validator::*;
 
 pub(crate) use common::{
     idle_ttl, max_turns_per_session, ModelTurnMeta, MAX_BYTES_PER_SESSION, MAX_SESSIONS,

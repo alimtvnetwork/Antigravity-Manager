@@ -58,8 +58,15 @@ impl InstanceLeaseClaimCoordinator {
             }
         }
 
-        map.insert(account_id.to_string(), (instance_id.to_string(), Instant::now()));
-        debug!(account = account_id, instance = instance_id, "Granted account lease claim");
+        map.insert(
+            account_id.to_string(),
+            (instance_id.to_string(), Instant::now()),
+        );
+        debug!(
+            account = account_id,
+            instance = instance_id,
+            "Granted account lease claim"
+        );
         LeaseClaimResult::ClaimGranted
     }
 
@@ -73,7 +80,11 @@ impl InstanceLeaseClaimCoordinator {
         if let Some((holder, _)) = map.get(account_id) {
             if holder == instance_id {
                 map.remove(account_id);
-                debug!(account = account_id, instance = instance_id, "Released account lease claim");
+                debug!(
+                    account = account_id,
+                    instance = instance_id,
+                    "Released account lease claim"
+                );
                 return true;
             }
         }
@@ -93,7 +104,11 @@ impl InstanceLeaseClaimCoordinator {
         let released = before - map.len();
 
         if released > 0 {
-            debug!(instance = instance_id, count = released, "Released all instance leases");
+            debug!(
+                instance = instance_id,
+                count = released,
+                "Released all instance leases"
+            );
         }
 
         released

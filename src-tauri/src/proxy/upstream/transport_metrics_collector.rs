@@ -31,13 +31,18 @@ impl TransportMetricsCollector {
     /// Ingests a new transport timing record and updates moving average TTFB.
     pub fn record(&self, timings: &TransportTimings) {
         if let Ok(mut guard) = self.averages.write() {
-            let entry = guard.entry(timings.endpoint_url.clone()).or_insert(timings.ttfb_ms);
+            let entry = guard
+                .entry(timings.endpoint_url.clone())
+                .or_insert(timings.ttfb_ms);
             *entry = (*entry * 0.8) + (timings.ttfb_ms * 0.2); // 20% weight to new sample
         }
     }
 
     /// Gets current average TTFB in milliseconds for an endpoint.
     pub fn average_ttfb(&self, endpoint_url: &str) -> Option<f64> {
-        self.averages.read().ok().and_then(|g| g.get(endpoint_url).copied())
+        self.averages
+            .read()
+            .ok()
+            .and_then(|g| g.get(endpoint_url).copied())
     }
 }

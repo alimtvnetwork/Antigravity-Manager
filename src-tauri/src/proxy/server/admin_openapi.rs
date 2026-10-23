@@ -94,8 +94,7 @@ pub fn generate_openapi_spec() -> Value {
 
 /// Generates the OpenAPI spec as a formatted JSON string.
 pub fn generate_openapi_json() -> String {
-    serde_json::to_string_pretty(&generate_openapi_spec())
-        .unwrap_or_else(|_| "{}".to_string())
+    serde_json::to_string_pretty(&generate_openapi_spec()).unwrap_or_else(|_| "{}".to_string())
 }
 
 /// Returns the registry of all documented proxy and admin endpoints.

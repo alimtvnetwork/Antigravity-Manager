@@ -66,10 +66,7 @@ impl ThinkingCacheConfig {
     }
 
     /// Creates a compliant architecture refactor release configuration.
-    pub fn refactor(
-        target_version: impl Into<String>,
-        package_version: impl Into<String>,
-    ) -> Self {
+    pub fn refactor(target_version: impl Into<String>, package_version: impl Into<String>) -> Self {
         let tv = target_version.into();
         Self {
             is_suggestion_delete_store_enabled: true,
@@ -196,7 +193,10 @@ fn generate_guidance(
             ThinkingCacheGuardViolation::ArchitectureRefactorMissingPrompt => {
                 notes.push("Set SUGGESTION_DELETE_THINKING_STORE = true and SUGGESTION_TARGET_VERSION to the new version in SuggestionDeleteThinkingModal.tsx.");
             }
-            ThinkingCacheGuardViolation::MismatchedTargetVersion { target_version, package_version } => {
+            ThinkingCacheGuardViolation::MismatchedTargetVersion {
+                target_version,
+                package_version,
+            } => {
                 notes.push("Align SUGGESTION_TARGET_VERSION with package version.");
             }
             ThinkingCacheGuardViolation::EmptyTargetVersionOnEnabledPrompt => {

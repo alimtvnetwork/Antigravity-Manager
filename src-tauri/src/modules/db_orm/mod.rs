@@ -25,10 +25,10 @@ pub mod dump;
 pub mod fifo_dead_letter_queue_spillover_guard;
 pub mod fifo_prompt_order_enforcer;
 pub mod fifo_prompt_queue_coordinator;
-pub mod fifo_prompt_restore_transaction_guard;
-pub mod fifo_prompt_restore_validator;
 pub mod fifo_prompt_restore_concurrency_limiter;
 pub mod fifo_prompt_restore_cursor_stepper;
+pub mod fifo_prompt_restore_transaction_guard;
+pub mod fifo_prompt_restore_validator;
 pub mod fifo_queue_batch_drain_guard;
 pub mod fifo_queue_compaction_guard;
 pub mod fifo_queue_drain_monotonicity_verifier;
@@ -46,10 +46,10 @@ pub mod health_probe_aggregator;
 pub mod highwater;
 pub mod index_cardinality_analyzer;
 pub mod index_coverage_verifier;
-pub mod index_health;
-pub mod index_health_checker;
 pub mod index_fragmentation_analyzer;
 pub mod index_fragmentation_scorer;
+pub mod index_health;
+pub mod index_health_checker;
 pub mod index_usage_inspector;
 pub mod json_extract;
 pub mod lock_checker;
@@ -69,8 +69,8 @@ pub mod page_freelist_analyzer;
 pub mod pagination;
 pub mod pool_limiter;
 pub mod pool_starvation_guard;
-pub mod pragmas;
 pub mod pragma_diagnostic_reporter;
+pub mod pragmas;
 pub mod query_cost_estimator;
 pub mod query_latency_histogram;
 pub mod query_profile_exporter;
@@ -115,69 +115,39 @@ pub mod write_ahead_flush;
 #[cfg(test)]
 pub mod tests;
 #[cfg(test)]
-pub mod tests_wal_schedulers;
-#[cfg(test)]
-pub mod tests_page_freelist;
-#[cfg(test)]
 pub mod tests_busy_timeout_scaler;
 #[cfg(test)]
-pub mod tests_wal_fragmentation_surveyor;
-#[cfg(test)]
-pub mod tests_lock_contention_watchdog;
-#[cfg(test)]
-pub mod tests_lock_timeout_escalator;
-#[cfg(test)]
-pub mod tests_index_fragmentation_scorer;
-#[cfg(test)]
-pub mod tests_page_cache_adjuster;
-#[cfg(test)]
-pub mod tests_mmap_tuner;
-#[cfg(test)]
-pub mod tests_page_budget_controller;
-#[cfg(test)]
-pub mod tests_connection_checkout_limiter;
-#[cfg(test)]
-pub mod tests_free_page_stepper;
+pub mod tests_column_default_validator;
 #[cfg(test)]
 pub mod tests_column_nullability_validator;
 #[cfg(test)]
 pub mod tests_column_type_affinity_validator;
 #[cfg(test)]
-pub mod tests_column_default_validator;
-#[cfg(test)]
-pub mod tests_index_coverage_verifier;
-#[cfg(test)]
-pub mod tests_index_cardinality_analyzer;
-#[cfg(test)]
-pub mod tests_query_latency_histogram;
-#[cfg(test)]
 pub mod tests_commit_latency_observer;
+#[cfg(test)]
+pub mod tests_compile_options;
+#[cfg(test)]
+pub mod tests_connection_checkout_limiter;
+#[cfg(test)]
+pub mod tests_connection_starvation_watchdog;
 #[cfg(test)]
 pub mod tests_db_size_watchdog;
 #[cfg(test)]
 pub mod tests_deadlock_detector;
 #[cfg(test)]
-pub mod tests_compile_options;
-#[cfg(test)]
-pub mod tests_vacuum_stepper;
-#[cfg(test)]
-pub mod tests_schema_integrity_gate;
-#[cfg(test)]
-pub mod tests_page_cache_manager;
+pub mod tests_fifo_dead_letter_queue_spillover_guard;
 #[cfg(test)]
 pub mod tests_fifo_prompt_order_enforcer;
 #[cfg(test)]
 pub mod tests_fifo_prompt_queue_coordinator;
-#[cfg(test)]
-pub mod tests_fifo_prompt_restore_validator;
-#[cfg(test)]
-pub mod tests_fifo_dead_letter_queue_spillover_guard;
 #[cfg(test)]
 pub mod tests_fifo_prompt_restore_concurrency_limiter;
 #[cfg(test)]
 pub mod tests_fifo_prompt_restore_cursor_stepper;
 #[cfg(test)]
 pub mod tests_fifo_prompt_restore_transaction_guard;
+#[cfg(test)]
+pub mod tests_fifo_prompt_restore_validator;
 #[cfg(test)]
 pub mod tests_fifo_queue_batch_drain_guard;
 #[cfg(test)]
@@ -189,22 +159,40 @@ pub mod tests_fifo_queue_index_analyzer;
 #[cfg(test)]
 pub mod tests_fifo_restore_transaction_coordinator;
 #[cfg(test)]
-pub mod tests_connection_starvation_watchdog;
+pub mod tests_free_page_stepper;
+#[cfg(test)]
+pub mod tests_index_cardinality_analyzer;
+#[cfg(test)]
+pub mod tests_index_coverage_verifier;
+#[cfg(test)]
+pub mod tests_index_fragmentation_scorer;
+#[cfg(test)]
+pub mod tests_lock_contention_watchdog;
+#[cfg(test)]
+pub mod tests_lock_timeout_escalator;
+#[cfg(test)]
+pub mod tests_mmap_tuner;
+#[cfg(test)]
+pub mod tests_page_budget_controller;
+#[cfg(test)]
+pub mod tests_page_cache_adjuster;
+#[cfg(test)]
+pub mod tests_page_cache_manager;
+#[cfg(test)]
+pub mod tests_page_freelist;
+#[cfg(test)]
+pub mod tests_query_latency_histogram;
+#[cfg(test)]
+pub mod tests_schema_integrity_gate;
+#[cfg(test)]
+pub mod tests_vacuum_stepper;
+#[cfg(test)]
+pub mod tests_wal_fragmentation_surveyor;
+#[cfg(test)]
+pub mod tests_wal_schedulers;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;
-pub use fifo_dead_letter_queue_spillover_guard::*;
-pub use fifo_prompt_order_enforcer::*;
-pub use fifo_prompt_queue_coordinator::*;
-pub use fifo_prompt_restore_transaction_guard::*;
-pub use fifo_prompt_restore_validator::*;
-pub use fifo_prompt_restore_concurrency_limiter::*;
-pub use fifo_prompt_restore_cursor_stepper::*;
-pub use fifo_queue_batch_drain_guard::*;
-pub use fifo_queue_compaction_guard::*;
-pub use fifo_queue_drain_monotonicity_verifier::*;
-pub use fifo_queue_index_analyzer::*;
-pub use fifo_restore_transaction_coordinator::*;
 pub use builder::{Order, QueryBuilder, ViewQueryBuilder};
 pub use busy_handler::*;
 pub use busy_retry::*;
@@ -228,6 +216,18 @@ pub use database_snapshot_manifest::*;
 pub use db_size_watchdog::*;
 pub use deadlock_detector::*;
 pub use dump::*;
+pub use fifo_dead_letter_queue_spillover_guard::*;
+pub use fifo_prompt_order_enforcer::*;
+pub use fifo_prompt_queue_coordinator::*;
+pub use fifo_prompt_restore_concurrency_limiter::*;
+pub use fifo_prompt_restore_cursor_stepper::*;
+pub use fifo_prompt_restore_transaction_guard::*;
+pub use fifo_prompt_restore_validator::*;
+pub use fifo_queue_batch_drain_guard::*;
+pub use fifo_queue_compaction_guard::*;
+pub use fifo_queue_drain_monotonicity_verifier::*;
+pub use fifo_queue_index_analyzer::*;
+pub use fifo_restore_transaction_coordinator::*;
 pub use fk_resolver::*;
 pub use foreign_key_action_validator::*;
 pub use foreign_key_watchdog::*;
@@ -240,10 +240,10 @@ pub use health_probe_aggregator::*;
 pub use highwater::*;
 pub use index_cardinality_analyzer::*;
 pub use index_coverage_verifier::*;
-pub use index_health::*;
-pub use index_health_checker::*;
 pub use index_fragmentation_analyzer::*;
 pub use index_fragmentation_scorer::*;
+pub use index_health::*;
+pub use index_health_checker::*;
 pub use index_usage_inspector::*;
 pub use json_extract::*;
 pub use lock_checker::*;
@@ -263,8 +263,8 @@ pub use page_freelist_analyzer::*;
 pub use pagination::*;
 pub use pool_limiter::*;
 pub use pool_starvation_guard::*;
-pub use pragmas::*;
 pub use pragma_diagnostic_reporter::*;
+pub use pragmas::*;
 pub use query_cost_estimator::*;
 pub use query_latency_histogram::*;
 pub use query_profile_exporter::*;

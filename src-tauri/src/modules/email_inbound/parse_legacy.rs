@@ -195,11 +195,7 @@ pub(crate) fn parse_legacy_prefix_command(
         };
         let query = clean_subj[prefix_len..].trim().to_string();
         let body_first = body.trim().lines().next().unwrap_or("").trim().to_string();
-        let effective_query = if query.is_empty() {
-            body_first
-        } else {
-            query
-        };
+        let effective_query = if query.is_empty() { body_first } else { query };
         return InboundAction::NamedPromptExecution {
             prompt_query: effective_query,
         };
@@ -376,10 +372,7 @@ mod tests {
             extract_fast_forward_target("fast-forward: worker-2", "fast-forward: worker-2"),
             Some("worker-2".to_string())
         );
-        assert_eq!(
-            extract_fast_forward_target("status", "status"),
-            None
-        );
+        assert_eq!(extract_fast_forward_target("status", "status"), None);
     }
 
     #[test]
@@ -398,7 +391,11 @@ mod tests {
     #[test]
     fn test_extract_account_switch_query() {
         assert_eq!(
-            extract_account_switch_query("agm switch user@example.com", "agm switch user@example.com", ""),
+            extract_account_switch_query(
+                "agm switch user@example.com",
+                "agm switch user@example.com",
+                ""
+            ),
             Some("user@example.com".to_string())
         );
         assert_eq!(

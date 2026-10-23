@@ -308,17 +308,16 @@ fn test_architectural_barrier_pipeline_rejects_protocol_leaks() {
         "thinking_block_backfill",
         "anthropic_claude_special_header_parse",
     ];
-    let report = validate_architectural_barrier(
-        ProcessingStage::PipelineUniformProcessing,
-        None,
-        ops,
-        &[],
-    );
+    let report =
+        validate_architectural_barrier(ProcessingStage::PipelineUniformProcessing, None, ops, &[]);
 
     assert!(!report.is_compliant);
     assert!(report.violations.iter().any(|v| matches!(
         v,
-        DecouplingViolation::ProtocolLeakInPipeline { protocol: AiProtocol::AnthropicClaude, .. }
+        DecouplingViolation::ProtocolLeakInPipeline {
+            protocol: AiProtocol::AnthropicClaude,
+            ..
+        }
     )));
 }
 
@@ -339,11 +338,17 @@ fn test_lint_pipeline_source_code_leaks() {
     assert_eq!(violations.len(), 2);
     assert!(violations.iter().any(|v| matches!(
         v,
-        DecouplingViolation::ProtocolLeakInPipeline { protocol: AiProtocol::AnthropicClaude, .. }
+        DecouplingViolation::ProtocolLeakInPipeline {
+            protocol: AiProtocol::AnthropicClaude,
+            ..
+        }
     )));
     assert!(violations.iter().any(|v| matches!(
         v,
-        DecouplingViolation::ProtocolLeakInPipeline { protocol: AiProtocol::OpenAiChatCompletions, .. }
+        DecouplingViolation::ProtocolLeakInPipeline {
+            protocol: AiProtocol::OpenAiChatCompletions,
+            ..
+        }
     )));
 
     let clean_pipeline_code = r#"

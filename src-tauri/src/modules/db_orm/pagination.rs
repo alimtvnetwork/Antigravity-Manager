@@ -31,7 +31,7 @@ pub fn query_paginated_table(
     req: PageRequest,
 ) -> Result<PageResponse<Value>> {
     let sanitized_table = table_name.replace(|c: char| !c.is_alphanumeric() && c != '_', "");
-    
+
     // 1. Calculate total row count
     let count_sql = format!("SELECT COUNT(*) FROM \"{}\"", sanitized_table);
     let total_rows: usize = conn.query_row(&count_sql, [], |r| r.get(0))?;
@@ -67,11 +67,7 @@ pub fn query_paginated_table(
     );
 
     let mut stmt = conn.prepare(&query_sql)?;
-    let col_names: Vec<String> = stmt
-        .column_names()
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    let col_names: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
 
     let mut rows_data = Vec::new();
     let mut rows = stmt.query([])?;

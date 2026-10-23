@@ -1,8 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::super::switch_settling_timer::{
-        SwitchSettlingTimer, DEFAULT_SETTLING_DELAY_SECS,
-    };
+    use super::super::switch_settling_timer::{SwitchSettlingTimer, DEFAULT_SETTLING_DELAY_SECS};
     use std::time::Duration;
 
     #[test]

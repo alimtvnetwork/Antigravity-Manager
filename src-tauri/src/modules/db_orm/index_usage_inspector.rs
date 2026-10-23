@@ -17,7 +17,10 @@ pub struct IndexUsageInspector;
 
 impl IndexUsageInspector {
     /// Executes EXPLAIN QUERY PLAN on the given SQL statement and inspects index usage.
-    pub fn inspect_query(conn: &Connection, query: &str) -> Result<IndexInspectionResult, rusqlite::Error> {
+    pub fn inspect_query(
+        conn: &Connection,
+        query: &str,
+    ) -> Result<IndexInspectionResult, rusqlite::Error> {
         let explain_sql = format!("EXPLAIN QUERY PLAN {}", query);
         let mut stmt = conn.prepare(&explain_sql)?;
 
@@ -35,10 +38,14 @@ impl IndexUsageInspector {
             let detail = row?;
             let detail_upper = detail.to_ascii_uppercase();
 
-            if detail_upper.contains("SCAN TABLE") && !detail_upper.contains("USING COVERING INDEX") {
+            if detail_upper.contains("SCAN TABLE") && !detail_upper.contains("USING COVERING INDEX")
+            {
                 has_table_scan = true;
             }
-            if detail_upper.contains("USING INDEX") || detail_upper.contains("USING COVERING INDEX") || detail_upper.contains("SEARCH TABLE") {
+            if detail_upper.contains("USING INDEX")
+                || detail_upper.contains("USING COVERING INDEX")
+                || detail_upper.contains("SEARCH TABLE")
+            {
                 has_index_search = true;
             }
 

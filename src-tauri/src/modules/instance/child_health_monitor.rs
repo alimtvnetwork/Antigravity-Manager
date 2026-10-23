@@ -34,10 +34,13 @@ impl ChildHealthMonitor {
     /// Records receipt of a heartbeat pulse from an instance.
     pub fn record_heartbeat(&mut self, instance_id: &str) {
         let now = Instant::now();
-        let entry = self.instances.entry(instance_id.to_string()).or_insert_with(|| ChildHeartbeatRecord {
-            last_heartbeat_at: now,
-            total_heartbeats: 0,
-        });
+        let entry = self
+            .instances
+            .entry(instance_id.to_string())
+            .or_insert_with(|| ChildHeartbeatRecord {
+                last_heartbeat_at: now,
+                total_heartbeats: 0,
+            });
         entry.last_heartbeat_at = now;
         entry.total_heartbeats += 1;
     }
@@ -52,7 +55,9 @@ impl ChildHealthMonitor {
 
     /// Returns the duration since the last heartbeat was received.
     pub fn silence_duration(&self, instance_id: &str) -> Option<Duration> {
-        self.instances.get(instance_id).map(|r| r.last_heartbeat_at.elapsed())
+        self.instances
+            .get(instance_id)
+            .map(|r| r.last_heartbeat_at.elapsed())
     }
 
     /// Deregisters an instance upon clean shutdown.

@@ -14,7 +14,9 @@ pub struct StorageCleanerReport {
 }
 
 /// Sweeps obsolete files within an instance directory.
-pub fn sweep_obsolete_instance_files(instance_dir: &Path) -> Result<StorageCleanerReport, std::io::Error> {
+pub fn sweep_obsolete_instance_files(
+    instance_dir: &Path,
+) -> Result<StorageCleanerReport, std::io::Error> {
     let mut report = StorageCleanerReport::default();
 
     if !instance_dir.exists() || !instance_dir.is_dir() {

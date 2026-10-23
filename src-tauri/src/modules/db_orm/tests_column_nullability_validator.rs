@@ -15,8 +15,9 @@ fn setup_test_db() -> Connection {
             email TEXT NOT NULL,
             notes TEXT,
             quota_limit INTEGER
-        );"
-    ).expect("Create accounts table");
+        );",
+    )
+    .expect("Create accounts table");
     conn
 }
 
@@ -42,13 +43,14 @@ fn test_inspect_table_columns_extracts_all_fields() {
 #[test]
 fn test_validate_required_not_null_columns_passes_when_compliant() {
     let conn = setup_test_db();
-    let violations = validate_required_not_null_columns(
-        &conn,
-        "accounts",
-        &["id", "account_id", "email"],
-    ).expect("Validation query should succeed");
+    let violations =
+        validate_required_not_null_columns(&conn, "accounts", &["id", "account_id", "email"])
+            .expect("Validation query should succeed");
 
-    assert!(violations.is_empty(), "Compliant columns should produce zero violations");
+    assert!(
+        violations.is_empty(),
+        "Compliant columns should produce zero violations"
+    );
 }
 
 #[test]
@@ -58,7 +60,8 @@ fn test_validate_required_not_null_columns_catches_violations() {
         &conn,
         "accounts",
         &["account_id", "notes", "quota_limit"],
-    ).expect("Validation query should succeed");
+    )
+    .expect("Validation query should succeed");
 
     assert_eq!(violations.len(), 2);
     assert!(violations.contains(&NullabilityViolation {

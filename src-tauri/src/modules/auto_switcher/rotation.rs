@@ -33,7 +33,13 @@ pub async fn execute_profile_rotation_with_context(
         });
     let inst_id = &target.instance_id;
 
-    // Step 0: Ensure all running and queued prompts are snapshotted and backed up before profile switch
+    // Step 0: Ensure all running, queued, and pending prompts are swept, snapshotted and backed up before profile switch
+    crate::error::record_ignored(
+        crate::modules::repo_db::backup::sweep_incomplete_prompts_for_instance(
+            &current_instance_id,
+        ),
+        "sweep_incomplete_prompts_for_instance",
+    );
     let backup_res = crate::modules::repo_db::backup_running_prompts(&current_instance_id);
     let backed_up_count = backup_res.as_ref().copied().unwrap_or(0);
     // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
@@ -456,8 +462,16 @@ pub async fn execute_profile_rotation_with_context(
         proj_names_clone,
     );
 
-    // Auto-resume recent active prompts (<1h) if configured
+    // Schedule post-switch prompt restore on target instance if auto_reopen_on_switch is enabled
+    // or if backed-up prompts exist for the target instance
     let app_config = config::load_app_config().unwrap_or_default();
+    if app_config.auto_profile_switcher.auto_reopen_on_switch || backed_up_count_val > 0 {
+        crate::modules::instance::schedule_prompt_restore_after_launch(
+            target_inst_id_clone.clone(),
+        );
+    }
+
+    // Auto-resume recent active prompts (<1h) if configured
     if app_config.auto_profile_switcher.auto_resume_recent_prompts {
         let threshold = app_config
             .auto_profile_switcher

@@ -47,12 +47,8 @@ mod tests {
             Some("Antigravity-IDE".to_string()),
         );
 
-        let res = evaluate_instance_command(
-            "inst-worker-01",
-            InstanceCommandType::Stop,
-            false,
-            &ctx,
-        );
+        let res =
+            evaluate_instance_command("inst-worker-01", InstanceCommandType::Stop, false, &ctx);
 
         assert!(!res.is_intercepted);
         assert_eq!(res.exit_code, 0);
@@ -169,7 +165,8 @@ mod tests {
             Some("Antigravity".to_string()),
         );
 
-        let blocked = evaluate_instance_command("inst-active", InstanceCommandType::Stop, false, &ctx);
+        let blocked =
+            evaluate_instance_command("inst-active", InstanceCommandType::Stop, false, &ctx);
         let error_msg = blocked.format_terminal_error();
         assert!(error_msg.contains("Error [Exit Code 2]"));
         assert!(error_msg.contains("Remediation:"));
@@ -178,7 +175,8 @@ mod tests {
         let display_str = blocked.to_string();
         assert!(display_str.contains("[BLOCKED - exit code 2]"));
 
-        let permitted = evaluate_instance_command("inst-active", InstanceCommandType::Stop, true, &ctx);
+        let permitted =
+            evaluate_instance_command("inst-active", InstanceCommandType::Stop, true, &ctx);
         assert!(!permitted.format_terminal_error().contains("Error"));
         assert!(permitted.to_string().contains("[PERMITTED]"));
     }

@@ -25,7 +25,10 @@ mod tests {
     fn test_validate_content_length_exceeds_default_limit() {
         let mut headers = HeaderMap::new();
         let oversize = DEFAULT_MAX_REQUEST_BODY_BYTES + 1024;
-        headers.insert(CONTENT_LENGTH, HeaderValue::from_str(&oversize.to_string()).unwrap());
+        headers.insert(
+            CONTENT_LENGTH,
+            HeaderValue::from_str(&oversize.to_string()).unwrap(),
+        );
 
         let result = validate_content_length(&headers, None);
         assert_eq!(

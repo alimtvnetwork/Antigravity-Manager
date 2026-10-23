@@ -200,10 +200,12 @@ fn check_item_pair_monotonicity(
         });
     }
     if curr.created_at == prev.created_at && curr.id < prev.id {
-        return Err(TransactionCoordinatorViolation::OutOrOrderSequenceDetected {
-            previous_id: prev.id,
-            current_id: curr.id,
-        });
+        return Err(
+            TransactionCoordinatorViolation::OutOrOrderSequenceDetected {
+                previous_id: prev.id,
+                current_id: curr.id,
+            },
+        );
     }
     Ok(())
 }

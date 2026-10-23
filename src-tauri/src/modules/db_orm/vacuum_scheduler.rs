@@ -72,7 +72,10 @@ impl VacuumScheduler {
         }
 
         let pages_to_vacuum = self.config.pages_per_step.min(freelist);
-        conn.execute(&format!("PRAGMA incremental_vacuum({});", pages_to_vacuum), [])?;
+        conn.execute(
+            &format!("PRAGMA incremental_vacuum({});", pages_to_vacuum),
+            [],
+        )?;
 
         self.last_vacuum_at = Some(Instant::now());
         self.total_vacuums_performed += 1;

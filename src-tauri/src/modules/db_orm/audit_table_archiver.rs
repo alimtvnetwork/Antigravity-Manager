@@ -55,7 +55,8 @@ pub fn purge_archived_prompt_batch(
             "DELETE FROM active_prompts WHERE id IN ({});",
             placeholders.join(", ")
         );
-        let params: Vec<&dyn rusqlite::ToSql> = chunk.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
+        let params: Vec<&dyn rusqlite::ToSql> =
+            chunk.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
         deleted_total += conn.execute(&sql, params.as_slice())?;
     }
 

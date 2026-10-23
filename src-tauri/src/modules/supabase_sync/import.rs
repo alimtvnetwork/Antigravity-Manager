@@ -66,17 +66,18 @@ pub fn merge_supabase_json_into_config(
         Some(s.trim().to_string())
     };
 
-    let mut merge_endpoint = |cfg: &mut SupabaseConfig, mut new_ep: supabase_client::SupabaseEndpoint| {
-        new_ep.url = supabase_client::normalize_supabase_url(&new_ep.url);
-        if let Some(pos) = cfg.endpoints.iter().position(|e| {
-            e.id == new_ep.id || supabase_client::normalize_supabase_url(&e.url) == new_ep.url
-        }) {
-            cfg.endpoints[pos] = new_ep;
-        } else {
-            cfg.endpoints.push(new_ep);
-        }
-        out.endpoints_added += 1;
-    };
+    let mut merge_endpoint =
+        |cfg: &mut SupabaseConfig, mut new_ep: supabase_client::SupabaseEndpoint| {
+            new_ep.url = supabase_client::normalize_supabase_url(&new_ep.url);
+            if let Some(pos) = cfg.endpoints.iter().position(|e| {
+                e.id == new_ep.id || supabase_client::normalize_supabase_url(&e.url) == new_ep.url
+            }) {
+                cfg.endpoints[pos] = new_ep;
+            } else {
+                cfg.endpoints.push(new_ep);
+            }
+            out.endpoints_added += 1;
+        };
 
     if let Some(arr) = val.get("endpoints").and_then(|v| v.as_array()) {
         if let Ok(eps) = serde_json::from_value::<Vec<supabase_client::SupabaseEndpoint>>(

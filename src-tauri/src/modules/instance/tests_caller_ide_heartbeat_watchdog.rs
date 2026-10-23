@@ -18,7 +18,10 @@ mod tests {
         assert_eq!(report.caller_pid, None);
         assert!(!report.is_alive);
         assert!(!report.is_eviction_immune);
-        assert_eq!(report.vitality_state, WatchdogVitalityStateType::Uninitialized);
+        assert_eq!(
+            report.vitality_state,
+            WatchdogVitalityStateType::Uninitialized
+        );
         assert_eq!(
             report.decision_type,
             CallerEvictionDecisionType::EvictionPermittedNoCallerTracked
@@ -43,12 +46,8 @@ mod tests {
         watchdog.register_caller(1001);
         watchdog.record_heartbeat_at(10_000);
         let now_ms = 15_000;
-        let is_protected = watchdog.should_protect_from_eviction_with_probe(
-            1001,
-            false,
-            now_ms,
-            |_pid| true,
-        );
+        let is_protected =
+            watchdog.should_protect_from_eviction_with_probe(1001, false, now_ms, |_pid| true);
         assert!(is_protected);
         assert!(watchdog.is_heartbeat_fresh(now_ms));
         assert_eq!(watchdog.last_heartbeat_age_ms(now_ms), 5_000);
@@ -59,12 +58,8 @@ mod tests {
         let mut watchdog = CallerIdeHeartbeatWatchdog::new();
         watchdog.register_caller(1001);
         watchdog.record_heartbeat_at(10_000);
-        let decision = watchdog.evaluate_eviction_decision_with_probe(
-            1001,
-            false,
-            12_000,
-            |_pid| true,
-        );
+        let decision =
+            watchdog.evaluate_eviction_decision_with_probe(1001, false, 12_000, |_pid| true);
         assert_eq!(decision, CallerEvictionDecisionType::ProtectedActiveCaller);
         assert!(decision.is_protected());
         assert_eq!(decision.as_str(), "protected_active_caller");
@@ -76,21 +71,16 @@ mod tests {
         watchdog.register_caller(1001);
         watchdog.record_heartbeat_at(10_000);
         let now_ms = 10_000 + DEFAULT_HEARTBEAT_TTL_MS + 1_000;
-        let is_protected = watchdog.should_protect_from_eviction_with_probe(
-            1001,
-            false,
-            now_ms,
-            |_pid| true,
-        );
+        let is_protected =
+            watchdog.should_protect_from_eviction_with_probe(1001, false, now_ms, |_pid| true);
         assert!(!is_protected);
         assert!(!watchdog.is_heartbeat_fresh(now_ms));
-        let decision = watchdog.evaluate_eviction_decision_with_probe(
-            1001,
-            false,
-            now_ms,
-            |_pid| true,
+        let decision =
+            watchdog.evaluate_eviction_decision_with_probe(1001, false, now_ms, |_pid| true);
+        assert_eq!(
+            decision,
+            CallerEvictionDecisionType::EvictionPermittedHeartbeatStale
         );
-        assert_eq!(decision, CallerEvictionDecisionType::EvictionPermittedHeartbeatStale);
     }
 
     #[test]
@@ -99,7 +89,9 @@ mod tests {
         watchdog.register_caller(1001);
         watchdog.record_heartbeat_at(10_000);
         let stale_time = 50_000;
-        assert!(!watchdog.should_protect_from_eviction_with_probe(1001, false, stale_time, |_| true));
+        assert!(
+            !watchdog.should_protect_from_eviction_with_probe(1001, false, stale_time, |_| true)
+        );
         watchdog.record_heartbeat_at(51_000);
         let fresh_time = 52_000;
         assert!(watchdog.should_protect_from_eviction_with_probe(1001, false, fresh_time, |_| true));
@@ -111,20 +103,15 @@ mod tests {
         let mut watchdog = CallerIdeHeartbeatWatchdog::new();
         watchdog.register_caller(1001);
         watchdog.record_heartbeat_at(10_000);
-        let is_protected = watchdog.should_protect_from_eviction_with_probe(
-            1001,
-            true,
-            12_000,
-            |_pid| true,
-        );
+        let is_protected =
+            watchdog.should_protect_from_eviction_with_probe(1001, true, 12_000, |_pid| true);
         assert!(!is_protected);
-        let decision = watchdog.evaluate_eviction_decision_with_probe(
-            1001,
-            true,
-            12_000,
-            |_pid| true,
+        let decision =
+            watchdog.evaluate_eviction_decision_with_probe(1001, true, 12_000, |_pid| true);
+        assert_eq!(
+            decision,
+            CallerEvictionDecisionType::EvictionPermittedForcedOverride
         );
-        assert_eq!(decision, CallerEvictionDecisionType::EvictionPermittedForcedOverride);
     }
 
     #[test]
@@ -132,20 +119,15 @@ mod tests {
         let mut watchdog = CallerIdeHeartbeatWatchdog::new();
         watchdog.register_caller(1001);
         watchdog.record_heartbeat_at(10_000);
-        let is_protected = watchdog.should_protect_from_eviction_with_probe(
-            2002,
-            false,
-            12_000,
-            |_pid| true,
-        );
+        let is_protected =
+            watchdog.should_protect_from_eviction_with_probe(2002, false, 12_000, |_pid| true);
         assert!(!is_protected);
-        let decision = watchdog.evaluate_eviction_decision_with_probe(
-            2002,
-            false,
-            12_000,
-            |_pid| true,
+        let decision =
+            watchdog.evaluate_eviction_decision_with_probe(2002, false, 12_000, |_pid| true);
+        assert_eq!(
+            decision,
+            CallerEvictionDecisionType::EvictionPermittedDifferentTarget
         );
-        assert_eq!(decision, CallerEvictionDecisionType::EvictionPermittedDifferentTarget);
     }
 
     #[test]
@@ -153,20 +135,15 @@ mod tests {
         let mut watchdog = CallerIdeHeartbeatWatchdog::new();
         watchdog.register_caller(1001);
         watchdog.record_heartbeat_at(10_000);
-        let is_protected = watchdog.should_protect_from_eviction_with_probe(
-            1001,
-            false,
-            12_000,
-            |_pid| false,
-        );
+        let is_protected =
+            watchdog.should_protect_from_eviction_with_probe(1001, false, 12_000, |_pid| false);
         assert!(!is_protected);
-        let decision = watchdog.evaluate_eviction_decision_with_probe(
-            1001,
-            false,
-            12_000,
-            |_pid| false,
+        let decision =
+            watchdog.evaluate_eviction_decision_with_probe(1001, false, 12_000, |_pid| false);
+        assert_eq!(
+            decision,
+            CallerEvictionDecisionType::EvictionPermittedCallerDead
         );
-        assert_eq!(decision, CallerEvictionDecisionType::EvictionPermittedCallerDead);
     }
 
     #[test]
@@ -176,12 +153,8 @@ mod tests {
         watchdog.record_heartbeat_at(10_000);
         watchdog.set_protection_enabled(false);
         assert!(!watchdog.is_protection_enabled());
-        let is_protected = watchdog.should_protect_from_eviction_with_probe(
-            1001,
-            false,
-            12_000,
-            |_pid| true,
-        );
+        let is_protected =
+            watchdog.should_protect_from_eviction_with_probe(1001, false, 12_000, |_pid| true);
         assert!(!is_protected);
     }
 
@@ -205,8 +178,14 @@ mod tests {
         assert!(report.is_alive);
         assert!(report.is_eviction_immune);
         assert_eq!(report.last_heartbeat_age_ms, 5_000);
-        assert_eq!(report.vitality_state, WatchdogVitalityStateType::HealthyActive);
-        assert_eq!(report.decision_type, CallerEvictionDecisionType::ProtectedActiveCaller);
+        assert_eq!(
+            report.vitality_state,
+            WatchdogVitalityStateType::HealthyActive
+        );
+        assert_eq!(
+            report.decision_type,
+            CallerEvictionDecisionType::ProtectedActiveCaller
+        );
     }
 
     #[test]
@@ -219,8 +198,14 @@ mod tests {
         assert_eq!(report.caller_pid, Some(1001));
         assert!(report.is_alive);
         assert!(!report.is_eviction_immune);
-        assert_eq!(report.vitality_state, WatchdogVitalityStateType::StaleHeartbeat);
-        assert_eq!(report.decision_type, CallerEvictionDecisionType::EvictionPermittedHeartbeatStale);
+        assert_eq!(
+            report.vitality_state,
+            WatchdogVitalityStateType::StaleHeartbeat
+        );
+        assert_eq!(
+            report.decision_type,
+            CallerEvictionDecisionType::EvictionPermittedHeartbeatStale
+        );
     }
 
     #[test]
@@ -232,8 +217,14 @@ mod tests {
         assert_eq!(report.caller_pid, Some(1001));
         assert!(!report.is_alive);
         assert!(!report.is_eviction_immune);
-        assert_eq!(report.vitality_state, WatchdogVitalityStateType::DeadProcess);
-        assert_eq!(report.decision_type, CallerEvictionDecisionType::EvictionPermittedCallerDead);
+        assert_eq!(
+            report.vitality_state,
+            WatchdogVitalityStateType::DeadProcess
+        );
+        assert_eq!(
+            report.decision_type,
+            CallerEvictionDecisionType::EvictionPermittedCallerDead
+        );
     }
 
     #[test]
@@ -243,12 +234,15 @@ mod tests {
             true,
             true,
             1_234,
-            EvictionProtectionReasonType::ActiveCallerWithLivePid.as_str().to_string(),
+            EvictionProtectionReasonType::ActiveCallerWithLivePid
+                .as_str()
+                .to_string(),
             WatchdogVitalityStateType::HealthyActive,
             CallerEvictionDecisionType::ProtectedActiveCaller,
         );
         let json_str = serde_json::to_string(&report).expect("Serialize report");
-        let parsed: CallerIdeHeartbeatReport = serde_json::from_str(&json_str).expect("Deserialize report");
+        let parsed: CallerIdeHeartbeatReport =
+            serde_json::from_str(&json_str).expect("Deserialize report");
         assert_eq!(report, parsed);
     }
 

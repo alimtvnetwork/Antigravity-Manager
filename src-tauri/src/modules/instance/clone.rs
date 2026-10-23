@@ -487,10 +487,19 @@ pub fn copy_instance_with_options(
 /// so cloned profiles have completely isolated synthetic telemetry identities.
 pub fn scrub_storage_json_telemetry(dst_data_dir: &std::path::Path, instance_id: &str) {
     let candidate_paths = [
-        dst_data_dir.join("User").join("globalStorage").join("storage.json"),
+        dst_data_dir
+            .join("User")
+            .join("globalStorage")
+            .join("storage.json"),
         dst_data_dir.join("globalStorage").join("storage.json"),
         dst_data_dir.join("storage.json"),
-        dst_data_dir.join("AppData").join("Roaming").join("Antigravity").join("User").join("globalStorage").join("storage.json"),
+        dst_data_dir
+            .join("AppData")
+            .join("Roaming")
+            .join("Antigravity")
+            .join("User")
+            .join("globalStorage")
+            .join("storage.json"),
     ];
 
     for storage_path in &candidate_paths {
@@ -513,13 +522,29 @@ pub fn scrub_storage_json_telemetry(dst_data_dir: &std::path::Path, instance_id:
                     let new_mac_machine_id = format!("{:x}", mac_hasher.finalize());
 
                     let new_dev_device_id = uuid::Uuid::new_v4().to_string();
-                    let new_sqm_id = format!("{{{}}}", uuid::Uuid::new_v4().to_string().to_uppercase());
+                    let new_sqm_id =
+                        format!("{{{}}}", uuid::Uuid::new_v4().to_string().to_uppercase());
 
-                    obj.insert("telemetry.machineId".to_string(), serde_json::Value::String(new_machine_id));
-                    obj.insert("telemetry.macMachineId".to_string(), serde_json::Value::String(new_mac_machine_id));
-                    obj.insert("telemetry.devDeviceId".to_string(), serde_json::Value::String(new_dev_device_id));
-                    obj.insert("telemetry.sqmId".to_string(), serde_json::Value::String(new_sqm_id));
-                    obj.insert("telemetry.sessionId".to_string(), serde_json::Value::String(uuid::Uuid::new_v4().to_string()));
+                    obj.insert(
+                        "telemetry.machineId".to_string(),
+                        serde_json::Value::String(new_machine_id),
+                    );
+                    obj.insert(
+                        "telemetry.macMachineId".to_string(),
+                        serde_json::Value::String(new_mac_machine_id),
+                    );
+                    obj.insert(
+                        "telemetry.devDeviceId".to_string(),
+                        serde_json::Value::String(new_dev_device_id),
+                    );
+                    obj.insert(
+                        "telemetry.sqmId".to_string(),
+                        serde_json::Value::String(new_sqm_id),
+                    );
+                    obj.insert(
+                        "telemetry.sessionId".to_string(),
+                        serde_json::Value::String(uuid::Uuid::new_v4().to_string()),
+                    );
 
                     if let Ok(serialized) = serde_json::to_string_pretty(&json) {
                         // Justification: best-effort telemetry scrubbing for cloned profile isolation

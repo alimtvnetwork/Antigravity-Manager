@@ -21,7 +21,9 @@ pub fn normalize_instance_launch_args(data_dir: &Path, existing_args: &[String])
     }
 
     // 2. Ensure dynamic CDP port argument is present
-    let has_cdp = args.iter().any(|a| a.starts_with("--remote-debugging-port="));
+    let has_cdp = args
+        .iter()
+        .any(|a| a.starts_with("--remote-debugging-port="));
     if !has_cdp {
         args.push(DYNAMIC_CDP_PORT_ARG.to_string());
     }

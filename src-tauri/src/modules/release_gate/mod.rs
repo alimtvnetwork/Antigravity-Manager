@@ -21,9 +21,9 @@ pub mod bounded_matcher_timeout_verifier;
 pub mod branch_release_channel_gate;
 pub mod caller_ide_preservation_guard;
 pub mod capsule_dropdown_styling_guard;
-pub mod channel_gate;
 pub mod changelog_structure_validator;
 pub mod changelog_tag_monotonic_gate;
+pub mod channel_gate;
 pub mod coauthor_attribution_verifier;
 pub mod coauthor_trailer_alignment_guard;
 pub mod commit_convergence_auditor;
@@ -34,24 +34,24 @@ pub mod docker_sync_verifier;
 pub mod fifo_queue_ordering_guard;
 pub mod generic_fix_preference_guard;
 pub mod github_release_notes_parity_guard;
-pub mod individually_revertable_commit_guard;
 pub mod headless_cli_parity_guard;
+pub mod individually_revertable_commit_guard;
 pub mod job_breakaway_fallback_ladder;
 pub mod manifest_sync;
-pub mod no_silent_errors_linter;
 pub mod no_silent_errors_justification_auditor;
+pub mod no_silent_errors_linter;
 pub mod origin_tier_hierarchy_guard;
 pub mod path_hygiene;
 pub mod pipeline_protocol_decoupling_guard;
-pub mod preflight_checks_gate;
-pub mod preflight_clippy_gate;
-pub mod preflight_gate_runner;
-pub mod profile_duplication_parity_guard;
 pub mod pr_problem_classification_linter;
 pub mod pr_scope_cohesion_verifier;
 pub mod pr_template_compliance_guard;
 pub mod pr_template_compliance_linter;
 pub mod pr_unverified_paths_linter;
+pub mod preflight_checks_gate;
+pub mod preflight_clippy_gate;
+pub mod preflight_gate_runner;
+pub mod profile_duplication_parity_guard;
 pub mod published_tip_rewrite_guard;
 pub mod readme_changelog_sync_gate;
 pub mod readme_changelog_synchronizer;
@@ -76,11 +76,11 @@ pub mod thinking_cache_invalidation_guard;
 pub mod thinking_cache_target_version_guard;
 pub mod transcript_deep_inspection_scanner;
 pub mod transcript_full_log_reverse_scanner;
+pub mod transient_test_sandbox_lifecycle_guard;
 pub mod truncation_callout_parser_guard;
 pub mod unverified_paths_disclosure_guard;
 pub mod verified_fallback_path_linter;
 pub mod wildcard_model_routing_guard;
-pub mod transient_test_sandbox_lifecycle_guard;
 
 #[cfg(test)]
 pub mod tests_agent_prompt_sanitizer;
@@ -129,21 +129,13 @@ pub mod tests_individually_revertable_commit_guard;
 #[cfg(test)]
 pub mod tests_job_breakaway_fallback;
 #[cfg(test)]
-pub mod tests_no_silent_errors_linter;
-#[cfg(test)]
 pub mod tests_no_silent_errors_justification_auditor;
+#[cfg(test)]
+pub mod tests_no_silent_errors_linter;
 #[cfg(test)]
 pub mod tests_origin_tier_hierarchy;
 #[cfg(test)]
 pub mod tests_pipeline_protocol_decoupling;
-#[cfg(test)]
-pub mod tests_preflight_checks_gate;
-#[cfg(test)]
-pub mod tests_preflight_clippy_gate;
-#[cfg(test)]
-pub mod tests_preflight_gate;
-#[cfg(test)]
-pub mod tests_profile_duplication_parity;
 #[cfg(test)]
 pub mod tests_pr_problem_classification_linter;
 #[cfg(test)]
@@ -155,6 +147,14 @@ pub mod tests_pr_template_linter;
 #[cfg(test)]
 pub mod tests_pr_unverified_paths_linter;
 #[cfg(test)]
+pub mod tests_preflight_checks_gate;
+#[cfg(test)]
+pub mod tests_preflight_clippy_gate;
+#[cfg(test)]
+pub mod tests_preflight_gate;
+#[cfg(test)]
+pub mod tests_profile_duplication_parity;
+#[cfg(test)]
 pub mod tests_published_tip_rewrite;
 #[cfg(test)]
 pub mod tests_readme_changelog_sync_gate;
@@ -163,11 +163,11 @@ pub mod tests_readme_changelog_synchronizer;
 #[cfg(test)]
 pub mod tests_rejection_breakdown_generator;
 #[cfg(test)]
+pub mod tests_relative_path_linter;
+#[cfg(test)]
 pub mod tests_release_channel_gate;
 #[cfg(test)]
 pub mod tests_release_notes_relative_paths_linter;
-#[cfg(test)]
-pub mod tests_relative_path_linter;
 #[cfg(test)]
 pub mod tests_remote_branch_base;
 #[cfg(test)]
@@ -207,6 +207,8 @@ pub mod tests_transcript_deep_inspection;
 #[cfg(test)]
 pub mod tests_transcript_full_log_reverse_scanner;
 #[cfg(test)]
+pub mod tests_transient_test_sandbox_lifecycle_guard;
+#[cfg(test)]
 pub mod tests_truncation_callout_parser;
 #[cfg(test)]
 pub mod tests_unverified_paths_disclosure_guard;
@@ -216,8 +218,6 @@ pub mod tests_verified_fallback_path_linter;
 pub mod tests_version_manifest_sync;
 #[cfg(test)]
 pub mod tests_wildcard_model_routing;
-#[cfg(test)]
-pub mod tests_transient_test_sandbox_lifecycle_guard;
 
 pub use agent_prompt_sanitizer_guard::*;
 pub use attribution_verifier::*;
@@ -227,9 +227,9 @@ pub use bounded_matcher_timeout_verifier::*;
 pub use branch_release_channel_gate::*;
 pub use caller_ide_preservation_guard::*;
 pub use capsule_dropdown_styling_guard::*;
-pub use channel_gate::*;
 pub use changelog_structure_validator::*;
 pub use changelog_tag_monotonic_gate::*;
+pub use channel_gate::*;
 pub use coauthor_attribution_verifier::*;
 pub use coauthor_trailer_alignment_guard::*;
 pub use commit_convergence_auditor::*;
@@ -240,24 +240,24 @@ pub use docker_sync_verifier::*;
 pub use fifo_queue_ordering_guard::*;
 pub use generic_fix_preference_guard::*;
 pub use github_release_notes_parity_guard::*;
-pub use individually_revertable_commit_guard::*;
 pub use headless_cli_parity_guard::*;
+pub use individually_revertable_commit_guard::*;
 pub use job_breakaway_fallback_ladder::*;
 pub use manifest_sync::*;
-pub use no_silent_errors_linter::*;
 pub use no_silent_errors_justification_auditor::*;
+pub use no_silent_errors_linter::*;
 pub use origin_tier_hierarchy_guard::*;
 pub use path_hygiene::*;
 pub use pipeline_protocol_decoupling_guard::*;
-pub use preflight_checks_gate::*;
-pub use preflight_clippy_gate::*;
-pub use preflight_gate_runner::*;
-pub use profile_duplication_parity_guard::*;
 pub use pr_problem_classification_linter::*;
 pub use pr_scope_cohesion_verifier::*;
 pub use pr_template_compliance_guard::*;
 pub use pr_template_compliance_linter::*;
 pub use pr_unverified_paths_linter::*;
+pub use preflight_checks_gate::*;
+pub use preflight_clippy_gate::*;
+pub use preflight_gate_runner::*;
+pub use profile_duplication_parity_guard::*;
 pub use published_tip_rewrite_guard::*;
 pub use readme_changelog_sync_gate::*;
 pub use readme_changelog_synchronizer::*;
@@ -282,8 +282,8 @@ pub use thinking_cache_invalidation_guard::*;
 pub use thinking_cache_target_version_guard::*;
 pub use transcript_deep_inspection_scanner::*;
 pub use transcript_full_log_reverse_scanner::*;
+pub use transient_test_sandbox_lifecycle_guard::*;
 pub use truncation_callout_parser_guard::*;
 pub use unverified_paths_disclosure_guard::*;
 pub use verified_fallback_path_linter::*;
 pub use wildcard_model_routing_guard::*;
-pub use transient_test_sandbox_lifecycle_guard::*;

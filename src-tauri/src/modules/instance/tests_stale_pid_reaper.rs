@@ -31,10 +31,7 @@ mod tests {
 
     #[test]
     fn test_reap_all_alive() {
-        let tracked = vec![
-            ("inst_1".to_string(), 100),
-            ("inst_2".to_string(), 200),
-        ];
+        let tracked = vec![("inst_1".to_string(), 100), ("inst_2".to_string(), 200)];
 
         let reaped = StalePidReaper::reap_dead_instances(&tracked, |_| true);
         assert!(reaped.is_empty());

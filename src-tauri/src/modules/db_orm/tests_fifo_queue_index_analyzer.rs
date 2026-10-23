@@ -99,7 +99,10 @@ fn test_missing_composite_index_detected() {
         .expect("Analysis failed");
 
     assert_eq!(status.table_name(), "active_prompts");
-    assert_eq!(status.status, FifoIndexStatusType::MissingCompositeIndexType);
+    assert_eq!(
+        status.status,
+        FifoIndexStatusType::MissingCompositeIndexType
+    );
     assert!(!status.has_composite_index());
     assert_eq!(status.risk_level(), IndexRiskLevelType::HighType);
     assert!(status.matching_index_name.is_none());
@@ -148,7 +151,10 @@ fn test_improper_sort_direction_detected() {
         .analyze_table(&conn, "active_prompts")
         .expect("Analysis failed");
 
-    assert_eq!(status.status, FifoIndexStatusType::ImproperSortDirectionType);
+    assert_eq!(
+        status.status,
+        FifoIndexStatusType::ImproperSortDirectionType
+    );
     assert!(!status.has_composite_index());
     assert_eq!(status.risk_level(), IndexRiskLevelType::HighType);
     assert_eq!(status.matching_index_name.as_deref(), Some("idx_lifo_desc"));
@@ -193,7 +199,10 @@ fn test_partial_single_column_index_detected() {
         .analyze_table(&conn, "active_prompts")
         .expect("Analysis failed");
 
-    assert_eq!(status.status, FifoIndexStatusType::MissingCompositeIndexType);
+    assert_eq!(
+        status.status,
+        FifoIndexStatusType::MissingCompositeIndexType
+    );
     assert!(!status.has_composite_index());
     assert_eq!(status.risk_level(), IndexRiskLevelType::MediumType);
     assert!(status.remediation_sql().is_some());
@@ -236,7 +245,9 @@ fn test_apply_remediations_achieves_full_compliance() {
         .expect("Remediation execution failed");
     assert_eq!(applied_count, 3);
 
-    let final_report = analyzer.analyze(&conn).expect("Post-remediation analysis failed");
+    let final_report = analyzer
+        .analyze(&conn)
+        .expect("Post-remediation analysis failed");
     assert!(final_report.is_fully_indexed());
     assert_eq!(final_report.missing_index_count(), 0);
     assert!(final_report.remediation_sql().is_empty());
@@ -258,11 +269,26 @@ fn test_custom_tables_analyzer() {
 
 #[test]
 fn test_display_and_formatting() {
-    assert_eq!(format!("{}", FifoIndexStatusType::FullyCompliantType), "Fully Compliant");
-    assert_eq!(format!("{}", FifoIndexStatusType::MissingCompositeIndexType), "Missing Composite Index");
-    assert_eq!(format!("{}", FifoIndexStatusType::ImproperColumnOrderType), "Improper Column Order");
-    assert_eq!(format!("{}", FifoIndexStatusType::ImproperSortDirectionType), "Improper Sort Direction");
-    assert_eq!(format!("{}", FifoIndexStatusType::TableNotFoundType), "Table Not Found");
+    assert_eq!(
+        format!("{}", FifoIndexStatusType::FullyCompliantType),
+        "Fully Compliant"
+    );
+    assert_eq!(
+        format!("{}", FifoIndexStatusType::MissingCompositeIndexType),
+        "Missing Composite Index"
+    );
+    assert_eq!(
+        format!("{}", FifoIndexStatusType::ImproperColumnOrderType),
+        "Improper Column Order"
+    );
+    assert_eq!(
+        format!("{}", FifoIndexStatusType::ImproperSortDirectionType),
+        "Improper Sort Direction"
+    );
+    assert_eq!(
+        format!("{}", FifoIndexStatusType::TableNotFoundType),
+        "Table Not Found"
+    );
 
     assert_eq!(format!("{}", IndexRiskLevelType::NoneType), "None");
     assert_eq!(format!("{}", IndexRiskLevelType::LowType), "Low");

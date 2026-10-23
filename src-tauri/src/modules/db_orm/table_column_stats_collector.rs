@@ -25,7 +25,10 @@ pub struct TableColumnStatsCollector;
 
 impl TableColumnStatsCollector {
     /// Collects basic column distribution statistics for a given table.
-    pub fn collect_table_stats(conn: &Connection, table_name: &str) -> Result<TableColumnStatsReport, rusqlite::Error> {
+    pub fn collect_table_stats(
+        conn: &Connection,
+        table_name: &str,
+    ) -> Result<TableColumnStatsReport, rusqlite::Error> {
         let count_query = format!("SELECT COUNT(*) FROM {};", table_name);
         let mut count_stmt = conn.prepare(&count_query)?;
         let total_rows: i64 = count_stmt.query_row([], |row| row.get(0))?;
@@ -43,7 +46,10 @@ impl TableColumnStatsCollector {
         for col_res in column_rows {
             let (name, col_type, nullable) = col_res?;
             let null_count = if nullable && total_rows > 0 {
-                let null_query = format!("SELECT COUNT(*) FROM {} WHERE {} IS NULL;", table_name, name);
+                let null_query = format!(
+                    "SELECT COUNT(*) FROM {} WHERE {} IS NULL;",
+                    table_name, name
+                );
                 let mut null_stmt = conn.prepare(&null_query)?;
                 null_stmt.query_row([], |row| row.get(0)).unwrap_or(0)
             } else {

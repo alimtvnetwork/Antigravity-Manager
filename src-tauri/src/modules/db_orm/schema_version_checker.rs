@@ -24,7 +24,10 @@ impl SchemaVersionChecker {
     }
 
     /// Evaluates whether the database's user_version meets the compiled threshold.
-    pub fn verify_version(conn: &Connection, expected_version: u32) -> Result<SchemaVersionReport, rusqlite::Error> {
+    pub fn verify_version(
+        conn: &Connection,
+        expected_version: u32,
+    ) -> Result<SchemaVersionReport, rusqlite::Error> {
         let current_version = Self::read_user_version(conn)?;
         let is_compatible = current_version >= expected_version;
         let requires_migration = current_version < expected_version;

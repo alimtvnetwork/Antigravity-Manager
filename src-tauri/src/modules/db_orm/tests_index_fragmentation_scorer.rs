@@ -2,7 +2,9 @@ use super::*;
 
 #[cfg(test)]
 mod tests {
-    use super::index_fragmentation_scorer::{IndexFragmentationScorer, IndexMaintenanceRecommendation};
+    use super::index_fragmentation_scorer::{
+        IndexFragmentationScorer, IndexMaintenanceRecommendation,
+    };
 
     #[test]
     fn test_zero_pages_returns_none() {
@@ -27,7 +29,10 @@ mod tests {
         // 80% full (10% penalty), 15% out-of-order (7.5% penalty) = 17.5%
         let res = scorer.score_index("idx_moderate", 100, 0.8, 15);
         assert!(res.fragmentation_percent >= 15.0 && res.fragmentation_percent < 30.0);
-        assert_eq!(res.recommendation, IndexMaintenanceRecommendation::AnalyzeOnly);
+        assert_eq!(
+            res.recommendation,
+            IndexMaintenanceRecommendation::AnalyzeOnly
+        );
     }
 
     #[test]
@@ -36,7 +41,10 @@ mod tests {
         // 50% full (25% penalty), 40% out-of-order (20% penalty) = 45%
         let res = scorer.score_index("idx_bloated", 200, 0.5, 80);
         assert!(res.fragmentation_percent >= 30.0);
-        assert_eq!(res.recommendation, IndexMaintenanceRecommendation::ReindexRequired);
+        assert_eq!(
+            res.recommendation,
+            IndexMaintenanceRecommendation::ReindexRequired
+        );
     }
 
     #[test]
@@ -45,6 +53,9 @@ mod tests {
         // Negative fullness or extreme out-of-order clamp safely to 100%
         let res = scorer.score_index("idx_extreme", 10, -0.5, 50);
         assert_eq!(res.fragmentation_percent, 100.0);
-        assert_eq!(res.recommendation, IndexMaintenanceRecommendation::ReindexRequired);
+        assert_eq!(
+            res.recommendation,
+            IndexMaintenanceRecommendation::ReindexRequired
+        );
     }
 }

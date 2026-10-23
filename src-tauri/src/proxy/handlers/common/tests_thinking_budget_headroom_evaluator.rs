@@ -19,7 +19,10 @@ fn test_thinking_disabled_produces_thinking_disabled_and_valid_report() {
     assert!(!report.has_thinking());
     assert!(!report.is_adjusted());
     assert_eq!(report.status(), &HeadroomStatus::ThinkingDisabled);
-    assert_eq!(report.action(), &HeadroomAdjustmentAction::NoAdjustmentNeeded);
+    assert_eq!(
+        report.action(),
+        &HeadroomAdjustmentAction::NoAdjustmentNeeded
+    );
     assert_eq!(report.effective_max_output_tokens, 2048);
     assert_eq!(report.effective_thinking_budget, None);
 
@@ -51,7 +54,10 @@ fn test_sufficient_headroom_produces_sufficient_headroom_and_no_adjustment() {
     assert!(report.is_valid());
     assert!(report.has_thinking());
     assert!(!report.is_adjusted());
-    assert_eq!(report.action(), &HeadroomAdjustmentAction::NoAdjustmentNeeded);
+    assert_eq!(
+        report.action(),
+        &HeadroomAdjustmentAction::NoAdjustmentNeeded
+    );
     assert_eq!(report.effective_max_output_tokens, 8192);
     assert_eq!(report.effective_thinking_budget, Some(2048));
 
@@ -115,7 +121,10 @@ fn test_unspecified_max_output_defaults_to_sufficient_headroom() {
     assert!(!report.is_adjusted());
     assert_eq!(report.effective_max_output_tokens, 4096 + 1024);
     assert_eq!(report.effective_thinking_budget, Some(4096));
-    assert_eq!(report.action(), &HeadroomAdjustmentAction::NoAdjustmentNeeded);
+    assert_eq!(
+        report.action(),
+        &HeadroomAdjustmentAction::NoAdjustmentNeeded
+    );
 }
 
 #[test]
@@ -123,12 +132,7 @@ fn test_exceeding_ceiling_clamps_thinking_budget_when_feasible() {
     let max_output = Some(65000);
     let thinking_budget = Some(65000);
 
-    let report = evaluate_thinking_budget_headroom(
-        max_output,
-        thinking_budget,
-        1024,
-        65536,
-    );
+    let report = evaluate_thinking_budget_headroom(max_output, thinking_budget, 1024, 65536);
 
     assert!(report.is_valid());
     assert!(report.has_thinking());
@@ -157,12 +161,8 @@ fn test_extreme_over_ceiling_returns_rejection_and_invalid() {
     let ceiling = 1200;
     let min_headroom = 1024;
 
-    let report = evaluate_thinking_budget_headroom(
-        max_output,
-        thinking_budget,
-        min_headroom,
-        ceiling,
-    );
+    let report =
+        evaluate_thinking_budget_headroom(max_output, thinking_budget, min_headroom, ceiling);
 
     assert!(!report.is_valid());
     assert!(report.is_adjusted());
@@ -175,7 +175,10 @@ fn test_extreme_over_ceiling_returns_rejection_and_invalid() {
             assert_eq!(*requested_total, 2000 + 1024);
             assert_eq!(*c, 1200);
         }
-        other => panic!("Expected RejectedDueToExceedingContextCeiling, got: {:?}", other),
+        other => panic!(
+            "Expected RejectedDueToExceedingContextCeiling, got: {:?}",
+            other
+        ),
     }
 }
 

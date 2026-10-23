@@ -32,7 +32,9 @@ impl JitteredBackoff {
         let cap = (base_ms * exp).min(max_ms);
 
         // Deterministic pseudo-random fraction based on seed and attempt
-        let hash = seed.wrapping_mul(6364136223846793005).wrapping_add(attempt as u64);
+        let hash = seed
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(attempt as u64);
         let fraction = ((hash % 1000) as f64) / 1000.0;
         let jittered_ms = (fraction * cap).max(base_ms);
 

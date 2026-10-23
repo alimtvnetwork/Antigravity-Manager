@@ -32,50 +32,50 @@ pub mod round_robin_jitter;
 pub mod route_latency_calculator;
 pub mod streaming_timeout_sentinel;
 pub mod tcp_keepalive_probe;
+#[cfg(test)]
+pub mod tests_backoff_and_probe;
+#[cfg(test)]
+pub mod tests_connection_age_sentinel;
+#[cfg(test)]
+pub mod tests_connection_health_probe;
+#[cfg(test)]
+pub mod tests_dynamic_dns_resolver;
+#[cfg(test)]
+pub mod tests_dynamic_pool_sizer;
+#[cfg(test)]
+pub mod tests_dynamic_route_balancer;
+#[cfg(test)]
+pub mod tests_endpoint_health_decay;
+#[cfg(test)]
+pub mod tests_endpoint_weight_matrix;
+#[cfg(test)]
+pub mod tests_h2_ping_scheduler;
+#[cfg(test)]
+pub mod tests_h2_window_recovery;
+#[cfg(test)]
+pub mod tests_http2_flow_controller;
+#[cfg(test)]
+pub mod tests_latency_exponential_smoother;
+#[cfg(test)]
+pub mod tests_response_chunk_assembler;
+#[cfg(test)]
+pub mod tests_retry_decelerator;
+#[cfg(test)]
+pub mod tests_route_latency_calculator;
+#[cfg(test)]
+pub mod tests_streaming_timeout_sentinel;
+#[cfg(test)]
+pub mod tests_tls_sni_sanitizer;
+#[cfg(test)]
+pub mod tests_transport_backoff_stepper;
+#[cfg(test)]
+pub mod tests_transport_metrics_collector;
 pub mod timeout_matrix;
 pub mod tls_alpn_negotiator;
 pub mod tls_fingerprint_config;
 pub mod tls_sni_sanitizer;
 pub mod transport_backoff_stepper;
 pub mod transport_metrics_collector;
-#[cfg(test)]
-pub mod tests_backoff_and_probe;
-#[cfg(test)]
-pub mod tests_connection_health_probe;
-#[cfg(test)]
-pub mod tests_h2_ping_scheduler;
-#[cfg(test)]
-pub mod tests_dynamic_route_balancer;
-#[cfg(test)]
-pub mod tests_tls_sni_sanitizer;
-#[cfg(test)]
-pub mod tests_transport_metrics_collector;
-#[cfg(test)]
-pub mod tests_dynamic_pool_sizer;
-#[cfg(test)]
-pub mod tests_latency_exponential_smoother;
-#[cfg(test)]
-pub mod tests_http2_flow_controller;
-#[cfg(test)]
-pub mod tests_endpoint_health_decay;
-#[cfg(test)]
-pub mod tests_endpoint_weight_matrix;
-#[cfg(test)]
-pub mod tests_streaming_timeout_sentinel;
-#[cfg(test)]
-pub mod tests_route_latency_calculator;
-#[cfg(test)]
-pub mod tests_h2_window_recovery;
-#[cfg(test)]
-pub mod tests_response_chunk_assembler;
-#[cfg(test)]
-pub mod tests_connection_age_sentinel;
-#[cfg(test)]
-pub mod tests_dynamic_dns_resolver;
-#[cfg(test)]
-pub mod tests_retry_decelerator;
-#[cfg(test)]
-pub mod tests_transport_backoff_stepper;
 
 pub use brotli_decompressor::*;
 pub use circuit_breaker_counter::*;

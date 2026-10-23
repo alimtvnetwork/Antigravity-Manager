@@ -45,7 +45,9 @@ impl ChangesetCategory {
     /// Returns a descriptive explanation of the concerns encompassed by this category.
     pub fn description(&self) -> &'static str {
         match self {
-            Self::CorePipeline => "Core proxy backend, protocol adapters, engine, and streaming pipeline",
+            Self::CorePipeline => {
+                "Core proxy backend, protocol adapters, engine, and streaming pipeline"
+            }
             Self::UIComponents => "Frontend UI components, React stores, views, and styling",
             Self::Governance => "Governance rules, AGENTS.md, specifications, and AI memory",
             Self::Documentation => "Documentation, README files, guides, and user manuals",
@@ -55,7 +57,10 @@ impl ChangesetCategory {
 
     /// Returns true if AGENTS.md mandates keeping this concern in isolated PRs.
     pub fn is_isolated_concern(&self) -> bool {
-        matches!(self, Self::Governance | Self::ReleaseTooling | Self::Documentation)
+        matches!(
+            self,
+            Self::Governance | Self::ReleaseTooling | Self::Documentation
+        )
     }
 
     /// Determines whether this category can be mixed with another category in a single PR.
@@ -344,10 +349,7 @@ pub fn check_mixed_concerns(files: &[FileChangeset]) -> Vec<MixedConcernViolatio
                     (cat_b, cat_a)
                 };
 
-                let files_involved = category_files
-                    .get(&isolated)
-                    .cloned()
-                    .unwrap_or_default();
+                let files_involved = category_files.get(&isolated).cloned().unwrap_or_default();
 
                 violations.push(MixedConcernViolation {
                     isolated_category: isolated,
@@ -413,13 +415,11 @@ pub fn audit_pr_scope(commits: &[CommitMetadata], files: &[&str]) -> PrScopeAudi
         distribution_map.into_iter().collect();
     category_distribution.sort_by(|a, b| b.1.cmp(&a.1));
 
-    let revertability_reports: Vec<CommitRevertabilityReport> = commits
-        .iter()
-        .map(validate_commit_revertability)
-        .collect();
+    let revertability_reports: Vec<CommitRevertabilityReport> =
+        commits.iter().map(validate_commit_revertability).collect();
 
-    let all_commits_revertable = revertability_reports.is_empty()
-        || revertability_reports.iter().all(|r| r.is_revertable);
+    let all_commits_revertable =
+        revertability_reports.is_empty() || revertability_reports.iter().all(|r| r.is_revertable);
 
     let is_single_problem_scope =
         cohesion_score >= 0.75 && mixed_concerns.is_empty() && all_commits_revertable;

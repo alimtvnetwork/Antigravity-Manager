@@ -189,9 +189,7 @@ pub fn evaluate_preflight_results(results: &[PreflightCheckResult]) -> Preflight
     let passed_count = results.iter().filter(|r| r.is_passed()).count();
     let failed_count = results.iter().filter(|r| r.is_failed()).count();
 
-    let has_blocking_failure = results
-        .iter()
-        .any(|r| r.is_blocking && r.is_failed());
+    let has_blocking_failure = results.iter().any(|r| r.is_blocking && r.is_failed());
 
     PreflightReport {
         is_ready_for_release: !has_blocking_failure,
@@ -211,7 +209,10 @@ pub fn format_preflight_summary(report: &PreflightReport) -> String {
     };
 
     let mut lines = Vec::new();
-    lines.push(format!("=== Preflight Checks Report [{}] ===", readiness_tag));
+    lines.push(format!(
+        "=== Preflight Checks Report [{}] ===",
+        readiness_tag
+    ));
     lines.push(format!(
         "Summary: Total: {}, Passed: {}, Failed: {}, Skipped: {}",
         report.total_checks,

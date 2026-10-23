@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
     use super::super::contributor_cost_disclosure_linter::{
-        format_rejection_breakdown, lint_contributor_pr, lint_rejection_response,
-        FileDecision, FileDisposition, RejectionBreakdown,
+        format_rejection_breakdown, lint_contributor_pr, lint_rejection_response, FileDecision,
+        FileDisposition, RejectionBreakdown,
     };
 
     #[test]
@@ -44,7 +44,10 @@ Added a new button in UI toolbar.
         let report = lint_contributor_pr(pr, false);
         assert!(!report.is_merge_ready);
         assert!(!report.has_cost_disclosure);
-        assert!(report.violations.iter().any(|v| v.contains("Cost Disclosure")));
+        assert!(report
+            .violations
+            .iter()
+            .any(|v| v.contains("Cost Disclosure")));
     }
 
     #[test]
@@ -64,7 +67,10 @@ Production cluster deployment under multi-node master election.
         let report = lint_contributor_pr(pr, false);
         assert!(!report.is_merge_ready);
         assert!(!report.has_affected_behaviors);
-        assert!(report.violations.iter().any(|v| v.contains("trivial placeholder")));
+        assert!(report
+            .violations
+            .iter()
+            .any(|v| v.contains("trivial placeholder")));
     }
 
     #[test]
@@ -109,7 +115,10 @@ Third-party clients calling deprecated /v1/old-stream.
         let report = lint_contributor_pr(pr, true);
         assert!(!report.is_merge_ready);
         assert!(report.proxy_missing_coauthor);
-        assert!(report.violations.iter().any(|v| v.contains("Proxy PR submitted on behalf of contributor must attach")));
+        assert!(report
+            .violations
+            .iter()
+            .any(|v| v.contains("Proxy PR submitted on behalf of contributor must attach")));
     }
 
     #[test]
@@ -130,7 +139,10 @@ Co-authored-by: Bob Jones without email
 "#;
         let report = lint_contributor_pr(pr, false);
         assert!(!report.is_merge_ready);
-        assert!(report.violations.iter().any(|v| v.contains("Malformed Co-authored-by trailer")));
+        assert!(report
+            .violations
+            .iter()
+            .any(|v| v.contains("Malformed Co-authored-by trailer")));
     }
 
     #[test]

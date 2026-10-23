@@ -15,7 +15,10 @@ mod tests {
     fn test_gradual_consumption_does_not_trip() {
         let mut cb = DrainCircuitBreaker::new("acc-test-2");
         // 100% -> 95% -> 90% over 30s
-        assert_eq!(cb.record_observation(100, 1000), CircuitBreakerState::Closed);
+        assert_eq!(
+            cb.record_observation(100, 1000),
+            CircuitBreakerState::Closed
+        );
         assert_eq!(cb.record_observation(95, 1015), CircuitBreakerState::Closed);
         assert_eq!(cb.record_observation(90, 1030), CircuitBreakerState::Closed);
         assert!(cb.is_eligible(1030));

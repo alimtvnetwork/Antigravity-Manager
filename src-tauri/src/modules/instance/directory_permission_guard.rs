@@ -12,7 +12,8 @@ impl DirectoryPermissionGuard {
     pub fn verify_write_permission<P: AsRef<Path>>(dir: P) -> Result<(), String> {
         let path = dir.as_ref();
         if !path.exists() {
-            fs::create_dir_all(path).map_err(|e| format!("Failed to create directory {}: {}", path.display(), e))?;
+            fs::create_dir_all(path)
+                .map_err(|e| format!("Failed to create directory {}: {}", path.display(), e))?;
         }
 
         let probe_file = path.join(".agm_write_probe.tmp");

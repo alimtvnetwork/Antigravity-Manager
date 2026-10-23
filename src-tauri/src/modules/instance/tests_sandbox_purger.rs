@@ -24,7 +24,8 @@ fn test_purge_non_existent_directory_returns_empty_report() {
         crate::error::record_ignored(fs::remove_dir_all(&non_existent), "cleanup existing dir");
     }
 
-    let report = purge_ephemeral_sandboxes(&non_existent).expect("Expected Ok report on missing dir");
+    let report =
+        purge_ephemeral_sandboxes(&non_existent).expect("Expected Ok report on missing dir");
     assert!(report.deleted_paths.is_empty());
     assert!(report.skipped_locked_paths.is_empty());
     assert_eq!(report.total_reclaimed_bytes, 0);
@@ -77,24 +78,45 @@ fn test_purge_ephemeral_sandboxes_by_prefix_and_reclaims_bytes() {
 
     // Write files to verify byte reclamation
     let payload = vec![0u8; 1024]; // 1 KB
+                                   // Justification: Test fixture file write
+    crate::error::record_ignored(
+        fs::write(sandbox_a.join("state.bin"), &payload),
+        "write state.bin",
+    );
     // Justification: Test fixture file write
-    crate::error::record_ignored(fs::write(sandbox_a.join("state.bin"), &payload), "write state.bin");
+    crate::error::record_ignored(
+        fs::write(sandbox_b.join("config.json"), &payload),
+        "write config.json",
+    );
     // Justification: Test fixture file write
-    crate::error::record_ignored(fs::write(sandbox_b.join("config.json"), &payload), "write config.json");
+    crate::error::record_ignored(
+        fs::write(sandbox_c.join("cache.dat"), &payload),
+        "write cache.dat",
+    );
     // Justification: Test fixture file write
-    crate::error::record_ignored(fs::write(sandbox_c.join("cache.dat"), &payload), "write cache.dat");
-    // Justification: Test fixture file write
-    crate::error::record_ignored(fs::write(preserved.join("important.txt"), &payload), "write important.txt");
+    crate::error::record_ignored(
+        fs::write(preserved.join("important.txt"), &payload),
+        "write important.txt",
+    );
 
     let report = purge_ephemeral_sandboxes(&root).expect("Expected Ok purge");
 
     assert_eq!(report.deleted_paths.len(), 3);
     assert!(report.total_reclaimed_bytes >= 3072);
 
-    assert!(!sandbox_a.exists(), ".antigravity-sandbox- should have been removed");
-    assert!(!sandbox_b.exists(), ".test-profile- should have been removed");
+    assert!(
+        !sandbox_a.exists(),
+        ".antigravity-sandbox- should have been removed"
+    );
+    assert!(
+        !sandbox_b.exists(),
+        ".test-profile- should have been removed"
+    );
     assert!(!sandbox_c.exists(), "agm-test- should have been removed");
-    assert!(preserved.exists(), "Non-ephemeral profile must be preserved");
+    assert!(
+        preserved.exists(),
+        "Non-ephemeral profile must be preserved"
+    );
 
     // Justification: Best-effort test cleanup
     crate::error::record_ignored(fs::remove_dir_all(&root), "clean test root");

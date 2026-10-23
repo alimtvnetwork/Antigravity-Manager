@@ -44,16 +44,14 @@ pub struct ImportSummary {
 
 impl ImportSummary {
     /// Fold one recipient add outcome into the summary counts (plan 88, subtask 002).
-    pub fn record_recipient_outcome(
-        &mut self,
-        outcome: &Result<AddRecipientOutcome, String>,
-    ) {
+    pub fn record_recipient_outcome(&mut self, outcome: &Result<AddRecipientOutcome, String>) {
         match outcome {
             Ok(o) if o.is_added() => self.recipients_imported += 1,
             Ok(_) => self.recipients_skipped_duplicates += 1,
             Err(e) => {
                 self.recipients_failed += 1;
-                self.errors.push(format!("Failed to import recipient: {}", e));
+                self.errors
+                    .push(format!("Failed to import recipient: {}", e));
             }
         }
     }

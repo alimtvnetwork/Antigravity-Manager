@@ -195,7 +195,13 @@ fn parse_markdown_sections(markdown: &str) -> HashMap<PrTemplateSection, String>
 /// Extracts the clean title from a markdown header or bold title line.
 fn extract_header_title(trimmed: &str) -> Option<&str> {
     if trimmed.starts_with('#') {
-        Some(trimmed.trim_start_matches('#').trim().trim_matches('*').trim())
+        Some(
+            trimmed
+                .trim_start_matches('#')
+                .trim()
+                .trim_matches('*')
+                .trim(),
+        )
     } else if trimmed.starts_with("**") && trimmed.ends_with("**") && trimmed.len() > 4 {
         Some(trimmed.trim_matches('*').trim())
     } else {

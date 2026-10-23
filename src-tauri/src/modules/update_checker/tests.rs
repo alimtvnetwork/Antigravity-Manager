@@ -82,7 +82,10 @@ pub(crate) mod tests {
         let selected = res.selected.expect("a release is selected");
         assert_eq!(selected.version, "4.299.0");
         assert!(res.selected_asset_url.is_some());
-        assert_eq!(res.candidates, vec!["4.299.0".to_string(), "4.298.0".to_string()]);
+        assert_eq!(
+            res.candidates,
+            vec!["4.299.0".to_string(), "4.298.0".to_string()]
+        );
         assert_eq!(res.skipped.len(), 1);
         assert_eq!(res.skipped[0].version, "4.300.0");
     }
@@ -118,7 +121,10 @@ pub(crate) mod tests {
         assert_eq!(res.skipped[0].version, "4.300.0-beta.1");
 
         let res_beta = resolve_installable_release(&releases, UpdateChannel::Beta);
-        assert_eq!(res_beta.selected.expect("selected").version, "4.300.0-beta.1");
+        assert_eq!(
+            res_beta.selected.expect("selected").version,
+            "4.300.0-beta.1"
+        );
     }
 
     #[test]

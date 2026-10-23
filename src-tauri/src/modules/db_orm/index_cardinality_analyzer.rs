@@ -25,12 +25,14 @@ impl IndexCardinalityAnalyzer {
         column: &str,
         index_name: &str,
     ) -> Result<IndexCardinalityMetric, rusqlite::Error> {
-        let count_query = format!("SELECT COUNT(*), COUNT(DISTINCT {}) FROM {};", column, table);
+        let count_query = format!(
+            "SELECT COUNT(*), COUNT(DISTINCT {}) FROM {};",
+            column, table
+        );
         let mut stmt = conn.prepare(&count_query)?;
-        
-        let (total_rows, distinct_count): (i64, i64) = stmt.query_row([], |row| {
-            Ok((row.get(0)?, row.get(1)?))
-        })?;
+
+        let (total_rows, distinct_count): (i64, i64) =
+            stmt.query_row([], |row| Ok((row.get(0)?, row.get(1)?)))?;
 
         let selectivity = if total_rows > 0 {
             distinct_count as f64 / total_rows as f64

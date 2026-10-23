@@ -33,7 +33,10 @@ pub enum DeadLetterReason {
 impl fmt::Display for DeadLetterReason {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::RetryLimitExceeded { attempts, max_retries } => {
+            Self::RetryLimitExceeded {
+                attempts,
+                max_retries,
+            } => {
                 write!(f, "Retry limit exceeded ({attempts}/{max_retries})")
             }
             Self::UnrecoverableSyntaxError(err) => {
@@ -222,7 +225,8 @@ impl DeadLetterSpilloverReport {
 
 /// Strips surrounding quote characters or table alias prefixes from a SQL column name.
 fn clean_column_name(token: &str) -> String {
-    let unquoted = token.trim_matches(|c: char| c == '`' || c == '"' || c == '[' || c == ']' || c == '\'');
+    let unquoted =
+        token.trim_matches(|c: char| c == '`' || c == '"' || c == '[' || c == ']' || c == '\'');
     if let Some((_, col)) = unquoted.rsplit_once('.') {
         col.to_string()
     } else {
@@ -236,9 +240,13 @@ fn find_order_by_boundary(upper: &str) -> Option<usize> {
     while let Some(pos) = upper[search_from..].find("ORDER") {
         let abs_order = search_from + pos;
         let before_ok = abs_order == 0
-            || upper.as_bytes().get(abs_order - 1).map_or(true, |b| b.is_ascii_whitespace() || *b == b')');
+            || upper
+                .as_bytes()
+                .get(abs_order - 1)
+                .map_or(true, |b| b.is_ascii_whitespace() || *b == b')');
         let after_order = abs_order + 5;
-        let after_ok = after_order < upper.len() && upper.as_bytes()[after_order].is_ascii_whitespace();
+        let after_ok =
+            after_order < upper.len() && upper.as_bytes()[after_order].is_ascii_whitespace();
 
         if before_ok && after_ok {
             let rest = &upper[after_order..];
@@ -247,7 +255,10 @@ fn find_order_by_boundary(upper: &str) -> Option<usize> {
             if trimmed.starts_with("BY") {
                 let after_by = 2;
                 let by_end_ok = after_by >= trimmed.len()
-                    || trimmed.as_bytes().get(after_by).map_or(true, |b| b.is_ascii_whitespace());
+                    || trimmed
+                        .as_bytes()
+                        .get(after_by)
+                        .map_or(true, |b| b.is_ascii_whitespace());
                 if by_end_ok {
                     return Some(after_order + whitespace_len + 2);
                 }
@@ -272,10 +283,16 @@ fn find_clause_end_pos(upper_rem: &str) -> usize {
                 break;
             }
             let before_ok = abs_pos == 0
-                || upper_rem.as_bytes().get(abs_pos - 1).map_or(false, |b| b.is_ascii_whitespace());
+                || upper_rem
+                    .as_bytes()
+                    .get(abs_pos - 1)
+                    .map_or(false, |b| b.is_ascii_whitespace());
             let after_marker = abs_pos + marker.len();
             let after_ok = after_marker >= upper_rem.len()
-                || upper_rem.as_bytes().get(after_marker).map_or(false, |b| b.is_ascii_whitespace());
+                || upper_rem
+                    .as_bytes()
+                    .get(after_marker)
+                    .map_or(false, |b| b.is_ascii_whitespace());
             if before_ok && after_ok {
                 if abs_pos < end_idx {
                     end_idx = abs_pos;
@@ -416,7 +433,8 @@ pub fn record_dead_letter_spillover(items: &[DeadLetterPromptItem]) -> DeadLette
         let prev = &items[idx - 1];
         let curr = &items[idx];
 
-        if prev.original_created_at.trim().is_empty() || curr.original_created_at.trim().is_empty() {
+        if prev.original_created_at.trim().is_empty() || curr.original_created_at.trim().is_empty()
+        {
             continue;
         }
 
@@ -453,7 +471,11 @@ pub fn record_dead_letter_spillover(items: &[DeadLetterPromptItem]) -> DeadLette
 }
 
 /// Generates a standardized SQL query to select candidates for dead-letter spillover.
-pub fn build_spillover_drain_query(source_table: &str, retry_threshold: u32, limit: Option<usize>) -> String {
+pub fn build_spillover_drain_query(
+    source_table: &str,
+    retry_threshold: u32,
+    limit: Option<usize>,
+) -> String {
     let mut query = format!(
         "SELECT id, original_created_at, prompt_text, retry_count FROM {source_table} WHERE retry_count >= {retry_threshold} ORDER BY created_at ASC, id ASC"
     );

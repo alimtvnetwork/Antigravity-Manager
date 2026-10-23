@@ -1,8 +1,6 @@
 //! Unit tests for Dynamic Quota Safety Floor Guard (Imp-563).
 
-use super::dynamic_quota_floor::{
-    DynamicQuotaFloorGuard, ModelConsumptionTier,
-};
+use super::dynamic_quota_floor::{DynamicQuotaFloorGuard, ModelConsumptionTier};
 
 #[test]
 fn test_model_consumption_tier_classification() {
@@ -26,10 +24,22 @@ fn test_model_consumption_tier_classification() {
 
 #[test]
 fn test_minimum_safe_headroom_percent() {
-    assert_eq!(ModelConsumptionTier::Lightweight.minimum_safe_headroom_percent(), 3.0);
-    assert_eq!(ModelConsumptionTier::Standard.minimum_safe_headroom_percent(), 5.0);
-    assert_eq!(ModelConsumptionTier::Heavyweight.minimum_safe_headroom_percent(), 8.0);
-    assert_eq!(ModelConsumptionTier::Reasoning.minimum_safe_headroom_percent(), 12.0);
+    assert_eq!(
+        ModelConsumptionTier::Lightweight.minimum_safe_headroom_percent(),
+        3.0
+    );
+    assert_eq!(
+        ModelConsumptionTier::Standard.minimum_safe_headroom_percent(),
+        5.0
+    );
+    assert_eq!(
+        ModelConsumptionTier::Heavyweight.minimum_safe_headroom_percent(),
+        8.0
+    );
+    assert_eq!(
+        ModelConsumptionTier::Reasoning.minimum_safe_headroom_percent(),
+        12.0
+    );
 }
 
 #[test]

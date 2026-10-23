@@ -42,8 +42,14 @@ mod tests {
         // Justification: Write dummy test lockfiles
         crate::error::record_ignored(fs::write(&lock1, b"1234"), "write lock1");
         crate::error::record_ignored(fs::write(&lock2, b"5678"), "write lock2");
-        crate::error::record_ignored(fs::write(&lock3, b"9222\n/devtools/browser/xyz"), "write lock3");
-        crate::error::record_ignored(fs::write(&non_lock, b"{\"theme\":\"dark\"}"), "write settings");
+        crate::error::record_ignored(
+            fs::write(&lock3, b"9222\n/devtools/browser/xyz"),
+            "write lock3",
+        );
+        crate::error::record_ignored(
+            fs::write(&non_lock, b"{\"theme\":\"dark\"}"),
+            "write settings",
+        );
 
         assert!(lock1.exists());
         assert!(lock2.exists());
@@ -56,7 +62,10 @@ mod tests {
         assert!(!lock1.exists(), "SingletonLock must be deleted");
         assert!(!lock2.exists(), "code.lock must be deleted");
         assert!(!lock3.exists(), "DevToolsActivePort must be deleted");
-        assert!(non_lock.exists(), "Non-stale user settings must remain untouched");
+        assert!(
+            non_lock.exists(),
+            "Non-stale user settings must remain untouched"
+        );
 
         // Second run finds 0 stale files
         let count2 = SessionFileReclaimer::reclaim_stale_files(&temp_dir).unwrap();

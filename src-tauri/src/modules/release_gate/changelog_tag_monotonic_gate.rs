@@ -246,12 +246,7 @@ impl ChangelogTagMonotonicGate {
     ) -> Result<TagMonotonicValidationReport, AppError> {
         let path = changelog_path.as_ref();
         let content = fs::read_to_string(path)?;
-        Ok(self.validate(
-            candidate_tag,
-            branch,
-            &content,
-            latest_historical_tag,
-        ))
+        Ok(self.validate(candidate_tag, branch, &content, latest_historical_tag))
     }
 
     /// Static convenience method for validating progression.
@@ -374,7 +369,10 @@ fn compare_prerelease_precedence(cand: &Option<String>, base: &Option<String>) -
 }
 
 /// Compares two parsed SemVer tags. Returns true if candidate > baseline according to SemVer rules.
-pub fn compare_monotonic_versions(candidate: &ParsedVersionTag, baseline: &ParsedVersionTag) -> bool {
+pub fn compare_monotonic_versions(
+    candidate: &ParsedVersionTag,
+    baseline: &ParsedVersionTag,
+) -> bool {
     let cand_core = (candidate.major, candidate.minor, candidate.patch);
     let base_core = (baseline.major, baseline.minor, baseline.patch);
 
@@ -480,8 +478,7 @@ fn evaluate_monotonic_progression(
         _ => return Ok(()),
     };
 
-    let cand = cand_parsed
-        .map_err(|e| format!("Candidate tag '{candidate_tag}' invalid: {e}"))?;
+    let cand = cand_parsed.map_err(|e| format!("Candidate tag '{candidate_tag}' invalid: {e}"))?;
     let hist = parse_semver_tag(historical_str)
         .map_err(|e| format!("Historical tag '{historical_str}' invalid: {e}"))?;
 
@@ -523,11 +520,8 @@ pub fn validate_tag_monotonic_progression(
         failure_reasons.push(msg);
     }
 
-    let mono_eval = evaluate_monotonic_progression(
-        cand_parsed.as_ref(),
-        cand_trimmed,
-        latest_historical_tag,
-    );
+    let mono_eval =
+        evaluate_monotonic_progression(cand_parsed.as_ref(), cand_trimmed, latest_historical_tag);
     let is_monotonic = mono_eval.is_ok();
     if let Err(msg) = mono_eval {
         failure_reasons.push(msg);

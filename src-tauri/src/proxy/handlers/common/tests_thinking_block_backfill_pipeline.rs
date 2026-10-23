@@ -48,7 +48,8 @@ mod tests {
 
     #[test]
     fn test_backfill_missing_thought_tags_with_reasoning_prefix() {
-        let raw = "Reasoning: First, let us check the input parameters.\nSecond, evaluate edge cases.";
+        let raw =
+            "Reasoning: First, let us check the input parameters.\nSecond, evaluate edge cases.";
         let report = backfill_gemini_thinking_blocks(raw, true);
 
         assert!(report.is_modified());
@@ -166,7 +167,8 @@ mod tests {
         assert_eq!(estimate_thinking_tokens("   "), 0);
         assert_eq!(estimate_thinking_tokens("hi"), 1); // min 1 for non-empty
 
-        let longer_thought = "This is a detailed reasoning step that spans across multiple sentences and tokens.";
+        let longer_thought =
+            "This is a detailed reasoning step that spans across multiple sentences and tokens.";
         let tokens = estimate_thinking_tokens(longer_thought);
         assert!(tokens >= 15);
     }

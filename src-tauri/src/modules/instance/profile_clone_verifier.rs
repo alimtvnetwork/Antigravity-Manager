@@ -17,9 +17,7 @@ pub enum CloneIntegrityResult {
 }
 
 /// Core relative files that should exist or be valid in an IDE profile.
-pub const REQUIRED_PROFILE_RELATIVE_FILES: &[&str] = &[
-    "User/settings.json",
-];
+pub const REQUIRED_PROFILE_RELATIVE_FILES: &[&str] = &["User/settings.json"];
 
 /// Inspects the cloned profile directory and verifies structural integrity.
 pub fn verify_cloned_profile_integrity(cloned_dir: &Path) -> CloneIntegrityResult {

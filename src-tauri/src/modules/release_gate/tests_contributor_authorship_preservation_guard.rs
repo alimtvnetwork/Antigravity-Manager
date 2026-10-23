@@ -5,8 +5,8 @@ mod tests {
     use super::super::contributor_authorship_preservation_guard::{
         attach_coauthor_trailers, format_coauthor_trailer, format_coauthor_trailers,
         format_contributor_coauthor_trailer, parse_coauthor_trailers_from_msg,
-        parse_cost_disclosure_from_text, validate_contributor_authorship, AuthorshipPreservationReport,
-        CommitType, CostDisclosure,
+        parse_cost_disclosure_from_text, validate_contributor_authorship,
+        AuthorshipPreservationReport, CommitType, CostDisclosure,
     };
 
     #[test]
@@ -17,10 +17,8 @@ mod tests {
         let alias = format_contributor_coauthor_trailer("Bob Vance", "<bob@vance.com>");
         assert_eq!(alias, "Co-authored-by: Bob Vance <bob@vance.com>");
 
-        let list = format_coauthor_trailers(&[
-            ("Alice", "alice@example.com"),
-            ("Bob", "bob@example.com"),
-        ]);
+        let list =
+            format_coauthor_trailers(&[("Alice", "alice@example.com"), ("Bob", "bob@example.com")]);
         assert_eq!(list.len(), 2);
         assert_eq!(list[0], "Co-authored-by: Alice <alice@example.com>");
         assert_eq!(list[1], "Co-authored-by: Bob <bob@example.com>");
@@ -145,10 +143,7 @@ Co-authored-by: Bob Builder <bob@example.com>
     #[test]
     fn test_merge_commit_missing_coauthor_trailer_rejected() {
         let msg = "Merge branch 'feature/speedup' from contributor";
-        let cost = CostDisclosure::new(
-            vec!["Database schema updated".to_string()],
-            vec![],
-        );
+        let cost = CostDisclosure::new(vec!["Database schema updated".to_string()], vec![]);
 
         let report = validate_contributor_authorship(
             msg,
@@ -260,10 +255,7 @@ Co-authored-by: Diana Prince <diana@themyscira.gov>
         assert!(report.is_compliant);
         assert!(report.has_valid_author);
         assert!(report.cost_disclosure.has_disclosed_costs);
-        assert_eq!(
-            report.cost_disclosure.affected_existing_behaviors.len(),
-            2
-        );
+        assert_eq!(report.cost_disclosure.affected_existing_behaviors.len(), 2);
         assert_eq!(report.cost_disclosure.unverified_paths.len(), 1);
         assert!(report.violations.is_empty());
     }

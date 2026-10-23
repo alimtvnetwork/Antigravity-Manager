@@ -23,11 +23,22 @@ pub enum CapsuleStylingViolation {
 /// Violation types for inline `<select>` dropdowns mounted inside capsules.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DropdownStylingViolation {
-    MissingTransparentBackground { snippet: String },
-    MissingBorderZero { snippet: String },
-    MissingFocusRingZero { snippet: String },
-    MissingFocusOutlineNone { snippet: String },
-    NestedPillVisualDefect { snippet: String, offending_class: String },
+    MissingTransparentBackground {
+        snippet: String,
+    },
+    MissingBorderZero {
+        snippet: String,
+    },
+    MissingFocusRingZero {
+        snippet: String,
+    },
+    MissingFocusOutlineNone {
+        snippet: String,
+    },
+    NestedPillVisualDefect {
+        snippet: String,
+        offending_class: String,
+    },
 }
 
 /// Evaluation report covering capsule and dropdown styling.
@@ -110,7 +121,10 @@ pub fn has_dark_glass_styling(classes: &str) -> bool {
 }
 
 /// Validates segmented pill capsule classes.
-pub fn validate_segmented_capsule_classes(classes: &str, context: &str) -> Vec<CapsuleStylingViolation> {
+pub fn validate_segmented_capsule_classes(
+    classes: &str,
+    context: &str,
+) -> Vec<CapsuleStylingViolation> {
     let mut violations = Vec::new();
 
     if !has_rounded_full(classes) {
@@ -141,7 +155,10 @@ pub fn validate_segmented_capsule_classes(classes: &str, context: &str) -> Vec<C
 }
 
 /// Validates inline `<select>` classes against AGENTS.md requirements.
-pub fn validate_inline_select_classes(classes: &str, snippet: &str) -> Vec<DropdownStylingViolation> {
+pub fn validate_inline_select_classes(
+    classes: &str,
+    snippet: &str,
+) -> Vec<DropdownStylingViolation> {
     let tokens: Vec<&str> = classes.split_whitespace().collect();
     let mut violations = Vec::new();
 
@@ -181,7 +198,7 @@ pub fn validate_inline_select_classes(classes: &str, snippet: &str) -> Vec<Dropd
             || *token == "bg-zinc-700"
             || *token == "bg-gray-100"
             || *token == "bg-gray-200"
-            || (*token != &"border-0" && token.starts_with("border-2"))
+            || (*token != "border-0" && token.starts_with("border-2"))
             || *token == "ring-1"
             || *token == "ring-2";
 
@@ -236,7 +253,8 @@ pub fn validate_capsule_with_dropdown(
     capsule_classes: &str,
     select_classes: &str,
 ) -> Result<(), CapsuleDropdownReport> {
-    let capsule_violations = validate_segmented_capsule_classes(capsule_classes, "capsule_container");
+    let capsule_violations =
+        validate_segmented_capsule_classes(capsule_classes, "capsule_container");
     let dropdown_violations = validate_inline_select_classes(select_classes, "<select ...>");
 
     let is_clean = capsule_violations.is_empty() && dropdown_violations.is_empty();
@@ -273,13 +291,20 @@ pub fn lint_ui_markup_for_capsules_and_dropdowns(content: &str) -> CapsuleDropdo
         let line_num = line_idx + 1;
 
         // Detect disjointed circular buttons for window controls
-        let is_window_control_btn = (line.contains("minimize") || line.contains("maximize") || line.contains("close"))
-            && line.contains("<button");
-        if is_window_control_btn && line.contains("rounded-full") && !line.contains("divide-x") && !line.contains("capsule") {
+        let is_window_control_btn =
+            (line.contains("minimize") || line.contains("maximize") || line.contains("close"))
+                && line.contains("<button");
+        if is_window_control_btn
+            && line.contains("rounded-full")
+            && !line.contains("divide-x")
+            && !line.contains("capsule")
+        {
             // Check if it's rendered as loose disjointed buttons without a shared segmented wrapper
             if line.contains("w-") && line.contains("h-") {
                 capsule_violations.push(CapsuleStylingViolation::DisjointedCircularButtons {
-                    context: format!("Line {line_num}: Loose circular window control button detected"),
+                    context: format!(
+                        "Line {line_num}: Loose circular window control button detected"
+                    ),
                 });
             }
         }
@@ -289,7 +314,10 @@ pub fn lint_ui_markup_for_capsules_and_dropdowns(content: &str) -> CapsuleDropdo
             let select_snippet = &line[select_start..];
             // Extract class or className attribute
             let class_str = extract_class_attribute(select_snippet);
-            let select_issues = validate_inline_select_classes(&class_str, &format!("Line {line_num}: {line.trim()}"));
+            let select_issues = validate_inline_select_classes(
+                &class_str,
+                &format!("Line {line_num}: {line.trim()}"),
+            );
             dropdown_violations.extend(select_issues);
         }
     }

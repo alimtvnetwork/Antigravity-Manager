@@ -62,11 +62,7 @@ impl CompactionTable {
 
     /// Returns an array of all recognized compaction tables.
     pub fn all() -> &'static [CompactionTable] {
-        &[
-            Self::ActivePrompts,
-            Self::PromptBackups,
-            Self::RepoPrompts,
-        ]
+        &[Self::ActivePrompts, Self::PromptBackups, Self::RepoPrompts]
     }
 }
 
@@ -274,9 +270,13 @@ fn find_order_by_boundary(upper: &str) -> Option<usize> {
     while let Some(pos) = upper[search_from..].find("ORDER") {
         let abs_order = search_from + pos;
         let before_ok = abs_order == 0
-            || upper.as_bytes().get(abs_order - 1).map_or(true, |b| b.is_ascii_whitespace() || *b == b')');
+            || upper
+                .as_bytes()
+                .get(abs_order - 1)
+                .map_or(true, |b| b.is_ascii_whitespace() || *b == b')');
         let after_order = abs_order + 5;
-        let after_ok = after_order < upper.len() && upper.as_bytes()[after_order].is_ascii_whitespace();
+        let after_ok =
+            after_order < upper.len() && upper.as_bytes()[after_order].is_ascii_whitespace();
 
         if before_ok && after_ok {
             let rest = &upper[after_order..];
@@ -285,7 +285,10 @@ fn find_order_by_boundary(upper: &str) -> Option<usize> {
             if trimmed.starts_with("BY") {
                 let after_by = 2;
                 let by_end_ok = after_by >= trimmed.len()
-                    || trimmed.as_bytes().get(after_by).map_or(true, |b| b.is_ascii_whitespace());
+                    || trimmed
+                        .as_bytes()
+                        .get(after_by)
+                        .map_or(true, |b| b.is_ascii_whitespace());
                 if by_end_ok {
                     return Some(after_order + whitespace_len + 2);
                 }
@@ -302,9 +305,13 @@ fn find_order_by_index(upper: &str) -> Option<usize> {
     while let Some(pos) = upper[search_from..].find("ORDER") {
         let abs_order = search_from + pos;
         let before_ok = abs_order == 0
-            || upper.as_bytes().get(abs_order - 1).map_or(true, |b| b.is_ascii_whitespace() || *b == b')');
+            || upper
+                .as_bytes()
+                .get(abs_order - 1)
+                .map_or(true, |b| b.is_ascii_whitespace() || *b == b')');
         let after_order = abs_order + 5;
-        let after_ok = after_order < upper.len() && upper.as_bytes()[after_order].is_ascii_whitespace();
+        let after_ok =
+            after_order < upper.len() && upper.as_bytes()[after_order].is_ascii_whitespace();
 
         if before_ok && after_ok {
             let rest = &upper[after_order..];
@@ -312,7 +319,10 @@ fn find_order_by_index(upper: &str) -> Option<usize> {
             if trimmed.starts_with("BY") {
                 let after_by = 2;
                 let by_end_ok = after_by >= trimmed.len()
-                    || trimmed.as_bytes().get(after_by).map_or(true, |b| b.is_ascii_whitespace());
+                    || trimmed
+                        .as_bytes()
+                        .get(after_by)
+                        .map_or(true, |b| b.is_ascii_whitespace());
                 if by_end_ok {
                     return Some(abs_order);
                 }
@@ -337,10 +347,16 @@ fn find_clause_end_pos(upper_rem: &str) -> usize {
                 break;
             }
             let before_ok = abs_pos == 0
-                || upper_rem.as_bytes().get(abs_pos - 1).map_or(false, |b| b.is_ascii_whitespace());
+                || upper_rem
+                    .as_bytes()
+                    .get(abs_pos - 1)
+                    .map_or(false, |b| b.is_ascii_whitespace());
             let after_marker = abs_pos + marker.len();
             let after_ok = after_marker >= upper_rem.len()
-                || upper_rem.as_bytes().get(after_marker).map_or(false, |b| b.is_ascii_whitespace());
+                || upper_rem
+                    .as_bytes()
+                    .get(after_marker)
+                    .map_or(false, |b| b.is_ascii_whitespace());
             if before_ok && after_ok {
                 if abs_pos < end_idx {
                     end_idx = abs_pos;
@@ -355,7 +371,8 @@ fn find_clause_end_pos(upper_rem: &str) -> usize {
 
 /// Strips surrounding quote characters or table alias prefixes from a SQL column name.
 fn clean_column_name(token: &str) -> String {
-    let unquoted = token.trim_matches(|c: char| c == '`' || c == '"' || c == '[' || c == ']' || c == '\'');
+    let unquoted =
+        token.trim_matches(|c: char| c == '`' || c == '"' || c == '[' || c == ']' || c == '\'');
     if let Some((_, col)) = unquoted.rsplit_once('.') {
         col.to_string()
     } else {
@@ -393,7 +410,11 @@ pub fn validate_compaction_query_sql(sql: &str) -> Result<(), CompactionViolatio
 
     let clause = match extract_order_by_clause(trimmed) {
         Some(c) => c,
-        None => return Err(CompactionViolation::MissingOrderByClause { sql: trimmed.to_string() }),
+        None => {
+            return Err(CompactionViolation::MissingOrderByClause {
+                sql: trimmed.to_string(),
+            })
+        }
     };
 
     let upper_clause = clause.to_uppercase();
@@ -413,13 +434,17 @@ pub fn validate_compaction_query_sql(sql: &str) -> Result<(), CompactionViolatio
         .collect();
 
     if parts.is_empty() {
-        return Err(CompactionViolation::MissingOrderByClause { sql: trimmed.to_string() });
+        return Err(CompactionViolation::MissingOrderByClause {
+            sql: trimmed.to_string(),
+        });
     }
 
     // Check primary sort column: must be created_at (optionally qualified)
     let first_tokens: Vec<&str> = parts[0].split_whitespace().collect();
     if first_tokens.is_empty() {
-        return Err(CompactionViolation::MissingOrderByClause { sql: trimmed.to_string() });
+        return Err(CompactionViolation::MissingOrderByClause {
+            sql: trimmed.to_string(),
+        });
     }
 
     let primary_col = clean_column_name(first_tokens[0]);

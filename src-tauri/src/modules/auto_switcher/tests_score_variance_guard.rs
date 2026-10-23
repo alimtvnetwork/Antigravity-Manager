@@ -1,8 +1,6 @@
 //! Unit tests for Candidate Score Variance & Outlier Dampener (Imp-559).
 
-use super::score_variance_guard::{
-    dampen_score_variance, CandidateScoreItem, MAX_ALLOWED_Z_SCORE,
-};
+use super::score_variance_guard::{dampen_score_variance, CandidateScoreItem, MAX_ALLOWED_Z_SCORE};
 
 #[test]
 fn test_dampen_score_variance_small_pool() {

@@ -84,7 +84,12 @@ fn find_delimiter(buf: &[u8]) -> Option<(usize, usize)> {
         if i + 1 < len && buf[i] == b'\n' && buf[i + 1] == b'\n' {
             return Some((i, 2));
         }
-        if i + 3 < len && buf[i] == b'\r' && buf[i + 1] == b'\n' && buf[i + 2] == b'\r' && buf[i + 3] == b'\n' {
+        if i + 3 < len
+            && buf[i] == b'\r'
+            && buf[i + 1] == b'\n'
+            && buf[i + 2] == b'\r'
+            && buf[i + 3] == b'\n'
+        {
             return Some((i, 4));
         }
     }

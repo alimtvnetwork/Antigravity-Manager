@@ -106,15 +106,14 @@ mod tests {
     fn test_mismatched_heading_rejection() {
         // Missing 'v' prefix in heading
         let cl_missing_v = "## [4.8.2] - 2026-10-23\n";
-        let report_no_v = validate_tag_monotonic_progression(
-            "v4.8.2",
-            "main",
-            cl_missing_v,
-            Some("v4.8.1"),
-        );
+        let report_no_v =
+            validate_tag_monotonic_progression("v4.8.2", "main", cl_missing_v, Some("v4.8.1"));
         assert!(!report_no_v.is_valid());
         assert!(!report_no_v.has_character_match());
-        assert!(report_no_v.failure_reasons.iter().any(|r| r.contains("does not match changelog heading")));
+        assert!(report_no_v
+            .failure_reasons
+            .iter()
+            .any(|r| r.contains("does not match changelog heading")));
 
         // Missing '-beta' suffix in heading
         let cl_missing_beta = "## [v4.8.2] - 2026-10-23\n";
@@ -129,12 +128,8 @@ mod tests {
 
         // Extra '-beta' suffix in heading when candidate is stable
         let cl_extra_beta = "## [v4.8.2-beta.1] - 2026-10-23\n";
-        let report_extra_beta = validate_tag_monotonic_progression(
-            "v4.8.2",
-            "main",
-            cl_extra_beta,
-            Some("v4.8.1"),
-        );
+        let report_extra_beta =
+            validate_tag_monotonic_progression("v4.8.2", "main", cl_extra_beta, Some("v4.8.1"));
         assert!(!report_extra_beta.is_valid());
         assert!(!report_extra_beta.has_character_match());
     }
@@ -142,12 +137,8 @@ mod tests {
     #[test]
     fn test_monotonic_version_progression_verification() {
         let changelog = "## [v4.8.2] - 2026-10-23\n";
-        let report = validate_tag_monotonic_progression(
-            "v4.8.2",
-            "main",
-            changelog,
-            Some("v4.8.1"),
-        );
+        let report =
+            validate_tag_monotonic_progression("v4.8.2", "main", changelog, Some("v4.8.1"));
         assert!(report.is_valid());
         assert!(report.has_character_match());
         assert!(report.is_monotonic());
@@ -157,12 +148,7 @@ mod tests {
         assert_eq!(report.latest_historical_tag, Some("v4.8.1".to_string()));
 
         // Verification with no baseline tag (first release)
-        let report_no_hist = validate_tag_monotonic_progression(
-            "v4.8.2",
-            "main",
-            changelog,
-            None,
-        );
+        let report_no_hist = validate_tag_monotonic_progression("v4.8.2", "main", changelog, None);
         assert!(report_no_hist.is_valid());
         assert!(report_no_hist.is_monotonic());
     }
@@ -171,24 +157,19 @@ mod tests {
     fn test_non_monotonic_version_regression_interception() {
         let changelog = "## [v4.8.0] - 2026-10-23\n";
         // Downgrade candidate < historical
-        let report_downgrade = validate_tag_monotonic_progression(
-            "v4.8.0",
-            "main",
-            changelog,
-            Some("v4.8.1"),
-        );
+        let report_downgrade =
+            validate_tag_monotonic_progression("v4.8.0", "main", changelog, Some("v4.8.1"));
         assert!(!report_downgrade.is_valid());
         assert!(!report_downgrade.is_monotonic());
-        assert!(report_downgrade.failure_reasons.iter().any(|r| r.contains("not monotonically greater")));
+        assert!(report_downgrade
+            .failure_reasons
+            .iter()
+            .any(|r| r.contains("not monotonically greater")));
 
         // Duplicate candidate == historical
         let changelog_dup = "## [v4.8.1] - 2026-10-23\n";
-        let report_dup = validate_tag_monotonic_progression(
-            "v4.8.1",
-            "main",
-            changelog_dup,
-            Some("v4.8.1"),
-        );
+        let report_dup =
+            validate_tag_monotonic_progression("v4.8.1", "main", changelog_dup, Some("v4.8.1"));
         assert!(!report_dup.is_valid());
         assert!(!report_dup.is_monotonic());
     }
@@ -198,12 +179,8 @@ mod tests {
         let changelog = "## [v4.8.2] - 2026-10-23\n";
 
         // Allowed on main
-        let report_main = validate_tag_monotonic_progression(
-            "v4.8.2",
-            "main",
-            changelog,
-            Some("v4.8.1"),
-        );
+        let report_main =
+            validate_tag_monotonic_progression("v4.8.2", "main", changelog, Some("v4.8.1"));
         assert!(report_main.is_valid());
         assert!(report_main.is_channel_compliant());
 
@@ -218,15 +195,14 @@ mod tests {
         assert!(report_refs.is_channel_compliant());
 
         // Rejected on beta
-        let report_beta = validate_tag_monotonic_progression(
-            "v4.8.2",
-            "beta",
-            changelog,
-            Some("v4.8.1"),
-        );
+        let report_beta =
+            validate_tag_monotonic_progression("v4.8.2", "beta", changelog, Some("v4.8.1"));
         assert!(!report_beta.is_valid());
         assert!(!report_beta.is_channel_compliant());
-        assert!(report_beta.failure_reasons.iter().any(|r| r.contains("Cross-branch tag misplacement")));
+        assert!(report_beta
+            .failure_reasons
+            .iter()
+            .any(|r| r.contains("Cross-branch tag misplacement")));
 
         // Rejected on feature branch
         let report_feature = validate_tag_monotonic_progression(
@@ -244,12 +220,8 @@ mod tests {
         let changelog = "## [v4.8.2-beta.1] - 2026-10-23\n";
 
         // Allowed on beta
-        let report_beta = validate_tag_monotonic_progression(
-            "v4.8.2-beta.1",
-            "beta",
-            changelog,
-            Some("v4.8.1"),
-        );
+        let report_beta =
+            validate_tag_monotonic_progression("v4.8.2-beta.1", "beta", changelog, Some("v4.8.1"));
         assert!(report_beta.is_valid());
         assert!(report_beta.is_channel_compliant());
 
@@ -264,15 +236,14 @@ mod tests {
         assert!(report_origin.is_channel_compliant());
 
         // Rejected on main
-        let report_main = validate_tag_monotonic_progression(
-            "v4.8.2-beta.1",
-            "main",
-            changelog,
-            Some("v4.8.1"),
-        );
+        let report_main =
+            validate_tag_monotonic_progression("v4.8.2-beta.1", "main", changelog, Some("v4.8.1"));
         assert!(!report_main.is_valid());
         assert!(!report_main.is_channel_compliant());
-        assert!(report_main.failure_reasons.iter().any(|r| r.contains("Cross-branch tag misplacement")));
+        assert!(report_main
+            .failure_reasons
+            .iter()
+            .any(|r| r.contains("Cross-branch tag misplacement")));
     }
 
     #[test]
@@ -283,7 +254,8 @@ mod tests {
         let report1 = gate.validate("v4.8.2", "main", changelog, Some("v4.8.1"));
         assert!(report1.is_valid());
 
-        let report2 = ChangelogTagMonotonicGate::evaluate("v4.8.2", "main", changelog, Some("v4.8.1"));
+        let report2 =
+            ChangelogTagMonotonicGate::evaluate("v4.8.2", "main", changelog, Some("v4.8.1"));
         assert!(report2.is_valid());
         assert_eq!(report1, report2);
     }
@@ -301,7 +273,8 @@ mod tests {
         };
 
         let json = serde_json::to_string(&report).expect("serializable");
-        let restored: TagMonotonicValidationReport = serde_json::from_str(&json).expect("deserializable");
+        let restored: TagMonotonicValidationReport =
+            serde_json::from_str(&json).expect("deserializable");
         assert_eq!(report, restored);
         assert!(restored.is_valid());
         assert_eq!(restored.tag(), "v4.8.2");

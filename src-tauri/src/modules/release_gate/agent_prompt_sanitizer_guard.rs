@@ -32,8 +32,7 @@ static PEM_PRIVATE_KEY_REGEX: Lazy<Regex> = Lazy::new(|| {
 });
 
 static DB_URI_AUTH_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\b([a-z0-9+]+://[^:\s]+:)[^@\s]+(@[^/\s]+)")
-        .expect("valid db uri regex")
+    Regex::new(r"(?i)\b([a-z0-9+]+://[^:\s]+:)[^@\s]+(@[^/\s]+)").expect("valid db uri regex")
 });
 
 static GENERIC_SECRET_ASSIGN_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -52,29 +51,21 @@ static AUTH_HEADER_REGEX: Lazy<Regex> = Lazy::new(|| {
 });
 
 static BEARER_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\b(bearer\s+)[A-Za-z0-9_\-\.]{16,}")
-        .expect("valid bearer regex")
+    Regex::new(r"(?i)\b(bearer\s+)[A-Za-z0-9_\-\.]{16,}").expect("valid bearer regex")
 });
 
 static BASIC_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)\b(basic\s+)[A-Za-z0-9+/=]{16,}")
-        .expect("valid basic auth regex")
+    Regex::new(r"(?i)\b(basic\s+)[A-Za-z0-9+/=]{16,}").expect("valid basic auth regex")
 });
 
-static OPENAI_KEY_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\b(?:sk|org)-[A-Za-z0-9]{20,}\b")
-        .expect("valid openai key regex")
-});
+static OPENAI_KEY_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\b(?:sk|org)-[A-Za-z0-9]{20,}\b").expect("valid openai key regex"));
 
-static GEMINI_KEY_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\bAIza[0-9A-Za-z\-_]{35}\b")
-        .expect("valid gemini key regex")
-});
+static GEMINI_KEY_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\bAIza[0-9A-Za-z\-_]{35}\b").expect("valid gemini key regex"));
 
-static ANTHROPIC_KEY_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\bsk-ant-[A-Za-z0-9_\-]{20,}\b")
-        .expect("valid anthropic key regex")
-});
+static ANTHROPIC_KEY_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\bsk-ant-[A-Za-z0-9_\-]{20,}\b").expect("valid anthropic key regex"));
 
 static MANGLED_WORD_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"\b[A-Za-z0-9_]*(?:REDACTED_SECRET|REDACTED_AUTH|\[REDACTED\])[A-Za-z0-9_]*\b")
@@ -171,7 +162,10 @@ pub fn sanitize_prompt_text(input: &str) -> SanitizationReport {
         });
     }
     current = PEM_PRIVATE_KEY_REGEX
-        .replace_all(&current, format!("{pem_header}\n{REDACTED_SECRET}\n{pem_footer}"))
+        .replace_all(
+            &current,
+            format!("{pem_header}\n{REDACTED_SECRET}\n{pem_footer}"),
+        )
         .to_string();
 
     // 2. Database URI embedded credentials
@@ -312,9 +306,7 @@ pub fn sanitize_prompt_text(input: &str) -> SanitizationReport {
 }
 
 /// Sanitizes a structured prompt payload and evaluates its integrity.
-pub fn sanitize_prompt_payload(
-    payload: &PromptPayload,
-) -> (PromptPayload, PromptIntegrityReport) {
+pub fn sanitize_prompt_payload(payload: &PromptPayload) -> (PromptPayload, PromptIntegrityReport) {
     let sanitized_system = payload
         .system_prompt
         .as_ref()
@@ -419,7 +411,10 @@ pub fn evaluate_prompt_integrity(
         if let Some(ref o_sys) = original.system_prompt {
             let destructive = detect_destructive_keyword_replacement(o_sys, s_sys);
             for d in destructive {
-                violations.push(format!("Destructive replacement in system prompt: {}", d.detail));
+                violations.push(format!(
+                    "Destructive replacement in system prompt: {}",
+                    d.detail
+                ));
             }
         }
     }
@@ -427,7 +422,10 @@ pub fn evaluate_prompt_integrity(
     let user_destructive =
         detect_destructive_keyword_replacement(&original.user_query, &sanitized.user_query);
     for d in user_destructive {
-        violations.push(format!("Destructive replacement in user query: {}", d.detail));
+        violations.push(format!(
+            "Destructive replacement in user query: {}",
+            d.detail
+        ));
     }
 
     let is_intact = violations.is_empty()
@@ -510,8 +508,8 @@ pub fn audit_sanitization_rule(rule_pattern: &str) -> Result<(), DestructiveKeyw
 
     // Naive static keywords without regex delimiters or structural qualifiers
     let static_keywords = [
-        "key", "keys", "token", "tokens", "auth", "secret", "secrets", "pass",
-        "password", "pwd", "bearer", "basic",
+        "key", "keys", "token", "tokens", "auth", "secret", "secrets", "pass", "password", "pwd",
+        "bearer", "basic",
     ];
 
     if static_keywords.contains(&lower.as_str()) {
@@ -525,7 +523,12 @@ pub fn audit_sanitization_rule(rule_pattern: &str) -> Result<(), DestructiveKeyw
     }
 
     // Must contain regex word boundary or assignment structure
-    if !trimmed.contains('\\') && !trimmed.contains(':') && !trimmed.contains('=') && !trimmed.contains('^') && !trimmed.contains('$') {
+    if !trimmed.contains('\\')
+        && !trimmed.contains(':')
+        && !trimmed.contains('=')
+        && !trimmed.contains('^')
+        && !trimmed.contains('$')
+    {
         if trimmed.len() < 8 {
             return Err(DestructiveKeywordViolation {
                 violation_type: DestructiveViolationType::StaticBareKeywordRule,

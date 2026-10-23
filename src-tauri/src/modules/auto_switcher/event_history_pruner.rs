@@ -58,9 +58,8 @@ impl EventHistoryPruner {
         let initial_len = self.records.len();
         let retention = self.retention_window;
 
-        self.records.retain(|rec| {
-            now.duration_since(rec.timestamp) <= retention
-        });
+        self.records
+            .retain(|rec| now.duration_since(rec.timestamp) <= retention);
 
         initial_len.saturating_sub(self.records.len())
     }

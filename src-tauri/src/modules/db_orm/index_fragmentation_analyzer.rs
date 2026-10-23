@@ -25,22 +25,18 @@ pub struct IndexFragmentationAnalyzer;
 
 impl IndexFragmentationAnalyzer {
     /// Analyzes all declared indexes for the specified database table.
-    pub fn analyze_table_indexes(conn: &Connection, table_name: &str) -> Result<IndexAnalysisReport, AppError> {
+    pub fn analyze_table_indexes(
+        conn: &Connection,
+        table_name: &str,
+    ) -> Result<IndexAnalysisReport, AppError> {
         let sql = format!("PRAGMA index_list('{}');", table_name);
-        let mut stmt = conn
-            .prepare(&sql)
-            .map_err(AppError::Database)?;
+        let mut stmt = conn.prepare(&sql).map_err(AppError::Database)?;
 
-        let mut rows = stmt
-            .query([])
-            .map_err(AppError::Database)?;
+        let mut rows = stmt.query([]).map_err(AppError::Database)?;
 
         let mut indexes = Vec::new();
 
-        while let Some(row) = rows
-            .next()
-            .map_err(AppError::Database)?
-        {
+        while let Some(row) = rows.next().map_err(AppError::Database)? {
             let name: String = row.get(1).unwrap_or_default();
             let unique: bool = row.get::<_, i32>(2).unwrap_or(0) != 0;
             let origin: String = row.get(3).unwrap_or_default();
@@ -65,19 +61,12 @@ impl IndexFragmentationAnalyzer {
 
     fn get_indexed_columns(conn: &Connection, index_name: &str) -> Result<Vec<String>, AppError> {
         let sql = format!("PRAGMA index_info('{}');", index_name);
-        let mut stmt = conn
-            .prepare(&sql)
-            .map_err(AppError::Database)?;
+        let mut stmt = conn.prepare(&sql).map_err(AppError::Database)?;
 
-        let mut rows = stmt
-            .query([])
-            .map_err(AppError::Database)?;
+        let mut rows = stmt.query([]).map_err(AppError::Database)?;
 
         let mut cols = Vec::new();
-        while let Some(row) = rows
-            .next()
-            .map_err(AppError::Database)?
-        {
+        while let Some(row) = rows.next().map_err(AppError::Database)? {
             if let Ok(name) = row.get::<_, String>(2) {
                 cols.push(name);
             }

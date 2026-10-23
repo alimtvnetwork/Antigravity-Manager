@@ -1,8 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::super::compression_negotiator::{
-        CompressionNegotiator, SelectedEncoding,
-    };
+    use super::super::compression_negotiator::{CompressionNegotiator, SelectedEncoding};
 
     #[test]
     fn test_negotiate_sse_streaming_prefers_identity() {
@@ -33,7 +31,8 @@ mod tests {
 
     #[test]
     fn test_negotiate_brotli_priority_over_gzip() {
-        let decision = CompressionNegotiator::negotiate(Some("gzip, deflate, br"), false, Some(10000));
+        let decision =
+            CompressionNegotiator::negotiate(Some("gzip, deflate, br"), false, Some(10000));
         assert_eq!(decision.encoding, SelectedEncoding::Brotli);
         assert!(decision.should_compress);
         assert_eq!(decision.encoding.as_header_str(), Some("br"));

@@ -1,10 +1,10 @@
 #[cfg(test)]
 mod tests {
     use super::super::bounded_matcher_timeout_guard::{
-        apply_bounded_regex_replacement, execute_with_timeout_bounds,
-        lint_wait_calls_in_source, poll_until_bounded_timeout, validate_match_boundary,
-        validate_replacement_boundaries, validate_wait_timeout, BoundaryCheckType,
-        BoundaryViolation, MatchSpan, TimeoutConfig, TimeoutViolation,
+        apply_bounded_regex_replacement, execute_with_timeout_bounds, lint_wait_calls_in_source,
+        poll_until_bounded_timeout, validate_match_boundary, validate_replacement_boundaries,
+        validate_wait_timeout, BoundaryCheckType, BoundaryViolation, MatchSpan, TimeoutConfig,
+        TimeoutViolation,
     };
     use regex::Regex;
 
@@ -111,10 +111,12 @@ mod tests {
         let clean_span = MatchSpan::from_first_occurrence(text, "bar").expect("found");
         let bleed_span = MatchSpan::new(2, 8, "o|bar|");
 
-        let ok_res = validate_match_boundary(text, &clean_span, BoundaryCheckType::CustomDelimiter('|'));
+        let ok_res =
+            validate_match_boundary(text, &clean_span, BoundaryCheckType::CustomDelimiter('|'));
         assert!(ok_res.is_ok());
 
-        let err_res = validate_match_boundary(text, &bleed_span, BoundaryCheckType::CustomDelimiter('|'));
+        let err_res =
+            validate_match_boundary(text, &bleed_span, BoundaryCheckType::CustomDelimiter('|'));
         assert!(matches!(
             err_res,
             Err(BoundaryViolation::CrossesCustomDelimiterForbidden { delimiter: '|', .. })
@@ -166,7 +168,10 @@ mod tests {
             "'new_token'\nlet hacked = 1",
             BoundaryCheckType::SingleLineOnly,
         );
-        assert!(matches!(err1, Err(BoundaryViolation::SpansLineBreaksForbidden { .. })));
+        assert!(matches!(
+            err1,
+            Err(BoundaryViolation::SpansLineBreaksForbidden { .. })
+        ));
 
         // 2. Replacement injects HTML tags into TagEnclosed
         let err2 = validate_replacement_boundaries(
@@ -175,7 +180,10 @@ mod tests {
             "'new_token' <script>alert(1)</script>",
             BoundaryCheckType::TagEnclosed,
         );
-        assert!(matches!(err2, Err(BoundaryViolation::CrossesHtmlTagsForbidden { .. })));
+        assert!(matches!(
+            err2,
+            Err(BoundaryViolation::CrossesHtmlTagsForbidden { .. })
+        ));
     }
 
     #[test]
@@ -183,13 +191,9 @@ mod tests {
         let text = "val_1 = 100; val_2 = 200; val_3 = 300;";
         let regex = Regex::new(r"\d+").expect("valid regex");
 
-        let (result, count) = apply_bounded_regex_replacement(
-            text,
-            &regex,
-            "999",
-            BoundaryCheckType::SingleLineOnly,
-        )
-        .expect("Valid regex replacements should succeed");
+        let (result, count) =
+            apply_bounded_regex_replacement(text, &regex, "999", BoundaryCheckType::SingleLineOnly)
+                .expect("Valid regex replacements should succeed");
 
         assert_eq!(count, 3);
         assert_eq!(result, "val_1 = 999; val_2 = 999; val_3 = 999;");
@@ -207,7 +211,10 @@ mod tests {
             BoundaryCheckType::SingleLineOnly,
         );
 
-        assert!(matches!(err, Err(BoundaryViolation::SpansLineBreaksForbidden { .. })));
+        assert!(matches!(
+            err,
+            Err(BoundaryViolation::SpansLineBreaksForbidden { .. })
+        ));
     }
 
     #[test]
@@ -223,22 +230,34 @@ mod tests {
         // 2. Unbounded (None) is strictly forbidden
         let unbounded_config = TimeoutConfig::unbounded(30000, "infinite_poll");
         let err_unbounded = validate_wait_timeout(&unbounded_config);
-        assert!(matches!(err_unbounded, Err(TimeoutViolation::UnboundedWaitForbidden { .. })));
+        assert!(matches!(
+            err_unbounded,
+            Err(TimeoutViolation::UnboundedWaitForbidden { .. })
+        ));
 
         // 3. Zero duration is strictly forbidden
         let zero_config = TimeoutConfig::bounded(0, 30000, "instant_poll");
         let err_zero = validate_wait_timeout(&zero_config);
-        assert!(matches!(err_zero, Err(TimeoutViolation::UnboundedWaitForbidden { .. })));
+        assert!(matches!(
+            err_zero,
+            Err(TimeoutViolation::UnboundedWaitForbidden { .. })
+        ));
 
         // 4. Exceeds max ceiling
         let over_config = TimeoutConfig::bounded(60000, 30000, "slow_query");
         let err_over = validate_wait_timeout(&over_config);
-        assert!(matches!(err_over, Err(TimeoutViolation::ExceedsMaxAllowed { .. })));
+        assert!(matches!(
+            err_over,
+            Err(TimeoutViolation::ExceedsMaxAllowed { .. })
+        ));
 
         // 5. Empty description
         let empty_config = TimeoutConfig::bounded(5000, 30000, "   ");
         let err_empty = validate_wait_timeout(&empty_config);
-        assert!(matches!(err_empty, Err(TimeoutViolation::EmptyOperationDescription)));
+        assert!(matches!(
+            err_empty,
+            Err(TimeoutViolation::EmptyOperationDescription)
+        ));
     }
 
     #[tokio::test]
@@ -298,14 +317,13 @@ mod tests {
     async fn test_poll_until_bounded_timeout_times_out() {
         let config = TimeoutConfig::bounded(40, 5000, "unachievable_condition");
 
-        let result: Result<i32, TimeoutViolation> = poll_until_bounded_timeout(
-            &config,
-            15,
-            || async { None },
-        )
-        .await;
+        let result: Result<i32, TimeoutViolation> =
+            poll_until_bounded_timeout(&config, 15, || async { None }).await;
 
-        assert!(matches!(result, Err(TimeoutViolation::OperationTimedOut { .. })));
+        assert!(matches!(
+            result,
+            Err(TimeoutViolation::OperationTimedOut { .. })
+        ));
     }
 
     #[test]
@@ -327,10 +345,15 @@ fn poller() {
 "#;
 
         let violations = lint_wait_calls_in_source(risky_source);
-        assert!(!violations.is_empty(), "Risky sleep and loops must be flagged");
+        assert!(
+            !violations.is_empty(),
+            "Risky sleep and loops must be flagged"
+        );
         assert!(violations.iter().any(|v| v.contains("thread::sleep")));
         assert!(violations.iter().any(|v| v.contains("tokio::time::sleep")));
-        assert!(violations.iter().any(|v| v.contains("Unbounded loop wait detected")));
+        assert!(violations
+            .iter()
+            .any(|v| v.contains("Unbounded loop wait detected")));
     }
 
     #[test]
@@ -358,6 +381,9 @@ async fn safe_poller() {
 "#;
 
         let violations = lint_wait_calls_in_source(safe_source);
-        assert!(violations.is_empty(), "Guarded and commented sleeps should pass: {violations:?}");
+        assert!(
+            violations.is_empty(),
+            "Guarded and commented sleeps should pass: {violations:?}"
+        );
     }
 }

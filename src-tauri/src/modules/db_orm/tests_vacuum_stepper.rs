@@ -9,22 +9,28 @@ mod tests {
     fn setup_test_db() -> Connection {
         let conn = Connection::open_in_memory().expect("Open in-memory db");
         // Incremental vacuum mode must be configured before creating tables
-        conn.execute_batch("PRAGMA auto_vacuum = INCREMENTAL;").expect("Set auto_vacuum");
+        conn.execute_batch("PRAGMA auto_vacuum = INCREMENTAL;")
+            .expect("Set auto_vacuum");
         conn.execute_batch(
             "CREATE TABLE test_data (id INTEGER PRIMARY KEY, payload TEXT);
-             CREATE INDEX idx_payload ON test_data(payload);"
-        ).expect("Create tables");
+             CREATE INDEX idx_payload ON test_data(payload);",
+        )
+        .expect("Create tables");
         conn
     }
 
     fn populate_and_delete_for_freelist(conn: &Connection, count: usize, keep: usize) {
         {
-            let mut stmt = conn.prepare("INSERT INTO test_data (payload) VALUES (?)").unwrap();
+            let mut stmt = conn
+                .prepare("INSERT INTO test_data (payload) VALUES (?)")
+                .unwrap();
             for i in 0..count {
-                stmt.execute([format!("filler_payload_row_data_block_{}", i)]).unwrap();
+                stmt.execute([format!("filler_payload_row_data_block_{}", i)])
+                    .unwrap();
             }
         }
-        conn.execute_batch(&format!("DELETE FROM test_data WHERE id > {};", keep)).unwrap();
+        conn.execute_batch(&format!("DELETE FROM test_data WHERE id > {};", keep))
+            .unwrap();
     }
 
     #[test]
@@ -68,17 +74,23 @@ mod tests {
         let conn = setup_test_db();
         populate_and_delete_for_freelist(&conn, 600, 50);
 
-        let freelist: i64 = conn.query_row("PRAGMA freelist_count", [], |r| r.get(0)).unwrap();
+        let freelist: i64 = conn
+            .query_row("PRAGMA freelist_count", [], |r| r.get(0))
+            .unwrap();
         if freelist > 0 {
             let max_to_reclaim = 50.min(freelist);
             let chunk_size = 20;
-            let report = step_incremental_vacuum(&conn, Some(max_to_reclaim), Some(chunk_size)).unwrap();
+            let report =
+                step_incremental_vacuum(&conn, Some(max_to_reclaim), Some(chunk_size)).unwrap();
 
             assert_eq!(report.freelist_before, freelist);
             assert!(report.steps_executed >= 1);
             let expected_steps = ((max_to_reclaim + chunk_size - 1) / chunk_size) as usize;
             assert_eq!(report.steps_executed, expected_steps);
-            assert_eq!(report.pages_reclaimed, report.freelist_before - report.freelist_after);
+            assert_eq!(
+                report.pages_reclaimed,
+                report.freelist_before - report.freelist_after
+            );
             assert!(report.freelist_after <= freelist);
         }
     }
@@ -88,12 +100,17 @@ mod tests {
         let conn = setup_test_db();
         populate_and_delete_for_freelist(&conn, 800, 20);
 
-        let freelist_before: i64 = conn.query_row("PRAGMA freelist_count", [], |r| r.get(0)).unwrap();
+        let freelist_before: i64 = conn
+            .query_row("PRAGMA freelist_count", [], |r| r.get(0))
+            .unwrap();
         if freelist_before > 0 {
             let report = step_incremental_vacuum(&conn, None, None).unwrap();
             assert_eq!(report.freelist_before, freelist_before);
             assert!(report.steps_executed >= 1);
-            assert_eq!(report.pages_reclaimed, report.freelist_before - report.freelist_after);
+            assert_eq!(
+                report.pages_reclaimed,
+                report.freelist_before - report.freelist_after
+            );
         }
     }
 }

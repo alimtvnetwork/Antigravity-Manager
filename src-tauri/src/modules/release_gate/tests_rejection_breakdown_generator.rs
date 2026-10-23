@@ -50,10 +50,14 @@ fn test_validation_rejects_missing_actionable_path_on_drop() {
 
     let res = validate_rejection_has_actionable_path(&report);
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("lacks an actionable path forward"));
+    assert!(res
+        .unwrap_err()
+        .contains("lacks an actionable path forward"));
 
     // Add actionable step and verify success
-    report.actionable_path_forward.push("Move logic to pipeline common handler".to_string());
+    report
+        .actionable_path_forward
+        .push("Move logic to pipeline common handler".to_string());
     assert!(validate_rejection_has_actionable_path(&report).is_ok());
 }
 
@@ -68,17 +72,27 @@ fn test_validation_rejects_absolute_path() {
     let report = RejectionBreakdownReport::new("Review", "author").with_file(item);
     let res = validate_rejection_has_actionable_path(&report);
     assert!(res.is_err());
-    assert!(res.unwrap_err().contains("not a repository-relative Git path"));
+    assert!(res
+        .unwrap_err()
+        .contains("not a repository-relative Git path"));
 }
 
 #[test]
 fn test_parse_and_classify_changeset() {
-    let files = ["src-tauri/src/proxy.rs", "target/output.tmp", "package-lock.json"];
+    let files = [
+        "src-tauri/src/proxy.rs",
+        "target/output.tmp",
+        "package-lock.json",
+    ];
     let drop_patterns = ["target/*", "*.tmp"];
 
     let report = parse_and_classify_changeset(&files, &drop_patterns, |path| {
         if path == "src-tauri/src/proxy.rs" {
-            (FileDisposition::Accept, "Verified proxy changes".to_string(), None)
+            (
+                FileDisposition::Accept,
+                "Verified proxy changes".to_string(),
+                None,
+            )
         } else if path == "package-lock.json" {
             (
                 FileDisposition::PartialAccept,
@@ -108,7 +122,10 @@ fn test_generate_markdown_rejection_breakdown() {
         "src-tauri/src/proxy/handlers/claude.rs",
         FileDisposition::Drop,
         "Local adapter fix violates pipeline-first decoupling guideline.",
-        Some("Refactor generic prompt sanitization logic into common/request_header_sanitizer.rs".to_string()),
+        Some(
+            "Refactor generic prompt sanitization logic into common/request_header_sanitizer.rs"
+                .to_string(),
+        ),
     );
 
     let report = RejectionBreakdownReport::new("Refactor pipeline", "contributor_jane")

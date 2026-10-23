@@ -11,13 +11,7 @@ mod tests {
     #[test]
     fn test_native_binary_with_breakaway_enabled() {
         let args = vec!["--user-data-dir=data".to_string(), "--headless".to_string()];
-        let plan = build_launch_plan(
-            "target/bin/antigravity.exe",
-            &args,
-            None,
-            true,
-            None,
-        );
+        let plan = build_launch_plan("target/bin/antigravity.exe", &args, None, true, None);
 
         assert_eq!(plan.program, "target/bin/antigravity.exe");
         assert_eq!(plan.args, args);
@@ -65,13 +59,7 @@ mod tests {
     fn test_batch_script_bat_routing_to_detected_base_binary() {
         let args = vec!["--profile".to_string(), "worker".to_string()];
         let base_binary = "target/base/antigravity.exe";
-        let plan = build_launch_plan(
-            "scripts/launcher.bat",
-            &args,
-            Some(base_binary),
-            true,
-            None,
-        );
+        let plan = build_launch_plan("scripts/launcher.bat", &args, Some(base_binary), true, None);
 
         assert_eq!(plan.program, base_binary);
         assert_eq!(plan.args, args);
@@ -87,13 +75,7 @@ mod tests {
     fn test_batch_script_cmd_routing_to_detected_base_binary() {
         let args = vec!["--sandbox".to_string()];
         let base_binary = "target/base/antigravity.exe";
-        let plan = build_launch_plan(
-            "scripts/runner.CMD",
-            &args,
-            Some(base_binary),
-            true,
-            None,
-        );
+        let plan = build_launch_plan("scripts/runner.CMD", &args, Some(base_binary), true, None);
 
         assert_eq!(plan.program, base_binary);
         assert_eq!(plan.args, args);

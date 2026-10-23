@@ -41,5 +41,8 @@ pub fn negotiate_content_encoding(headers: &HeaderMap) -> SupportedEncoding {
 
 /// Checks if an encoding is supported for transparent server-side decompression.
 pub fn is_encoding_supported(encoding: SupportedEncoding) -> bool {
-    matches!(encoding, SupportedEncoding::Identity | SupportedEncoding::Gzip | SupportedEncoding::Deflate)
+    matches!(
+        encoding,
+        SupportedEncoding::Identity | SupportedEncoding::Gzip | SupportedEncoding::Deflate
+    )
 }

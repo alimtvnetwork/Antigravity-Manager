@@ -16,10 +16,7 @@ pub struct TableIndexInfo {
 }
 
 /// Evaluates if an existing set of table indices covers a target set of filter columns.
-pub fn is_query_covered(
-    indices: &[TableIndexInfo],
-    filter_columns: &[&str],
-) -> bool {
+pub fn is_query_covered(indices: &[TableIndexInfo], filter_columns: &[&str]) -> bool {
     if filter_columns.is_empty() {
         return true;
     }
@@ -27,7 +24,10 @@ pub fn is_query_covered(
     // Check if the primary filter column matches the leading column of any index
     let leading_col = filter_columns[0];
     indices.iter().any(|idx| {
-        idx.columns.first().map(|c| c.eq_ignore_ascii_case(leading_col)).unwrap_or(false)
+        idx.columns
+            .first()
+            .map(|c| c.eq_ignore_ascii_case(leading_col))
+            .unwrap_or(false)
     })
 }
 

@@ -13,8 +13,13 @@ fn test_inactive_account_disqualified() {
     let res = score_candidate_dynamically(&factors);
     assert!(!res.is_eligible);
     assert_eq!(res.final_score, 0.0);
-    assert!(res.exclusion_reason.unwrap().contains("inactive or disabled"));
-    assert!(res.violations.contains(&ScoringViolation::AccountInactiveOrDisabled));
+    assert!(res
+        .exclusion_reason
+        .unwrap()
+        .contains("inactive or disabled"));
+    assert!(res
+        .violations
+        .contains(&ScoringViolation::AccountInactiveOrDisabled));
     assert!(res.has_violations());
     assert!(!res.is_selectable());
 }
@@ -27,8 +32,13 @@ fn test_in_use_by_other_instance_disqualified() {
     let res = score_candidate_dynamically(&factors);
     assert!(!res.is_eligible);
     assert_eq!(res.final_score, 0.0);
-    assert!(res.exclusion_reason.unwrap().contains("in use by sibling instance"));
-    assert!(res.violations.contains(&ScoringViolation::InUseByOtherInstance));
+    assert!(res
+        .exclusion_reason
+        .unwrap()
+        .contains("in use by sibling instance"));
+    assert!(res
+        .violations
+        .contains(&ScoringViolation::InUseByOtherInstance));
     assert!(!res.is_selectable());
 }
 
@@ -40,7 +50,10 @@ fn test_cooldown_active_disqualified() {
     let res = score_candidate_dynamically(&factors);
     assert!(!res.is_eligible);
     assert_eq!(res.final_score, 0.0);
-    assert!(res.exclusion_reason.unwrap().contains("in cooldown (45s remaining)"));
+    assert!(res
+        .exclusion_reason
+        .unwrap()
+        .contains("in cooldown (45s remaining)"));
     assert!(res.violations.contains(&ScoringViolation::ActiveCooldown));
     assert!(!res.is_selectable());
 }
@@ -53,7 +66,10 @@ fn test_exhausted_quota_disqualified() {
     let res = score_candidate_dynamically(&factors);
     assert!(!res.is_eligible);
     assert_eq!(res.final_score, 0.0);
-    assert!(res.exclusion_reason.unwrap().contains("Quota completely exhausted"));
+    assert!(res
+        .exclusion_reason
+        .unwrap()
+        .contains("Quota completely exhausted"));
     assert!(res.violations.contains(&ScoringViolation::QuotaExhausted));
     assert!(!res.is_selectable());
 }
@@ -83,7 +99,9 @@ fn test_velocity_penalties() {
     let res_crit = score_candidate_dynamically(&f_crit);
     assert_eq!(res_crit.velocity_penalty, 400.0);
     assert_eq!(res_crit.final_score, 600.0);
-    assert!(res_crit.violations.contains(&ScoringViolation::CriticalVelocityExhaustion));
+    assert!(res_crit
+        .violations
+        .contains(&ScoringViolation::CriticalVelocityExhaustion));
 
     // Case B: <= 300s remaining -> 200 pt penalty
     let mut f_warn = CandidateScoringFactors::new("acc-warn", "warn@example.com");
@@ -110,10 +128,13 @@ fn test_throttle_penalties() {
     assert_eq!(res.final_score, 700.0);
 
     // Excessive throttles (>= 3)
-    let mut f_excess = CandidateScoringFactors::new("acc-heavy-throttled", "throttled2@example.com");
+    let mut f_excess =
+        CandidateScoringFactors::new("acc-heavy-throttled", "throttled2@example.com");
     f_excess.consecutive_throttles = 3;
     let res_excess = score_candidate_dynamically(&f_excess);
-    assert!(res_excess.violations.contains(&ScoringViolation::ExcessiveThrottling));
+    assert!(res_excess
+        .violations
+        .contains(&ScoringViolation::ExcessiveThrottling));
 }
 
 #[test]

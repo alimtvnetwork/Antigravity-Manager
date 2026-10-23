@@ -7,12 +7,30 @@ mod tests {
 
     #[test]
     fn test_content_encoding_from_header() {
-        assert_eq!(ContentEncoding::from_header(Some("gzip")), ContentEncoding::Gzip);
-        assert_eq!(ContentEncoding::from_header(Some("GZIP, Deflate")), ContentEncoding::Gzip);
-        assert_eq!(ContentEncoding::from_header(Some("deflate")), ContentEncoding::Deflate);
-        assert_eq!(ContentEncoding::from_header(Some("identity")), ContentEncoding::Identity);
-        assert_eq!(ContentEncoding::from_header(None), ContentEncoding::Identity);
-        assert_eq!(ContentEncoding::from_header(Some("")), ContentEncoding::Identity);
+        assert_eq!(
+            ContentEncoding::from_header(Some("gzip")),
+            ContentEncoding::Gzip
+        );
+        assert_eq!(
+            ContentEncoding::from_header(Some("GZIP, Deflate")),
+            ContentEncoding::Gzip
+        );
+        assert_eq!(
+            ContentEncoding::from_header(Some("deflate")),
+            ContentEncoding::Deflate
+        );
+        assert_eq!(
+            ContentEncoding::from_header(Some("identity")),
+            ContentEncoding::Identity
+        );
+        assert_eq!(
+            ContentEncoding::from_header(None),
+            ContentEncoding::Identity
+        );
+        assert_eq!(
+            ContentEncoding::from_header(Some("")),
+            ContentEncoding::Identity
+        );
     }
 
     #[test]

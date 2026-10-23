@@ -169,10 +169,7 @@ mod tests {
 
         assert!(!report.is_decoupled);
         assert_eq!(report.leak_count(), 4);
-        assert_eq!(
-            report.leaks[0].leak_category(),
-            "thinking_budget_filtering"
-        );
+        assert_eq!(report.leaks[0].leak_category(), "thinking_budget_filtering");
         assert_eq!(
             report.leaks[1].leak_category(),
             "prefix_stability_enforcement"

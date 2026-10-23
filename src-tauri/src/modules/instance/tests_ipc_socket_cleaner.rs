@@ -1,8 +1,6 @@
 //! Unit tests for VS Code IPC Socket Cleaner.
 
-use super::ipc_socket_cleaner::{
-    clean_stale_ipc_sockets, is_stale_ipc_socket_name,
-};
+use super::ipc_socket_cleaner::{clean_stale_ipc_sockets, is_stale_ipc_socket_name};
 use tempfile::tempdir;
 
 #[test]

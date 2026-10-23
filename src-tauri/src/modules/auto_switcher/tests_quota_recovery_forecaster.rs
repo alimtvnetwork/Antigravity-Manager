@@ -48,10 +48,12 @@ mod tests {
     #[test]
     fn test_forecast_recovery_quota_clamping() {
         let now = 1_000_000;
-        let forecast_neg = QuotaRecoveryForecaster::forecast_recovery("acc_4", -15.0, now + 3600, now);
+        let forecast_neg =
+            QuotaRecoveryForecaster::forecast_recovery("acc_4", -15.0, now + 3600, now);
         assert_eq!(forecast_neg.current_quota_percent, 0.0);
 
-        let forecast_over = QuotaRecoveryForecaster::forecast_recovery("acc_5", 150.0, now + 3600, now);
+        let forecast_over =
+            QuotaRecoveryForecaster::forecast_recovery("acc_5", 150.0, now + 3600, now);
         assert_eq!(forecast_over.current_quota_percent, 100.0);
     }
 }

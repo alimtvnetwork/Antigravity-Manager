@@ -36,12 +36,15 @@ impl ToolCallAssembler {
 
         for item in array {
             let index = item.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-            let call = self.calls_by_index.entry(index).or_insert_with(|| AssembledToolCall {
-                id: String::new(),
-                call_type: "function".to_string(),
-                function_name: String::new(),
-                arguments_buffer: String::new(),
-            });
+            let call = self
+                .calls_by_index
+                .entry(index)
+                .or_insert_with(|| AssembledToolCall {
+                    id: String::new(),
+                    call_type: "function".to_string(),
+                    function_name: String::new(),
+                    arguments_buffer: String::new(),
+                });
 
             if let Some(id) = item.get("id").and_then(|v| v.as_str()) {
                 call.id = id.to_string();

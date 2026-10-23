@@ -4,7 +4,9 @@
 
 #[cfg(test)]
 mod tests {
-    use super::super::sse_stream_padder::{generate_sse_preamble_padding, DEFAULT_PREAMBLE_PADDING_BYTES};
+    use super::super::sse_stream_padder::{
+        generate_sse_preamble_padding, DEFAULT_PREAMBLE_PADDING_BYTES,
+    };
     use super::super::sse_stream_splitter::SseStreamSplitter;
     use bytes::Bytes;
 
@@ -40,8 +42,14 @@ mod tests {
         let frames = splitter.feed(chunk);
 
         assert_eq!(frames.len(), 2);
-        assert_eq!(frames[0], Bytes::from_static(b"event: update\ndata: 100\n\n"));
-        assert_eq!(frames[1], Bytes::from_static(b"event: ping\ndata: pong\n\n"));
+        assert_eq!(
+            frames[0],
+            Bytes::from_static(b"event: update\ndata: 100\n\n")
+        );
+        assert_eq!(
+            frames[1],
+            Bytes::from_static(b"event: ping\ndata: pong\n\n")
+        );
         assert_eq!(splitter.buffered_bytes_count(), 0);
     }
 
@@ -55,7 +63,10 @@ mod tests {
 
         let f2 = splitter.feed(b"second part\n\n");
         assert_eq!(f2.len(), 1);
-        assert_eq!(f2[0], Bytes::from_static(b"data: first part second part\n\n"));
+        assert_eq!(
+            f2[0],
+            Bytes::from_static(b"data: first part second part\n\n")
+        );
         assert_eq!(splitter.buffered_bytes_count(), 0);
     }
 
@@ -84,7 +95,10 @@ mod tests {
         assert_eq!(splitter.buffered_bytes_count(), 22);
 
         let remainder = splitter.flush_remainder();
-        assert_eq!(remainder, Some(Bytes::from_static(b"data: incomplete_tail")));
+        assert_eq!(
+            remainder,
+            Some(Bytes::from_static(b"data: incomplete_tail"))
+        );
         assert_eq!(splitter.buffered_bytes_count(), 0);
         assert_eq!(splitter.flush_remainder(), None);
     }

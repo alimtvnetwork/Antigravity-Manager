@@ -96,15 +96,9 @@ pub enum BranchBaseViolation {
     /// Base reference string is empty or contains only whitespace.
     EmptyBaseRef,
     /// Base reference is a local branch rather than a remote tracking branch.
-    LocalBranchBaseForbidden {
-        base_ref: String,
-        guidance: String,
-    },
+    LocalBranchBaseForbidden { base_ref: String, guidance: String },
     /// Base reference does not have a recognized remote prefix (`origin/` or `upstream/`).
-    MissingRemotePrefix {
-        base_ref: String,
-        guidance: String,
-    },
+    MissingRemotePrefix { base_ref: String, guidance: String },
     /// Base reference does not match the mandatory base for the chosen release channel.
     ChannelBaseMismatch {
         channel: ReleaseChannel,
@@ -113,10 +107,7 @@ pub enum BranchBaseViolation {
         guidance: String,
     },
     /// Branch name contains illegal git ref characters.
-    InvalidBranchName {
-        branch_name: String,
-        reason: String,
-    },
+    InvalidBranchName { branch_name: String, reason: String },
 }
 
 impl fmt::Display for BranchBaseViolation {
@@ -148,7 +139,10 @@ impl fmt::Display for BranchBaseViolation {
                     channel.display_name()
                 )
             }
-            Self::InvalidBranchName { branch_name, reason } => {
+            Self::InvalidBranchName {
+                branch_name,
+                reason,
+            } => {
                 write!(f, "Invalid branch name '{branch_name}': {reason}")
             }
         }
@@ -190,7 +184,10 @@ pub fn evaluate_branch_base(verification: &BranchBaseVerification) -> BranchBase
 
     if branch_name.is_empty() {
         violations.push("Branch name cannot be empty".to_string());
-    } else if branch_name.contains(' ') || branch_name.contains("..") || branch_name.starts_with('-') {
+    } else if branch_name.contains(' ')
+        || branch_name.contains("..")
+        || branch_name.starts_with('-')
+    {
         violations.push(format!(
             "Branch name '{branch_name}' contains illegal characters or formatting"
         ));

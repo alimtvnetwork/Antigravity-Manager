@@ -5,12 +5,9 @@ use super::capsule_segmented_button_group_styler::*;
 #[test]
 fn test_format_window_control_segmented_capsule() {
     let buttons = vec![
-        SegmentButton::new("btn-min", "", "Minimize window")
-            .with_icon("minus"),
-        SegmentButton::new("btn-max", "", "Maximize window")
-            .with_icon("maximize"),
-        SegmentButton::new("btn-close", "", "Close window")
-            .with_icon("x"),
+        SegmentButton::new("btn-min", "", "Minimize window").with_icon("minus"),
+        SegmentButton::new("btn-max", "", "Maximize window").with_icon("maximize"),
+        SegmentButton::new("btn-close", "", "Close window").with_icon("x"),
     ];
 
     let config = CapsuleGroupConfig::horizontal_dark_glass("sm");
@@ -34,7 +31,10 @@ fn test_format_window_control_segmented_capsule() {
     assert!(result.formatted_html.contains("id=\"btn-min\""));
     assert!(result.formatted_html.contains("id=\"btn-max\""));
     assert!(result.formatted_html.contains("id=\"btn-close\""));
-    assert_eq!(result.formatted_html.matches("role=\"separator\"").count(), 2);
+    assert_eq!(
+        result.formatted_html.matches("role=\"separator\"").count(),
+        2
+    );
 }
 
 #[test]
@@ -48,7 +48,9 @@ fn test_format_html_aria_roles_and_borderless_styling() {
     let result = format_segmented_button_group(&buttons, &config);
 
     assert!(result.formatted_html.contains("role=\"group\""));
-    assert!(result.formatted_html.contains("aria-label=\"Segmented button group\""));
+    assert!(result
+        .formatted_html
+        .contains("aria-label=\"Segmented button group\""));
     assert!(result.formatted_html.contains("aria-pressed=\"true\""));
     assert!(result.formatted_html.contains("aria-pressed=\"false\""));
 }
@@ -66,7 +68,10 @@ fn test_format_vertical_segmented_capsule() {
     assert!(result.container_classes.contains("flex-col"));
     assert!(result.button_classes[0].contains("rounded-t-full"));
     assert!(result.button_classes[1].contains("rounded-b-full"));
-    assert_eq!(result.divider_classes, CANONICAL_SEGMENT_DIVIDER_VERTICAL_CLASSES);
+    assert_eq!(
+        result.divider_classes,
+        CANONICAL_SEGMENT_DIVIDER_VERTICAL_CLASSES
+    );
 }
 
 #[test]

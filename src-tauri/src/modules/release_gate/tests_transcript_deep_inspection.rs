@@ -20,10 +20,18 @@ mod tests {
 
     #[test]
     fn test_is_ignorable_telemetry_record() {
-        assert!(is_ignorable_telemetry_record("{\"type\": \"TOKEN_USAGE\", \"tokens\": 120}"));
-        assert!(is_ignorable_telemetry_record("{\"type\": \"HEARTBEAT\", \"alive\": true}"));
-        assert!(is_ignorable_telemetry_record("{\"type\": \"TELEMETRY\", \"latency\": 12}"));
-        assert!(!is_ignorable_telemetry_record("{\"type\": \"PLANNER_RESPONSE\", \"tool_calls\": []}"));
+        assert!(is_ignorable_telemetry_record(
+            "{\"type\": \"TOKEN_USAGE\", \"tokens\": 120}"
+        ));
+        assert!(is_ignorable_telemetry_record(
+            "{\"type\": \"HEARTBEAT\", \"alive\": true}"
+        ));
+        assert!(is_ignorable_telemetry_record(
+            "{\"type\": \"TELEMETRY\", \"latency\": 12}"
+        ));
+        assert!(!is_ignorable_telemetry_record(
+            "{\"type\": \"PLANNER_RESPONSE\", \"tool_calls\": []}"
+        ));
     }
 
     #[test]

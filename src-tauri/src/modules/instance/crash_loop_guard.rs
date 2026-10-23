@@ -34,11 +34,13 @@ impl CrashLoopGuard {
     /// Records that an instance process has launched.
     pub fn record_launch(&self, instance_id: &str) {
         if let Ok(mut guard) = self.records.write() {
-            let entry = guard.entry(instance_id.to_string()).or_insert_with(|| CrashRecord {
-                launch_time: Instant::now(),
-                consecutive_rapid_crashes: 0,
-                quarantine_until: None,
-            });
+            let entry = guard
+                .entry(instance_id.to_string())
+                .or_insert_with(|| CrashRecord {
+                    launch_time: Instant::now(),
+                    consecutive_rapid_crashes: 0,
+                    quarantine_until: None,
+                });
             entry.launch_time = Instant::now();
         }
     }

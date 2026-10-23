@@ -75,7 +75,10 @@ pub enum ScopeEntanglementViolation {
 impl fmt::Display for ScopeEntanglementViolation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::UnrelatedDomainsMixed { domains, file_count } => {
+            Self::UnrelatedDomainsMixed {
+                domains,
+                file_count,
+            } => {
                 let domain_list = domains
                     .iter()
                     .map(|d| d.as_str())
@@ -119,10 +122,7 @@ impl ScopeLinterReport {
     /// Generates a human-readable summary of the PR scope audit.
     pub fn summary(&self) -> String {
         if self.is_cohesive {
-            let primary = self
-                .primary_domain
-                .map(|d| d.as_str())
-                .unwrap_or("None");
+            let primary = self.primary_domain.map(|d| d.as_str()).unwrap_or("None");
             format!(
                 "PR scope cohesive: primary domain '{}', {} touched domain(s)",
                 primary,
@@ -248,8 +248,8 @@ fn check_unrelated_domains(
 
 /// Checks for mandatory Problem Classification header in the PR description.
 fn check_classification_header(pr_body: &str) -> Option<ScopeEntanglementViolation> {
-    let has_header = pr_body.contains("Problem Classification")
-        || pr_body.contains("problem classification");
+    let has_header =
+        pr_body.contains("Problem Classification") || pr_body.contains("problem classification");
     if !has_header {
         Some(ScopeEntanglementViolation::MissingProblemClassificationHeader)
     } else {

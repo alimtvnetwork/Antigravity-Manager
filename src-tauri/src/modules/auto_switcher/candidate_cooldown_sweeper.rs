@@ -38,7 +38,13 @@ impl CandidateCooldownSweeper {
             Err(p) => p.into_inner(),
         };
         let id = account_id.into();
-        guard.insert(id.clone(), CooldownEntry { account_id: id, expires_at });
+        guard.insert(
+            id.clone(),
+            CooldownEntry {
+                account_id: id,
+                expires_at,
+            },
+        );
     }
 
     /// Sweeps expired entries and returns accounts that are now unblocked.

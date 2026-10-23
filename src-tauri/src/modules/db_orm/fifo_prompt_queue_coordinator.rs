@@ -142,7 +142,9 @@ impl FifoPromptQueueCoordinator {
     /// Enqueues a new prompt item, maintaining strict FIFO order by created_at then id.
     pub fn enqueue(&mut self, item: FifoPromptItem) -> AppResult<()> {
         if item.id.trim().is_empty() {
-            return Err(AppError::Config("Cannot enqueue prompt with empty id".to_string()));
+            return Err(AppError::Config(
+                "Cannot enqueue prompt with empty id".to_string(),
+            ));
         }
 
         // Binary search insertion index to enforce FIFO order

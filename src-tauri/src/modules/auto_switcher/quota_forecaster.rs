@@ -61,13 +61,14 @@ pub fn forecast_quota_depletion(
 
     let is_rapid_drain = burn_rate_pct_per_min >= RAPID_DRAIN_THRESHOLD_PCT_PER_MIN;
 
-    let estimated_minutes_to_threshold = if burn_rate_pct_per_min > 0.01 && current_quota > threshold {
-        let quota_headroom = current_quota - threshold;
-        let mins = quota_headroom / burn_rate_pct_per_min;
-        Some((mins * 10.0).round() / 10.0)
-    } else {
-        None
-    };
+    let estimated_minutes_to_threshold =
+        if burn_rate_pct_per_min > 0.01 && current_quota > threshold {
+            let quota_headroom = current_quota - threshold;
+            let mins = quota_headroom / burn_rate_pct_per_min;
+            Some((mins * 10.0).round() / 10.0)
+        } else {
+            None
+        };
 
     QuotaForecast {
         burn_rate_pct_per_min: (burn_rate_pct_per_min * 1000.0).round() / 1000.0,

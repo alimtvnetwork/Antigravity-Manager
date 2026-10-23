@@ -100,10 +100,8 @@ mod tests {
 
     #[test]
     fn test_configure_tcp_keepalive_custom_idle_and_interval() {
-        let config = configure_tcp_keepalive(
-            Some(Duration::from_secs(45)),
-            Some(Duration::from_secs(5)),
-        );
+        let config =
+            configure_tcp_keepalive(Some(Duration::from_secs(45)), Some(Duration::from_secs(5)));
 
         assert_eq!(config.idle_time, Duration::from_secs(45));
         assert_eq!(config.probe_interval, Duration::from_secs(5));

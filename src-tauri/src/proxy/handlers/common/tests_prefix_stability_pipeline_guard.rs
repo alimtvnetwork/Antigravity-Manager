@@ -119,14 +119,10 @@ mod tests {
 
     #[test]
     fn test_swapping_order_of_earlier_turns() {
-        let baseline = build_dialog_turns([
-            ("user", "Turn 0 User"),
-            ("assistant", "Turn 1 Assistant"),
-        ]);
-        let new_history = build_dialog_turns([
-            ("assistant", "Turn 1 Assistant"),
-            ("user", "Turn 0 User"),
-        ]);
+        let baseline =
+            build_dialog_turns([("user", "Turn 0 User"), ("assistant", "Turn 1 Assistant")]);
+        let new_history =
+            build_dialog_turns([("assistant", "Turn 1 Assistant"), ("user", "Turn 0 User")]);
 
         let report = verify_prefix_stability(&baseline, &new_history);
         assert!(!report.is_stable());
@@ -140,7 +136,10 @@ mod tests {
             } => *turn_index == 0 && expected_role == "user" && actual_role == "assistant",
             _ => false,
         });
-        assert!(has_role_swap, "Expected TurnOrderAltered violation for turn 0");
+        assert!(
+            has_role_swap,
+            "Expected TurnOrderAltered violation for turn 0"
+        );
     }
 
     #[test]
@@ -151,19 +150,18 @@ mod tests {
             ("assistant", "Answer 1."),
             ("user", "Question 2."),
         ]);
-        let new_history = build_dialog_turns([
-            ("system", "System prompt."),
-            ("user", "Question 1."),
-        ]);
+        let new_history =
+            build_dialog_turns([("system", "System prompt."), ("user", "Question 1.")]);
 
         let report = verify_prefix_stability(&baseline, &new_history);
         assert!(!report.is_stable());
         assert_eq!(report.prefix_turns_preserved, 2);
         assert_eq!(report.total_new_turns, 2);
 
-        let truncation_violation = report.violations.iter().find(|v| {
-            matches!(v, PrefixStabilityViolation::TurnHistoryTruncated { .. })
-        });
+        let truncation_violation = report
+            .violations
+            .iter()
+            .find(|v| matches!(v, PrefixStabilityViolation::TurnHistoryTruncated { .. }));
 
         match truncation_violation {
             Some(PrefixStabilityViolation::TurnHistoryTruncated {
@@ -199,8 +197,12 @@ mod tests {
 
         assert!(v1.to_string().contains("System prompt mutated"));
         assert!(v2.to_string().contains("Turn order altered at turn 2"));
-        assert!(v3.to_string().contains("Earlier turn content mutated at turn 1"));
-        assert!(v4.to_string().contains("Turn history truncated: baseline has 5"));
+        assert!(v3
+            .to_string()
+            .contains("Earlier turn content mutated at turn 1"));
+        assert!(v4
+            .to_string()
+            .contains("Turn history truncated: baseline has 5"));
 
         // Verify std::error::Error trait bound
         let error_ref: &dyn std::error::Error = &v1;
@@ -220,10 +222,8 @@ mod tests {
     #[test]
     fn test_empty_baseline_initial_turns() {
         let baseline = Vec::<DialogTurn>::new();
-        let new_history = build_dialog_turns([
-            ("system", "System prompt."),
-            ("user", "Hello world."),
-        ]);
+        let new_history =
+            build_dialog_turns([("system", "System prompt."), ("user", "Hello world.")]);
 
         let report = verify_prefix_stability(&baseline, &new_history);
         assert!(report.is_stable());
@@ -253,7 +253,9 @@ mod tests {
         let utf8_multibyte = "✨ 统一上下文结构对齐与前缀稳定性检测保护 🚀 确保模型缓存效率提升并防止 prompt 漂移与状态不一致！继续输入更多内容以验证截断处理。";
         let turn_utf8 = create_dialog_turn(1, "system", utf8_multibyte);
         assert!(turn_utf8.content_snippet.chars().count() <= 60);
-        assert!(turn_utf8.content_snippet.starts_with("✨ 统一上下文结构对齐"));
+        assert!(turn_utf8
+            .content_snippet
+            .starts_with("✨ 统一上下文结构对齐"));
     }
 
     #[test]
@@ -265,8 +267,15 @@ mod tests {
 
         assert_eq!(hash_a, hash_b, "Hash should be deterministic");
         assert_ne!(hash_a, hash_diff_role, "Hash should discriminate roles");
-        assert_ne!(hash_a, hash_diff_content, "Hash should discriminate content");
-        assert_eq!(hash_a.len(), 64, "SHA-256 hex digest should be 64 characters");
+        assert_ne!(
+            hash_a, hash_diff_content,
+            "Hash should discriminate content"
+        );
+        assert_eq!(
+            hash_a.len(),
+            64,
+            "SHA-256 hex digest should be 64 characters"
+        );
     }
 
     #[test]
@@ -276,10 +285,8 @@ mod tests {
             ("user", "User prompt."),
             ("assistant", "Model reply."),
         ]);
-        let new_history = build_dialog_turns([
-            ("system", "System altered."),
-            ("assistant", "Model reply."),
-        ]);
+        let new_history =
+            build_dialog_turns([("system", "System altered."), ("assistant", "Model reply.")]);
 
         let report = verify_prefix_stability(&baseline, &new_history);
         assert!(!report.is_stable());
@@ -295,12 +302,10 @@ mod tests {
             is_stable: false,
             prefix_turns_preserved: 2,
             total_new_turns: 4,
-            violations: vec![
-                PrefixStabilityViolation::EarlierTurnContentMutated {
-                    turn_index: 2,
-                    snippet: "Sample mutated snippet".to_string(),
-                },
-            ],
+            violations: vec![PrefixStabilityViolation::EarlierTurnContentMutated {
+                turn_index: 2,
+                snippet: "Sample mutated snippet".to_string(),
+            }],
         };
 
         let json = serde_json::to_string(&original_report).expect("Serialization failed");

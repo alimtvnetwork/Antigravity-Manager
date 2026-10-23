@@ -48,7 +48,10 @@ mod tests {
         let frames = coalescer.push_chunk(chunk);
         assert_eq!(frames.len(), 3);
         assert_eq!(frames[0], Bytes::from_static(b"data: frame 1\n\n"));
-        assert_eq!(frames[1], Bytes::from_static(b"event: ping\ndata: frame 2\r\n\r\n"));
+        assert_eq!(
+            frames[1],
+            Bytes::from_static(b"event: ping\ndata: frame 2\r\n\r\n")
+        );
         assert_eq!(frames[2], Bytes::from_static(b"data: frame 3\n\n"));
         assert_eq!(coalescer.buffered_len(), 0);
         assert_eq!(coalescer.stats(), (chunk.len(), 3));
@@ -110,7 +113,10 @@ mod tests {
         assert_eq!(coalescer.buffered_len(), 24);
 
         let residual = coalescer.finish();
-        assert_eq!(residual, Some(Bytes::from_static(b"data: trailing residual")));
+        assert_eq!(
+            residual,
+            Some(Bytes::from_static(b"data: trailing residual"))
+        );
     }
 
     #[test]

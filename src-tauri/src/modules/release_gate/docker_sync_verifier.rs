@@ -44,7 +44,10 @@ pub fn evaluate_docker_tag_sync(
                 is_valid: false,
                 is_production_channel: true,
                 latest_tag_allowed: false,
-                reason: format!("Prerelease tag '{}' is strictly forbidden on 'main' branch", clean_tag),
+                reason: format!(
+                    "Prerelease tag '{}' is strictly forbidden on 'main' branch",
+                    clean_tag
+                ),
             };
         }
         if !make_latest {
@@ -83,7 +86,10 @@ pub fn evaluate_docker_tag_sync(
                 is_valid: false,
                 is_production_channel: false,
                 latest_tag_allowed: false,
-                reason: format!("Preview release on 'beta' requires a prerelease tag suffix, got '{}'", clean_tag),
+                reason: format!(
+                    "Preview release on 'beta' requires a prerelease tag suffix, got '{}'",
+                    clean_tag
+                ),
             };
         }
         DockerSyncEvaluation {
@@ -97,7 +103,10 @@ pub fn evaluate_docker_tag_sync(
             is_valid: false,
             is_production_channel: false,
             latest_tag_allowed: false,
-            reason: format!("Unauthorized release branch '{}'; releases must originate from 'main' or 'beta'", clean_branch),
+            reason: format!(
+                "Unauthorized release branch '{}'; releases must originate from 'main' or 'beta'",
+                clean_branch
+            ),
         }
     }
 }

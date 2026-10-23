@@ -415,12 +415,8 @@ impl CallerIdeHeartbeatWatchdog {
     {
         let (is_alive, vitality_state) = self.determine_vitality_state(now_ms, &vitality_probe);
         let target_pid = self.caller_pid.unwrap_or(0);
-        let decision = self.evaluate_eviction_decision_with_probe(
-            target_pid,
-            false,
-            now_ms,
-            &vitality_probe,
-        );
+        let decision =
+            self.evaluate_eviction_decision_with_probe(target_pid, false, now_ms, &vitality_probe);
         let is_eviction_immune = decision.is_protected();
         let age_ms = self.last_heartbeat_age_ms(now_ms);
         let reason = Self::resolve_protection_reason(decision, vitality_state);

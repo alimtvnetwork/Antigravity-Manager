@@ -21,12 +21,15 @@ impl SchemaIntegrityGate {
         conn: &Connection,
         expected_tables: &[&str],
     ) -> Result<SchemaIntegrityReport, rusqlite::Error> {
-        let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")?;
+        let mut stmt = conn.prepare(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';",
+        )?;
         let table_names: Vec<String> = stmt
             .query_map([], |row| row.get(0))?
             .collect::<Result<Vec<_>, _>>()?;
 
-        let existing_set: HashSet<String> = table_names.iter().map(|n| n.to_ascii_lowercase()).collect();
+        let existing_set: HashSet<String> =
+            table_names.iter().map(|n| n.to_ascii_lowercase()).collect();
         let mut missing_tables = Vec::new();
 
         for &expected in expected_tables {

@@ -44,7 +44,11 @@ impl IdleConnectionReaper {
     }
 
     /// Registers or updates activity on a pooled connection.
-    pub fn touch_connection(&self, connection_id: impl Into<String>, endpoint_id: impl Into<String>) {
+    pub fn touch_connection(
+        &self,
+        connection_id: impl Into<String>,
+        endpoint_id: impl Into<String>,
+    ) {
         let mut guard = match self.connections.lock() {
             Ok(g) => g,
             Err(p) => p.into_inner(),
@@ -79,8 +83,10 @@ impl IdleConnectionReaper {
         let mut stale_ids = Vec::new();
 
         guard.retain(|id, conn| {
-            let is_idle_expired = now.duration_since(conn.last_active_at) > self.config.max_idle_duration;
-            let is_lifetime_expired = now.duration_since(conn.created_at) > self.config.max_connection_lifetime;
+            let is_idle_expired =
+                now.duration_since(conn.last_active_at) > self.config.max_idle_duration;
+            let is_lifetime_expired =
+                now.duration_since(conn.created_at) > self.config.max_connection_lifetime;
 
             if is_idle_expired || is_lifetime_expired {
                 stale_ids.push(id.clone());

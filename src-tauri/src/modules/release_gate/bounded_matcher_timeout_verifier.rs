@@ -100,24 +100,50 @@ impl fmt::Display for MatcherViolationType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnboundedMultilineSpan { pattern } => {
-                write!(f, "Unbounded multiline span detected in pattern: '{pattern}'")
+                write!(
+                    f,
+                    "Unbounded multiline span detected in pattern: '{pattern}'"
+                )
             }
             Self::TagBoundaryCrossing { pattern } => {
-                write!(f, "Unconstrained wildcard crossing tag boundary in: '{pattern}'")
+                write!(
+                    f,
+                    "Unconstrained wildcard crossing tag boundary in: '{pattern}'"
+                )
             }
             Self::BareWildcard { pattern } => {
-                write!(f, "Bare unanchored wildcard detected in pattern: '{pattern}'")
+                write!(
+                    f,
+                    "Bare unanchored wildcard detected in pattern: '{pattern}'"
+                )
             }
             Self::ZeroTimeoutForbidden { wait_type } => {
                 write!(f, "Zero timeout forbidden for wait type '{wait_type}'")
             }
-            Self::TimeoutBelowFloor { wait_type, timeout_ms, min_ms } => {
-                write!(f, "Timeout {timeout_ms}ms below floor {min_ms}ms for '{wait_type}'")
+            Self::TimeoutBelowFloor {
+                wait_type,
+                timeout_ms,
+                min_ms,
+            } => {
+                write!(
+                    f,
+                    "Timeout {timeout_ms}ms below floor {min_ms}ms for '{wait_type}'"
+                )
             }
-            Self::TimeoutExceedsCeiling { wait_type, timeout_ms, max_ms } => {
-                write!(f, "Timeout {timeout_ms}ms exceeds ceiling {max_ms}ms for '{wait_type}'")
+            Self::TimeoutExceedsCeiling {
+                wait_type,
+                timeout_ms,
+                max_ms,
+            } => {
+                write!(
+                    f,
+                    "Timeout {timeout_ms}ms exceeds ceiling {max_ms}ms for '{wait_type}'"
+                )
             }
-            Self::BoundaryBreach { boundary_type, detail } => {
+            Self::BoundaryBreach {
+                boundary_type,
+                detail,
+            } => {
                 write!(f, "Boundary breach for '{boundary_type}': {detail}")
             }
         }
@@ -267,8 +293,7 @@ impl BoundedMatcherTimeoutVerifier {
 
     /// Audits a pattern string and propagates violations directly via AppError.
     pub fn audit_pattern_or_error(&self, pattern: &str) -> Result<(), AppError> {
-        self.audit_pattern(pattern)
-            .map_err(AppError::Config)
+        self.audit_pattern(pattern).map_err(AppError::Config)
     }
 
     /// Validates an asynchronous wait timeout against minimum and maximum bounds.
@@ -289,7 +314,9 @@ impl BoundedMatcherTimeoutVerifier {
             return Err(format!("{wait_type}: Timeout {cur}ms below floor {min}ms"));
         }
         if timeout > self.max_timeout {
-            return Err(format!("{wait_type}: Timeout {cur}ms exceeds ceiling {max}ms"));
+            return Err(format!(
+                "{wait_type}: Timeout {cur}ms exceeds ceiling {max}ms"
+            ));
         }
         Ok(())
     }
@@ -374,10 +401,7 @@ fn has_bare_unanchored_wildcard(p: &str) -> bool {
 }
 
 /// Verifies that a matched text snippet adheres strictly to the specified boundary constraint.
-pub fn verify_matched_snippet(
-    snippet: &str,
-    boundary: MatcherBoundaryType,
-) -> Result<(), String> {
+pub fn verify_matched_snippet(snippet: &str, boundary: MatcherBoundaryType) -> Result<(), String> {
     match boundary {
         MatcherBoundaryType::SingleLineOnly => check_single_line_boundary(snippet),
         MatcherBoundaryType::WithinTagBound => check_tag_boundary(snippet),
@@ -409,7 +433,8 @@ fn check_tag_boundary(snippet: &str) -> Result<(), String> {
 
 fn check_clause_boundary(snippet: &str) -> Result<(), String> {
     let has_semi = snippet.contains(';');
-    let has_sentence_end = snippet.contains(". ") || snippet.contains("? ") || snippet.contains("! ");
+    let has_sentence_end =
+        snippet.contains(". ") || snippet.contains("? ") || snippet.contains("! ");
     if has_semi || has_sentence_end {
         return Err(format!("Snippet crossed clause delimiter: '{snippet}'"));
     }
@@ -437,10 +462,14 @@ pub fn verify_wait_timeout(timeout_ms: u64, max_cap_ms: u64) -> Result<(), Strin
         return Err("Zero timeout is forbidden; waits must be bounded".to_string());
     }
     if timeout_ms > max_cap_ms {
-        return Err(format!("Timeout {timeout_ms}ms exceeds maximum cap {max_cap_ms}ms"));
+        return Err(format!(
+            "Timeout {timeout_ms}ms exceeds maximum cap {max_cap_ms}ms"
+        ));
     }
     if timeout_ms < DEFAULT_MIN_TIMEOUT_MS {
-        return Err(format!("Timeout {timeout_ms}ms below floor {DEFAULT_MIN_TIMEOUT_MS}ms"));
+        return Err(format!(
+            "Timeout {timeout_ms}ms below floor {DEFAULT_MIN_TIMEOUT_MS}ms"
+        ));
     }
     Ok(())
 }

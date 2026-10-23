@@ -16,8 +16,7 @@ impl PipeSocketCleaner {
 
         let mut cleaned_count = 0usize;
 
-        let entries = std::fs::read_dir(runtime_dir)
-            .map_err(AppError::Io)?;
+        let entries = std::fs::read_dir(runtime_dir).map_err(AppError::Io)?;
 
         for entry in entries.flatten() {
             let path = entry.path();

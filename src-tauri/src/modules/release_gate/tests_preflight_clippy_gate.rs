@@ -170,10 +170,7 @@ error: aborting due to 1 previous error; 1 warning emitted
     #[test]
     fn test_windows_drive_letter_source_location() {
         let loc = parse_source_location("--> C:\\work\\repo\\src\\lib.rs:55:12");
-        assert_eq!(
-            loc,
-            Some(("C:\\work\\repo\\src\\lib.rs".to_string(), 55))
-        );
+        assert_eq!(loc, Some(("C:\\work\\repo\\src\\lib.rs".to_string(), 55)));
 
         let posix_loc = parse_source_location("--> src/main.rs:102:4");
         assert_eq!(posix_loc, Some(("src/main.rs".to_string(), 102)));

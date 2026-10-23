@@ -229,8 +229,8 @@ fn has_qualified_fifo_clause(unified_sql: &str) -> bool {
         let parts: Vec<&str> = after_order.split(',').collect();
         if parts.len() >= 2 {
             let first_col_ok = parts[0].trim().ends_with("CREATED_AT ASC");
-            let second_col_ok = parts[1].trim().starts_with("ID ASC")
-                || parts[1].trim().contains(".ID ASC");
+            let second_col_ok =
+                parts[1].trim().starts_with("ID ASC") || parts[1].trim().contains(".ID ASC");
             return first_col_ok && second_col_ok;
         }
     }

@@ -5,8 +5,7 @@
 #[cfg(test)]
 mod tests {
     use crate::modules::db_orm::connection_busy_timeout_scaler::{
-        ConnectionBusyTimeoutScaler, BASE_BUSY_TIMEOUT_MS, MAX_BUSY_TIMEOUT_MS,
-        MIN_BUSY_TIMEOUT_MS,
+        ConnectionBusyTimeoutScaler, BASE_BUSY_TIMEOUT_MS, MAX_BUSY_TIMEOUT_MS, MIN_BUSY_TIMEOUT_MS,
     };
     use rusqlite::Connection;
 
@@ -55,7 +54,9 @@ mod tests {
             assert!(
                 curr_timeout >= MIN_BUSY_TIMEOUT_MS && curr_timeout <= MAX_BUSY_TIMEOUT_MS,
                 "Timeout must remain bounded between MIN ({}) and MAX ({}): got {}",
-                MIN_BUSY_TIMEOUT_MS, MAX_BUSY_TIMEOUT_MS, curr_timeout
+                MIN_BUSY_TIMEOUT_MS,
+                MAX_BUSY_TIMEOUT_MS,
+                curr_timeout
             );
             prev_timeout = curr_timeout;
         }

@@ -120,7 +120,9 @@ mod tests {
 
     #[test]
     fn test_initial_turn_not_user_backfills_synthetic_user() {
-        let turns = vec![ConversationTurn::model("Spontaneous greeting from assistant.")];
+        let turns = vec![ConversationTurn::model(
+            "Spontaneous greeting from assistant.",
+        )];
 
         let report = align_conversation_turns(&turns);
 
@@ -128,10 +130,7 @@ mod tests {
         assert_eq!(report.initial_turn_count, 1);
         assert_eq!(report.aligned_turn_count, 2);
         assert_eq!(report.aligned_turns[0].role, ConversationRole::User);
-        assert_eq!(
-            report.aligned_turns[0].text,
-            DEFAULT_SYNTHETIC_USER_PROMPT
-        );
+        assert_eq!(report.aligned_turns[0].text, DEFAULT_SYNTHETIC_USER_PROMPT);
         assert_eq!(report.aligned_turns[1].role, ConversationRole::Model);
         assert_eq!(
             report.aligned_turns[1].text,

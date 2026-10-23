@@ -23,14 +23,9 @@ impl PageCacheAdjuster {
             .prepare("PRAGMA cache_size;")
             .map_err(AppError::Database)?;
 
-        let mut rows = stmt
-            .query([])
-            .map_err(AppError::Database)?;
+        let mut rows = stmt.query([]).map_err(AppError::Database)?;
 
-        if let Some(row) = rows
-            .next()
-            .map_err(AppError::Database)?
-        {
+        if let Some(row) = rows.next().map_err(AppError::Database)? {
             let val: i64 = row.get(0).unwrap_or(0);
             Ok(val)
         } else {

@@ -36,8 +36,10 @@ impl Default for IndexFragmentationScorer {
 impl IndexFragmentationScorer {
     pub fn new(reindex_threshold: Option<f64>, analyze_threshold: Option<f64>) -> Self {
         Self {
-            reindex_threshold_percent: reindex_threshold.unwrap_or(DEFAULT_REINDEX_THRESHOLD_PERCENT),
-            analyze_threshold_percent: analyze_threshold.unwrap_or(DEFAULT_ANALYZE_THRESHOLD_PERCENT),
+            reindex_threshold_percent: reindex_threshold
+                .unwrap_or(DEFAULT_REINDEX_THRESHOLD_PERCENT),
+            analyze_threshold_percent: analyze_threshold
+                .unwrap_or(DEFAULT_ANALYZE_THRESHOLD_PERCENT),
         }
     }
 

@@ -41,7 +41,8 @@ impl ReadinessEvaluator {
         } else if !token_valid {
             rejection_reason = Some("OAuth access token expired or nearing expiration".to_string());
         } else if !lease_available {
-            rejection_reason = Some("Account actively leased by another cluster machine".to_string());
+            rejection_reason =
+                Some("Account actively leased by another cluster machine".to_string());
         } else if !quota_sufficient {
             rejection_reason = Some("Account 4-hour quota depleted (0.0% remaining)".to_string());
         }

@@ -30,7 +30,7 @@ impl SlidingVelocityGuard {
     pub fn new(window_duration: Option<Duration>, min_safety_secs: Option<f64>) -> Self {
         Self {
             window_duration: window_duration.unwrap_or(Duration::from_secs(300)), // 5 minutes
-            minimum_exhaustion_safety_secs: min_safety_secs.unwrap_or(60.0),      // 60 seconds minimum runway
+            minimum_exhaustion_safety_secs: min_safety_secs.unwrap_or(60.0), // 60 seconds minimum runway
             events: VecDeque::new(),
         }
     }

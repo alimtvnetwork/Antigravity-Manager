@@ -16,11 +16,9 @@ impl StorageMigrationGuard {
             return Ok(false);
         }
 
-        let content = std::fs::read_to_string(storage_path)
-            .map_err(AppError::Io)?;
+        let content = std::fs::read_to_string(storage_path).map_err(AppError::Io)?;
 
-        let mut root: Value = serde_json::from_str(&content)
-            .unwrap_or_else(|_| json!({}));
+        let mut root: Value = serde_json::from_str(&content).unwrap_or_else(|_| json!({}));
 
         let mut modified = false;
 
@@ -33,7 +31,12 @@ impl StorageMigrationGuard {
         ];
 
         for key in required_keys {
-            if root.get(key).and_then(|v| v.as_str()).map(|s| s.trim().is_empty()).unwrap_or(true) {
+            if root
+                .get(key)
+                .and_then(|v| v.as_str())
+                .map(|s| s.trim().is_empty())
+                .unwrap_or(true)
+            {
                 let synthetic_guid = generate_synthetic_guid();
                 root[key] = json!(synthetic_guid);
                 modified = true;
@@ -41,11 +44,11 @@ impl StorageMigrationGuard {
         }
 
         if modified {
-            let serialized = serde_json::to_string_pretty(&root)
-                .map_err(|e| AppError::Config(format!("Failed to serialize migrated storage.json: {}", e)))?;
+            let serialized = serde_json::to_string_pretty(&root).map_err(|e| {
+                AppError::Config(format!("Failed to serialize migrated storage.json: {}", e))
+            })?;
 
-            std::fs::write(storage_path, serialized)
-                .map_err(AppError::Io)?;
+            std::fs::write(storage_path, serialized).map_err(AppError::Io)?;
         }
 
         Ok(modified)

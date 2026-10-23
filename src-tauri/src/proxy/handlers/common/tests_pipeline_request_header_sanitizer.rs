@@ -11,7 +11,10 @@ mod tests {
         let token = format!("{}-{}", "Bearer", "valid_auth_token_98765");
         headers.insert("authorization".to_string(), token.clone());
         headers.insert("content-type".to_string(), "application/json".to_string());
-        headers.insert("x-goog-api-key".to_string(), "gemini-api-key-sample".to_string());
+        headers.insert(
+            "x-goog-api-key".to_string(),
+            "gemini-api-key-sample".to_string(),
+        );
         headers.insert("user-agent".to_string(), "Antigravity/4.0".to_string());
         headers.insert("accept".to_string(), "application/json".to_string());
 
@@ -24,7 +27,10 @@ mod tests {
         assert!(report.stripped_headers.is_empty());
         assert!(report.normalized_headers.is_empty());
         assert_eq!(
-            report.retained_headers.get("authorization").map(String::as_str),
+            report
+                .retained_headers
+                .get("authorization")
+                .map(String::as_str),
             Some(token.as_str())
         );
     }
@@ -66,7 +72,10 @@ mod tests {
         headers.insert("x-forwarded-for".to_string(), "10.0.0.1".to_string());
         headers.insert("x-forwarded-proto".to_string(), "https".to_string());
         headers.insert("x-agm-instance-id".to_string(), "inst-001".to_string());
-        headers.insert("x-internal-routing-secret".to_string(), "route-key".to_string());
+        headers.insert(
+            "x-internal-routing-secret".to_string(),
+            "route-key".to_string(),
+        );
 
         let report = sanitize_pipeline_request_headers(&headers);
 
@@ -78,7 +87,10 @@ mod tests {
         for record in &report.stripped_headers {
             match &record.action {
                 SanitizedHeaderAction::Stripped { category, reason } => {
-                    assert_eq!(*category, HeaderSanitizationCategory::RiskyInternalTelemetry);
+                    assert_eq!(
+                        *category,
+                        HeaderSanitizationCategory::RiskyInternalTelemetry
+                    );
                     assert!(reason.contains("Internal telemetry"));
                 }
                 _ => panic!("Expected Stripped action for internal header"),
@@ -91,7 +103,10 @@ mod tests {
         let mut headers = HashMap::new();
         headers.insert("cookie".to_string(), "session=secret".to_string());
         headers.insert("cookie2".to_string(), "v=2".to_string());
-        headers.insert("sec-ch-ua".to_string(), "\"Google Chrome\";v=\"125\"".to_string());
+        headers.insert(
+            "sec-ch-ua".to_string(),
+            "\"Google Chrome\";v=\"125\"".to_string(),
+        );
         headers.insert("sec-ch-ua-platform".to_string(), "\"Windows\"".to_string());
 
         let report = sanitize_pipeline_request_headers(&headers);
@@ -104,7 +119,10 @@ mod tests {
         for record in &report.stripped_headers {
             match &record.action {
                 SanitizedHeaderAction::Stripped { category, reason } => {
-                    assert_eq!(*category, HeaderSanitizationCategory::UntrustedClientMetadata);
+                    assert_eq!(
+                        *category,
+                        HeaderSanitizationCategory::UntrustedClientMetadata
+                    );
                     assert!(reason.contains("Untrusted client metadata"));
                 }
                 _ => panic!("Expected Stripped action for untrusted metadata"),

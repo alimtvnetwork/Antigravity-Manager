@@ -38,10 +38,7 @@ pub enum AccumulatedPart {
         is_complete: bool,
     },
     /// Inlined binary or multimodal payload data.
-    InlineData {
-        mime_type: String,
-        data: String,
-    },
+    InlineData { mime_type: String, data: String },
 }
 
 impl AccumulatedPart {
@@ -300,7 +297,11 @@ pub struct AccumulatedToolCall {
 
 impl AccumulatedToolCall {
     /// Constructs a new tool call record.
-    pub fn new(id: impl Into<String>, name: impl Into<String>, arguments: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        arguments: impl Into<String>,
+    ) -> Self {
         Self {
             id: id.into(),
             name: name.into(),
@@ -685,9 +686,7 @@ impl StreamingPayloadAccumulator {
 
         if self.config.auto_repair_json {
             if let Some(AccumulatedPart::FunctionCall {
-                args,
-                is_complete,
-                ..
+                args, is_complete, ..
             }) = self.current_turn.parts.last_mut()
             {
                 if !*is_complete {
@@ -864,7 +863,11 @@ impl StreamingPayloadAccumulator {
         Ok(())
     }
 
-    fn parse_json_payload(&mut self, json_str: &str, chunk_len: usize) -> Result<(), AccumulatorError> {
+    fn parse_json_payload(
+        &mut self,
+        json_str: &str,
+        chunk_len: usize,
+    ) -> Result<(), AccumulatorError> {
         let value: serde_json::Value = serde_json::from_str(json_str)
             .map_err(|e| AccumulatorError::MalformedJsonChunk(e.to_string()))?;
 
@@ -883,7 +886,10 @@ impl StreamingPayloadAccumulator {
                     .and_then(|p| p.as_array())
                 {
                     for part in parts {
-                        let is_thought = part.get("thought").and_then(|t| t.as_bool()).unwrap_or(false);
+                        let is_thought = part
+                            .get("thought")
+                            .and_then(|t| t.as_bool())
+                            .unwrap_or(false);
                         if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
                             if is_thought {
                                 Self::append_or_create_thought(
@@ -896,7 +902,11 @@ impl StreamingPayloadAccumulator {
                             }
                         }
                         if let Some(fc) = part.get("functionCall") {
-                            let name = fc.get("name").and_then(|n| n.as_str()).unwrap_or("").to_string();
+                            let name = fc
+                                .get("name")
+                                .and_then(|n| n.as_str())
+                                .unwrap_or("")
+                                .to_string();
                             let args = if let Some(args_val) = fc.get("args") {
                                 if args_val.is_string() {
                                     args_val.as_str().unwrap().to_string()
@@ -951,7 +961,9 @@ impl StreamingPayloadAccumulator {
                             let id = tc.get("id").and_then(|i| i.as_str());
                             let fn_obj = tc.get("function");
                             let name = fn_obj.and_then(|f| f.get("name")).and_then(|n| n.as_str());
-                            let args = fn_obj.and_then(|f| f.get("arguments")).and_then(|a| a.as_str());
+                            let args = fn_obj
+                                .and_then(|f| f.get("arguments"))
+                                .and_then(|a| a.as_str());
 
                             self.ingest_tool_call_delta(idx, id, name, args);
                         }
@@ -1021,7 +1033,9 @@ impl StreamingPayloadAccumulator {
         }
 
         self.legacy_tool_calls.push(AccumulatedToolCall {
-            id: id.unwrap_or(&format!("call_{}", self.legacy_tool_calls.len() + 1)).to_string(),
+            id: id
+                .unwrap_or(&format!("call_{}", self.legacy_tool_calls.len() + 1))
+                .to_string(),
             name: name.unwrap_or("").to_string(),
             arguments: args.unwrap_or("").to_string(),
         });

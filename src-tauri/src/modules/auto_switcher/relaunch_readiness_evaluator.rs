@@ -35,7 +35,10 @@ impl RelaunchReadinessEvaluator {
 
         if elapsed < settling_target {
             let rem = (settling_target - elapsed).as_secs_f64();
-            pending.push(format!("Mandatory 10s settling delay in progress ({:.1}s remaining)", rem));
+            pending.push(format!(
+                "Mandatory 10s settling delay in progress ({:.1}s remaining)",
+                rem
+            ));
         }
 
         if !is_cdp_port_open {

@@ -5,12 +5,7 @@
 use std::collections::HashSet;
 
 /// Blacklisted environment variable prefixes and exact names that cause child process leakage.
-pub const BLACKLISTED_ENV_PREFIXES: &[&str] = &[
-    "VSCODE_",
-    "ELECTRON_",
-    "CHROME_",
-    "ORIGINAL_XDG_",
-];
+pub const BLACKLISTED_ENV_PREFIXES: &[&str] = &["VSCODE_", "ELECTRON_", "CHROME_", "ORIGINAL_XDG_"];
 
 pub const BLACKLISTED_EXACT_ENVS: &[&str] = &[
     "NODE_OPTIONS",

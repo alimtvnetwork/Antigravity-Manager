@@ -11,7 +11,10 @@ pub struct WorkspaceStorageMigrator;
 impl WorkspaceStorageMigrator {
     /// Copies workspaceStorage directory contents from source to destination,
     /// skipping volatile locks, socket files, and temporary caches.
-    pub fn copy_workspace_storage(source_data_dir: &Path, dest_data_dir: &Path) -> std::io::Result<usize> {
+    pub fn copy_workspace_storage(
+        source_data_dir: &Path,
+        dest_data_dir: &Path,
+    ) -> std::io::Result<usize> {
         let src_storage = source_data_dir.join("User").join("workspaceStorage");
         let dst_storage = dest_data_dir.join("User").join("workspaceStorage");
 
@@ -46,7 +49,10 @@ impl WorkspaceStorageMigrator {
             }
         }
 
-        info!("Migrated {} workspaceStorage trees from {:?} to {:?}", copied_workspaces, src_storage, dst_storage);
+        info!(
+            "Migrated {} workspaceStorage trees from {:?} to {:?}",
+            copied_workspaces, src_storage, dst_storage
+        );
         Ok(copied_workspaces)
     }
 

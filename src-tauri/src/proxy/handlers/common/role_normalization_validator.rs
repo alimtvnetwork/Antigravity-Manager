@@ -63,5 +63,10 @@ pub fn validate_turn_order(roles: &[CanonicalRole]) -> bool {
         return false;
     }
     // Must contain at least one user or system message
-    roles.iter().any(|r| matches!(r, CanonicalRole::User | CanonicalRole::System | CanonicalRole::Developer))
+    roles.iter().any(|r| {
+        matches!(
+            r,
+            CanonicalRole::User | CanonicalRole::System | CanonicalRole::Developer
+        )
+    })
 }

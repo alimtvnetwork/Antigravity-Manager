@@ -15,10 +15,7 @@ pub struct InstanceAffinityKey {
 impl InstanceAffinityKey {
     /// Constructs a new affinity key by hashing the normalized workspace path.
     pub fn new(instance_id: &str, workspace_path: &str) -> Self {
-        let normalized_path = workspace_path
-            .trim()
-            .to_lowercase()
-            .replace('\\', "/");
+        let normalized_path = workspace_path.trim().to_lowercase().replace('\\', "/");
 
         let mut hasher = DefaultHasher::new();
         normalized_path.hash(&mut hasher);
@@ -37,7 +34,11 @@ impl InstanceAffinityKey {
 
     /// Evaluates affinity similarity score bonus (0.0 to 15.0 points)
     /// to favor sticking with the previously bound account when quota remains.
-    pub fn compute_stickiness_bonus(&self, current_binding: Option<&str>, candidate_id: &str) -> f64 {
+    pub fn compute_stickiness_bonus(
+        &self,
+        current_binding: Option<&str>,
+        candidate_id: &str,
+    ) -> f64 {
         if let Some(current) = current_binding {
             if current == candidate_id {
                 return 15.0; // Significant stickiness bonus to prevent account churn

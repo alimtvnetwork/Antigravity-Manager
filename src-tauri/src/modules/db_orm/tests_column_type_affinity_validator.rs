@@ -2,30 +2,67 @@
 
 use rusqlite::Connection;
 
-use super::column_type_affinity_validator::{
-    inspect_table_columns, SqliteAffinity,
-};
+use super::column_type_affinity_validator::{inspect_table_columns, SqliteAffinity};
 
 #[test]
 fn test_sqlite_affinity_from_declared_type() {
-    assert_eq!(SqliteAffinity::from_declared_type("INT"), SqliteAffinity::Integer);
-    assert_eq!(SqliteAffinity::from_declared_type("INTEGER"), SqliteAffinity::Integer);
-    assert_eq!(SqliteAffinity::from_declared_type("BIGINT"), SqliteAffinity::Integer);
+    assert_eq!(
+        SqliteAffinity::from_declared_type("INT"),
+        SqliteAffinity::Integer
+    );
+    assert_eq!(
+        SqliteAffinity::from_declared_type("INTEGER"),
+        SqliteAffinity::Integer
+    );
+    assert_eq!(
+        SqliteAffinity::from_declared_type("BIGINT"),
+        SqliteAffinity::Integer
+    );
 
-    assert_eq!(SqliteAffinity::from_declared_type("TEXT"), SqliteAffinity::Text);
-    assert_eq!(SqliteAffinity::from_declared_type("VARCHAR(255)"), SqliteAffinity::Text);
-    assert_eq!(SqliteAffinity::from_declared_type("CLOB"), SqliteAffinity::Text);
+    assert_eq!(
+        SqliteAffinity::from_declared_type("TEXT"),
+        SqliteAffinity::Text
+    );
+    assert_eq!(
+        SqliteAffinity::from_declared_type("VARCHAR(255)"),
+        SqliteAffinity::Text
+    );
+    assert_eq!(
+        SqliteAffinity::from_declared_type("CLOB"),
+        SqliteAffinity::Text
+    );
 
-    assert_eq!(SqliteAffinity::from_declared_type("BLOB"), SqliteAffinity::Blob);
+    assert_eq!(
+        SqliteAffinity::from_declared_type("BLOB"),
+        SqliteAffinity::Blob
+    );
     assert_eq!(SqliteAffinity::from_declared_type(""), SqliteAffinity::Blob);
 
-    assert_eq!(SqliteAffinity::from_declared_type("REAL"), SqliteAffinity::Real);
-    assert_eq!(SqliteAffinity::from_declared_type("FLOAT"), SqliteAffinity::Real);
-    assert_eq!(SqliteAffinity::from_declared_type("DOUBLE"), SqliteAffinity::Real);
+    assert_eq!(
+        SqliteAffinity::from_declared_type("REAL"),
+        SqliteAffinity::Real
+    );
+    assert_eq!(
+        SqliteAffinity::from_declared_type("FLOAT"),
+        SqliteAffinity::Real
+    );
+    assert_eq!(
+        SqliteAffinity::from_declared_type("DOUBLE"),
+        SqliteAffinity::Real
+    );
 
-    assert_eq!(SqliteAffinity::from_declared_type("NUMERIC"), SqliteAffinity::Numeric);
-    assert_eq!(SqliteAffinity::from_declared_type("DECIMAL(10,5)"), SqliteAffinity::Numeric);
-    assert_eq!(SqliteAffinity::from_declared_type("BOOLEAN"), SqliteAffinity::Numeric);
+    assert_eq!(
+        SqliteAffinity::from_declared_type("NUMERIC"),
+        SqliteAffinity::Numeric
+    );
+    assert_eq!(
+        SqliteAffinity::from_declared_type("DECIMAL(10,5)"),
+        SqliteAffinity::Numeric
+    );
+    assert_eq!(
+        SqliteAffinity::from_declared_type("BOOLEAN"),
+        SqliteAffinity::Numeric
+    );
 }
 
 #[test]
@@ -38,8 +75,9 @@ fn test_inspect_table_columns_affinity_extraction() {
             weight REAL,
             raw_payload BLOB,
             is_enabled BOOLEAN DEFAULT 1
-        );"
-    ).expect("Create test_table");
+        );",
+    )
+    .expect("Create test_table");
 
     let cols = inspect_table_columns(&conn, "test_table").expect("Inspect columns");
     assert_eq!(cols.len(), 5);

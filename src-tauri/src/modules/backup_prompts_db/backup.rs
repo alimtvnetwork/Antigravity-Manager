@@ -42,13 +42,23 @@ pub fn backup_active_running_prompts_for_instance(
             || p.instance_id == target_inst
             || (target_inst == "default"
                 && (p.instance_id == "default" || p.instance_id.is_empty()));
-        // RC-5: queued rows are backup candidates at any age — the 2h
+        // RC-5: queued, pending, and blocked rows are backup candidates at any age — the 2h
         // freshness window silently dropped long-queued prompts before a
         // switch. Running / backed_up rows keep the freshness filter to
         // bound stale-row backup load.
-        let is_fresh_enough = p.status == "queued" || p.updated_at >= freshness_cutoff;
+        let is_fresh_enough = p.status == "queued"
+            || p.status == "pending"
+            || p.status == "blocked"
+            || p.updated_at >= freshness_cutoff;
+        let is_candidate_status = p.status == "running"
+            || p.status == "queued"
+            || p.status == "backed_up"
+            || p.status == "pending"
+            || p.status == "in_flight"
+            || p.status == "dispatched"
+            || p.status == "blocked";
         if is_inst_match
-            && (p.status == "running" || p.status == "queued" || p.status == "backed_up")
+            && is_candidate_status
             && is_fresh_enough
             && !candidate_prompts.iter().any(|c| {
                 c.id == p.id
@@ -303,15 +313,15 @@ pub fn backup_queued_prompts_for_instance(
     let is_default_scope = target_inst == "default" || target_inst == "__default__";
     let queued_sql = if unscoped {
         "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload
-         FROM active_prompts WHERE status = 'queued' ORDER BY created_at ASC, id ASC"
+         FROM active_prompts WHERE status IN ('queued', 'pending', 'blocked') ORDER BY created_at ASC, id ASC"
     } else if is_default_scope {
         "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload
-         FROM active_prompts WHERE status = 'queued'
+         FROM active_prompts WHERE status IN ('queued', 'pending', 'blocked')
            AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL)
          ORDER BY created_at ASC, id ASC"
     } else {
         "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload
-         FROM active_prompts WHERE status = 'queued' AND instance_id = ?1
+         FROM active_prompts WHERE status IN ('queued', 'pending', 'blocked') AND instance_id = ?1
          ORDER BY created_at ASC, id ASC"
     };
     let mut qstmt = repo_conn

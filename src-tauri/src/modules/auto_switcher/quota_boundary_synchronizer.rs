@@ -31,14 +31,22 @@ impl Default for QuotaBoundarySynchronizer {
 impl QuotaBoundarySynchronizer {
     pub fn new(window_secs: u64, impending_recovery_secs: u64) -> Self {
         Self {
-            window_secs: if window_secs == 0 { DEFAULT_ROLLING_WINDOW_SECS } else { window_secs },
+            window_secs: if window_secs == 0 {
+                DEFAULT_ROLLING_WINDOW_SECS
+            } else {
+                window_secs
+            },
             impending_recovery_secs,
         }
     }
 
     /// Evaluates whether an account with a given reset anchor or last activity epoch
     /// is close to its quota replenishment boundary.
-    pub fn evaluate_boundary(&self, current_epoch_secs: u64, last_reset_epoch_secs: u64) -> QuotaBoundaryStatus {
+    pub fn evaluate_boundary(
+        &self,
+        current_epoch_secs: u64,
+        last_reset_epoch_secs: u64,
+    ) -> QuotaBoundaryStatus {
         let elapsed = current_epoch_secs.saturating_sub(last_reset_epoch_secs);
         let remainder = elapsed % self.window_secs;
         let secs_until_reset = if remainder == 0 {

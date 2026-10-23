@@ -23,10 +23,16 @@ impl ConnectionBusyTimeoutScaler {
     }
 
     /// Applies the computed busy timeout to an open SQLite connection.
-    pub fn apply_scaled_timeout(conn: &Connection, active_concurrency: usize) -> Result<u32, rusqlite::Error> {
+    pub fn apply_scaled_timeout(
+        conn: &Connection,
+        active_concurrency: usize,
+    ) -> Result<u32, rusqlite::Error> {
         let timeout_ms = Self::compute_timeout_ms(active_concurrency);
         conn.execute(&format!("PRAGMA busy_timeout = {};", timeout_ms), [])?;
-        debug!(active_concurrency, timeout_ms, "Applied scaled busy_timeout pragma");
+        debug!(
+            active_concurrency,
+            timeout_ms, "Applied scaled busy_timeout pragma"
+        );
         Ok(timeout_ms)
     }
 }

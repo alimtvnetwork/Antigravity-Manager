@@ -1,8 +1,8 @@
 //! Unit tests for Co-Author Trailer Alignment Guard (`AGENTS.md`).
 
 use super::coauthor_trailer_alignment_guard::{
-    audit_commit_message_trailers, format_coauthor_trailer, parse_coauthor_line,
-    CoauthorTrailer, TrailerValidationFinding,
+    audit_commit_message_trailers, format_coauthor_trailer, parse_coauthor_line, CoauthorTrailer,
+    TrailerValidationFinding,
 };
 
 #[test]
@@ -154,7 +154,10 @@ fn test_malformed_syntax_missing_colon_or_empty_name() {
 #[test]
 fn test_formatting_helper_produces_correct_git_trailer() {
     let formatted = format_coauthor_trailer("  Alice Cooper  ", "  alice@example.com  ");
-    assert_eq!(formatted, "Co-authored-by: Alice Cooper <alice@example.com>");
+    assert_eq!(
+        formatted,
+        "Co-authored-by: Alice Cooper <alice@example.com>"
+    );
 }
 
 #[test]
@@ -163,25 +166,33 @@ fn test_display_and_error_formatting_of_findings() {
         line: 1,
         raw: "Co-authored-by invalid".to_string(),
     };
-    assert!(f1.to_string().contains("Line 1: Malformed Co-authored-by trailer syntax"));
+    assert!(f1
+        .to_string()
+        .contains("Line 1: Malformed Co-authored-by trailer syntax"));
 
     let f2 = TrailerValidationFinding::MissingEmailBracket {
         line: 2,
         raw: "Co-authored-by: John Doe".to_string(),
     };
-    assert!(f2.to_string().contains("Line 2: Missing '<email>' brackets"));
+    assert!(f2
+        .to_string()
+        .contains("Line 2: Missing '<email>' brackets"));
 
     let f3 = TrailerValidationFinding::InvalidEmailFormat {
         line: 3,
         email: "bad-email".to_string(),
     };
-    assert!(f3.to_string().contains("Line 3: Invalid contributor email format"));
+    assert!(f3
+        .to_string()
+        .contains("Line 3: Invalid contributor email format"));
 
     let f4 = TrailerValidationFinding::DisallowedHandleInName {
         line: 4,
         handle: "@badhandle".to_string(),
     };
-    assert!(f4.to_string().contains("Line 4: Disallowed handle '@badhandle'"));
+    assert!(f4
+        .to_string()
+        .contains("Line 4: Disallowed handle '@badhandle'"));
 
     // Verify std::error::Error trait
     let err_box: Box<dyn std::error::Error> = Box::new(f1);

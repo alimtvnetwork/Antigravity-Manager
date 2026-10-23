@@ -9,10 +9,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ExecutablePathViolation {
-    DirectBatchExecutionForbidden {
-        path: String,
-        suggestion: String,
-    },
+    DirectBatchExecutionForbidden { path: String, suggestion: String },
     EmptyExecutablePath,
 }
 
@@ -43,10 +40,7 @@ pub fn validate_executable_path(path: &str) -> Result<(), ExecutablePathViolatio
 }
 
 /// Resolves the actual process executable and argument vector, wrapping batch files in shell dispatch.
-pub fn resolve_windows_execution_command(
-    exe_path: &str,
-    args: &[&str],
-) -> (String, Vec<String>) {
+pub fn resolve_windows_execution_command(exe_path: &str, args: &[&str]) -> (String, Vec<String>) {
     let trimmed = exe_path.trim();
 
     if is_batch_file_extension(trimmed) {
@@ -59,6 +53,9 @@ pub fn resolve_windows_execution_command(
         shell_args.extend(args.iter().map(|s| s.to_string()));
         ("cmd.exe".to_string(), shell_args)
     } else {
-        (trimmed.to_string(), args.iter().map(|s| s.to_string()).collect())
+        (
+            trimmed.to_string(),
+            args.iter().map(|s| s.to_string()).collect(),
+        )
     }
 }

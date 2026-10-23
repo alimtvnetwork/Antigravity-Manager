@@ -61,7 +61,10 @@ pub fn map_upstream_status_to_canonical(
         },
         502 | 503 | 504 => CanonicalErrorPayload {
             error_type: "upstream_unavailable".to_string(),
-            message: format!("Upstream service temporarily unreachable ({})", upstream_status),
+            message: format!(
+                "Upstream service temporarily unreachable ({})",
+                upstream_status
+            ),
             status: 503,
             upstream_status: Some(upstream_status),
             retry_after_secs: Some(5),

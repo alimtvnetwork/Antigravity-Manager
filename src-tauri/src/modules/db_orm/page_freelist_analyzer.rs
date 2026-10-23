@@ -19,7 +19,10 @@ pub struct PageFreelistAnalyzer;
 
 impl PageFreelistAnalyzer {
     /// Inspects the number of free pages currently in the SQLite database freelist.
-    pub fn inspect_freelist(conn: &Connection, threshold: Option<i64>) -> Result<FreelistReport, rusqlite::Error> {
+    pub fn inspect_freelist(
+        conn: &Connection,
+        threshold: Option<i64>,
+    ) -> Result<FreelistReport, rusqlite::Error> {
         let mut free_stmt = conn.prepare("PRAGMA freelist_count;")?;
         let freelist_pages: i64 = free_stmt.query_row([], |row| row.get(0))?;
 
@@ -39,7 +42,10 @@ impl PageFreelistAnalyzer {
     }
 
     /// Executes incremental vacuum to reclaim up to max_pages.
-    pub fn execute_incremental_vacuum(conn: &Connection, max_pages: i64) -> Result<(), rusqlite::Error> {
+    pub fn execute_incremental_vacuum(
+        conn: &Connection,
+        max_pages: i64,
+    ) -> Result<(), rusqlite::Error> {
         conn.execute(&format!("PRAGMA incremental_vacuum({});", max_pages), [])?;
         Ok(())
     }

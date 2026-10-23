@@ -37,7 +37,9 @@ pub fn inspect_table_indexes(
     for row in rows {
         let (index_name, is_unique) = row?;
         let col_count: usize = conn
-            .query_row(&format!("PRAGMA index_info({});", index_name), [], |_| Ok(()))
+            .query_row(&format!("PRAGMA index_info({});", index_name), [], |_| {
+                Ok(())
+            })
             .map(|_| 1)
             .unwrap_or(0);
 
@@ -71,7 +73,10 @@ pub fn evaluate_query_plan(
     }
 
     for detail in &plans {
-        if detail.contains("SCAN") && !detail.contains("USING INDEX") && !detail.contains("USING COVERING INDEX") {
+        if detail.contains("SCAN")
+            && !detail.contains("USING INDEX")
+            && !detail.contains("USING COVERING INDEX")
+        {
             return Ok(QueryPlanEvaluation::FullTableScanWarning {
                 detail: detail.clone(),
             });

@@ -31,13 +31,23 @@ impl Default for BindingHistoryCache {
 impl BindingHistoryCache {
     pub fn new(max_capacity: usize) -> Self {
         Self {
-            max_capacity: if max_capacity == 0 { DEFAULT_MAX_HISTORY_ENTRIES } else { max_capacity },
+            max_capacity: if max_capacity == 0 {
+                DEFAULT_MAX_HISTORY_ENTRIES
+            } else {
+                max_capacity
+            },
             records: Arc::new(Mutex::new(VecDeque::new())),
         }
     }
 
     /// Records a new binding event, evicting the oldest entry when capacity is exceeded.
-    pub fn record_binding(&self, instance_id: &str, account_id: &str, timestamp: u64, reason: &str) {
+    pub fn record_binding(
+        &self,
+        instance_id: &str,
+        account_id: &str,
+        timestamp: u64,
+        reason: &str,
+    ) {
         if let Ok(mut lock) = self.records.lock() {
             if lock.len() >= self.max_capacity {
                 lock.pop_front();
@@ -54,11 +64,18 @@ impl BindingHistoryCache {
     /// Finds the most recent binding for a given instance ID.
     pub fn get_last_binding_for_instance(&self, instance_id: &str) -> Option<BindingRecord> {
         let lock = self.records.lock().ok()?;
-        lock.iter().rev().find(|r| r.instance_id == instance_id).cloned()
+        lock.iter()
+            .rev()
+            .find(|r| r.instance_id == instance_id)
+            .cloned()
     }
 
     /// Counts how many times an account was bound across all instances recently.
-    pub fn count_recent_bindings_for_account(&self, account_id: &str, lookback_entries: usize) -> usize {
+    pub fn count_recent_bindings_for_account(
+        &self,
+        account_id: &str,
+        lookback_entries: usize,
+    ) -> usize {
         let lock = match self.records.lock() {
             Ok(l) => l,
             Err(_) => return 0,

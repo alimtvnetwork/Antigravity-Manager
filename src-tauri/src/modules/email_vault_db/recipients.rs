@@ -183,9 +183,7 @@ pub fn find_duplicate_recipients_with_conn(
         .map_err(|e| format!("Failed to scan duplicate recipients: {}", e))?;
     let mut groups = Vec::new();
     for row in rows {
-        groups.push(
-            row.map_err(|e| format!("Failed to read a duplicate recipient group: {}", e))?,
-        );
+        groups.push(row.map_err(|e| format!("Failed to read a duplicate recipient group: {}", e))?);
     }
     Ok(groups)
 }

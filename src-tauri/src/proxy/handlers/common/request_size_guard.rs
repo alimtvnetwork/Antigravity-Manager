@@ -11,7 +11,10 @@ pub const ABSOLUTE_HARD_LIMIT_BYTES: usize = 100 * 1024 * 1024; // 100 MB
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SizeGuardOutcome {
     Accepted,
-    RejectedTooLarge { actual_bytes: usize, ceiling_bytes: usize },
+    RejectedTooLarge {
+        actual_bytes: usize,
+        ceiling_bytes: usize,
+    },
 }
 
 /// Evaluates content length against model capability thresholds.
@@ -20,7 +23,9 @@ pub fn evaluate_request_size(
     actual_body_len: usize,
     is_multimodal: bool,
 ) -> SizeGuardOutcome {
-    let effective_len = content_length.unwrap_or(actual_body_len).max(actual_body_len);
+    let effective_len = content_length
+        .unwrap_or(actual_body_len)
+        .max(actual_body_len);
 
     let ceiling = if is_multimodal {
         DEFAULT_MULTIMODAL_PAYLOAD_CEILING_BYTES

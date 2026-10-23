@@ -18,7 +18,10 @@ pub struct ProfileTelemetryIsolation;
 
 impl ProfileTelemetryIsolation {
     /// Compares storage.json between source and target instance directories.
-    pub fn verify_isolation<P: AsRef<Path>>(source_dir: P, target_dir: P) -> TelemetryIsolationReport {
+    pub fn verify_isolation<P: AsRef<Path>>(
+        source_dir: P,
+        target_dir: P,
+    ) -> TelemetryIsolationReport {
         let source_storage = source_dir.as_ref().join("storage.json");
         let target_storage = target_dir.as_ref().join("storage.json");
 
@@ -43,15 +46,23 @@ impl ProfileTelemetryIsolation {
         let source_json: Value = serde_json::from_str(&source_content).unwrap_or(Value::Null);
         let target_json: Value = serde_json::from_str(&target_content).unwrap_or(Value::Null);
 
-        let s_machine = source_json.get("telemetry.machineId").and_then(|v| v.as_str());
-        let t_machine = target_json.get("telemetry.machineId").and_then(|v| v.as_str());
+        let s_machine = source_json
+            .get("telemetry.machineId")
+            .and_then(|v| v.as_str());
+        let t_machine = target_json
+            .get("telemetry.machineId")
+            .and_then(|v| v.as_str());
         let machine_differs = match (s_machine, t_machine) {
             (Some(s), Some(t)) => s != t,
             _ => true,
         };
 
-        let s_device = source_json.get("telemetry.devDeviceId").and_then(|v| v.as_str());
-        let t_device = target_json.get("telemetry.devDeviceId").and_then(|v| v.as_str());
+        let s_device = source_json
+            .get("telemetry.devDeviceId")
+            .and_then(|v| v.as_str());
+        let t_device = target_json
+            .get("telemetry.devDeviceId")
+            .and_then(|v| v.as_str());
         let device_differs = match (s_device, t_device) {
             (Some(s), Some(t)) => s != t,
             _ => true,

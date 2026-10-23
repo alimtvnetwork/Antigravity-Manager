@@ -62,7 +62,11 @@ impl EndpointWeightMatrix {
     pub fn best_endpoint(&self) -> Option<String> {
         self.endpoints
             .values()
-            .max_by(|a, b| a.current_weight.partial_cmp(&b.current_weight).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.current_weight
+                    .partial_cmp(&b.current_weight)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|e| e.url.clone())
     }
 }

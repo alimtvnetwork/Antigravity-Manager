@@ -1073,22 +1073,26 @@ export { IMAGE_EXTENSIONS };
 // ============================================================================
 
 /** Message choice offered by the rerun UI picker. */
-export type RerunMessageOption = 'is-it-done' | 'is-it-published' | 'randomized';
+export type RerunMessageOption = 'randomized' | 'is-it-done' | 'is-it-finished' | 'is-it-published' | 'is-it-released';
 
 /** Picker rows rendered by the rerun UI. The randomized row is explicitly labeled. */
 export const RERUN_MESSAGE_OPTIONS: ReadonlyArray<{ value: RerunMessageOption; label: string; hint: string }> = [
-    { value: 'is-it-done', label: 'Is it done?', hint: 'Send a completion-check nudge' },
-    { value: 'is-it-published', label: 'Is it published?', hint: 'Send a publish-status nudge' },
     {
         value: 'randomized',
         label: 'Randomized nudge (random pick)',
         hint: 'Every dispatch picks ONE message at random from the built-in set',
     },
+    { value: 'is-it-done', label: 'Is it done?', hint: 'Send a completion-check nudge' },
+    { value: 'is-it-finished', label: 'Is it finished?', hint: 'Send a finished-check nudge' },
+    { value: 'is-it-published', label: 'Is it published?', hint: 'Send a publish-status nudge' },
+    { value: 'is-it-released', label: 'Is it released?', hint: 'Send a release-status nudge' },
 ];
 
 /** Built-in set of follow-up nudges used by the "randomized" option. */
 export const RERUN_RANDOM_MESSAGE_SET: ReadonlyArray<string> = [
-    'Quick status check â€” is it done yet?',
+    'Quick status check — is it done yet?',
+    'Is it finished? Please confirm when complete.',
+    'Is it released? Let me know the release status.',
     'Please continue where you left off and confirm when finished.',
     'Give me a brief progress update.',
     'Checking in: how is it going? Any blockers?',
@@ -1101,12 +1105,16 @@ export const RERUN_RANDOM_MESSAGE_SET: ReadonlyArray<string> = [
     'Still working on it? Wrap up and confirm once it is done.',
     'Any update on this? Please confirm when it is published or finished.',
     'Are you finished? Summarize the result.',
-    'Keep going â€” ping me when it is published.',
+    'Keep going — ping me when it is published.',
+    'Is it released? Share the release notes or version details.',
+    'Wrap up the pending tasks and confirm if it is finished.',
 ];
 
 export const RERUN_FIXED_MESSAGES: Record<Exclude<RerunMessageOption, 'randomized'>, string> = {
     'is-it-done': 'Is it done?',
+    'is-it-finished': 'Is it finished?',
     'is-it-published': 'Is it published?',
+    'is-it-released': 'Is it released?',
 };
 
 export const RERUN_DEFAULT_COUNT = 4;
@@ -1120,7 +1128,13 @@ const RERUN_MESSAGE_OPTION_STORAGE_KEY = 'agm_prompt_tree_rerun_message_option';
 const RERUN_COUNT_STORAGE_KEY = 'agm_prompt_tree_rerun_count';
 
 function isRerunMessageOption(value: string | null): value is RerunMessageOption {
-    return value === 'is-it-done' || value === 'is-it-published' || value === 'randomized';
+    return (
+        value === 'randomized' ||
+        value === 'is-it-done' ||
+        value === 'is-it-finished' ||
+        value === 'is-it-published' ||
+        value === 'is-it-released'
+    );
 }
 
 /** Load the persisted rerun message option (defaults to the randomized nudge). */

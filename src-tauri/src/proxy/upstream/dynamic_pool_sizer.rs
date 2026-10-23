@@ -35,13 +35,18 @@ impl DynamicPoolSizer {
 
     /// Increments active in-flight request counter and calculates required pool size.
     pub fn on_request_started(&self) -> usize {
-        let count = self.active_in_flight_requests.fetch_add(1, Ordering::SeqCst) + 1;
+        let count = self
+            .active_in_flight_requests
+            .fetch_add(1, Ordering::SeqCst)
+            + 1;
         self.recalculate(count)
     }
 
     /// Decrements active in-flight request counter and recalculates pool size.
     pub fn on_request_finished(&self) -> usize {
-        let prev = self.active_in_flight_requests.fetch_sub(1, Ordering::SeqCst);
+        let prev = self
+            .active_in_flight_requests
+            .fetch_sub(1, Ordering::SeqCst);
         let count = prev.saturating_sub(1);
         self.recalculate(count)
     }

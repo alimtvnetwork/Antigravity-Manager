@@ -19,13 +19,20 @@ impl EntropyCandidateShuffler {
     /// Shuffles candidates within tied score bands (score difference <= tolerance).
     /// Uses a lightweight linear congruential generator (LCG) seeded by current nanoseconds
     /// to avoid external dependencies.
-    pub fn shuffle_tied_candidates(mut candidates: Vec<ScoredCandidate>, score_tolerance: f64) -> Vec<ScoredCandidate> {
+    pub fn shuffle_tied_candidates(
+        mut candidates: Vec<ScoredCandidate>,
+        score_tolerance: f64,
+    ) -> Vec<ScoredCandidate> {
         if candidates.len() <= 1 {
             return candidates;
         }
 
         // Sort descending by score first
-        candidates.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        candidates.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let seed = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -66,7 +73,9 @@ impl EntropyCandidateShuffler {
             return;
         }
         for i in (1..n).rev() {
-            *state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            *state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             let j = (*state as usize) % (i + 1);
             slice.swap(i, j);
         }

@@ -16,8 +16,7 @@ pub const CANONICAL_INLINE_SELECT_CLASSES: &str =
     "bg-transparent border-0 text-xs text-zinc-300 focus:ring-0 focus:outline-none cursor-pointer py-0.5 px-1.5 pr-5 appearance-none";
 
 /// Canonical CSS classes for `<option>` items inside inline select dropdowns.
-pub const CANONICAL_INLINE_OPTION_CLASSES: &str =
-    "bg-zinc-900 text-zinc-200 text-xs py-1 px-2";
+pub const CANONICAL_INLINE_OPTION_CLASSES: &str = "bg-zinc-900 text-zinc-200 text-xs py-1 px-2";
 
 /// Mandatory CSS classes that must all be present for capsule inline select compliance.
 pub const MANDATORY_INLINE_SELECT_CLASSES: &[&str] = &[
@@ -55,7 +54,8 @@ impl DropdownStylingReport {
     /// Summary string describing the compliance status.
     pub fn summary(&self) -> String {
         if self.is_compliant {
-            "Compliant: inline select satisfies transparent borderless capsule requirements".to_string()
+            "Compliant: inline select satisfies transparent borderless capsule requirements"
+                .to_string()
         } else {
             format!(
                 "Non-compliant: {} styling violation(s) detected",
@@ -124,11 +124,13 @@ pub fn validate_select_classes(classes: &str) -> DropdownStylingReport {
     let has_transparent_bg = tokens.contains(&"bg-transparent");
     let has_zero_border = tokens.contains(&"border-0") || tokens.contains(&"border-none");
     let has_zero_focus_ring = tokens.contains(&"focus:ring-0");
-    let has_zero_outline = tokens.contains(&"focus:outline-none") || tokens.contains(&"outline-none");
+    let has_zero_outline =
+        tokens.contains(&"focus:outline-none") || tokens.contains(&"outline-none");
 
     let mut forbidden_classes_found = Vec::new();
     for &token in &tokens {
-        if is_forbidden_select_class(token) && !forbidden_classes_found.contains(&token.to_string()) {
+        if is_forbidden_select_class(token) && !forbidden_classes_found.contains(&token.to_string())
+        {
             forbidden_classes_found.push(token.to_string());
         }
     }
@@ -194,7 +196,8 @@ pub fn normalize_select_classes(existing_classes: &str) -> String {
         }
     }
 
-    let mut result_tokens = Vec::with_capacity(MANDATORY_INLINE_SELECT_CLASSES.len() + retained_tokens.len());
+    let mut result_tokens =
+        Vec::with_capacity(MANDATORY_INLINE_SELECT_CLASSES.len() + retained_tokens.len());
     for &mandatory in MANDATORY_INLINE_SELECT_CLASSES {
         result_tokens.push(mandatory);
     }

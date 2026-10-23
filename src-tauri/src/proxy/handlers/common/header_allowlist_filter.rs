@@ -88,7 +88,9 @@ mod tests {
         assert!(HeaderAllowlistFilter::is_allowed_header("content-type"));
         assert!(HeaderAllowlistFilter::is_allowed_header("Content-Type"));
         assert!(HeaderAllowlistFilter::is_allowed_header("AUTHORIZATION"));
-        assert!(HeaderAllowlistFilter::is_allowed_header("anthropic-version"));
+        assert!(HeaderAllowlistFilter::is_allowed_header(
+            "anthropic-version"
+        ));
         assert!(!HeaderAllowlistFilter::is_allowed_header("x-custom-secret"));
     }
 
@@ -96,22 +98,30 @@ mod tests {
     fn test_is_hop_by_hop_header() {
         assert!(HeaderAllowlistFilter::is_hop_by_hop_header("connection"));
         assert!(HeaderAllowlistFilter::is_hop_by_hop_header("Upgrade"));
-        assert!(HeaderAllowlistFilter::is_hop_by_hop_header("transfer-encoding"));
+        assert!(HeaderAllowlistFilter::is_hop_by_hop_header(
+            "transfer-encoding"
+        ));
         assert!(!HeaderAllowlistFilter::is_hop_by_hop_header("content-type"));
     }
 
     #[test]
     fn test_is_client_trace_header() {
-        assert!(HeaderAllowlistFilter::is_client_trace_header("x-forwarded-for"));
+        assert!(HeaderAllowlistFilter::is_client_trace_header(
+            "x-forwarded-for"
+        ));
         assert!(HeaderAllowlistFilter::is_client_trace_header("Cookie"));
         assert!(HeaderAllowlistFilter::is_client_trace_header("x-real-ip"));
-        assert!(!HeaderAllowlistFilter::is_client_trace_header("authorization"));
+        assert!(!HeaderAllowlistFilter::is_client_trace_header(
+            "authorization"
+        ));
     }
 
     #[test]
     fn test_is_forwardable_header() {
         assert!(HeaderAllowlistFilter::is_forwardable_header("content-type"));
-        assert!(HeaderAllowlistFilter::is_forwardable_header("authorization"));
+        assert!(HeaderAllowlistFilter::is_forwardable_header(
+            "authorization"
+        ));
         assert!(!HeaderAllowlistFilter::is_forwardable_header("connection"));
         assert!(!HeaderAllowlistFilter::is_forwardable_header("cookie"));
     }

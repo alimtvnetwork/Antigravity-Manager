@@ -32,7 +32,8 @@ fn test_empty_argument_quoted() {
 
 #[test]
 fn test_build_windows_shell_start_command() {
-    let (exe, args) = build_windows_shell_start_command("C:\\app.exe", &["--port", "8080", "--name", "My App"]);
+    let (exe, args) =
+        build_windows_shell_start_command("C:\\app.exe", &["--port", "8080", "--name", "My App"]);
     assert_eq!(exe, "cmd.exe");
     assert_eq!(args[0], "/c");
     assert_eq!(args[1], "start");
@@ -54,7 +55,11 @@ fn test_audit_and_build_shell_dispatch() {
     assert_eq!(report.target_executable, "C:\\Program Files\\App.exe");
     assert_eq!(report.raw_arguments_count, 2);
     assert_eq!(report.escaped_arguments_count, 2); // Exe + "value with spaces"
-    assert!(report.full_command_line.starts_with("cmd.exe /c start \"\""));
-    assert!(report.full_command_line.contains("\"C:\\Program Files\\App.exe\""));
+    assert!(report
+        .full_command_line
+        .starts_with("cmd.exe /c start \"\""));
+    assert!(report
+        .full_command_line
+        .contains("\"C:\\Program Files\\App.exe\""));
     assert!(report.full_command_line.contains("\"value with spaces\""));
 }

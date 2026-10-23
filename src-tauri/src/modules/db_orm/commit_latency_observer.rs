@@ -65,7 +65,11 @@ impl CommitLatencyObserver {
         let max_ms = self.max_duration_ms.lock().map(|g| *g).unwrap_or(0.0);
         let slow = self.slow_count.lock().map(|g| *g).unwrap_or(0);
 
-        let avg = if count > 0 { total_ms / (count as f64) } else { 0.0 };
+        let avg = if count > 0 {
+            total_ms / (count as f64)
+        } else {
+            0.0
+        };
 
         CommitLatencyStats {
             total_commits_tracked: count,

@@ -54,20 +54,11 @@ pub struct CommitMetadata {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CommitQualityViolation {
     /// Commit message is empty, single-word, or too brief (< 10 chars).
-    VagueOrEmptyMessage {
-        commit_id: String,
-        message: String,
-    },
+    VagueOrEmptyMessage { commit_id: String, message: String },
     /// Commit lacks standard prefix (e.g. `Feature:`, `Fix:`).
-    MissingStandardPrefix {
-        commit_id: String,
-        message: String,
-    },
+    MissingStandardPrefix { commit_id: String, message: String },
     /// Commit represents iterative debugging noise rather than a consolidated final state.
-    TrialAndErrorNoise {
-        commit_id: String,
-        keyword: String,
-    },
+    TrialAndErrorNoise { commit_id: String, keyword: String },
     /// Commit touches excessive unrelated files without cohesive focus.
     ExcessiveFileScope {
         commit_id: String,
@@ -85,10 +76,19 @@ impl fmt::Display for CommitQualityViolation {
                 write!(f, "Commit {commit_id} lacks standard prefix: '{message}'")
             }
             Self::TrialAndErrorNoise { commit_id, keyword } => {
-                write!(f, "Commit {commit_id} contains trial-and-error noise keyword '{keyword}'")
+                write!(
+                    f,
+                    "Commit {commit_id} contains trial-and-error noise keyword '{keyword}'"
+                )
             }
-            Self::ExcessiveFileScope { commit_id, file_count } => {
-                write!(f, "Commit {commit_id} touches an excessive {file_count} files")
+            Self::ExcessiveFileScope {
+                commit_id,
+                file_count,
+            } => {
+                write!(
+                    f,
+                    "Commit {commit_id} touches an excessive {file_count} files"
+                )
             }
         }
     }

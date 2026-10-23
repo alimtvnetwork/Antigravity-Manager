@@ -105,7 +105,9 @@ mod tests {
     #[test]
     fn test_is_fifo_monitored_query_and_detect_table() {
         assert!(is_fifo_monitored_query("SELECT * FROM active_prompts"));
-        assert!(is_fifo_monitored_query("INSERT INTO prompt_backups VALUES (...)"));
+        assert!(is_fifo_monitored_query(
+            "INSERT INTO prompt_backups VALUES (...)"
+        ));
         assert!(is_fifo_monitored_query("ATTACH 'repo_prompts.db' AS rdb"));
         assert!(!is_fifo_monitored_query("SELECT * FROM user_settings"));
 
@@ -117,16 +119,15 @@ mod tests {
             detect_target_table("SELECT * FROM prompt_backups"),
             Some("prompt_backups".to_string())
         );
-        assert_eq!(
-            detect_target_table("SELECT * FROM user_settings"),
-            None
-        );
+        assert_eq!(detect_target_table("SELECT * FROM user_settings"), None);
     }
 
     #[test]
     fn test_extract_order_by_clause() {
         assert_eq!(
-            extract_order_by_clause("SELECT * FROM active_prompts ORDER BY created_at ASC, id ASC LIMIT 5"),
+            extract_order_by_clause(
+                "SELECT * FROM active_prompts ORDER BY created_at ASC, id ASC LIMIT 5"
+            ),
             Some("created_at ASC, id ASC".to_string())
         );
         assert_eq!(
@@ -197,7 +198,10 @@ mod tests {
         let report = inspect_and_validate_query(compliant);
         assert!(report.is_fifo_compliant);
         assert_eq!(report.target_detected, Some("active_prompts".to_string()));
-        assert_eq!(report.extracted_order_by, Some("created_at ASC, id ASC".to_string()));
+        assert_eq!(
+            report.extracted_order_by,
+            Some("created_at ASC, id ASC".to_string())
+        );
         assert!(report.violations.is_empty());
         assert_eq!(report.normalized_query, None);
 

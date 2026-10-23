@@ -9,7 +9,8 @@ fn test_evaluate_commit_compliant() {
         message: "Feature: proxy - implement streaming chunk boundary guard".to_string(),
         touched_files: vec![
             "src-tauri/src/proxy/handlers/common/streaming_chunk_boundary_guard.rs".to_string(),
-            "src-tauri/src/proxy/handlers/common/tests_streaming_chunk_boundary_guard.rs".to_string(),
+            "src-tauri/src/proxy/handlers/common/tests_streaming_chunk_boundary_guard.rs"
+                .to_string(),
         ],
     };
 
@@ -28,7 +29,10 @@ fn test_evaluate_commit_vague_message() {
 
     let record = evaluate_commit(&commit);
     assert!(!record.is_revertable);
-    assert!(record.violations.iter().any(|v| matches!(v, CommitQualityViolation::VagueOrEmptyMessage { .. })));
+    assert!(record
+        .violations
+        .iter()
+        .any(|v| matches!(v, CommitQualityViolation::VagueOrEmptyMessage { .. })));
 }
 
 #[test]
@@ -41,7 +45,10 @@ fn test_evaluate_commit_missing_prefix() {
 
     let record = evaluate_commit(&commit);
     assert!(!record.is_revertable);
-    assert!(record.violations.iter().any(|v| matches!(v, CommitQualityViolation::MissingStandardPrefix { .. })));
+    assert!(record
+        .violations
+        .iter()
+        .any(|v| matches!(v, CommitQualityViolation::MissingStandardPrefix { .. })));
 }
 
 #[test]
@@ -54,7 +61,10 @@ fn test_evaluate_commit_noise_keyword() {
 
     let record = evaluate_commit(&commit);
     assert!(!record.is_revertable);
-    assert!(record.violations.iter().any(|v| matches!(v, CommitQualityViolation::TrialAndErrorNoise { .. })));
+    assert!(record
+        .violations
+        .iter()
+        .any(|v| matches!(v, CommitQualityViolation::TrialAndErrorNoise { .. })));
 }
 
 #[test]

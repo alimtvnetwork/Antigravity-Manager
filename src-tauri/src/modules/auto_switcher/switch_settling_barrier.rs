@@ -14,7 +14,10 @@ pub const MANDATORY_SETTLING_DELAY_SECS: u64 = 10;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SettlingBarrierState {
     /// Settling timer is still active.
-    Waiting { elapsed_secs: u64, remaining_secs: u64 },
+    Waiting {
+        elapsed_secs: u64,
+        remaining_secs: u64,
+    },
     /// Settling period elapsed, probing runtime liveness.
     ProbingRuntime,
     /// Settling and probes completed successfully; instance is ready.

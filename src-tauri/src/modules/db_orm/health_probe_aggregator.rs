@@ -25,16 +25,13 @@ pub struct SplitDbHealthSummary {
 }
 
 /// Probes a single database connection and path.
-pub fn probe_database(
-    conn: &Connection,
-    db_name: &str,
-    file_path: &Path,
-) -> SingleDbHealth {
+pub fn probe_database(conn: &Connection, db_name: &str, file_path: &Path) -> SingleDbHealth {
     let start = Instant::now();
     let file_size = file_path.metadata().map(|m| m.len()).unwrap_or(0);
 
     // Run quick check
-    let probe_res: Result<String, rusqlite::Error> = conn.query_row("PRAGMA quick_check(1);", [], |row| row.get(0));
+    let probe_res: Result<String, rusqlite::Error> =
+        conn.query_row("PRAGMA quick_check(1);", [], |row| row.get(0));
     let latency_ms = start.elapsed().as_secs_f64() * 1000.0;
 
     match probe_res {

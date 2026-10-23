@@ -66,10 +66,9 @@ mod tests {
         let report = validate_tag_and_heading("4.250.0", "main", changelog);
         assert!(!report.is_compliant);
         assert!(report.has_violations());
-        assert!(report
-            .violations
-            .iter()
-            .any(|v| matches!(v, TagMatchingViolation::MissingLeadingVPrefix { tag } if tag == "4.250.0")));
+        assert!(report.violations.iter().any(
+            |v| matches!(v, TagMatchingViolation::MissingLeadingVPrefix { tag } if tag == "4.250.0")
+        ));
     }
 
     #[test]

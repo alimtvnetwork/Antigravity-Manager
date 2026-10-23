@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use super::super::preflight_gate_runner::{classify_preflight_requirements, PreflightRequirements};
+    use super::super::preflight_gate_runner::{
+        classify_preflight_requirements, PreflightRequirements,
+    };
 
     #[test]
     fn test_rust_only_changes() {

@@ -57,11 +57,14 @@ pub fn tune_http2_flow_control(
     if let Some(payload_bytes) = estimated_payload_bytes {
         if payload_bytes > 4 * 1024 * 1024 {
             // For large streaming responses (>4MB), expand stream window to 4MB or max
-            config.stream_window_size = (payload_bytes as u32).clamp(MIN_STREAM_WINDOW_SIZE, MAX_STREAM_WINDOW_SIZE);
-            config.connection_window_size = (config.stream_window_size * 4).max(DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
+            config.stream_window_size =
+                (payload_bytes as u32).clamp(MIN_STREAM_WINDOW_SIZE, MAX_STREAM_WINDOW_SIZE);
+            config.connection_window_size =
+                (config.stream_window_size * 4).max(DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE);
         } else if payload_bytes < 128 * 1024 {
             // For lightweight calls (<128KB), keep stream window conservative
-            config.stream_window_size = (128 * 1024).clamp(MIN_STREAM_WINDOW_SIZE, MAX_STREAM_WINDOW_SIZE);
+            config.stream_window_size =
+                (128 * 1024).clamp(MIN_STREAM_WINDOW_SIZE, MAX_STREAM_WINDOW_SIZE);
         }
     }
 
@@ -69,7 +72,9 @@ pub fn tune_http2_flow_control(
     if let Some(concurrent_count) = concurrency_hint {
         config.max_concurrent_streams = concurrent_count.clamp(16, 512);
         // Ensure connection window size is scaled proportionally
-        let required_conn_window = config.stream_window_size.saturating_mul(config.max_concurrent_streams.min(8));
+        let required_conn_window = config
+            .stream_window_size
+            .saturating_mul(config.max_concurrent_streams.min(8));
         config.connection_window_size = config.connection_window_size.max(required_conn_window);
     }
 

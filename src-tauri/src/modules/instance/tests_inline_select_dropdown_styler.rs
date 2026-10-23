@@ -33,7 +33,10 @@ mod tests {
         assert!(report.has_zero_border);
         assert!(report.has_zero_focus_ring);
         assert!(report.has_zero_outline);
-        assert!(report.violations.iter().any(|v| v.contains("bg-transparent")));
+        assert!(report
+            .violations
+            .iter()
+            .any(|v| v.contains("bg-transparent")));
     }
 
     #[test]
@@ -61,7 +64,10 @@ mod tests {
         let report = validate_select_classes(classes);
         assert!(!report.is_compliant);
         assert!(!report.has_zero_outline);
-        assert!(report.violations.iter().any(|v| v.contains("focus:outline-none")));
+        assert!(report
+            .violations
+            .iter()
+            .any(|v| v.contains("focus:outline-none")));
     }
 
     #[test]
@@ -70,8 +76,13 @@ mod tests {
         let report = validate_select_classes(classes);
         assert!(!report.is_compliant);
         assert!(!report.has_transparent_bg);
-        assert!(report.forbidden_classes_found.contains(&"bg-white".to_string()));
-        assert!(report.violations.iter().any(|v| v.contains("nested pill defect")));
+        assert!(report
+            .forbidden_classes_found
+            .contains(&"bg-white".to_string()));
+        assert!(report
+            .violations
+            .iter()
+            .any(|v| v.contains("nested pill defect")));
     }
 
     #[test]
@@ -79,19 +90,32 @@ mod tests {
         let classes = "bg-transparent border-0 focus:ring-0 focus:outline-none rounded-full rounded-md text-xs";
         let report = validate_select_classes(classes);
         assert!(!report.is_compliant);
-        assert!(report.forbidden_classes_found.contains(&"rounded-full".to_string()));
-        assert!(report.forbidden_classes_found.contains(&"rounded-md".to_string()));
+        assert!(report
+            .forbidden_classes_found
+            .contains(&"rounded-full".to_string()));
+        assert!(report
+            .forbidden_classes_found
+            .contains(&"rounded-md".to_string()));
     }
 
     #[test]
     fn test_forbidden_borders_and_rings_detected() {
-        let classes = "bg-transparent border border-zinc-700 focus:ring-2 ring-indigo-500 shadow-md";
+        let classes =
+            "bg-transparent border border-zinc-700 focus:ring-2 ring-indigo-500 shadow-md";
         let report = validate_select_classes(classes);
         assert!(!report.is_compliant);
-        assert!(report.forbidden_classes_found.contains(&"border".to_string()));
-        assert!(report.forbidden_classes_found.contains(&"border-zinc-700".to_string()));
-        assert!(report.forbidden_classes_found.contains(&"focus:ring-2".to_string()));
-        assert!(report.forbidden_classes_found.contains(&"shadow-md".to_string()));
+        assert!(report
+            .forbidden_classes_found
+            .contains(&"border".to_string()));
+        assert!(report
+            .forbidden_classes_found
+            .contains(&"border-zinc-700".to_string()));
+        assert!(report
+            .forbidden_classes_found
+            .contains(&"focus:ring-2".to_string()));
+        assert!(report
+            .forbidden_classes_found
+            .contains(&"shadow-md".to_string()));
     }
 
     #[test]
@@ -173,9 +197,7 @@ mod tests {
 
     #[test]
     fn test_format_capsule_select_html_escaping() {
-        let options = &[
-            ("val<1>", "Label with <brackets> & \"quotes\""),
-        ];
+        let options = &[("val<1>", "Label with <brackets> & \"quotes\"")];
 
         let html = format_capsule_select_html("sel&test", options, "val<1>");
 

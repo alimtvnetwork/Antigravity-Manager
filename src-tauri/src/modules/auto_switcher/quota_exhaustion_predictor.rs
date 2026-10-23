@@ -168,7 +168,8 @@ impl ExhaustionForecast {
 
     /// Returns projected runway in minutes, if available.
     pub fn runway_minutes(&self) -> Option<f64> {
-        self.runway_seconds.map(|s| (s / 60.0 * 10.0).round() / 10.0)
+        self.runway_seconds
+            .map(|s| (s / 60.0 * 10.0).round() / 10.0)
     }
 }
 
@@ -198,7 +199,9 @@ pub fn calculate_burn_rate_velocity(observations: &[UsageObservation]) -> BurnRa
     let oldest = &sorted[0];
     let newest = &sorted[sorted.len() - 1];
 
-    let window_secs = newest.timestamp_epoch_secs.saturating_sub(oldest.timestamp_epoch_secs);
+    let window_secs = newest
+        .timestamp_epoch_secs
+        .saturating_sub(oldest.timestamp_epoch_secs);
     let total_tokens: u64 = sorted.iter().map(|o| o.tokens_consumed).sum();
 
     // If multiple observations occur at the exact same second, bound window to minimum 1s to prevent division by zero
@@ -330,7 +333,11 @@ pub fn predict_quota_exhaustion_default(
     observations: &[UsageObservation],
     remaining_tokens: u64,
 ) -> ExhaustionForecast {
-    predict_quota_exhaustion(observations, remaining_tokens, DEFAULT_SWITCH_THRESHOLD_SECONDS)
+    predict_quota_exhaustion(
+        observations,
+        remaining_tokens,
+        DEFAULT_SWITCH_THRESHOLD_SECONDS,
+    )
 }
 
 /// OOP-style wrapper around the quota exhaustion functions.

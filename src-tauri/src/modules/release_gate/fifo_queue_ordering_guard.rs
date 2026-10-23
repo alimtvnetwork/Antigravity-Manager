@@ -40,10 +40,7 @@ pub enum FifoOrderingViolation {
     /// A DESC sort direction was encountered where ASC is mandatory.
     DescendingDirectionForbidden { query: String, column: String },
     /// An unexpected primary ordering column was encountered (expected `created_at`).
-    InvalidPrimaryOrderColumn {
-        query: String,
-        found_column: String,
-    },
+    InvalidPrimaryOrderColumn { query: String, found_column: String },
     /// Empty or whitespace-only query string.
     EmptyQuery,
 }
@@ -57,7 +54,10 @@ impl fmt::Display for FifoOrderingViolation {
                     "LIFO ordering is strictly forbidden in dispatch queries: {details} (query: {query})"
                 )
             }
-            Self::MissingOrderByClause { query, target_table } => {
+            Self::MissingOrderByClause {
+                query,
+                target_table,
+            } => {
                 write!(
                     f,
                     "Missing ORDER BY clause for monitored table '{target_table}' (query: {query})"
@@ -149,7 +149,9 @@ pub fn extract_order_by_clause(sql: &str) -> Option<String> {
 
     let mut end_offset = remainder.len();
 
-    for keyword in &[" limit", "\nlimit", "\tlimit", " offset", "\noffset", " window", "\nwindow", ";"] {
+    for keyword in &[
+        " limit", "\nlimit", "\tlimit", " offset", "\noffset", " window", "\nwindow", ";",
+    ] {
         if let Some(pos) = lower_remainder.find(keyword) {
             if pos < end_offset {
                 end_offset = pos;
@@ -289,7 +291,9 @@ pub fn normalize_to_fifo_dispatch_query(sql: &str) -> String {
         let lower_remainder = &lower[after_start..];
 
         let mut boundary_offset = remainder.len();
-        for keyword in &[" limit", "\nlimit", "\tlimit", " offset", "\noffset", " window", "\nwindow", ";"] {
+        for keyword in &[
+            " limit", "\nlimit", "\tlimit", " offset", "\noffset", " window", "\nwindow", ";",
+        ] {
             if let Some(pos) = lower_remainder.find(keyword) {
                 if pos < boundary_offset {
                     boundary_offset = pos;
@@ -308,7 +312,9 @@ pub fn normalize_to_fifo_dispatch_query(sql: &str) -> String {
     } else {
         // Query does not contain an ORDER BY clause; insert before LIMIT/OFFSET/; if present
         let mut insert_pos = trimmed.len();
-        for keyword in &[" limit", "\nlimit", "\tlimit", " offset", "\noffset", " window", "\nwindow", ";"] {
+        for keyword in &[
+            " limit", "\nlimit", "\tlimit", " offset", "\noffset", " window", "\nwindow", ";",
+        ] {
             if let Some(pos) = lower.find(keyword) {
                 if pos < insert_pos {
                     insert_pos = pos;

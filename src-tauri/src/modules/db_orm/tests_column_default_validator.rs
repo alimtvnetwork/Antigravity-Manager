@@ -24,8 +24,12 @@ mod tests {
         // id is PK, email is nullable, status has DEFAULT 'active'
         // username and score are NOT NULL without DEFAULT
         assert_eq!(audit.columns_missing_defaults.len(), 2);
-        assert!(audit.columns_missing_defaults.contains(&"username".to_string()));
-        assert!(audit.columns_missing_defaults.contains(&"score".to_string()));
+        assert!(audit
+            .columns_missing_defaults
+            .contains(&"username".to_string()));
+        assert!(audit
+            .columns_missing_defaults
+            .contains(&"score".to_string()));
     }
 
     #[test]

@@ -15,7 +15,8 @@ mod tests {
             .with_args(vec!["--profile".to_string(), "p1".to_string()])
             .with_shell_fallback(false);
 
-        let plan = plan_multi_stage_launch(&spec, false).expect("Stage 1 launch plan should succeed");
+        let plan =
+            plan_multi_stage_launch(&spec, false).expect("Stage 1 launch plan should succeed");
 
         assert_eq!(plan.selected_stage, LaunchStage::Stage1TargetBinary);
         assert_eq!(plan.executable, "bin/antigravity.exe");
@@ -32,11 +33,15 @@ mod tests {
             .with_target("bin/antigravity.exe")
             .with_args(vec!["--headless".to_string()]);
 
-        let plan = plan_multi_stage_launch(&spec, true).expect("Stage 1 restricted launch should succeed");
+        let plan =
+            plan_multi_stage_launch(&spec, true).expect("Stage 1 restricted launch should succeed");
 
         assert_eq!(plan.selected_stage, LaunchStage::Stage1TargetBinary);
         assert_eq!(plan.executable, "bin/antigravity.exe");
-        assert_eq!(plan.breakaway_mode, JobBreakawayMode::BreakawayDeniedFallback);
+        assert_eq!(
+            plan.breakaway_mode,
+            JobBreakawayMode::BreakawayDeniedFallback
+        );
         assert!(plan.is_breakaway_denied_fallback());
         assert!(!plan.is_breakaway_requested());
     }
@@ -64,7 +69,8 @@ mod tests {
             .with_base("base/antigravity.exe")
             .with_args(vec!["--port".to_string(), "9000".to_string()]);
 
-        let plan = plan_multi_stage_launch(&spec, false).expect("Stage 2 empty target fallback should succeed");
+        let plan = plan_multi_stage_launch(&spec, false)
+            .expect("Stage 2 empty target fallback should succeed");
 
         assert_eq!(plan.selected_stage, LaunchStage::Stage2BaseBinary);
         assert_eq!(plan.executable, "base/antigravity.exe");
@@ -76,10 +82,14 @@ mod tests {
             .with_base("base/antigravity.exe")
             .with_args(vec!["--verbose".to_string()]);
 
-        let plan = plan_multi_stage_launch(&spec, true).expect("Stage 2 restricted launch should succeed");
+        let plan =
+            plan_multi_stage_launch(&spec, true).expect("Stage 2 restricted launch should succeed");
 
         assert_eq!(plan.selected_stage, LaunchStage::Stage2BaseBinary);
-        assert_eq!(plan.breakaway_mode, JobBreakawayMode::BreakawayDeniedFallback);
+        assert_eq!(
+            plan.breakaway_mode,
+            JobBreakawayMode::BreakawayDeniedFallback
+        );
         assert!(plan.is_breakaway_denied_fallback());
     }
 
@@ -89,7 +99,8 @@ mod tests {
             .with_args(vec!["--data-dir".to_string(), "profiles/p1".to_string()])
             .with_shell_fallback(true);
 
-        let plan = plan_multi_stage_launch(&spec, false).expect("Stage 3 shell fallback should succeed");
+        let plan =
+            plan_multi_stage_launch(&spec, false).expect("Stage 3 shell fallback should succeed");
 
         assert_eq!(plan.selected_stage, LaunchStage::Stage3WindowsShell);
         assert_eq!(plan.executable, "cmd.exe");
@@ -97,7 +108,10 @@ mod tests {
             plan.resolved_args,
             vec!["/c", "start", "\"\"", "--data-dir", "profiles/p1"]
         );
-        assert_eq!(plan.breakaway_mode, JobBreakawayMode::BreakawayNotApplicable);
+        assert_eq!(
+            plan.breakaway_mode,
+            JobBreakawayMode::BreakawayNotApplicable
+        );
         assert!(plan.is_shell_stage());
     }
 
@@ -113,7 +127,10 @@ mod tests {
         assert_eq!(plan.selected_stage, LaunchStage::Stage3WindowsShell);
         assert_eq!(plan.executable, "cmd.exe");
         assert_eq!(plan.resolved_args, vec!["/c", "start", "\"\""]);
-        assert_eq!(plan.breakaway_mode, JobBreakawayMode::BreakawayNotApplicable);
+        assert_eq!(
+            plan.breakaway_mode,
+            JobBreakawayMode::BreakawayNotApplicable
+        );
     }
 
     #[test]
@@ -122,7 +139,8 @@ mod tests {
             .with_target("scripts/launch.bat")
             .with_shell_fallback(true);
 
-        let err = plan_multi_stage_launch(&spec, false).expect_err("Direct .bat execution must be rejected");
+        let err = plan_multi_stage_launch(&spec, false)
+            .expect_err("Direct .bat execution must be rejected");
 
         match err {
             LauncherSecurityViolation::DirectBatchFileExecutionDisallowed { path, extension } => {
@@ -141,7 +159,8 @@ mod tests {
             .with_target("scripts/start.cmd")
             .with_shell_fallback(true);
 
-        let err = plan_multi_stage_launch(&spec, false).expect_err("Direct .cmd execution must be rejected");
+        let err = plan_multi_stage_launch(&spec, false)
+            .expect_err("Direct .cmd execution must be rejected");
 
         match err {
             LauncherSecurityViolation::DirectBatchFileExecutionDisallowed { path, extension } => {
@@ -173,7 +192,8 @@ mod tests {
     fn test_base_batch_file_disallowed_when_target_is_none() {
         let spec = LauncherTargetSpec::new().with_base("base/launcher.bat");
 
-        let err = plan_multi_stage_launch(&spec, false).expect_err("Base .bat execution must be rejected");
+        let err = plan_multi_stage_launch(&spec, false)
+            .expect_err("Base .bat execution must be rejected");
 
         match err {
             LauncherSecurityViolation::DirectBatchFileExecutionDisallowed { path, extension } => {
@@ -190,7 +210,8 @@ mod tests {
             .with_args(vec!["--inspect".to_string()])
             .with_shell_fallback(false);
 
-        let err = plan_multi_stage_launch(&spec, false).expect_err("All stages must fail when shell disabled");
+        let err = plan_multi_stage_launch(&spec, false)
+            .expect_err("All stages must fail when shell disabled");
 
         match err {
             LauncherSecurityViolation::AllLaunchStagesFailed {
@@ -216,7 +237,8 @@ mod tests {
             .with_base("")
             .with_shell_fallback(false);
 
-        let err = plan_multi_stage_launch(&spec, false).expect_err("Empty targets must fail without shell");
+        let err = plan_multi_stage_launch(&spec, false)
+            .expect_err("Empty targets must fail without shell");
         assert!(err.is_all_stages_failed());
     }
 
@@ -307,15 +329,27 @@ mod tests {
         assert!(LaunchStage::Stage2BaseBinary.is_stage2());
         assert!(LaunchStage::Stage3WindowsShell.is_stage3());
 
-        assert_eq!(LaunchStage::Stage1TargetBinary.as_str(), "stage_1_target_binary");
-        assert_eq!(format!("{}", LaunchStage::Stage1TargetBinary), "stage_1_target_binary");
+        assert_eq!(
+            LaunchStage::Stage1TargetBinary.as_str(),
+            "stage_1_target_binary"
+        );
+        assert_eq!(
+            format!("{}", LaunchStage::Stage1TargetBinary),
+            "stage_1_target_binary"
+        );
 
         assert!(JobBreakawayMode::BreakawayRequested.is_breakaway_requested());
         assert!(JobBreakawayMode::BreakawayDeniedFallback.is_breakaway_denied_fallback());
         assert!(JobBreakawayMode::BreakawayNotApplicable.is_breakaway_not_applicable());
 
-        assert_eq!(JobBreakawayMode::BreakawayRequested.as_str(), "breakaway_requested");
-        assert_eq!(format!("{}", JobBreakawayMode::BreakawayRequested), "breakaway_requested");
+        assert_eq!(
+            JobBreakawayMode::BreakawayRequested.as_str(),
+            "breakaway_requested"
+        );
+        assert_eq!(
+            format!("{}", JobBreakawayMode::BreakawayRequested),
+            "breakaway_requested"
+        );
     }
 
     #[test]

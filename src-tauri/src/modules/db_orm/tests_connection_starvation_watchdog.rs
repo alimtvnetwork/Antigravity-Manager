@@ -39,7 +39,10 @@ fn test_checkout_under_threshold_returns_empty_alerts() {
 
     // Evaluated at 1_002_000 (2000ms hold, below warning threshold 3000ms)
     let alerts = watchdog.check_starvation(1_002_000);
-    assert!(alerts.is_empty(), "Under threshold checkouts must not produce alerts");
+    assert!(
+        alerts.is_empty(),
+        "Under threshold checkouts must not produce alerts"
+    );
 
     // Evaluated right below threshold at 1_002_999 (2999ms hold)
     let boundary_alerts = watchdog.check_starvation(1_002_999);
@@ -124,11 +127,17 @@ fn test_active_checkout_release_clears_lease_and_eliminates_alerts() {
 
     // Re-releasing a removed lease should return false
     let re_released = watchdog.release_lease("lease-transient");
-    assert!(!re_released, "Releasing non-existent lease should return false");
+    assert!(
+        !re_released,
+        "Releasing non-existent lease should return false"
+    );
 
     // Post-release check must yield empty alerts
     let post_release_alerts = watchdog.check_starvation(15_000);
-    assert!(post_release_alerts.is_empty(), "Released checkout must eliminate alerts");
+    assert!(
+        post_release_alerts.is_empty(),
+        "Released checkout must eliminate alerts"
+    );
 }
 
 #[test]
@@ -149,7 +158,10 @@ fn test_pool_capacity_saturation_detects_exhaustion() {
 
     // Add 3rd lease - reaches capacity threshold (3 of 3)
     watchdog.acquire_lease(ConnectionLease::new("l3", "t3", 100, "q3", "db3"));
-    assert!(watchdog.is_pool_exhausted(), "Pool must report exhausted at capacity limit");
+    assert!(
+        watchdog.is_pool_exhausted(),
+        "Pool must report exhausted at capacity limit"
+    );
     assert_eq!(watchdog.get_active_lease_count(), 3);
 
     // Add 4th lease - over capacity
@@ -161,7 +173,10 @@ fn test_pool_capacity_saturation_detects_exhaustion() {
     watchdog.release_lease("l1");
     watchdog.release_lease("l2");
     assert_eq!(watchdog.get_active_lease_count(), 2);
-    assert!(!watchdog.is_pool_exhausted(), "Pool must recover from exhaustion once below limit");
+    assert!(
+        !watchdog.is_pool_exhausted(),
+        "Pool must recover from exhaustion once below limit"
+    );
 }
 
 #[test]
@@ -200,7 +215,11 @@ fn test_multi_database_concurrent_leases_ordered_by_duration() {
 
     // Evaluated at now_ms = 20_000
     let alerts = watchdog.check_starvation(20_000);
-    assert_eq!(alerts.len(), 2, "Only Warning and Critical leases emit alerts");
+    assert_eq!(
+        alerts.len(),
+        2,
+        "Only Warning and Critical leases emit alerts"
+    );
 
     // Worst offender should be first
     assert_eq!(alerts[0].lease_id, "lease-db-active");
@@ -252,7 +271,10 @@ fn test_saturating_time_edge_case() {
 
     // now_ms is less than acquired_at_epoch_ms (clock skew scenario)
     let alerts = watchdog.check_starvation(40_000);
-    assert!(alerts.is_empty(), "Clock skew must saturate duration to 0 and emit no alerts");
+    assert!(
+        alerts.is_empty(),
+        "Clock skew must saturate duration to 0 and emit no alerts"
+    );
 }
 
 #[test]

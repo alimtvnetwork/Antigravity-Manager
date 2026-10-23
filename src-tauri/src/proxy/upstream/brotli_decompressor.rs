@@ -29,10 +29,7 @@ pub fn is_brotli_encoded(content_encoding_header: Option<&str>) -> bool {
 }
 
 /// Evaluates a raw response byte buffer and returns decompression status.
-pub fn inspect_brotli_payload(
-    bytes: &[u8],
-    is_br_header: bool,
-) -> BrotliInspectionResult {
+pub fn inspect_brotli_payload(bytes: &[u8], is_br_header: bool) -> BrotliInspectionResult {
     if !is_br_header || bytes.is_empty() {
         return BrotliInspectionResult::NotBrotli;
     }

@@ -19,7 +19,10 @@ impl Default for HeadroomCurveConfig {
 }
 
 /// Computes non-linear headroom multiplier (0.0 to 1.0) given a ratio in [0.0, 1.0].
-pub fn calculate_headroom_multiplier(remaining_ratio: f64, config: Option<HeadroomCurveConfig>) -> f64 {
+pub fn calculate_headroom_multiplier(
+    remaining_ratio: f64,
+    config: Option<HeadroomCurveConfig>,
+) -> f64 {
     let cfg = config.unwrap_or_default();
     let clamped_ratio = remaining_ratio.clamp(0.0, 1.0);
 

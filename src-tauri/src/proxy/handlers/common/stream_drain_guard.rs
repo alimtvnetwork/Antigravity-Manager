@@ -30,7 +30,10 @@ pub fn evaluate_drain_action(
 
     match remaining_bytes_estimate {
         Some(bytes) if bytes > DEFAULT_MAX_DRAIN_BYTES => {
-            debug!(bytes = bytes, "Aborted stream too large to drain, dropping connection");
+            debug!(
+                bytes = bytes,
+                "Aborted stream too large to drain, dropping connection"
+            );
             DrainDecision::DropConnection
         }
         _ => {

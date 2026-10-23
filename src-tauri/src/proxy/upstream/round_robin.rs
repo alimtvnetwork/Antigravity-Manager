@@ -67,7 +67,10 @@ impl RoundRobinBalancer {
         }
 
         // Fallback: if all circuit breakers are open, return lowest failure endpoint
-        endpoints.iter().min_by_key(|e| e.consecutive_failures).map(|e| e.url.clone())
+        endpoints
+            .iter()
+            .min_by_key(|e| e.consecutive_failures)
+            .map(|e| e.url.clone())
     }
 
     /// Marks an endpoint request as successful, resetting its failure counter and circuit breaker.

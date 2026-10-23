@@ -166,8 +166,7 @@ mod tests {
         );
 
         let json = serde_json::to_string(&original_frame).expect("Serialize frame");
-        let deserialized: StreamFrame =
-            serde_json::from_str(&json).expect("Deserialize frame");
+        let deserialized: StreamFrame = serde_json::from_str(&json).expect("Deserialize frame");
         assert_eq!(original_frame, deserialized);
 
         let mut original_normalizer = StreamDelimiterNormalizer::new();

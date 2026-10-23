@@ -36,14 +36,38 @@ mod tests {
     fn test_env_token_scrubber_filters_all_sensitive_keys_case_insensitively() {
         let raw_envs = vec![
             ("PATH".to_string(), "/usr/bin:/bin".to_string()),
-            ("GITHUB_TOKEN".to_string(), "ghp_secret_token_12345".to_string()),
-            ("github_token".to_string(), "ghp_lowercase_token_67890".to_string()),
-            ("OpenAI_API_Key".to_string(), "sk-live-0987654321".to_string()),
-            ("ANTHROPIC_API_KEY".to_string(), "sk-ant-live-abc123".to_string()),
-            ("aws_secret_access_key".to_string(), "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string()),
-            ("GEMINI_API_KEY".to_string(), "AIzaSySecretGeminiKey".to_string()),
-            ("Claude_Api_Key".to_string(), "claude-test-secret".to_string()),
-            ("SUPABASE_SERVICE_ROLE_KEY".to_string(), "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9".to_string()),
+            (
+                "GITHUB_TOKEN".to_string(),
+                "ghp_secret_token_12345".to_string(),
+            ),
+            (
+                "github_token".to_string(),
+                "ghp_lowercase_token_67890".to_string(),
+            ),
+            (
+                "OpenAI_API_Key".to_string(),
+                "sk-live-0987654321".to_string(),
+            ),
+            (
+                "ANTHROPIC_API_KEY".to_string(),
+                "sk-ant-live-abc123".to_string(),
+            ),
+            (
+                "aws_secret_access_key".to_string(),
+                "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY".to_string(),
+            ),
+            (
+                "GEMINI_API_KEY".to_string(),
+                "AIzaSySecretGeminiKey".to_string(),
+            ),
+            (
+                "Claude_Api_Key".to_string(),
+                "claude-test-secret".to_string(),
+            ),
+            (
+                "SUPABASE_SERVICE_ROLE_KEY".to_string(),
+                "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9".to_string(),
+            ),
             ("STRIPE_API_KEY".to_string(), "rk_live_mock_key".to_string()),
             ("GH_TOKEN".to_string(), "gho_another_token".to_string()),
             ("USER".to_string(), "developer".to_string()),
@@ -52,8 +76,15 @@ mod tests {
 
         let (scrubbed, removed_count) = EnvTokenScrubber::scrub_environment(raw_envs);
 
-        assert_eq!(removed_count, 10, "All 10 sensitive tokens must be identified and removed");
-        assert_eq!(scrubbed.len(), 3, "Only non-sensitive variables must remain");
+        assert_eq!(
+            removed_count, 10,
+            "All 10 sensitive tokens must be identified and removed"
+        );
+        assert_eq!(
+            scrubbed.len(),
+            3,
+            "Only non-sensitive variables must remain"
+        );
 
         let remaining_keys: Vec<String> = scrubbed.into_iter().map(|(k, _)| k).collect();
         assert!(remaining_keys.contains(&"PATH".to_string()));
@@ -76,8 +107,14 @@ mod tests {
         env_map.insert("NODE_OPTIONS".to_string(), "--inspect=9229".to_string());
         env_map.insert("ELECTRON_RUN_AS_NODE".to_string(), "1".to_string());
         env_map.insert("VSCODE_CWD".to_string(), "/home/user/project".to_string());
-        env_map.insert("VSCODE_IPC_HOOK".to_string(), "/tmp/vscode-ipc.sock".to_string());
-        env_map.insert("VSCODE_NLS_CONFIG".to_string(), "{\"locale\":\"en\"}".to_string());
+        env_map.insert(
+            "VSCODE_IPC_HOOK".to_string(),
+            "/tmp/vscode-ipc.sock".to_string(),
+        );
+        env_map.insert(
+            "VSCODE_NLS_CONFIG".to_string(),
+            "{\"locale\":\"en\"}".to_string(),
+        );
         env_map.insert("VSCODE_PORTABLE".to_string(), "1".to_string());
         env_map.insert("ELECTRON_NO_ASAR".to_string(), "1".to_string());
         env_map.insert("SAFE_INSTANCE_ID".to_string(), "inst-alpha-001".to_string());
@@ -85,8 +122,15 @@ mod tests {
 
         LaunchEnvSanitizer::sanitize_env_map(&mut env_map);
 
-        assert_eq!(env_map.len(), 2, "Only non-contaminating environment variables must survive");
-        assert_eq!(env_map.get("SAFE_INSTANCE_ID").map(|s| s.as_str()), Some("inst-alpha-001"));
+        assert_eq!(
+            env_map.len(),
+            2,
+            "Only non-contaminating environment variables must survive"
+        );
+        assert_eq!(
+            env_map.get("SAFE_INSTANCE_ID").map(|s| s.as_str()),
+            Some("inst-alpha-001")
+        );
         assert_eq!(env_map.get("LANG").map(|s| s.as_str()), Some("en_US.UTF-8"));
 
         for &stripped in LaunchEnvSanitizer::STRIPPED_VARS {
@@ -103,9 +147,15 @@ mod tests {
         let sandboxed_bin = temp_root.join("sandboxed").join("bin");
         let gitmap_bin = temp_root.join("gitmap").join("bin");
         // Justification: Test fixture directory creation in temporary folder
-        crate::error::record_ignored(std::fs::create_dir_all(&sandboxed_bin), "create test bin dir");
+        crate::error::record_ignored(
+            std::fs::create_dir_all(&sandboxed_bin),
+            "create test bin dir",
+        );
         // Justification: Test fixture directory creation in temporary folder
-        crate::error::record_ignored(std::fs::create_dir_all(&gitmap_bin), "create test gitmap dir");
+        crate::error::record_ignored(
+            std::fs::create_dir_all(&gitmap_bin),
+            "create test gitmap dir",
+        );
 
         let priority_paths = vec![
             sandboxed_bin.clone(),
@@ -122,8 +172,14 @@ mod tests {
         assert_eq!(entries[0], sandboxed_bin.to_string_lossy().as_ref());
         assert_eq!(entries[1], gitmap_bin.to_string_lossy().as_ref());
 
-        let match_count = entries.iter().filter(|&&e| e == sandboxed_bin.to_string_lossy()).count();
-        assert_eq!(match_count, 1, "Duplicate priority path must be deduplicated");
+        let match_count = entries
+            .iter()
+            .filter(|&&e| e == sandboxed_bin.to_string_lossy())
+            .count();
+        assert_eq!(
+            match_count, 1,
+            "Duplicate priority path must be deduplicated"
+        );
 
         // Justification: Best-effort test cleanup
         crate::error::record_ignored(std::fs::remove_dir_all(&temp_root), "clean test dir");
@@ -135,13 +191,20 @@ mod tests {
         let inst_id = "inst-primary-cdp";
 
         let port1 = guard.allocate_port(inst_id);
-        assert!(port1.is_some(), "Port allocation within CDP range must succeed");
+        assert!(
+            port1.is_some(),
+            "Port allocation within CDP range must succeed"
+        );
         let allocated_port = port1.unwrap();
 
         assert!(allocated_port >= CDP_PORT_START && allocated_port <= CDP_PORT_END);
 
         let port2 = guard.allocate_port(inst_id);
-        assert_eq!(port2, Some(allocated_port), "Re-allocation for same instance ID must return identical leased port");
+        assert_eq!(
+            port2,
+            Some(allocated_port),
+            "Re-allocation for same instance ID must return identical leased port"
+        );
     }
 
     #[test]
@@ -160,9 +223,18 @@ mod tests {
         let p_b = port_b.unwrap();
         let p_c = port_c.unwrap();
 
-        assert_ne!(p_a, p_b, "Instance Alpha and Beta must receive distinct ports");
-        assert_ne!(p_b, p_c, "Instance Beta and Gamma must receive distinct ports");
-        assert_ne!(p_a, p_c, "Instance Alpha and Gamma must receive distinct ports");
+        assert_ne!(
+            p_a, p_b,
+            "Instance Alpha and Beta must receive distinct ports"
+        );
+        assert_ne!(
+            p_b, p_c,
+            "Instance Beta and Gamma must receive distinct ports"
+        );
+        assert_ne!(
+            p_a, p_c,
+            "Instance Alpha and Gamma must receive distinct ports"
+        );
 
         guard.release_port("instance-node-beta");
         let port_d = guard.allocate_port("instance-node-delta");
@@ -182,7 +254,10 @@ mod tests {
         assert!(!home_dir.exists());
 
         let result = DirectoryPermissionGuard::verify_instance_directories(&data_dir, &home_dir);
-        assert!(result.is_ok(), "Directory permission validation must succeed for writable temp paths");
+        assert!(
+            result.is_ok(),
+            "Directory permission validation must succeed for writable temp paths"
+        );
 
         assert!(data_dir.is_dir());
         assert!(home_dir.is_dir());
@@ -250,19 +325,32 @@ mod tests {
             Some(synthetic_id)
         );
 
-        let new_dev_id = parsed.get("telemetry.devDeviceId").and_then(|v| v.as_str()).unwrap();
+        let new_dev_id = parsed
+            .get("telemetry.devDeviceId")
+            .and_then(|v| v.as_str())
+            .unwrap();
         assert_ne!(new_dev_id, "host-dev-device-5555");
         assert!(!new_dev_id.is_empty());
 
         for &key in SCRUBBED_TELEMETRY_KEYS {
             if key != "telemetry.machineId" && key != "telemetry.devDeviceId" {
-                assert!(parsed.get(key).is_none(), "Telemetry key {:?} must be scrubbed", key);
+                assert!(
+                    parsed.get(key).is_none(),
+                    "Telemetry key {:?} must be scrubbed",
+                    key
+                );
             }
         }
 
         assert!(parsed.get("github.auth.token").is_none());
         assert!(parsed.get("custom.oauth.secret").is_none());
-        assert_eq!(parsed.get("editor.fontSize").and_then(|v| v.as_u64()), Some(14));
-        assert_eq!(parsed.get("workbench.colorTheme").and_then(|v| v.as_str()), Some("Default Dark+"));
+        assert_eq!(
+            parsed.get("editor.fontSize").and_then(|v| v.as_u64()),
+            Some(14)
+        );
+        assert_eq!(
+            parsed.get("workbench.colorTheme").and_then(|v| v.as_str()),
+            Some("Default Dark+")
+        );
     }
 }

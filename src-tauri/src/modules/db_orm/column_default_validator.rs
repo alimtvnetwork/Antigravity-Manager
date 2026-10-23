@@ -29,21 +29,14 @@ impl ColumnDefaultValidator {
     /// Validates column definitions for the specified table.
     pub fn audit_table(conn: &Connection, table_name: &str) -> Result<TableColumnAudit, AppError> {
         let sql = format!("PRAGMA table_info('{}');", table_name);
-        let mut stmt = conn
-            .prepare(&sql)
-            .map_err(AppError::Database)?;
+        let mut stmt = conn.prepare(&sql).map_err(AppError::Database)?;
 
-        let mut rows = stmt
-            .query([])
-            .map_err(AppError::Database)?;
+        let mut rows = stmt.query([]).map_err(AppError::Database)?;
 
         let mut columns = Vec::new();
         let mut missing_defaults = Vec::new();
 
-        while let Some(row) = rows
-            .next()
-            .map_err(AppError::Database)?
-        {
+        while let Some(row) = rows.next().map_err(AppError::Database)? {
             let cid: i64 = row.get(0).unwrap_or(0);
             let name: String = row.get(1).unwrap_or_default();
             let data_type: String = row.get(2).unwrap_or_default();

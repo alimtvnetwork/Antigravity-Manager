@@ -53,7 +53,10 @@ fn test_step_progression() {
 
     for (idx, &expected_ms) in expected_delays.iter().enumerate() {
         match escalator.next_timeout(true) {
-            LockEscalationDecision::RetryWithTimeout { timeout_ms, attempt } => {
+            LockEscalationDecision::RetryWithTimeout {
+                timeout_ms,
+                attempt,
+            } => {
                 assert_eq!(timeout_ms, expected_ms);
                 assert_eq!(attempt, (idx + 1) as u32);
             }
@@ -153,7 +156,10 @@ fn test_reset_restores_initial_state() {
     assert_eq!(escalator.attempt_count, 1);
     let decision = escalator.next_timeout(false);
     match decision {
-        LockEscalationDecision::RetryWithTimeout { timeout_ms, attempt } => {
+        LockEscalationDecision::RetryWithTimeout {
+            timeout_ms,
+            attempt,
+        } => {
             assert_eq!(timeout_ms, escalator.policy.base_timeout_ms);
             assert_eq!(attempt, 0);
         }

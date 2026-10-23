@@ -18,7 +18,10 @@ mod tests {
     #[test]
     fn test_negotiate_deflate() {
         let mut headers = HeaderMap::new();
-        headers.insert(header::CONTENT_ENCODING, HeaderValue::from_static("deflate"));
+        headers.insert(
+            header::CONTENT_ENCODING,
+            HeaderValue::from_static("deflate"),
+        );
 
         let encoding = negotiate_content_encoding(&headers);
         assert_eq!(encoding, SupportedEncoding::Deflate);
@@ -28,7 +31,10 @@ mod tests {
     #[test]
     fn test_negotiate_identity() {
         let mut headers = HeaderMap::new();
-        headers.insert(header::CONTENT_ENCODING, HeaderValue::from_static("identity"));
+        headers.insert(
+            header::CONTENT_ENCODING,
+            HeaderValue::from_static("identity"),
+        );
 
         let encoding = negotiate_content_encoding(&headers);
         assert_eq!(encoding, SupportedEncoding::Identity);

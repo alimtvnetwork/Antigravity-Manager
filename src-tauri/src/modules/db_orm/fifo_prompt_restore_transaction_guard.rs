@@ -43,35 +43,31 @@ pub enum FifoTransactionViolation {
         detected_clause: String,
     },
     /// The query is missing an `ORDER BY` clause altogether on a prompt queue table.
-    MissingOrderByClause {
-        sql: String,
-        table: String,
-    },
+    MissingOrderByClause { sql: String, table: String },
     /// The primary sort column is not `created_at ASC` (e.g. sorting by updated_at or priority).
-    DisallowedSortColumn {
-        sql: String,
-        column: String,
-    },
+    DisallowedSortColumn { sql: String, column: String },
     /// Transaction has already been aborted and poisoned due to an earlier FIFO invariant violation.
-    TransactionAlreadyAborted {
-        reason: String,
-    },
+    TransactionAlreadyAborted { reason: String },
     /// Low-level database error occurred during execution.
-    DatabaseError {
-        message: String,
-    },
+    DatabaseError { message: String },
 }
 
 impl fmt::Display for FifoTransactionViolation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvertedLIFOOrderDetected { sql, detected_clause } => {
+            Self::InvertedLIFOOrderDetected {
+                sql,
+                detected_clause,
+            } => {
                 write!(
                     f,
                     "Inverted LIFO ordering detected ('{detected_clause}') in query '{sql}': must use '{CANONICAL_FIFO_ORDER_CLAUSE}'"
                 )
             }
-            Self::MissingTieBreakerIdAsc { sql, detected_clause } => {
+            Self::MissingTieBreakerIdAsc {
+                sql,
+                detected_clause,
+            } => {
                 write!(
                     f,
                     "Missing mandatory secondary tie-breaker 'id ASC' ('{detected_clause}') in query '{sql}'"
@@ -90,13 +86,13 @@ impl fmt::Display for FifoTransactionViolation {
                 )
             }
             Self::TransactionAlreadyAborted { reason } => {
-                write!(
-                    f,
-                    "Transaction already aborted and poisoned: {reason}"
-                )
+                write!(f, "Transaction already aborted and poisoned: {reason}")
             }
             Self::DatabaseError { message } => {
-                write!(f, "Database error during FIFO guarded transaction: {message}")
+                write!(
+                    f,
+                    "Database error during FIFO guarded transaction: {message}"
+                )
             }
         }
     }
@@ -198,9 +194,9 @@ pub fn is_prompt_queue_table(table_name: &str) -> bool {
         .trim_matches('\'')
         .to_ascii_lowercase();
 
-    PROMPT_QUEUE_TABLES.iter().any(|&known| {
-        normalized == known || normalized.ends_with(&format!(".{known}"))
-    })
+    PROMPT_QUEUE_TABLES
+        .iter()
+        .any(|&known| normalized == known || normalized.ends_with(&format!(".{known}")))
 }
 
 /// Inspects whether an SQL statement targets a prompt queue table.
@@ -236,7 +232,8 @@ fn has_id_asc_tiebreaker(clause: &str) -> bool {
         let upper = part.to_ascii_uppercase();
         let tokens: Vec<&str> = upper.split_whitespace().collect();
         if tokens.len() == 2 && tokens[1] == "ASC" {
-            let col = tokens[0].trim_matches(|c: char| c == '`' || c == '"' || c == '[' || c == ']');
+            let col =
+                tokens[0].trim_matches(|c: char| c == '`' || c == '"' || c == '[' || c == ']');
             let bare_col = col.rsplit('.').next().unwrap_or(col);
             bare_col == "ID"
         } else {
@@ -364,7 +361,10 @@ impl<'conn> FifoPromptRestoreTransactionGuard<'conn> {
     }
 
     /// Intercepts and validates an SQL query against strict FIFO invariants, aborting if violated.
-    pub fn intercept_and_verify(&mut self, sql: &str) -> Result<Option<String>, FifoTransactionViolation> {
+    pub fn intercept_and_verify(
+        &mut self,
+        sql: &str,
+    ) -> Result<Option<String>, FifoTransactionViolation> {
         if self.is_aborted {
             return Err(FifoTransactionViolation::TransactionAlreadyAborted {
                 reason: self
@@ -507,11 +507,12 @@ impl<'conn> FifoPromptRestoreTransactionGuard<'conn> {
             });
         }
 
-        let tx = self.tx.take().ok_or_else(|| {
-            FifoTransactionViolation::TransactionAlreadyAborted {
-                reason: "Transaction was already consumed or rolled back".to_string(),
-            }
-        })?;
+        let tx =
+            self.tx
+                .take()
+                .ok_or_else(|| FifoTransactionViolation::TransactionAlreadyAborted {
+                    reason: "Transaction was already consumed or rolled back".to_string(),
+                })?;
 
         tx.commit()?;
         Ok(())

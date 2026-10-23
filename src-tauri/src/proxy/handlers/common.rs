@@ -55,61 +55,22 @@ pub mod sse_stream_splitter;
 pub mod status_mapper;
 pub mod stream_abort;
 pub mod stream_boundary_guard;
-pub mod streaming_chunk_boundary_guard;
-pub mod streaming_event_frame_parser;
-pub mod streaming_payload_accumulator;
 pub mod stream_drain_guard;
 pub mod stream_early_abort_sentinel;
 pub mod stream_flusher;
-pub mod thinking_block_backfill_pipeline;
-pub mod thinking_budget_filter_pipeline;
-pub mod thinking_budget_headroom_evaluator;
-pub mod thinking_budget_proportional_allocator;
-pub mod token_budget_decider;
-pub mod tool_response_formatter;
-pub mod unified_context_alignment_guard;
-pub mod unified_context_structural_aligner;
-pub mod user_agent_normalizer;
+pub mod streaming_chunk_boundary_guard;
+pub mod streaming_event_frame_parser;
+pub mod streaming_payload_accumulator;
 #[cfg(test)]
 pub mod tests_agent_prompt_sanitization_regex_engine;
-#[cfg(test)]
-pub mod tests_request_gzip_sniffer;
-#[cfg(test)]
-pub mod tests_sse_splitter_padder;
-#[cfg(test)]
-pub mod tests_sse_delimiter_normalizer;
-#[cfg(test)]
-pub mod tests_request_cancellation_watcher;
-#[cfg(test)]
-pub mod tests_request_size_guard;
-#[cfg(test)]
-pub mod tests_request_header_sanitizer;
-#[cfg(test)]
-pub mod tests_request_content_length_validator;
-#[cfg(test)]
-pub mod tests_response_content_type_matcher;
-#[cfg(test)]
-pub mod tests_response_stream_delimiter_normalizer;
-#[cfg(test)]
-pub mod tests_compression_negotiator;
-#[cfg(test)]
-pub mod tests_stream_flusher;
-#[cfg(test)]
-pub mod tests_stream_early_abort_sentinel;
-#[cfg(test)]
-pub mod tests_sse_chunk_coalescer;
-#[cfg(test)]
-pub mod tests_sse_comment_filter;
-#[cfg(test)]
-pub mod tests_role_normalization_validator;
-#[cfg(test)]
-pub mod tests_request_content_encoding_negotiator;
-#[cfg(test)]
-pub mod tests_decompressor;
 #[cfg(test)]
 pub mod tests_boundary_normalizer;
 #[cfg(test)]
 pub mod tests_chunk_boundary_validator;
+#[cfg(test)]
+pub mod tests_compression_negotiator;
+#[cfg(test)]
+pub mod tests_decompressor;
 #[cfg(test)]
 pub mod tests_json_payload_sanitizer;
 #[cfg(test)]
@@ -119,15 +80,43 @@ pub mod tests_pipeline_request_header_sanitizer;
 #[cfg(test)]
 pub mod tests_pipeline_response_header_sanitizer;
 #[cfg(test)]
+pub mod tests_prefix_stability_pipeline_guard;
+#[cfg(test)]
+pub mod tests_prefix_stability_sanitizer;
+#[cfg(test)]
+pub mod tests_protocol_adapter_divergence_auditor;
+#[cfg(test)]
+pub mod tests_request_cancellation_watcher;
+#[cfg(test)]
+pub mod tests_request_content_encoding_negotiator;
+#[cfg(test)]
+pub mod tests_request_content_length_validator;
+#[cfg(test)]
+pub mod tests_request_gzip_sniffer;
+#[cfg(test)]
+pub mod tests_request_header_sanitizer;
+#[cfg(test)]
+pub mod tests_request_size_guard;
+#[cfg(test)]
+pub mod tests_response_content_type_matcher;
+#[cfg(test)]
+pub mod tests_response_stream_delimiter_normalizer;
+#[cfg(test)]
+pub mod tests_role_normalization_validator;
+#[cfg(test)]
+pub mod tests_sse_chunk_coalescer;
+#[cfg(test)]
+pub mod tests_sse_comment_filter;
+#[cfg(test)]
+pub mod tests_sse_delimiter_normalizer;
+#[cfg(test)]
 pub mod tests_sse_heartbeat_generator;
 #[cfg(test)]
-pub mod tests_token_budget_decider;
+pub mod tests_sse_splitter_padder;
 #[cfg(test)]
-pub mod tests_thinking_block_backfill_pipeline;
+pub mod tests_stream_early_abort_sentinel;
 #[cfg(test)]
-pub mod tests_thinking_budget_filter_pipeline;
-#[cfg(test)]
-pub mod tests_thinking_budget_headroom_evaluator;
+pub mod tests_stream_flusher;
 #[cfg(test)]
 pub mod tests_streaming_chunk_boundary_guard;
 #[cfg(test)]
@@ -135,17 +124,28 @@ pub mod tests_streaming_event_frame_parser;
 #[cfg(test)]
 pub mod tests_streaming_payload_accumulator;
 #[cfg(test)]
+pub mod tests_thinking_block_backfill_pipeline;
+#[cfg(test)]
+pub mod tests_thinking_budget_filter_pipeline;
+#[cfg(test)]
+pub mod tests_thinking_budget_headroom_evaluator;
+#[cfg(test)]
 pub mod tests_thinking_budget_proportional_allocator;
 #[cfg(test)]
-pub mod tests_prefix_stability_pipeline_guard;
-#[cfg(test)]
-pub mod tests_prefix_stability_sanitizer;
-#[cfg(test)]
-pub mod tests_protocol_adapter_divergence_auditor;
+pub mod tests_token_budget_decider;
 #[cfg(test)]
 pub mod tests_unified_context_alignment_guard;
 #[cfg(test)]
 pub mod tests_unified_context_structural_aligner;
+pub mod thinking_block_backfill_pipeline;
+pub mod thinking_budget_filter_pipeline;
+pub mod thinking_budget_headroom_evaluator;
+pub mod thinking_budget_proportional_allocator;
+pub mod token_budget_decider;
+pub mod tool_response_formatter;
+pub mod unified_context_alignment_guard;
+pub mod unified_context_structural_aligner;
+pub mod user_agent_normalizer;
 
 pub use abort_sentinel::*;
 pub use agent_prompt_sanitization_regex_engine::*;
@@ -190,12 +190,12 @@ pub use sse_stream_splitter::*;
 pub use status_mapper::{map_upstream_status_to_canonical, CanonicalErrorPayload};
 pub use stream_abort::{StreamAbortHandle, StreamAbortReceiver};
 pub use stream_boundary_guard::*;
-pub use streaming_chunk_boundary_guard::*;
-pub use streaming_event_frame_parser::*;
-pub use streaming_payload_accumulator::*;
 pub use stream_drain_guard::*;
 pub use stream_early_abort_sentinel::*;
 pub use stream_flusher::{StreamFlusher, SSE_KEEPALIVE_BYTES};
+pub use streaming_chunk_boundary_guard::*;
+pub use streaming_event_frame_parser::*;
+pub use streaming_payload_accumulator::*;
 pub use thinking_block_backfill_pipeline::*;
 pub use thinking_budget_filter_pipeline::*;
 pub use thinking_budget_headroom_evaluator::*;
@@ -239,7 +239,11 @@ pub fn header_eq_ignore_case(headers: &axum::http::HeaderMap, key: &str, expecte
 }
 
 /// Imp-49: Fast zero-allocation case-insensitive header substring matching
-pub fn header_contains_ignore_case(headers: &axum::http::HeaderMap, key: &str, needle: &str) -> bool {
+pub fn header_contains_ignore_case(
+    headers: &axum::http::HeaderMap,
+    key: &str,
+    needle: &str,
+) -> bool {
     if let Some(val) = headers.get(key) {
         if let Ok(val_str) = val.to_str() {
             let v_bytes = val_str.as_bytes();

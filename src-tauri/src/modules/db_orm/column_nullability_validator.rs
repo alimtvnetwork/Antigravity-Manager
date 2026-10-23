@@ -60,7 +60,10 @@ pub fn validate_required_not_null_columns(
     let mut violations = Vec::new();
 
     for required in required_columns {
-        if let Some(col) = columns.iter().find(|c| c.name.eq_ignore_ascii_case(required)) {
+        if let Some(col) = columns
+            .iter()
+            .find(|c| c.name.eq_ignore_ascii_case(required))
+        {
             if !col.not_null && !col.is_pk {
                 violations.push(NullabilityViolation {
                     table_name: table_name.to_string(),

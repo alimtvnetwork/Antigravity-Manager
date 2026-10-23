@@ -14,7 +14,10 @@ fn sha256_hex(input: &str) -> String {
 }
 
 /// Re-seeds `storage.json` telemetry identity fields with unique synthetic values.
-pub fn reseed_profile_telemetry_identity(storage_json_path: &Path, instance_id: &str) -> Result<(), String> {
+pub fn reseed_profile_telemetry_identity(
+    storage_json_path: &Path,
+    instance_id: &str,
+) -> Result<(), String> {
     if !storage_json_path.exists() {
         return Ok(());
     }
@@ -22,8 +25,8 @@ pub fn reseed_profile_telemetry_identity(storage_json_path: &Path, instance_id: 
     let raw = std::fs::read_to_string(storage_json_path)
         .map_err(|e| format!("Failed to read storage.json: {}", e))?;
 
-    let mut json_val: Value = serde_json::from_str(&raw)
-        .map_err(|e| format!("Invalid JSON in storage.json: {}", e))?;
+    let mut json_val: Value =
+        serde_json::from_str(&raw).map_err(|e| format!("Invalid JSON in storage.json: {}", e))?;
 
     let machine_uuid = Uuid::new_v4().to_string();
     let mac_uuid = Uuid::new_v4().to_string();
@@ -34,11 +37,23 @@ pub fn reseed_profile_telemetry_identity(storage_json_path: &Path, instance_id: 
     let mac_hash = sha256_hex(&format!("{}-{}", instance_id, mac_uuid));
 
     if let Some(obj) = json_val.as_object_mut() {
-        obj.insert("telemetry.machineId".to_string(), Value::String(machine_hash));
-        obj.insert("telemetry.macMachineId".to_string(), Value::String(mac_hash));
-        obj.insert("telemetry.devDeviceId".to_string(), Value::String(dev_device_id.clone()));
+        obj.insert(
+            "telemetry.machineId".to_string(),
+            Value::String(machine_hash),
+        );
+        obj.insert(
+            "telemetry.macMachineId".to_string(),
+            Value::String(mac_hash),
+        );
+        obj.insert(
+            "telemetry.devDeviceId".to_string(),
+            Value::String(dev_device_id.clone()),
+        );
         obj.insert("telemetry.sqmId".to_string(), Value::String(sqm_id));
-        obj.insert("storage.serviceMachineId".to_string(), Value::String(dev_device_id));
+        obj.insert(
+            "storage.serviceMachineId".to_string(),
+            Value::String(dev_device_id),
+        );
     }
 
     let serialized = serde_json::to_string_pretty(&json_val)

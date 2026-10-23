@@ -9,13 +9,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-pub const NOISE_RECORD_TYPES: &[&str] = &[
-    "TOKEN_USAGE",
-    "HEARTBEAT",
-    "TELEMETRY",
-    "METRICS",
-    "PING",
-];
+pub const NOISE_RECORD_TYPES: &[&str] =
+    &["TOKEN_USAGE", "HEARTBEAT", "TELEMETRY", "METRICS", "PING"];
 pub const MINIMUM_REVERSE_SCAN_LINES: usize = 10;
 pub const TRANSCRIPT_FULL_FILENAME: &str = "transcript_full.jsonl";
 pub const TRANSCRIPT_COMPACT_FILENAME: &str = "transcript.jsonl";
@@ -116,7 +111,9 @@ pub fn select_transcript_file(full_exists: bool, compact_exists: bool) -> Option
 /// Evaluates if a given transcript log line matches recognized noise types.
 pub fn is_noise_record(line: &str) -> bool {
     let upper = line.to_ascii_uppercase();
-    NOISE_RECORD_TYPES.iter().any(|&noise| upper.contains(noise))
+    NOISE_RECORD_TYPES
+        .iter()
+        .any(|&noise| upper.contains(noise))
 }
 
 /// Extracts tool call names or string representations from parsed JSON Value.
@@ -168,7 +165,11 @@ fn extract_user_prompt_from_raw(line: &str) -> String {
 }
 
 /// Scans a single line and appends recognized genuine artifacts.
-fn scan_single_line(line: &str, line_number: usize, artifacts: &mut Vec<ExtractedExecutionArtifact>) {
+fn scan_single_line(
+    line: &str,
+    line_number: usize,
+    artifacts: &mut Vec<ExtractedExecutionArtifact>,
+) {
     if line.contains("\"tool_calls\"") {
         let tools = extract_tool_calls_from_raw(line);
         artifacts.push(ExtractedExecutionArtifact::new(

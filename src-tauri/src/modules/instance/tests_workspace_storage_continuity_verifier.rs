@@ -15,7 +15,10 @@ fn test_canonical_service_route_passes() {
 fn test_bypassed_service_route_returns_violation() {
     let result = verify_service_route("custom_direct_fs_copy");
     match result {
-        Err(ContinuityViolation::BypassedStandardServiceRoute { route_used, expected }) => {
+        Err(ContinuityViolation::BypassedStandardServiceRoute {
+            route_used,
+            expected,
+        }) => {
             assert_eq!(route_used, "custom_direct_fs_copy");
             assert_eq!(expected, CANONICAL_COPY_SERVICE_ROUTE);
         }
@@ -51,9 +54,7 @@ fn test_missing_workspace_ids_detected() {
         WorkspaceEntry::new("ws-alpha-101", true, 4096),
         WorkspaceEntry::new("ws-beta-202", true, 8192),
     ];
-    let target = vec![
-        WorkspaceEntry::new("ws-alpha-101", true, 4096),
-    ];
+    let target = vec![WorkspaceEntry::new("ws-alpha-101", true, 4096)];
 
     let report = verify_workspace_continuity(&source, &target, CANONICAL_COPY_SERVICE_ROUTE)
         .expect("continuity verification should succeed");
@@ -65,12 +66,8 @@ fn test_missing_workspace_ids_detected() {
 
 #[test]
 fn test_corrupted_state_db_detected() {
-    let source = vec![
-        WorkspaceEntry::new("ws-gamma-303", true, 2048),
-    ];
-    let target = vec![
-        WorkspaceEntry::new("ws-gamma-303", false, 0),
-    ];
+    let source = vec![WorkspaceEntry::new("ws-gamma-303", true, 2048)];
+    let target = vec![WorkspaceEntry::new("ws-gamma-303", false, 0)];
 
     let report = verify_workspace_continuity(&source, &target, CANONICAL_COPY_SERVICE_ROUTE)
         .expect("continuity verification should succeed");

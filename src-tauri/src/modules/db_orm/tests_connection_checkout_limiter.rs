@@ -15,15 +15,24 @@ fn test_default_limiter_permits_up_to_capacity() {
     let mut guards = Vec::new();
     for _ in 0..DEFAULT_MAX_BACKGROUND_CHECKOUTS {
         let guard = limiter.try_acquire_background_permit();
-        assert!(guard.is_some(), "Expected permit to be granted within capacity");
+        assert!(
+            guard.is_some(),
+            "Expected permit to be granted within capacity"
+        );
         guards.push(guard.unwrap());
     }
 
-    assert_eq!(limiter.current_background_load(), DEFAULT_MAX_BACKGROUND_CHECKOUTS);
+    assert_eq!(
+        limiter.current_background_load(),
+        DEFAULT_MAX_BACKGROUND_CHECKOUTS
+    );
 
     // Capacity is saturated; next acquire should return None
     let extra = limiter.try_acquire_background_permit();
-    assert!(extra.is_none(), "Expected permit to be denied when saturated");
+    assert!(
+        extra.is_none(),
+        "Expected permit to be denied when saturated"
+    );
 }
 
 #[test]

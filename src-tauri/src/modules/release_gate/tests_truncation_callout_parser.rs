@@ -21,8 +21,12 @@ mod tests {
             callout.banner_text,
             "⚡ [Omitted 2048 bytes of context - Click to inspect/expand]"
         );
-        assert!(callout.html_representation.contains("data-omitted-quantity=\"2048\""));
-        assert!(callout.html_representation.contains("data-omitted-unit=\"bytes\""));
+        assert!(callout
+            .html_representation
+            .contains("data-omitted-quantity=\"2048\""));
+        assert!(callout
+            .html_representation
+            .contains("data-omitted-unit=\"bytes\""));
     }
 
     #[test]
@@ -123,8 +127,12 @@ mod tests {
         assert!(result.has_truncations);
         assert_eq!(result.callouts.len(), 1);
         assert_eq!(result.raw_text, text);
-        assert!(result.formatted_text.contains("⚡ [Omitted 500 bytes of context - Click to inspect/expand]"));
-        assert!(result.html_text.contains("interactive-dark-glass-omission-banner"));
+        assert!(result
+            .formatted_text
+            .contains("⚡ [Omitted 500 bytes of context - Click to inspect/expand]"));
+        assert!(result
+            .html_text
+            .contains("interactive-dark-glass-omission-banner"));
     }
 
     #[test]

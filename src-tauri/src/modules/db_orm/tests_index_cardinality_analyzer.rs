@@ -35,7 +35,9 @@ mod tests {
             .expect("create table");
 
         // Insert 150 rows with only 2 distinct levels ('INFO', 'WARN')
-        let mut stmt = conn.prepare("INSERT INTO logs (level) VALUES (?);").expect("prepare");
+        let mut stmt = conn
+            .prepare("INSERT INTO logs (level) VALUES (?);")
+            .expect("prepare");
         for i in 0..150 {
             let lvl = if i % 2 == 0 { "INFO" } else { "WARN" };
             stmt.execute([lvl]).expect("insert row");

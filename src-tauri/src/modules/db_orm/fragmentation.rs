@@ -28,8 +28,8 @@ pub fn estimate_db_fragmentation(conn: &Connection) -> Result<FragmentationRepor
         0.0
     };
 
-    let is_vacuum_recommended =
-        fragmentation_ratio >= FRAGMENTATION_THRESHOLD_RATIO && freelist_count >= MIN_PAGES_FOR_VACUUM;
+    let is_vacuum_recommended = fragmentation_ratio >= FRAGMENTATION_THRESHOLD_RATIO
+        && freelist_count >= MIN_PAGES_FOR_VACUUM;
 
     Ok(FragmentationReport {
         page_count,

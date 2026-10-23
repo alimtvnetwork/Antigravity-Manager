@@ -51,13 +51,21 @@ impl CandidateScoringFactors {
 
     /// Sets the remaining quota percentage (clamped between 0.0 and 100.0).
     pub fn with_remaining_quota_percent(mut self, percent: f64) -> Self {
-        self.remaining_quota_percent = if percent.is_nan() { 0.0 } else { percent.clamp(0.0, 100.0) };
+        self.remaining_quota_percent = if percent.is_nan() {
+            0.0
+        } else {
+            percent.clamp(0.0, 100.0)
+        };
         self
     }
 
     /// Sets the measured burn rate velocity in tokens per second.
     pub fn with_burn_rate(mut self, burn_rate: f64) -> Self {
-        self.burn_rate_tokens_per_sec = if burn_rate.is_nan() || burn_rate < 0.0 { 0.0 } else { burn_rate };
+        self.burn_rate_tokens_per_sec = if burn_rate.is_nan() || burn_rate < 0.0 {
+            0.0
+        } else {
+            burn_rate
+        };
         self
     }
 
@@ -269,17 +277,19 @@ pub fn score_candidate_dynamically(factors: &CandidateScoringFactors) -> ScoredC
 
 /// Ranks a slice of candidate accounts, returning candidates sorted by final_score descending.
 pub fn rank_candidates(candidates: &[CandidateScoringFactors]) -> Vec<ScoredCandidate> {
-    let mut scored: Vec<ScoredCandidate> = candidates
-        .iter()
-        .map(score_candidate_dynamically)
-        .collect();
+    let mut scored: Vec<ScoredCandidate> =
+        candidates.iter().map(score_candidate_dynamically).collect();
 
     scored.sort_by(|a, b| {
         // First sort by eligibility (eligible first)
         b.is_eligible
             .cmp(&a.is_eligible)
             // Then sort by final_score descending
-            .then_with(|| b.final_score.partial_cmp(&a.final_score).unwrap_or(std::cmp::Ordering::Equal))
+            .then_with(|| {
+                b.final_score
+                    .partial_cmp(&a.final_score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             // Tie-breaker by account_id ascending
             .then_with(|| a.account_id.cmp(&b.account_id))
     });
@@ -289,5 +299,7 @@ pub fn rank_candidates(candidates: &[CandidateScoringFactors]) -> Vec<ScoredCand
 
 /// Selects the single best candidate from a candidate list, or None if no candidate is selectable.
 pub fn select_best_candidate(candidates: &[CandidateScoringFactors]) -> Option<ScoredCandidate> {
-    rank_candidates(candidates).into_iter().find(|c| c.is_selectable())
+    rank_candidates(candidates)
+        .into_iter()
+        .find(|c| c.is_selectable())
 }

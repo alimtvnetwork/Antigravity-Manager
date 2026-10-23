@@ -59,8 +59,12 @@ fn test_successful_lease_acquisition_and_release() {
         1_000
     ));
 
-    let lease_res =
-        acquire_restore_lease(&mut state, RestoreQueueTable::ActivePrompts, "task-1", 1_000);
+    let lease_res = acquire_restore_lease(
+        &mut state,
+        RestoreQueueTable::ActivePrompts,
+        "task-1",
+        1_000,
+    );
     assert!(lease_res.is_ok());
 
     let lease = lease_res.unwrap();
@@ -94,12 +98,20 @@ fn test_successful_lease_acquisition_and_release() {
 #[test]
 fn test_rejection_of_concurrent_restore_conflict_single_permit() {
     let mut state = LimiterState::default();
-    let lease1 =
-        acquire_restore_lease(&mut state, RestoreQueueTable::ActivePrompts, "worker-alpha", 5_000);
+    let lease1 = acquire_restore_lease(
+        &mut state,
+        RestoreQueueTable::ActivePrompts,
+        "worker-alpha",
+        5_000,
+    );
     assert!(lease1.is_ok());
 
-    let conflict_res =
-        acquire_restore_lease(&mut state, RestoreQueueTable::ActivePrompts, "worker-beta", 6_000);
+    let conflict_res = acquire_restore_lease(
+        &mut state,
+        RestoreQueueTable::ActivePrompts,
+        "worker-beta",
+        6_000,
+    );
     assert!(conflict_res.is_err());
 
     let err = conflict_res.unwrap_err();
@@ -144,8 +156,12 @@ fn test_rejection_when_max_permits_exceeded_multi_permit() {
     }
 
     let mut zero_state = LimiterState::new(0, 10_000);
-    let zero_res =
-        acquire_restore_lease(&mut zero_state, RestoreQueueTable::PromptBackups, "task-x", 100);
+    let zero_res = acquire_restore_lease(
+        &mut zero_state,
+        RestoreQueueTable::PromptBackups,
+        "task-x",
+        100,
+    );
     assert!(matches!(
         zero_res,
         Err(ConcurrencyLimiterViolation::MaxPermitsExceeded { max_permits: 0, .. })
@@ -156,8 +172,12 @@ fn test_rejection_when_max_permits_exceeded_multi_permit() {
 fn test_automatic_expiration_of_old_leases() {
     let mut state = LimiterState::new(1, 5_000);
 
-    let lease1 =
-        acquire_restore_lease(&mut state, RestoreQueueTable::PromptBackups, "task-old", 1_000);
+    let lease1 = acquire_restore_lease(
+        &mut state,
+        RestoreQueueTable::PromptBackups,
+        "task-old",
+        1_000,
+    );
     assert!(lease1.is_ok());
 
     assert!(has_active_lease(
@@ -170,8 +190,12 @@ fn test_automatic_expiration_of_old_leases() {
         1
     );
 
-    let blocked_res =
-        acquire_restore_lease(&mut state, RestoreQueueTable::PromptBackups, "task-new", 3_000);
+    let blocked_res = acquire_restore_lease(
+        &mut state,
+        RestoreQueueTable::PromptBackups,
+        "task-new",
+        3_000,
+    );
     assert!(blocked_res.is_err());
 
     assert!(!has_active_lease(
@@ -180,8 +204,12 @@ fn test_automatic_expiration_of_old_leases() {
         6_000
     ));
 
-    let success_res =
-        acquire_restore_lease(&mut state, RestoreQueueTable::PromptBackups, "task-new", 6_001);
+    let success_res = acquire_restore_lease(
+        &mut state,
+        RestoreQueueTable::PromptBackups,
+        "task-new",
+        6_001,
+    );
     assert!(success_res.is_ok());
 
     let new_lease = success_res.unwrap();
@@ -194,10 +222,18 @@ fn test_automatic_expiration_of_old_leases() {
 fn test_multi_table_isolation() {
     let mut state = LimiterState::default();
 
-    let lease_active =
-        acquire_restore_lease(&mut state, RestoreQueueTable::ActivePrompts, "worker-1", 500);
-    let lease_backups =
-        acquire_restore_lease(&mut state, RestoreQueueTable::PromptBackups, "worker-2", 500);
+    let lease_active = acquire_restore_lease(
+        &mut state,
+        RestoreQueueTable::ActivePrompts,
+        "worker-1",
+        500,
+    );
+    let lease_backups = acquire_restore_lease(
+        &mut state,
+        RestoreQueueTable::PromptBackups,
+        "worker-2",
+        500,
+    );
     let lease_repo =
         acquire_restore_lease(&mut state, RestoreQueueTable::RepoPrompts, "worker-3", 500);
 
@@ -221,7 +257,10 @@ fn test_multi_table_isolation() {
         500
     ));
 
-    assert!(release_restore_lease(&mut state, &lease_active.unwrap().lease_id));
+    assert!(release_restore_lease(
+        &mut state,
+        &lease_active.unwrap().lease_id
+    ));
     assert!(!has_active_lease(
         &state,
         RestoreQueueTable::ActivePrompts,
@@ -296,8 +335,10 @@ fn test_lease_record_helpers_and_expiration() {
 fn test_find_active_lease_and_purge_count() {
     let mut state = LimiterState::new(3, 10_000);
 
-    let l1 = acquire_restore_lease(&mut state, RestoreQueueTable::ActivePrompts, "t1", 1_000).unwrap();
-    let _l2 = acquire_restore_lease(&mut state, RestoreQueueTable::ActivePrompts, "t2", 2_000).unwrap();
+    let l1 =
+        acquire_restore_lease(&mut state, RestoreQueueTable::ActivePrompts, "t1", 1_000).unwrap();
+    let _l2 =
+        acquire_restore_lease(&mut state, RestoreQueueTable::ActivePrompts, "t2", 2_000).unwrap();
 
     let found = find_active_lease(&state, RestoreQueueTable::ActivePrompts, 5_000);
     assert!(found.is_some());

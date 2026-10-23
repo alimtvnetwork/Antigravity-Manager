@@ -33,7 +33,8 @@ impl VacuumOptimizer {
             0.0
         };
 
-        let should_vacuum = freelist_count >= min_freelist_pages || freelist_ratio >= min_freelist_ratio;
+        let should_vacuum =
+            freelist_count >= min_freelist_pages || freelist_ratio >= min_freelist_ratio;
         let mut vacuum_executed = false;
         let mut pages_requested = 0;
 

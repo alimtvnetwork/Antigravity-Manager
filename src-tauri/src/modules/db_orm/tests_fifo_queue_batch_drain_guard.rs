@@ -1,9 +1,8 @@
 //! Comprehensive unit tests for `FifoQueueBatchDrainGuard` (`Imp-664`).
 
 use super::fifo_queue_batch_drain_guard::{
-    build_batch_chunk_query, drain_chunks_safely, validate_chunk_query_ordering,
-    BatchDrainReport, BatchDrainViolation, DrainBatchSpec, DrainedItem,
-    MANDATORY_FIFO_ORDER_CLAUSE,
+    build_batch_chunk_query, drain_chunks_safely, validate_chunk_query_ordering, BatchDrainReport,
+    BatchDrainViolation, DrainBatchSpec, DrainedItem, MANDATORY_FIFO_ORDER_CLAUSE,
 };
 
 #[test]

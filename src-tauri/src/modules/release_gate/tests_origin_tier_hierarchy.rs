@@ -7,7 +7,10 @@ mod tests {
 
     #[test]
     fn test_classify_origin_tier() {
-        assert_eq!(classify_origin_tier("USER_INPUT", false), OriginTier::UserPrompt);
+        assert_eq!(
+            classify_origin_tier("USER_INPUT", false),
+            OriginTier::UserPrompt
+        );
         assert_eq!(
             classify_origin_tier("USER_INPUT", true),
             OriginTier::SubagentInstruction
@@ -20,7 +23,10 @@ mod tests {
             classify_origin_tier("SYSTEM_MESSAGE", false),
             OriginTier::SystemMessage
         );
-        assert_eq!(classify_origin_tier("TOOL_CALLS", false), OriginTier::ToolOutput);
+        assert_eq!(
+            classify_origin_tier("TOOL_CALLS", false),
+            OriginTier::ToolOutput
+        );
     }
 
     #[test]

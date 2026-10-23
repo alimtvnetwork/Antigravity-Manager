@@ -63,7 +63,7 @@ mod tests {
         assert_eq!(compensator.observed_drift_sec, 10);
 
         compensator.record_server_timestamp(1020, 1000); // 20s
-        // (10 * 4 + 20) / 5 = 60 / 5 = 12s
+                                                         // (10 * 4 + 20) / 5 = 60 / 5 = 12s
         assert_eq!(compensator.observed_drift_sec, 12);
     }
 

@@ -170,7 +170,10 @@ fn test_default_threshold_helper_and_struct_wrapper() {
     ];
     // Velocity = 100 tok/sec
     let forecast = predict_quota_exhaustion_default(&obs, 20_000);
-    assert_eq!(forecast.switch_threshold_seconds, DEFAULT_SWITCH_THRESHOLD_SECONDS);
+    assert_eq!(
+        forecast.switch_threshold_seconds,
+        DEFAULT_SWITCH_THRESHOLD_SECONDS
+    );
     assert_eq!(forecast.runway_seconds, Some(200.0));
     assert!(forecast.should_switch());
 
@@ -181,8 +184,11 @@ fn test_default_threshold_helper_and_struct_wrapper() {
     let velocity_struct = QuotaExhaustionPredictor::calculate_burn_rate_velocity(&obs);
     assert_eq!(velocity_struct.tokens_per_second, 100.0);
 
-    let forecast_struct2 =
-        QuotaExhaustionPredictor::predict_quota_exhaustion(&obs, 20_000, DEFAULT_SWITCH_THRESHOLD_SECONDS);
+    let forecast_struct2 = QuotaExhaustionPredictor::predict_quota_exhaustion(
+        &obs,
+        20_000,
+        DEFAULT_SWITCH_THRESHOLD_SECONDS,
+    );
     assert_eq!(forecast, forecast_struct2);
 }
 
@@ -203,6 +209,7 @@ fn test_serialization_and_deserialization() {
 
     let forecast = predict_quota_exhaustion_default(&[obs], 1000);
     let json = serde_json::to_string(&forecast).expect("Serialize forecast");
-    let deserialized: ExhaustionForecast = serde_json::from_str(&json).expect("Deserialize forecast");
+    let deserialized: ExhaustionForecast =
+        serde_json::from_str(&json).expect("Deserialize forecast");
     assert_eq!(forecast, deserialized);
 }

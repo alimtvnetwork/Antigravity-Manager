@@ -138,7 +138,10 @@ pub enum CallerIdeOrigin {
 impl fmt::Display for CallerIdeOrigin {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::AntigravityIdeTerminal { instance_id, ide_pid } => {
+            Self::AntigravityIdeTerminal {
+                instance_id,
+                ide_pid,
+            } => {
                 write!(
                     f,
                     "Antigravity IDE Terminal (Instance: '{instance_id}', PID: {ide_pid})"
@@ -200,14 +203,22 @@ fn extract_instance_id_from_node(node: &ProcessNode) -> Option<String> {
         // Match --instance-id=<id> or -instance-id <id>
         if let Some(idx) = cmd.find("--instance-id=") {
             let rest = &cmd[idx + "--instance-id=".len()..];
-            let token = rest.split_whitespace().next().unwrap_or("").trim_matches('"');
+            let token = rest
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
+                .trim_matches('"');
             if !token.is_empty() {
                 return Some(token.to_string());
             }
         }
         if let Some(idx) = cmd.find("--instance-id ") {
             let rest = &cmd[idx + "--instance-id ".len()..];
-            let token = rest.split_whitespace().next().unwrap_or("").trim_matches('"');
+            let token = rest
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
+                .trim_matches('"');
             if !token.is_empty() {
                 return Some(token.to_string());
             }
@@ -236,14 +247,22 @@ fn extract_instance_id_from_node(node: &ProcessNode) -> Option<String> {
         // Match --profile <id> or --profile=<id>
         if let Some(idx) = cmd.find("--profile=") {
             let rest = &cmd[idx + "--profile=".len()..];
-            let token = rest.split_whitespace().next().unwrap_or("").trim_matches('"');
+            let token = rest
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
+                .trim_matches('"');
             if !token.is_empty() {
                 return Some(token.to_string());
             }
         }
         if let Some(idx) = cmd.find("--profile ") {
             let rest = &cmd[idx + "--profile ".len()..];
-            let token = rest.split_whitespace().next().unwrap_or("").trim_matches('"');
+            let token = rest
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
+                .trim_matches('"');
             if !token.is_empty() {
                 return Some(token.to_string());
             }
@@ -252,9 +271,7 @@ fn extract_instance_id_from_node(node: &ProcessNode) -> Option<String> {
 
     // 2. Inspect cloned executable name: e.g. antigravity-worker-1.exe -> worker-1
     let lower_exe = node.executable_name.to_ascii_lowercase();
-    let clean_exe = lower_exe
-        .strip_suffix(".exe")
-        .unwrap_or(&lower_exe);
+    let clean_exe = lower_exe.strip_suffix(".exe").unwrap_or(&lower_exe);
 
     if let Some(inst) = clean_exe.strip_prefix("antigravity-") {
         if !inst.is_empty() && inst != "manager" {

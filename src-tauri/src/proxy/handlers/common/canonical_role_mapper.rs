@@ -28,9 +28,7 @@ impl CanonicalRole {
             || trimmed.eq_ignore_ascii_case("developer")
         {
             CanonicalRole::System
-        } else if trimmed.eq_ignore_ascii_case("tool")
-            || trimmed.eq_ignore_ascii_case("function")
-        {
+        } else if trimmed.eq_ignore_ascii_case("tool") || trimmed.eq_ignore_ascii_case("function") {
             CanonicalRole::Tool
         } else {
             // Safe fallback to User

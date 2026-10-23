@@ -13,10 +13,7 @@ pub struct TlsAlpnNegotiator;
 impl TlsAlpnNegotiator {
     /// Returns default wire-format ALPN protocols prioritizing h2.
     pub fn default_alpn_protocols() -> Vec<Vec<u8>> {
-        vec![
-            b"h2".to_vec(),
-            b"http/1.1".to_vec(),
-        ]
+        vec![b"h2".to_vec(), b"http/1.1".to_vec()]
     }
 
     /// Converts negotiated wire bytes into a strongly typed AlpnProtocol enum.

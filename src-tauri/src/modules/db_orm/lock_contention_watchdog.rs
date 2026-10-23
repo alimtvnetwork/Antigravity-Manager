@@ -48,7 +48,12 @@ impl LockContentionWatchdog {
     }
 
     /// Registers the acquisition of a database lock.
-    pub fn acquire_lock(&mut self, lock_id: impl Into<String>, db_name: impl Into<String>, now_ms: u64) {
+    pub fn acquire_lock(
+        &mut self,
+        lock_id: impl Into<String>,
+        db_name: impl Into<String>,
+        now_ms: u64,
+    ) {
         let id = lock_id.into();
         self.active_locks.insert(
             id.clone(),

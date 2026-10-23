@@ -38,7 +38,9 @@ pub fn is_account_eligible(
 
     // Check minimum tier if specified
     if let Some(ref min_tier) = req.min_tier {
-        if !account.tier.eq_ignore_ascii_case(min_tier) && account.tier.to_lowercase() < min_tier.to_lowercase() {
+        if !account.tier.eq_ignore_ascii_case(min_tier)
+            && account.tier.to_lowercase() < min_tier.to_lowercase()
+        {
             return false;
         }
     }

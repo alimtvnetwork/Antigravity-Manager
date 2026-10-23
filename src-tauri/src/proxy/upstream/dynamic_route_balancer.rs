@@ -46,14 +46,15 @@ impl DynamicRouteBalancer {
             Err(p) => p.into_inner(),
         };
 
-        map.entry(endpoint.to_string()).or_insert_with(|| RouteHealthProfile {
-            endpoint: endpoint.to_string(),
-            total_requests: 0,
-            successful_requests: 0,
-            consecutive_failures: 0,
-            last_failure_at: None,
-            current_weight: self.base_weight,
-        });
+        map.entry(endpoint.to_string())
+            .or_insert_with(|| RouteHealthProfile {
+                endpoint: endpoint.to_string(),
+                total_requests: 0,
+                successful_requests: 0,
+                consecutive_failures: 0,
+                last_failure_at: None,
+                current_weight: self.base_weight,
+            });
     }
 
     /// Records request result for a route and recalculates weight.
@@ -70,7 +71,8 @@ impl DynamicRouteBalancer {
                 profile.successful_requests += 1;
                 profile.consecutive_failures = 0;
                 // Gradually restore weight toward base
-                profile.current_weight = ((profile.current_weight * 9 + self.base_weight) / 10).max(10);
+                profile.current_weight =
+                    ((profile.current_weight * 9 + self.base_weight) / 10).max(10);
             } else {
                 profile.consecutive_failures += 1;
                 profile.last_failure_at = Some(Instant::now());
@@ -98,6 +100,8 @@ impl DynamicRouteBalancer {
             Err(p) => p.into_inner(),
         };
 
-        map.get(endpoint).map(|p| p.current_weight).unwrap_or(self.base_weight)
+        map.get(endpoint)
+            .map(|p| p.current_weight)
+            .unwrap_or(self.base_weight)
     }
 }

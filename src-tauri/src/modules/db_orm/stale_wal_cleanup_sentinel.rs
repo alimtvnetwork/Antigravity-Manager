@@ -44,7 +44,10 @@ impl StaleWalCleanupSentinel {
         // If WAL file is significantly large (>4MB) or orphaned, trigger a truncate checkpoint
         if has_wal && wal_bytes > 4 * 1024 * 1024 {
             if let Ok(conn) = Connection::open(main_db) {
-                if conn.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);").is_ok() {
+                if conn
+                    .execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")
+                    .is_ok()
+                {
                     was_recovered = true;
                 }
             }

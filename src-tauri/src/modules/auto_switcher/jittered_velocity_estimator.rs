@@ -35,7 +35,10 @@ pub fn estimate_jittered_velocity(
     let newest = recent_samples.last().unwrap();
 
     let delta_ratio = (newest.used_ratio - oldest.used_ratio).max(0.0);
-    let delta_secs = newest.recorded_at.duration_since(oldest.recorded_at).as_secs_f64();
+    let delta_secs = newest
+        .recorded_at
+        .duration_since(oldest.recorded_at)
+        .as_secs_f64();
 
     if delta_secs <= 0.0 {
         return 0.0;

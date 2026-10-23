@@ -30,23 +30,16 @@ impl TableRowSizeProfiler {
             payload_column, table_name, sample_limit
         );
 
-        let mut stmt = conn
-            .prepare(&sql)
-            .map_err(AppError::Database)?;
+        let mut stmt = conn.prepare(&sql).map_err(AppError::Database)?;
 
-        let mut rows = stmt
-            .query([])
-            .map_err(AppError::Database)?;
+        let mut rows = stmt.query([]).map_err(AppError::Database)?;
 
         let mut total_bytes = 0usize;
         let mut max_bytes = 0usize;
         let mut sampled = 0usize;
         let mut oversized = 0usize;
 
-        while let Some(row) = rows
-            .next()
-            .map_err(AppError::Database)?
-        {
+        while let Some(row) = rows.next().map_err(AppError::Database)? {
             let bytes: usize = row.get(0).unwrap_or(0);
             total_bytes += bytes;
             if bytes > max_bytes {
@@ -58,7 +51,11 @@ impl TableRowSizeProfiler {
             sampled += 1;
         }
 
-        let avg = if sampled > 0 { total_bytes / sampled } else { 0 };
+        let avg = if sampled > 0 {
+            total_bytes / sampled
+        } else {
+            0
+        };
 
         Ok(TableRowSizeStats {
             table_name: table_name.to_string(),

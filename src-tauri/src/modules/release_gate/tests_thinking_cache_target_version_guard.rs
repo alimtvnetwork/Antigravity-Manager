@@ -10,7 +10,10 @@ fn test_compliant_routine_release_passes_clean() {
     let config = ThinkingCacheConfig::routine("4.8.2");
     let report = evaluate_thinking_cache_configuration(&config, &ReleaseType::RoutineRelease);
 
-    assert!(report.is_compliant, "Routine release with prompt disabled must be compliant");
+    assert!(
+        report.is_compliant,
+        "Routine release with prompt disabled must be compliant"
+    );
     assert!(report.is_clean());
     assert!(report.violations.is_empty());
     assert!(report.guidance.contains("compliant with AGENTS.md"));
@@ -21,7 +24,10 @@ fn test_routine_release_erroneously_enabling_prompt_is_flagged() {
     let config = ThinkingCacheConfig::refactor("4.8.2", "4.8.2");
     let report = evaluate_thinking_cache_configuration(&config, &ReleaseType::RoutineRelease);
 
-    assert!(!report.is_compliant, "Routine release with prompt enabled must be flagged");
+    assert!(
+        !report.is_compliant,
+        "Routine release with prompt enabled must be flagged"
+    );
     assert!(!report.is_clean());
     assert_eq!(report.violations.len(), 1);
     match &report.violations[0] {
@@ -30,35 +36,41 @@ fn test_routine_release_erroneously_enabling_prompt_is_flagged() {
         }
         other => panic!("Unexpected violation variant: {:?}", other),
     }
-    assert!(report.guidance.contains("Set SUGGESTION_DELETE_THINKING_STORE = false"));
+    assert!(report
+        .guidance
+        .contains("Set SUGGESTION_DELETE_THINKING_STORE = false"));
 }
 
 #[test]
 fn test_architecture_refactor_without_prompt_is_flagged() {
     let config = ThinkingCacheConfig::routine("4.8.2");
-    let report = evaluate_thinking_cache_configuration(
-        &config,
-        &ReleaseType::SchemaOrArchitectureRefactor,
-    );
+    let report =
+        evaluate_thinking_cache_configuration(&config, &ReleaseType::SchemaOrArchitectureRefactor);
 
-    assert!(!report.is_compliant, "Architecture refactor without prompt must be flagged");
+    assert!(
+        !report.is_compliant,
+        "Architecture refactor without prompt must be flagged"
+    );
     assert_eq!(report.violations.len(), 1);
     assert_eq!(
         report.violations[0],
         ThinkingCacheGuardViolation::ArchitectureRefactorMissingPrompt
     );
-    assert!(report.guidance.contains("Set SUGGESTION_DELETE_THINKING_STORE = true"));
+    assert!(report
+        .guidance
+        .contains("Set SUGGESTION_DELETE_THINKING_STORE = true"));
 }
 
 #[test]
 fn test_compliant_architecture_refactor_with_matching_target_version_passes_clean() {
     let config = ThinkingCacheConfig::refactor("4.9.0", "4.9.0");
-    let report = evaluate_thinking_cache_configuration(
-        &config,
-        &ReleaseType::SchemaOrArchitectureRefactor,
-    );
+    let report =
+        evaluate_thinking_cache_configuration(&config, &ReleaseType::SchemaOrArchitectureRefactor);
 
-    assert!(report.is_compliant, "Architecture refactor with matching version must be compliant");
+    assert!(
+        report.is_compliant,
+        "Architecture refactor with matching version must be compliant"
+    );
     assert!(report.violations.is_empty());
     assert!(report.is_clean());
 }
@@ -66,12 +78,13 @@ fn test_compliant_architecture_refactor_with_matching_target_version_passes_clea
 #[test]
 fn test_target_version_mismatch_with_package_version_is_flagged() {
     let config = ThinkingCacheConfig::refactor("4.8.1", "4.8.2");
-    let report = evaluate_thinking_cache_configuration(
-        &config,
-        &ReleaseType::SchemaOrArchitectureRefactor,
-    );
+    let report =
+        evaluate_thinking_cache_configuration(&config, &ReleaseType::SchemaOrArchitectureRefactor);
 
-    assert!(!report.is_compliant, "Mismatched target version must be flagged");
+    assert!(
+        !report.is_compliant,
+        "Mismatched target version must be flagged"
+    );
     assert_eq!(report.violations.len(), 1);
     match &report.violations[0] {
         ThinkingCacheGuardViolation::MismatchedTargetVersion {
@@ -88,10 +101,8 @@ fn test_target_version_mismatch_with_package_version_is_flagged() {
 #[test]
 fn test_empty_target_version_on_enabled_prompt_is_flagged() {
     let config = ThinkingCacheConfig::new(true, None, "4.8.2");
-    let report = evaluate_thinking_cache_configuration(
-        &config,
-        &ReleaseType::SchemaOrArchitectureRefactor,
-    );
+    let report =
+        evaluate_thinking_cache_configuration(&config, &ReleaseType::SchemaOrArchitectureRefactor);
 
     assert!(!report.is_compliant);
     assert_eq!(
@@ -114,12 +125,13 @@ fn test_empty_target_version_on_enabled_prompt_is_flagged() {
 #[test]
 fn test_version_prefix_normalization_passes() {
     let config = ThinkingCacheConfig::refactor("v4.8.2", "4.8.2");
-    let report = evaluate_thinking_cache_configuration(
-        &config,
-        &ReleaseType::SchemaOrArchitectureRefactor,
-    );
+    let report =
+        evaluate_thinking_cache_configuration(&config, &ReleaseType::SchemaOrArchitectureRefactor);
 
-    assert!(report.is_compliant, "Prefix 'v' in target_version should match package_version");
+    assert!(
+        report.is_compliant,
+        "Prefix 'v' in target_version should match package_version"
+    );
     assert!(report.violations.is_empty());
 }
 

@@ -19,7 +19,8 @@ impl CooldownWatchdog {
 
     /// Registers or updates a cooldown expiration timestamp for an account.
     pub fn register_cooldown(&mut self, account_id: impl Into<String>, duration: Duration) {
-        self.cooldowns.insert(account_id.into(), Instant::now() + duration);
+        self.cooldowns
+            .insert(account_id.into(), Instant::now() + duration);
     }
 
     /// Computes duration until the earliest cooldown expires.

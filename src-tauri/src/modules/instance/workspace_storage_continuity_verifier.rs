@@ -23,13 +23,9 @@ pub enum ContinuityViolation {
         expected: String,
     },
     /// Target instance is missing the workspaceStorage root directory.
-    MissingWorkspaceStorage {
-        target_path: String,
-    },
+    MissingWorkspaceStorage { target_path: String },
     /// Not all workspace IDs were transferred to the target profile.
-    IncompleteWorkspaceTransfer {
-        missing_ids: Vec<String>,
-    },
+    IncompleteWorkspaceTransfer { missing_ids: Vec<String> },
     /// State database for a specific workspace is invalid or corrupted.
     CorruptedWorkspaceStateDb {
         workspace_id: String,
@@ -40,7 +36,10 @@ pub enum ContinuityViolation {
 impl fmt::Display for ContinuityViolation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::BypassedStandardServiceRoute { route_used, expected } => {
+            Self::BypassedStandardServiceRoute {
+                route_used,
+                expected,
+            } => {
                 write!(
                     f,
                     "Continuity violation: operation used route '{}', expected standard '{}'",
@@ -62,7 +61,10 @@ impl fmt::Display for ContinuityViolation {
                     missing_ids
                 )
             }
-            Self::CorruptedWorkspaceStateDb { workspace_id, details } => {
+            Self::CorruptedWorkspaceStateDb {
+                workspace_id,
+                details,
+            } => {
                 write!(
                     f,
                     "Continuity violation: corrupted state.vscdb for workspace '{}': {}",
@@ -142,7 +144,10 @@ pub fn verify_workspace_continuity(
     let mut corrupted = Vec::new();
 
     for src in source_entries {
-        match target_entries.iter().find(|t| t.workspace_id == src.workspace_id) {
+        match target_entries
+            .iter()
+            .find(|t| t.workspace_id == src.workspace_id)
+        {
             Some(tgt) => {
                 if !tgt.has_valid_state_db {
                     corrupted.push(tgt.workspace_id.clone());

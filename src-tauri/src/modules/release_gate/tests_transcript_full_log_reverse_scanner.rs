@@ -37,7 +37,9 @@ mod tests {
             );
         }
         assert!(!is_noise_record("{\"type\": \"PLANNER_RESPONSE\"}"));
-        assert!(!is_noise_record("{\"type\": \"USER_INPUT\", \"content\": \"hello\"}"));
+        assert!(!is_noise_record(
+            "{\"type\": \"USER_INPUT\", \"content\": \"hello\"}"
+        ));
     }
 
     #[test]
@@ -112,7 +114,10 @@ mod tests {
             TranscriptRecordType::IgnoredNoise("HEARTBEAT".to_string()),
         );
         assert!(!noise_artifact.is_genuine());
-        assert_eq!(format!("{}", noise_artifact), "Line 10: IgnoredNoise(HEARTBEAT)");
+        assert_eq!(
+            format!("{}", noise_artifact),
+            "Line 10: IgnoredNoise(HEARTBEAT)"
+        );
 
         let mut report = ReverseScanReport::new(true);
         report.total_lines_scanned = 12;

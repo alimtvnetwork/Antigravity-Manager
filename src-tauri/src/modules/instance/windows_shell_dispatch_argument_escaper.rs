@@ -103,10 +103,7 @@ pub fn build_windows_shell_start_command(
 }
 
 /// Generates a comprehensive escape audit report for a target execution.
-pub fn audit_and_build_shell_dispatch(
-    executable_path: &str,
-    args: &[&str],
-) -> ShellEscapeReport {
+pub fn audit_and_build_shell_dispatch(executable_path: &str, args: &[&str]) -> ShellEscapeReport {
     let mut escaped_count = 0;
     let mut formatted_args = Vec::with_capacity(args.len() + 4);
 

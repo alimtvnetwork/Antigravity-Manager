@@ -15,7 +15,8 @@ fn test_initial_query_generation_without_cursor() {
 
     // Custom batch size and table
     let custom_config = CursorStepConfig::new(25, "active_prompts");
-    let custom_sql = build_cursor_query_sql(None, &custom_config).expect("Custom query generation should succeed");
+    let custom_sql = build_cursor_query_sql(None, &custom_config)
+        .expect("Custom query generation should succeed");
     assert_eq!(
         custom_sql,
         "SELECT id, created_at, prompt_text, status FROM active_prompts ORDER BY created_at ASC, id ASC LIMIT 25"
@@ -23,7 +24,8 @@ fn test_initial_query_generation_without_cursor() {
 
     // Max drain limit capping batch size
     let capped_config = CursorStepConfig::new(50, "repo_prompts").with_max_drain_limit(10);
-    let capped_sql = build_cursor_query_sql(None, &capped_config).expect("Capped query generation should succeed");
+    let capped_sql = build_cursor_query_sql(None, &capped_config)
+        .expect("Capped query generation should succeed");
     assert_eq!(
         capped_sql,
         "SELECT id, created_at, prompt_text, status FROM repo_prompts ORDER BY created_at ASC, id ASC LIMIT 10"
@@ -34,7 +36,8 @@ fn test_initial_query_generation_without_cursor() {
 fn test_cursor_query_with_prompt_cursor() {
     let cursor = PromptCursor::new("2026-10-23T08:00:00Z", 42);
     let config = CursorStepConfig::default();
-    let sql = build_cursor_query_sql(Some(&cursor), &config).expect("Cursor query generation should succeed");
+    let sql = build_cursor_query_sql(Some(&cursor), &config)
+        .expect("Cursor query generation should succeed");
 
     assert_eq!(
         sql,
@@ -83,7 +86,8 @@ fn test_lifo_or_inverted_ordering_query_attempts_fail_validation() {
     }
 
     // Custom SQL in CursorStepConfig containing DESC
-    let bad_config = CursorStepConfig::default().with_custom_sql("SELECT * FROM prompt_backups ORDER BY created_at DESC");
+    let bad_config = CursorStepConfig::default()
+        .with_custom_sql("SELECT * FROM prompt_backups ORDER BY created_at DESC");
     assert!(matches!(
         build_cursor_query_sql(None, &bad_config),
         Err(CursorValidationError::LifoOrderingDetected(_))
@@ -139,9 +143,12 @@ fn test_monotonic_step_batch_tracking_extracts_next_cursor() {
     );
 
     // End of queue scenario (less items than batch_size)
-    let small_items = vec![
-        PromptQueueItem::new(20, "2026-10-23T08:10:00Z", "last prompt", "pending"),
-    ];
+    let small_items = vec![PromptQueueItem::new(
+        20,
+        "2026-10-23T08:10:00Z",
+        "last prompt",
+        "pending",
+    )];
     let eof_result = step_cursor_batch(&small_items, &config);
     assert_eq!(eof_result.items.len(), 1);
     assert!(eof_result.is_end_of_queue);

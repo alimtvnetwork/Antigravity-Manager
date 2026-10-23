@@ -28,7 +28,7 @@ fn test_evaluate_request_size_over_text_ceiling_rejected() {
 #[test]
 fn test_evaluate_request_size_multimodal_ceiling_accepted() {
     let payload_size = 35 * 1024 * 1024; // 35 MB
-    // Under 50 MB multimodal ceiling
+                                         // Under 50 MB multimodal ceiling
     let result = evaluate_request_size(Some(payload_size), payload_size, true);
     assert_eq!(result, SizeGuardOutcome::Accepted);
 }

@@ -37,12 +37,14 @@ impl QuotaResetEpochTracker {
     /// Records an observed quota reset event for an account.
     pub fn record_reset(&self, account_id: &str, current_epoch_secs: u64) {
         if let Ok(mut map) = self.records.write() {
-            let entry = map.entry(account_id.to_string()).or_insert_with(|| QuotaResetRecord {
-                account_id: account_id.to_string(),
-                last_replenish_epoch_secs: current_epoch_secs,
-                previous_replenish_epoch_secs: None,
-                estimated_cycle_secs: self.default_cycle_secs,
-            });
+            let entry = map
+                .entry(account_id.to_string())
+                .or_insert_with(|| QuotaResetRecord {
+                    account_id: account_id.to_string(),
+                    last_replenish_epoch_secs: current_epoch_secs,
+                    previous_replenish_epoch_secs: None,
+                    estimated_cycle_secs: self.default_cycle_secs,
+                });
 
             if entry.last_replenish_epoch_secs != current_epoch_secs {
                 entry.previous_replenish_epoch_secs = Some(entry.last_replenish_epoch_secs);
@@ -59,7 +61,9 @@ impl QuotaResetEpochTracker {
     pub fn predict_next_reset(&self, account_id: &str, current_epoch: u64) -> u64 {
         if let Ok(map) = self.records.read() {
             if let Some(record) = map.get(account_id) {
-                let next = record.last_replenish_epoch_secs.saturating_add(record.estimated_cycle_secs);
+                let next = record
+                    .last_replenish_epoch_secs
+                    .saturating_add(record.estimated_cycle_secs);
                 if next > current_epoch {
                     return next;
                 }

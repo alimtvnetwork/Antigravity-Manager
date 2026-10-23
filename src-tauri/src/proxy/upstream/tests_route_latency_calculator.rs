@@ -7,7 +7,10 @@ use super::route_latency_calculator::{LatencyWeightConfig, RouteLatencyCalculato
 #[test]
 fn test_unobserved_endpoint_returns_default_weight() {
     let calc = RouteLatencyCalculator::new(None);
-    assert_eq!(calc.compute_route_weight("https://api.unknown.internal"), 1.0);
+    assert_eq!(
+        calc.compute_route_weight("https://api.unknown.internal"),
+        1.0
+    );
     assert_eq!(calc.get_ema_latency("https://api.unknown.internal"), None);
 }
 
@@ -18,9 +21,14 @@ fn test_first_sample_initializes_ema() {
         baseline_latency_ms: 300.0,
     }));
 
-    calc.record_sample("https://api.upstream-a.internal", Duration::from_millis(200));
+    calc.record_sample(
+        "https://api.upstream-a.internal",
+        Duration::from_millis(200),
+    );
 
-    let ema = calc.get_ema_latency("https://api.upstream-a.internal").unwrap();
+    let ema = calc
+        .get_ema_latency("https://api.upstream-a.internal")
+        .unwrap();
     assert!((ema - 200.0).abs() < 1e-4);
 
     let weight = calc.compute_route_weight("https://api.upstream-a.internal");

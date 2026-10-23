@@ -90,7 +90,7 @@ fn test_detect_caller_with_user_data_dir_arg() {
         ProcessNode::new(500, 490, "agm.exe"),
         ProcessNode::new(490, 480, "bash"),
         ProcessNode::new(480, 1, "antigravity").with_command_line(
-            "antigravity --user-data-dir=\"/home/user/.antigravity_tools/instances/inst-alpha\""
+            "antigravity --user-data-dir=\"/home/user/.antigravity_tools/instances/inst-alpha\"",
         ),
     ];
 

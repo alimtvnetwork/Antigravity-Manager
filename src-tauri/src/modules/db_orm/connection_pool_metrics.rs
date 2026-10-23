@@ -51,9 +51,13 @@ impl ConnectionPoolMetrics {
     }
 
     pub fn record_query(&self, is_slow: bool) {
-        self.inner.total_queries_executed.fetch_add(1, Ordering::Relaxed);
+        self.inner
+            .total_queries_executed
+            .fetch_add(1, Ordering::Relaxed);
         if is_slow {
-            self.inner.total_slow_queries.fetch_add(1, Ordering::Relaxed);
+            self.inner
+                .total_slow_queries
+                .fetch_add(1, Ordering::Relaxed);
         }
     }
 

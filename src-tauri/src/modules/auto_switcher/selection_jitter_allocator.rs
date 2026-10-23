@@ -10,11 +10,7 @@ use std::hash::{Hash, Hasher};
 pub const MAX_JITTER_RATIO: f64 = 0.005;
 
 /// Computes a pseudo-random jitter modifier derived from account ID and round sequence.
-pub fn apply_selection_jitter(
-    account_id: &str,
-    raw_score: f64,
-    rotation_round: u64,
-) -> f64 {
+pub fn apply_selection_jitter(account_id: &str, raw_score: f64, rotation_round: u64) -> f64 {
     if raw_score <= 0.0 {
         return 0.0;
     }

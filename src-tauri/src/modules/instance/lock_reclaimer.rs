@@ -19,7 +19,10 @@ pub struct LockReclaimReport {
 }
 
 /// Reclaims stale lockfiles in an instance data directory if the instance process is not running.
-pub fn reclaim_stale_instance_locks(data_dir: &Path, is_process_running: bool) -> LockReclaimReport {
+pub fn reclaim_stale_instance_locks(
+    data_dir: &Path,
+    is_process_running: bool,
+) -> LockReclaimReport {
     let mut report = LockReclaimReport::default();
 
     if is_process_running {

@@ -290,7 +290,11 @@ impl ProxyPoolManager {
             }
         }
         if let Some(err) = last_err {
-            tracing::warn!("Proxy {} health check failed after retry: {}", entry.url, err);
+            tracing::warn!(
+                "Proxy {} health check failed after retry: {}",
+                entry.url,
+                err
+            );
         }
         (false, None)
     }

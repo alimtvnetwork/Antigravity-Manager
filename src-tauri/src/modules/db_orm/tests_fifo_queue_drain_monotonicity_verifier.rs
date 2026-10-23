@@ -30,7 +30,9 @@ fn test_detect_timestamp_regression() {
     let result = verify_queue_items_monotonicity(&items);
     assert!(result.is_err());
     match result.unwrap_err() {
-        MonotonicityViolation::TimestampRegression { prev_id, curr_id, .. } => {
+        MonotonicityViolation::TimestampRegression {
+            prev_id, curr_id, ..
+        } => {
             assert_eq!(prev_id, 101);
             assert_eq!(curr_id, 102);
         }
@@ -48,7 +50,12 @@ fn test_detect_id_tie_breaker_inversion() {
     let result = verify_queue_items_monotonicity(&items);
     assert!(result.is_err());
     match result.unwrap_err() {
-        MonotonicityViolation::IdTieBreakerInversion { prev_id, curr_id, created_at, .. } => {
+        MonotonicityViolation::IdTieBreakerInversion {
+            prev_id,
+            curr_id,
+            created_at,
+            ..
+        } => {
             assert_eq!(prev_id, 205);
             assert_eq!(curr_id, 204);
             assert_eq!(created_at, 1_000);

@@ -145,7 +145,11 @@ impl BatchInterceptionResult {
         if self.resolved_args.is_empty() {
             self.resolved_executable.clone()
         } else {
-            format!("{} {}", self.resolved_executable, self.resolved_args.join(" "))
+            format!(
+                "{} {}",
+                self.resolved_executable,
+                self.resolved_args.join(" ")
+            )
         }
     }
 }
@@ -165,10 +169,7 @@ pub enum ScriptExtension {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BatchInterceptorVerdict {
     /// Direct execution is strictly forbidden because the file is a batch file.
-    DirectExecutionForbidden {
-        extension: String,
-        reason: String,
-    },
+    DirectExecutionForbidden { extension: String, reason: String },
     /// The target is a safe native executable or non-batch script.
     SafeNativeExecutable,
     /// The target path provided was empty or whitespace.
@@ -240,11 +241,13 @@ pub fn evaluate_verdict(path: &str) -> BatchInterceptorVerdict {
     match classify_script_extension(cleaned) {
         ScriptExtension::Bat => BatchInterceptorVerdict::DirectExecutionForbidden {
             extension: "bat".to_string(),
-            reason: "Never pass .bat batch files directly to Command::new; wrap with cmd.exe".to_string(),
+            reason: "Never pass .bat batch files directly to Command::new; wrap with cmd.exe"
+                .to_string(),
         },
         ScriptExtension::Cmd => BatchInterceptorVerdict::DirectExecutionForbidden {
             extension: "cmd".to_string(),
-            reason: "Never pass .cmd batch files directly to Command::new; wrap with cmd.exe".to_string(),
+            reason: "Never pass .cmd batch files directly to Command::new; wrap with cmd.exe"
+                .to_string(),
         },
         ScriptExtension::Other(_) => BatchInterceptorVerdict::SafeNativeExecutable,
     }

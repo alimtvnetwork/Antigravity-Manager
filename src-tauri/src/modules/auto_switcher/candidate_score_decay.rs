@@ -50,7 +50,8 @@ impl CandidateScoreDecay {
         let decay_exponent = -idle_secs / self.params.half_life_secs.max(1.0);
         let recovery_ratio = 1.0 - 2.0_f64.powf(decay_exponent);
         let factor = self.params.min_dampen_factor
-            + (self.params.max_boost_factor - self.params.min_dampen_factor) * recovery_ratio.clamp(0.0, 1.0);
+            + (self.params.max_boost_factor - self.params.min_dampen_factor)
+                * recovery_ratio.clamp(0.0, 1.0);
 
         (base_score * factor).clamp(0.0, 1000.0)
     }

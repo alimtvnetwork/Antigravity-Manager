@@ -41,12 +41,7 @@ pub fn record_speed_error(
 
 /// Imp-77: Database Slow Query Telemetry
 /// Records an E2002 diagnostic record into errors.db when a query exceeds threshold_ms.
-pub fn record_slow_query(
-    db_name: &str,
-    query_preview: &str,
-    elapsed_ms: u64,
-    threshold_ms: u64,
-) {
+pub fn record_slow_query(db_name: &str, query_preview: &str, elapsed_ms: u64, threshold_ms: u64) {
     if elapsed_ms >= threshold_ms {
         let meta = format!(
             r#"{{"database":"{}","elapsed_ms":{},"threshold_ms":{},"query":"{}"}}"#,
@@ -58,7 +53,10 @@ pub fn record_slow_query(
         record_speed_error(
             "E2002",
             "warn",
-            &format!("Slow SQLite query on {db_name} ({}ms >= {}ms threshold)", elapsed_ms, threshold_ms),
+            &format!(
+                "Slow SQLite query on {db_name} ({}ms >= {}ms threshold)",
+                elapsed_ms, threshold_ms
+            ),
             "sqlite::query",
             "slow_query_detector",
             Some(&meta),

@@ -163,7 +163,10 @@ mod tests {
             json!({ "text": DEFAULT_FALLBACK_TEXT })
         );
         assert_eq!(aligned[1].role, "model");
-        assert_eq!(aligned[1].parts[0], json!({ "text": "Unsolicited greeting" }));
+        assert_eq!(
+            aligned[1].parts[0],
+            json!({ "text": "Unsolicited greeting" })
+        );
 
         assert!(!report.is_aligned);
         assert_eq!(report.final_turn_count, 2);

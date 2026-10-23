@@ -147,7 +147,12 @@ pub fn verify_readme_changelog_sync(
             verify_stable_readme_sync(tag, readme_zh_content, readme_en_content, &mut violations);
         }
         ReleaseTagType::PreReleaseBeta(_) => {
-            verify_prerelease_readme_sync(tag, readme_zh_content, readme_en_content, &mut violations);
+            verify_prerelease_readme_sync(
+                tag,
+                readme_zh_content,
+                readme_en_content,
+                &mut violations,
+            );
         }
     }
 

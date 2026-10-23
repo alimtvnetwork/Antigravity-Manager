@@ -18,11 +18,7 @@ pub const DEFAULT_PRESERVED_IDENTITY_KEYS: &[&str] = &[
 
 /// Recursively deep-merges `incoming` settings into `base` settings,
 /// strictly shielding keys specified in `preserved_keys` from being overwritten.
-pub fn deep_merge_settings(
-    base: &Value,
-    incoming: &Value,
-    preserved_keys: &[&str],
-) -> Value {
+pub fn deep_merge_settings(base: &Value, incoming: &Value, preserved_keys: &[&str]) -> Value {
     match (base, incoming) {
         (Value::Object(base_map), Value::Object(incoming_map)) => {
             let mut merged: Map<String, Value> = base_map.clone();

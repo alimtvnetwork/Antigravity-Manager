@@ -89,12 +89,10 @@ mod tests {
 
     #[test]
     fn test_sqlite_capabilities_extension_detection_matrix() {
-        let check_json1 = |options: &[&str]| -> bool {
-            options.iter().any(|o| o.contains("ENABLE_JSON1"))
-        };
-        let check_fts5 = |options: &[&str]| -> bool {
-            options.iter().any(|o| o.contains("ENABLE_FTS5"))
-        };
+        let check_json1 =
+            |options: &[&str]| -> bool { options.iter().any(|o| o.contains("ENABLE_JSON1")) };
+        let check_fts5 =
+            |options: &[&str]| -> bool { options.iter().any(|o| o.contains("ENABLE_FTS5")) };
 
         // Standard flags
         assert!(check_json1(&["ENABLE_JSON1"]));

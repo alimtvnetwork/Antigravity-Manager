@@ -11,10 +11,7 @@ use std::path::Path;
 use tracing::debug;
 
 /// Files that contribute to the configuration fingerprint.
-pub const FINGERPRINT_TARGET_FILES: &[&str] = &[
-    "User/settings.json",
-    "User/keybindings.json",
-];
+pub const FINGERPRINT_TARGET_FILES: &[&str] = &["User/settings.json", "User/keybindings.json"];
 
 /// Computes a structural fingerprint hash for an instance profile directory.
 pub fn compute_profile_fingerprint(profile_dir: &Path) -> Result<String, std::io::Error> {

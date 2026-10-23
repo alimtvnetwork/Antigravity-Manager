@@ -40,14 +40,20 @@ fn test_inactivity_timeout_detection() {
 
     let result = sentinel.check_liveness();
     match result {
-        Err(StreamingTimeoutError::InactivityTimeout { silence_secs: _, chunks_received }) => {
+        Err(StreamingTimeoutError::InactivityTimeout {
+            silence_secs: _,
+            chunks_received,
+        }) => {
             assert_eq!(chunks_received, 0);
         }
         other => panic!("Expected InactivityTimeout, got {:?}", other),
     }
 
     // Subsequent check should fail with AlreadyAborted
-    assert_eq!(sentinel.check_liveness(), Err(StreamingTimeoutError::AlreadyAborted));
+    assert_eq!(
+        sentinel.check_liveness(),
+        Err(StreamingTimeoutError::AlreadyAborted)
+    );
 }
 
 #[test]

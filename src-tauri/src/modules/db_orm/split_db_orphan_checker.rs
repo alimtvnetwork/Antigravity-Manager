@@ -28,21 +28,14 @@ impl SplitDbOrphanChecker {
             check_limit
         );
 
-        let mut stmt = backup_conn
-            .prepare(&sql)
-            .map_err(AppError::Database)?;
+        let mut stmt = backup_conn.prepare(&sql).map_err(AppError::Database)?;
 
-        let mut rows = stmt
-            .query([])
-            .map_err(AppError::Database)?;
+        let mut rows = stmt.query([]).map_err(AppError::Database)?;
 
         let mut total = 0usize;
         let mut orphans = Vec::new();
 
-        while let Some(row) = rows
-            .next()
-            .map_err(AppError::Database)?
-        {
+        while let Some(row) = rows.next().map_err(AppError::Database)? {
             let id: String = row.get(0).unwrap_or_default();
             let conv_id: Option<String> = row.get(1).ok();
 

@@ -181,9 +181,15 @@ pub fn load_registry() -> Result<InstanceRegistry, String> {
             // Imp-11: Auto-purge dead PID lockfiles from instance data directories on startup
             let target_data_path = std::path::Path::new(&inst.data_dir);
             if target_data_path.exists() {
-                let is_running = crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
+                let is_running = crate::modules::instance::is_instance_running(
+                    &inst.id,
+                    &inst.data_dir,
+                    inst.pid,
+                );
                 if !is_running {
-                    crate::modules::instance::close::clear_stale_instance_lockfiles(target_data_path);
+                    crate::modules::instance::close::clear_stale_instance_lockfiles(
+                        target_data_path,
+                    );
                 }
             }
         }

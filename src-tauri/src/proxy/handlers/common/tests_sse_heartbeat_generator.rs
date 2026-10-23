@@ -3,8 +3,8 @@
 #[cfg(test)]
 mod tests {
     use super::super::sse_heartbeat_generator::{
-        evaluate_heartbeat_tick, format_sse_comment, is_valid_sse_comment_frame,
-        HeartbeatConfig, HeartbeatFrameAction, HeartbeatGeneratorState,
+        evaluate_heartbeat_tick, format_sse_comment, is_valid_sse_comment_frame, HeartbeatConfig,
+        HeartbeatFrameAction, HeartbeatGeneratorState,
     };
 
     #[test]
@@ -92,12 +92,18 @@ mod tests {
         let config = HeartbeatConfig::default();
         let mut state = HeartbeatGeneratorState::new(0);
 
-        assert_eq!(evaluate_heartbeat_tick(&config, &mut state, 10_000), HeartbeatFrameAction::Idle);
+        assert_eq!(
+            evaluate_heartbeat_tick(&config, &mut state, 10_000),
+            HeartbeatFrameAction::Idle
+        );
 
         state.record_activity(12_000);
         assert_eq!(state.last_activity_epoch_ms(), 12_000);
 
-        assert_eq!(evaluate_heartbeat_tick(&config, &mut state, 15_000), HeartbeatFrameAction::Idle);
+        assert_eq!(
+            evaluate_heartbeat_tick(&config, &mut state, 15_000),
+            HeartbeatFrameAction::Idle
+        );
 
         let action = evaluate_heartbeat_tick(&config, &mut state, 27_000);
         assert!(action.is_emit());
@@ -128,7 +134,10 @@ mod tests {
     #[test]
     fn test_format_and_validate_sse_comment() {
         assert_eq!(format_sse_comment("ping"), ": ping\n\n");
-        assert_eq!(format_sse_comment("keepalive - deep thinking"), ": keepalive - deep thinking\n\n");
+        assert_eq!(
+            format_sse_comment("keepalive - deep thinking"),
+            ": keepalive - deep thinking\n\n"
+        );
         assert_eq!(format_sse_comment(""), ":\n\n");
 
         assert!(is_valid_sse_comment_frame(": ping\n\n"));

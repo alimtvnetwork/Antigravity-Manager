@@ -315,7 +315,11 @@ pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<Str
     let my_vm = crate::modules::email_watcher::detect_machine_name();
     let my_ip = crate::modules::email_watcher::detect_local_ip();
     let now = Utc::now().timestamp();
-    let effective_lookback = if lookback_seconds <= 0 { 3600 } else { lookback_seconds.max(1800) };
+    let effective_lookback = if lookback_seconds <= 0 {
+        3600
+    } else {
+        lookback_seconds.max(1800)
+    };
     let cutoff = now - effective_lookback;
     let mut excluded: Vec<String> = Vec::new();
 
@@ -385,7 +389,10 @@ pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<Str
         }
 
         let email_clean = new_email.trim().to_lowercase();
-        if !excluded.iter().any(|e| e.eq_ignore_ascii_case(&email_clean)) {
+        if !excluded
+            .iter()
+            .any(|e| e.eq_ignore_ascii_case(&email_clean))
+        {
             excluded.push(email_clean);
         }
     }

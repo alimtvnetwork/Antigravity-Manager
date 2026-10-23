@@ -4,8 +4,7 @@ mod tests {
         audit_operation_pipeline, inspect_operation_pipeline, is_irreversible_keyword,
         is_persistence_keyword, validate_operation_pipeline, validate_operation_sequence,
         OperationCategory, OperationPhase, OperationPipelineBuilder, OperationStep,
-        OrderingValidationReport, OrderingViolation, PlannedOperation,
-        SideEffectOrderingViolation,
+        OrderingValidationReport, OrderingViolation, PlannedOperation, SideEffectOrderingViolation,
     };
 
     // ========================================================================
@@ -26,8 +25,14 @@ mod tests {
     #[test]
     fn test_valid_pipeline_succeeds() {
         let steps = OperationPipelineBuilder::new()
-            .validate("validate_credentials_format", "Check token syntax and permissions")
-            .persist("write_credentials", "Persist auth token to encrypted keystore")
+            .validate(
+                "validate_credentials_format",
+                "Check token syntax and permissions",
+            )
+            .persist(
+                "write_credentials",
+                "Persist auth token to encrypted keystore",
+            )
             .execute_irreversible("terminate_old_daemon", "Kill existing background process")
             .cleanup("delete_staging_files", "Remove transient staging files")
             .build();
@@ -110,7 +115,10 @@ mod tests {
                 assert_eq!(irreversible_step, "truncate_table");
                 assert!(details.contains("preceding Validation step"));
             }
-            other => panic!("Expected MissingValidationBeforeDestruction, got: {:?}", other),
+            other => panic!(
+                "Expected MissingValidationBeforeDestruction, got: {:?}",
+                other
+            ),
         }
     }
 
@@ -133,15 +141,27 @@ mod tests {
 
     #[test]
     fn test_heuristic_keyword_detection() {
-        assert!(is_persistence_keyword("save_auth_token", "store credentials"));
+        assert!(is_persistence_keyword(
+            "save_auth_token",
+            "store credentials"
+        ));
         assert!(is_persistence_keyword("write_credentials_file", ""));
-        assert!(is_persistence_keyword("backup_config", "backup before switch"));
+        assert!(is_persistence_keyword(
+            "backup_config",
+            "backup before switch"
+        ));
         assert!(!is_persistence_keyword("check_syntax", "parse json input"));
 
-        assert!(is_irreversible_keyword("kill_instance", "terminate running IDE"));
+        assert!(is_irreversible_keyword(
+            "kill_instance",
+            "terminate running IDE"
+        ));
         assert!(is_irreversible_keyword("delete_old_cache", "remove files"));
         assert!(is_irreversible_keyword("drop_table", "drop SQLite table"));
-        assert!(!is_irreversible_keyword("verify_path", "check if folder exists"));
+        assert!(!is_irreversible_keyword(
+            "verify_path",
+            "check if folder exists"
+        ));
     }
 
     #[test]
@@ -188,12 +208,28 @@ mod tests {
     #[test]
     fn test_valid_operation_sequence_with_safe_ordering() {
         let ops = vec![
-            PlannedOperation::new("1", "validate_configuration", OperationCategory::PreValidation),
-            PlannedOperation::new("2", "write_credentials_file", OperationCategory::CredentialPersistence),
+            PlannedOperation::new(
+                "1",
+                "validate_configuration",
+                OperationCategory::PreValidation,
+            ),
+            PlannedOperation::new(
+                "2",
+                "write_credentials_file",
+                OperationCategory::CredentialPersistence,
+            ),
             PlannedOperation::new("3", "snapshot_state", OperationCategory::StateBackup),
-            PlannedOperation::new("4", "boundary_commit", OperationCategory::PointOfNoReturnBoundary),
+            PlannedOperation::new(
+                "4",
+                "boundary_commit",
+                OperationCategory::PointOfNoReturnBoundary,
+            ),
             PlannedOperation::new("5", "terminate_old_process", OperationCategory::ProcessKill),
-            PlannedOperation::new("6", "cleanup_stale_cache", OperationCategory::FilesystemPurge),
+            PlannedOperation::new(
+                "6",
+                "cleanup_stale_cache",
+                OperationCategory::FilesystemPurge,
+            ),
         ];
 
         let result = validate_operation_sequence(&ops);
@@ -212,14 +248,21 @@ mod tests {
         let ops = vec![
             PlannedOperation::new("1", "validate_input", OperationCategory::PreValidation),
             PlannedOperation::new("2", "kill_existing_server", OperationCategory::ProcessKill),
-            PlannedOperation::new("3", "save_new_credentials", OperationCategory::CredentialPersistence),
+            PlannedOperation::new(
+                "3",
+                "save_new_credentials",
+                OperationCategory::CredentialPersistence,
+            ),
         ];
 
         let result = validate_operation_sequence(&ops);
         assert!(result.is_err());
         let violation = result.unwrap_err();
         match violation {
-            OrderingViolation::ProcessKillBeforeCredentialWrite { kill_index, write_index } => {
+            OrderingViolation::ProcessKillBeforeCredentialWrite {
+                kill_index,
+                write_index,
+            } => {
                 assert_eq!(kill_index, 1);
                 assert_eq!(write_index, 2);
             }
@@ -231,8 +274,16 @@ mod tests {
     fn test_reject_deletion_before_validation() {
         // AGENTS.md rule: "validate before deleting"
         let ops = vec![
-            PlannedOperation::new("1", "delete_active_profile", OperationCategory::EntityDeletion),
-            PlannedOperation::new("2", "validate_profile_schema", OperationCategory::PreValidation),
+            PlannedOperation::new(
+                "1",
+                "delete_active_profile",
+                OperationCategory::EntityDeletion,
+            ),
+            PlannedOperation::new(
+                "2",
+                "validate_profile_schema",
+                OperationCategory::PreValidation,
+            ),
         ];
 
         let result = validate_operation_sequence(&ops);
@@ -253,9 +304,11 @@ mod tests {
 
     #[test]
     fn test_reject_destructive_op_with_no_prior_validation() {
-        let ops = vec![
-            PlannedOperation::new("1", "wipe_cache_dir", OperationCategory::FilesystemPurge),
-        ];
+        let ops = vec![PlannedOperation::new(
+            "1",
+            "wipe_cache_dir",
+            OperationCategory::FilesystemPurge,
+        )];
 
         let result = validate_operation_sequence(&ops);
         assert!(result.is_err());
@@ -263,7 +316,10 @@ mod tests {
             OrderingViolation::MissingValidationBeforeIrreversibleOp { op_name } => {
                 assert_eq!(op_name, "wipe_cache_dir");
             }
-            other => panic!("Expected MissingValidationBeforeIrreversibleOp, got {:?}", other),
+            other => panic!(
+                "Expected MissingValidationBeforeIrreversibleOp, got {:?}",
+                other
+            ),
         }
     }
 

@@ -143,7 +143,10 @@ mod tests {
         let frames = parser.push_chunk(chunk);
         assert!(frames.is_empty());
         assert!(parser.has_unprocessed_bytes());
-        assert_eq!(parser.incomplete_line_str().as_deref(), Some("data: unclosed trailing data"));
+        assert_eq!(
+            parser.incomplete_line_str().as_deref(),
+            Some("data: unclosed trailing data")
+        );
 
         let final_frames = parser.finish();
         assert_eq!(final_frames.len(), 1);

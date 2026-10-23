@@ -19,7 +19,9 @@ pub enum PartValidationOutcome {
 pub fn validate_part_envelope(part: &Value) -> PartValidationOutcome {
     let part_obj = match part.as_object() {
         Some(obj) => obj,
-        None => return PartValidationOutcome::InvalidStructure("Part is not a JSON object".to_string()),
+        None => {
+            return PartValidationOutcome::InvalidStructure("Part is not a JSON object".to_string())
+        }
     };
 
     // Check thought block
@@ -72,15 +74,13 @@ pub fn sanitize_gemini_candidates(candidates: &mut Value) -> usize {
             if let Some(content) = candidate.get_mut("content") {
                 if let Some(parts) = content.get_mut("parts").and_then(|p| p.as_array_mut()) {
                     let initial_len = parts.len();
-                    parts.retain(|part| {
-                        match validate_part_envelope(part) {
-                            PartValidationOutcome::ValidText(_)
-                            | PartValidationOutcome::ValidThought(_)
-                            | PartValidationOutcome::ValidFunctionCall { .. }
-                            | PartValidationOutcome::ValidFunctionResponse { .. } => true,
-                            PartValidationOutcome::EmptyOrRedundant
-                            | PartValidationOutcome::InvalidStructure(_) => false,
-                        }
+                    parts.retain(|part| match validate_part_envelope(part) {
+                        PartValidationOutcome::ValidText(_)
+                        | PartValidationOutcome::ValidThought(_)
+                        | PartValidationOutcome::ValidFunctionCall { .. }
+                        | PartValidationOutcome::ValidFunctionResponse { .. } => true,
+                        PartValidationOutcome::EmptyOrRedundant
+                        | PartValidationOutcome::InvalidStructure(_) => false,
                     });
                     stripped_count += initial_len.saturating_sub(parts.len());
                 }

@@ -32,7 +32,12 @@ pub fn register_stream_start() -> StreamGuard {
     // Update peak concurrency if current exceeds it
     let mut peak = PEAK_STREAMS.load(Ordering::Relaxed);
     while current > peak {
-        match PEAK_STREAMS.compare_exchange_weak(peak, current, Ordering::Relaxed, Ordering::Relaxed) {
+        match PEAK_STREAMS.compare_exchange_weak(
+            peak,
+            current,
+            Ordering::Relaxed,
+            Ordering::Relaxed,
+        ) {
             Ok(_) => break,
             Err(actual) => peak = actual,
         }

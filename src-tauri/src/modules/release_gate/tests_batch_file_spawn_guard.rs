@@ -36,7 +36,8 @@ mod tests {
 
     #[test]
     fn test_resolve_windows_execution_command_wraps_batch_file() {
-        let (exe, args) = resolve_windows_execution_command("launch.bat", &["--profile", "default"]);
+        let (exe, args) =
+            resolve_windows_execution_command("launch.bat", &["--profile", "default"]);
         assert_eq!(exe, "cmd.exe");
         assert_eq!(args[0], "/c");
         assert_eq!(args[1], "start");

@@ -48,8 +48,6 @@ pub mod message_content_flattener;
 pub mod message_turn_validator;
 #[cfg(test)]
 mod opus_tests;
-#[cfg(test)]
-pub mod tests_message_validator;
 mod request_log;
 mod response_handling;
 pub mod role_prefix_sanitizer;
@@ -57,9 +55,11 @@ mod setup_phase;
 pub mod stop_reason_normalizer;
 pub mod stop_sequence_matcher;
 pub mod stream_chunk_aggregator;
-pub mod tool_use_stream_assembler;
 mod stream_handling;
+#[cfg(test)]
+pub mod tests_message_validator;
 mod thinking;
+pub mod tool_use_stream_assembler;
 mod variant;
 #[cfg(test)]
 mod variant_tests;
@@ -68,20 +68,20 @@ mod warmup;
 mod warmup_tests;
 
 pub(crate) use apply_compression::apply_compression;
-pub use block_merger::*;
-pub use message_content_flattener::*;
-pub use message_turn_validator::*;
-pub use role_prefix_sanitizer::*;
-pub use stop_reason_normalizer::*;
-pub use stop_sequence_matcher::*;
-pub use stream_chunk_aggregator::*;
-pub use tool_use_stream_assembler::*;
 pub(crate) use attempt::{AttemptCall, AttemptState, ErrorOutcome, PrepOutcome, StreamOutcome};
 pub(crate) use attempt_setup::prepare_attempt;
+pub use block_merger::*;
 pub(crate) use compression::try_compress_with_summary;
 pub use handler::{handle_count_tokens, handle_list_models, handle_messages};
 pub(crate) use helpers::inject_cache_control_to_forked_summary;
+pub use message_content_flattener::*;
+pub use message_turn_validator::*;
+pub use role_prefix_sanitizer::*;
 pub(crate) use setup_phase::preprocess_request;
+pub use stop_reason_normalizer::*;
+pub use stop_sequence_matcher::*;
+pub use stream_chunk_aggregator::*;
 pub(crate) use thinking::{apply_thinking_hints, extract_thinking_hint};
+pub use tool_use_stream_assembler::*;
 pub(crate) use variant::apply_variant;
 pub(crate) use warmup::{create_warmup_response, is_warmup_request};

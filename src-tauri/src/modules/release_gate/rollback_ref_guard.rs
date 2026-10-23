@@ -20,7 +20,13 @@ pub fn format_backup_ref_name(task_slug: &str, timestamp_secs: u64) -> String {
     let clean_slug = task_slug
         .trim()
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '-' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect::<String>();
     format!("backup/{}-{}", clean_slug, timestamp_secs)
 }
@@ -32,7 +38,10 @@ pub fn is_valid_backup_ref(ref_name: &str) -> bool {
         return false;
     }
     let remainder = &s["backup/".len()..];
-    !remainder.is_empty() && remainder.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    !remainder.is_empty()
+        && remainder
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
 /// Parses the output of `git diff --stat <backup> HEAD` to verify zero content drift.
@@ -82,7 +91,10 @@ pub fn parse_drift_stat(diff_stat_output: &str) -> DriftReport {
         insertions,
         deletions,
         summary: if has_drift {
-            format!("Drift detected: {} files changed, +{} -{}", files_changed, insertions, deletions)
+            format!(
+                "Drift detected: {} files changed, +{} -{}",
+                files_changed, insertions, deletions
+            )
         } else {
             "Zero drift confirmed".to_string()
         },

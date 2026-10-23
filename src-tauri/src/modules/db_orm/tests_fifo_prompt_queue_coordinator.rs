@@ -25,7 +25,10 @@ fn test_forbidden_lifo_query_rejected() {
     let bad_sql_1 = "SELECT * FROM active_prompts ORDER BY updated_at DESC LIMIT 10";
     let res1 = FifoQueryValidator::validate_dispatch_query_sql(bad_sql_1);
     assert!(res1.is_err());
-    assert!(res1.unwrap_err().to_string().contains("Forbidden LIFO ordering"));
+    assert!(res1
+        .unwrap_err()
+        .to_string()
+        .contains("Forbidden LIFO ordering"));
 
     let bad_sql_2 = "SELECT * FROM active_prompts ORDER BY created_at DESC LIMIT 10";
     let res2 = FifoQueryValidator::validate_dispatch_query_sql(bad_sql_2);
@@ -41,7 +44,10 @@ fn test_missing_fifo_ordering_rejected() {
     let sql_no_order = "SELECT * FROM active_prompts WHERE status = 'Enqueued'";
     let res = FifoQueryValidator::validate_dispatch_query_sql(sql_no_order);
     assert!(res.is_err());
-    assert!(res.unwrap_err().to_string().contains("Missing mandatory FIFO ordering"));
+    assert!(res
+        .unwrap_err()
+        .to_string()
+        .contains("Missing mandatory FIFO ordering"));
 }
 
 #[test]

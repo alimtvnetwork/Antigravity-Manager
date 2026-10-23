@@ -11,7 +11,8 @@ mod tests {
     #[test]
     fn test_sse_delimiter_normalizer_complete_events_single_chunk() {
         let mut normalizer = SseDelimiterNormalizer::new();
-        let chunk = b"data: {\"type\":\"message_start\"}\n\ndata: {\"type\":\"content_block_start\"}\n\n";
+        let chunk =
+            b"data: {\"type\":\"message_start\"}\n\ndata: {\"type\":\"content_block_start\"}\n\n";
 
         let events = normalizer.feed(chunk);
         assert_eq!(events.len(), 2);

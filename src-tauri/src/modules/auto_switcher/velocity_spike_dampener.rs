@@ -22,10 +22,7 @@ pub struct DampenedVelocity {
 }
 
 /// Dampens short-term velocity if it exceeds the baseline by the spike ratio threshold.
-pub fn dampen_velocity_spike(
-    short_term_velocity: f64,
-    baseline_velocity: f64,
-) -> DampenedVelocity {
+pub fn dampen_velocity_spike(short_term_velocity: f64, baseline_velocity: f64) -> DampenedVelocity {
     // If baseline is effectively zero, clamp short-term velocity to safe default ceiling
     let effective_baseline = baseline_velocity.max(0.01);
     let ratio = short_term_velocity / effective_baseline;

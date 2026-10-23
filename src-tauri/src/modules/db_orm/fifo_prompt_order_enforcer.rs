@@ -35,9 +35,7 @@ pub enum FifoEnforcementAction {
     /// The query does not target a prompt queue table and passed through unmodified.
     NonTargetQueryPassThrough,
     /// The query was malformed or empty and could not be safely sanitized.
-    RejectedUnsanitizableQuery {
-        reason: String,
-    },
+    RejectedUnsanitizableQuery { reason: String },
 }
 
 /// Comprehensive report resulting from FIFO SQL ordering enforcement.
@@ -118,8 +116,8 @@ pub fn detect_target_table(sql: &str) -> Option<String> {
     let tokens: Vec<&str> = sql.split_whitespace().collect();
     for (i, token) in tokens.iter().enumerate() {
         if token.eq_ignore_ascii_case("FROM") && i + 1 < tokens.len() {
-            let table = tokens[i + 1]
-                .trim_matches(|c: char| !c.is_alphanumeric() && c != '_' && c != '.');
+            let table =
+                tokens[i + 1].trim_matches(|c: char| !c.is_alphanumeric() && c != '_' && c != '.');
             if !table.is_empty() {
                 return Some(table.to_string());
             }

@@ -70,10 +70,10 @@ fn test_multi_module_without_schema_recommended() {
     assert!(report.is_staging_needed());
     assert!(report.requires_maintainer_confirmation());
     assert_eq!(report.recommended_branch_target(), "origin/beta");
-    assert!(report
-        .deciding_factors
-        .iter()
-        .any(|f| matches!(f, StagingDecidingFactor::MultiModuleChangeset { modules_count: 5 })));
+    assert!(report.deciding_factors.iter().any(|f| matches!(
+        f,
+        StagingDecidingFactor::MultiModuleChangeset { modules_count: 5 }
+    )));
 }
 
 #[test]
@@ -84,10 +84,10 @@ fn test_large_refactor_over_500_lines_required() {
     assert_eq!(report.verdict, StagingVerdict::Required);
     assert!(report.is_beta_staging_required);
     assert!(report.requires_maintainer_confirmation());
-    assert!(report
-        .deciding_factors
-        .iter()
-        .any(|f| matches!(f, StagingDecidingFactor::NonTrivialCodebaseRefactor { lines_changed: 550 })));
+    assert!(report.deciding_factors.iter().any(|f| matches!(
+        f,
+        StagingDecidingFactor::NonTrivialCodebaseRefactor { lines_changed: 550 }
+    )));
 }
 
 #[test]
@@ -98,10 +98,10 @@ fn test_moderate_refactor_over_100_lines_recommended() {
     assert_eq!(report.verdict, StagingVerdict::Recommended);
     assert!(report.is_beta_staging_recommended);
     assert!(report.requires_maintainer_confirmation());
-    assert!(report
-        .deciding_factors
-        .iter()
-        .any(|f| matches!(f, StagingDecidingFactor::NonTrivialCodebaseRefactor { lines_changed: 130 })));
+    assert!(report.deciding_factors.iter().any(|f| matches!(
+        f,
+        StagingDecidingFactor::NonTrivialCodebaseRefactor { lines_changed: 130 }
+    )));
 }
 
 #[test]

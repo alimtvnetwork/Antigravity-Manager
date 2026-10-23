@@ -15,14 +15,20 @@ mod tests {
         let result = validate_release_channel("v4.250.0", "beta");
         assert!(!result.is_valid);
         assert_eq!(result.channel, ReleaseChannel::Stable);
-        assert!(result.error_message.unwrap().contains("forbidden on branch 'beta'"));
+        assert!(result
+            .error_message
+            .unwrap()
+            .contains("forbidden on branch 'beta'"));
     }
 
     #[test]
     fn test_stable_release_on_feature_branch_forbidden() {
         let result = validate_release_channel("v4.250.0", "feature/my-feat");
         assert!(!result.is_valid);
-        assert!(result.error_message.unwrap().contains("Must be tagged on 'main'"));
+        assert!(result
+            .error_message
+            .unwrap()
+            .contains("Must be tagged on 'main'"));
     }
 
     #[test]
@@ -38,6 +44,9 @@ mod tests {
         let result = validate_release_channel("v4.250.0-beta.1", "main");
         assert!(!result.is_valid);
         assert_eq!(result.channel, ReleaseChannel::Preview);
-        assert!(result.error_message.unwrap().contains("forbidden on branch 'main'"));
+        assert!(result
+            .error_message
+            .unwrap()
+            .contains("forbidden on branch 'main'"));
     }
 }

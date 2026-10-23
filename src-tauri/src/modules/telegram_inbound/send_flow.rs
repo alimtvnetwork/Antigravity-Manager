@@ -908,7 +908,10 @@ pub async fn handle_send_callback(chat_id: i64, data: &str) -> (String, Option<V
     if let Some(confirm_id) = payload.strip_prefix("confirm:") {
         clear_flow(chat_id);
         return (
-            format!("✅ <b>Action Confirmed:</b> Dispatched execution for <code>{}</code>", confirm_id),
+            format!(
+                "✅ <b>Action Confirmed:</b> Dispatched execution for <code>{}</code>",
+                confirm_id
+            ),
             None,
         );
     }

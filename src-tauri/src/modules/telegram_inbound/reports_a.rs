@@ -71,12 +71,19 @@ pub fn format_ping_report() -> String {
             kv(
                 palette,
                 "Instances",
-                &format!("{}", instance::list_instances().map(|i| i.len()).unwrap_or(0)),
+                &format!(
+                    "{}",
+                    instance::list_instances().map(|i| i.len()).unwrap_or(0)
+                ),
             ),
             kv(
                 palette,
                 "DB State",
-                if repo_db::connect_db().is_ok() { "Healthy" } else { "Degraded" },
+                if repo_db::connect_db().is_ok() {
+                    "Healthy"
+                } else {
+                    "Degraded"
+                },
             ),
         ],
     );

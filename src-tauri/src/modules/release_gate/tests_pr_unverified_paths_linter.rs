@@ -93,7 +93,10 @@ fn test_placeholder_content_todo_is_flagged() {
         }
         _ => false,
     });
-    assert!(found, "Expected PlaceholderContentDetected with TODO snippet");
+    assert!(
+        found,
+        "Expected PlaceholderContentDetected with TODO snippet"
+    );
 }
 
 #[test]
@@ -163,7 +166,9 @@ fn test_is_placeholder_text_helper() {
     assert!(is_placeholder_text(""));
 
     assert!(!is_placeholder_text("Windows Job object fallback path"));
-    assert!(!is_placeholder_text("Alters default timeout from 30s to 45s"));
+    assert!(!is_placeholder_text(
+        "Alters default timeout from 30s to 45s"
+    ));
 }
 
 #[test]

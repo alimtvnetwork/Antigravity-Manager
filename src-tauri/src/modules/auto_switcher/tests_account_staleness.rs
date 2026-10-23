@@ -11,13 +11,25 @@ mod tests {
     #[test]
     fn test_account_staleness_default_and_zero_threshold_fallback() {
         let default_detector = AccountStalenessDetector::default();
-        let rep_default = default_detector.evaluate_staleness("acc_default", 10_000, 10_000 + DEFAULT_STALENESS_THRESHOLD_SECS);
+        let rep_default = default_detector.evaluate_staleness(
+            "acc_default",
+            10_000,
+            10_000 + DEFAULT_STALENESS_THRESHOLD_SECS,
+        );
         assert!(rep_default.is_stale);
         assert!(!rep_default.requires_force_refresh);
 
         let zero_detector = AccountStalenessDetector::new(0);
-        let rep_zero_stale = zero_detector.evaluate_staleness("acc_zero", 10_000, 10_000 + DEFAULT_STALENESS_THRESHOLD_SECS);
-        let rep_zero_fresh = zero_detector.evaluate_staleness("acc_zero", 10_000, 10_000 + DEFAULT_STALENESS_THRESHOLD_SECS - 1);
+        let rep_zero_stale = zero_detector.evaluate_staleness(
+            "acc_zero",
+            10_000,
+            10_000 + DEFAULT_STALENESS_THRESHOLD_SECS,
+        );
+        let rep_zero_fresh = zero_detector.evaluate_staleness(
+            "acc_zero",
+            10_000,
+            10_000 + DEFAULT_STALENESS_THRESHOLD_SECS - 1,
+        );
         assert!(rep_zero_stale.is_stale);
         assert!(!rep_zero_fresh.is_stale);
 

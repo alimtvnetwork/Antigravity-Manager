@@ -4,7 +4,9 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::modules::instance::binary_execution_probe::{BinaryExecutionProbe, BinaryProbeResult};
+    use crate::modules::instance::binary_execution_probe::{
+        BinaryExecutionProbe, BinaryProbeResult,
+    };
     use std::fs;
     use std::path::PathBuf;
 
@@ -15,10 +17,19 @@ mod tests {
         let result = BinaryExecutionProbe::probe_binary(&nonexistent_path);
 
         assert_eq!(result.path, nonexistent_path.to_string_lossy());
-        assert!(!result.exists, "Nonexistent path must report exists = false");
-        assert!(!result.is_file, "Nonexistent path must report is_file = false");
+        assert!(
+            !result.exists,
+            "Nonexistent path must report exists = false"
+        );
+        assert!(
+            !result.is_file,
+            "Nonexistent path must report is_file = false"
+        );
         assert_eq!(result.size_bytes, 0, "Nonexistent path size must be 0");
-        assert!(!result.is_executable, "Nonexistent path cannot be executable");
+        assert!(
+            !result.is_executable,
+            "Nonexistent path cannot be executable"
+        );
         assert_eq!(
             result.error,
             Some("Executable binary path does not exist".to_string()),
@@ -39,7 +50,10 @@ mod tests {
 
         assert!(result.exists, "Directory path exists");
         assert!(!result.is_file, "Directory must report is_file = false");
-        assert!(!result.is_executable, "Directory cannot be considered an executable binary");
+        assert!(
+            !result.is_executable,
+            "Directory cannot be considered an executable binary"
+        );
         assert_eq!(
             result.error,
             Some("Binary path exists but is not a valid executable file".to_string()),
@@ -57,14 +71,20 @@ mod tests {
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
         ));
         // Justification: Test fixture file creation in temporary folder
-        crate::error::record_ignored(fs::write(&temp_file, b""), "create empty binary test fixture");
+        crate::error::record_ignored(
+            fs::write(&temp_file, b""),
+            "create empty binary test fixture",
+        );
 
         let result = BinaryExecutionProbe::probe_binary(&temp_file);
 
         assert!(result.exists);
         assert!(result.is_file);
         assert_eq!(result.size_bytes, 0, "Empty file must report size 0 bytes");
-        assert!(!result.is_executable, "Zero-byte file must NOT be considered executable");
+        assert!(
+            !result.is_executable,
+            "Zero-byte file must NOT be considered executable"
+        );
         assert_eq!(
             result.error,
             Some("Binary path exists but is not a valid executable file".to_string())
@@ -83,15 +103,24 @@ mod tests {
 
         let mock_binary_payload = b"MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xff\xff\x00\x00";
         // Justification: Test fixture file creation in temporary folder
-        crate::error::record_ignored(fs::write(&temp_bin, mock_binary_payload), "write valid mock binary");
+        crate::error::record_ignored(
+            fs::write(&temp_bin, mock_binary_payload),
+            "write valid mock binary",
+        );
 
         let result = BinaryExecutionProbe::probe_binary(&temp_bin);
 
         assert!(result.exists, "Target binary must exist");
         assert!(result.is_file, "Target binary must be recognized as a file");
         assert_eq!(result.size_bytes, mock_binary_payload.len() as u64);
-        assert!(result.is_executable, "Non-empty binary must be marked executable");
-        assert!(result.error.is_none(), "Valid binary probe must produce error: None");
+        assert!(
+            result.is_executable,
+            "Non-empty binary must be marked executable"
+        );
+        assert!(
+            result.error.is_none(),
+            "Valid binary probe must produce error: None"
+        );
 
         // Justification: Best-effort test fixture cleanup
         crate::error::record_ignored(fs::remove_file(&temp_bin), "clean test file");
@@ -102,11 +131,23 @@ mod tests {
         if let Ok(current_exe) = std::env::current_exe() {
             let result = BinaryExecutionProbe::probe_binary(&current_exe);
 
-            assert!(result.exists, "Current running executable must exist on disk");
+            assert!(
+                result.exists,
+                "Current running executable must exist on disk"
+            );
             assert!(result.is_file, "Current running executable must be a file");
-            assert!(result.size_bytes > 0, "Current running executable must have positive file size");
-            assert!(result.is_executable, "Current running executable must be valid and executable");
-            assert!(result.error.is_none(), "No errors expected for host binary probe");
+            assert!(
+                result.size_bytes > 0,
+                "Current running executable must have positive file size"
+            );
+            assert!(
+                result.is_executable,
+                "Current running executable must be valid and executable"
+            );
+            assert!(
+                result.error.is_none(),
+                "No errors expected for host binary probe"
+            );
         }
     }
 
@@ -129,7 +170,8 @@ mod tests {
         assert!(json_str.contains("\"is_executable\":true"));
         assert!(json_str.contains("\"error\":null"));
 
-        let roundtrip: BinaryProbeResult = serde_json::from_str(&json_str).expect("BinaryProbeResult deserialize");
+        let roundtrip: BinaryProbeResult =
+            serde_json::from_str(&json_str).expect("BinaryProbeResult deserialize");
         assert_eq!(roundtrip.path, probe_result.path);
         assert_eq!(roundtrip.exists, probe_result.exists);
         assert_eq!(roundtrip.is_file, probe_result.is_file);

@@ -19,8 +19,8 @@ pub const SOLE_PERMITTED_AUTHOR_HANDLE: &str = "@aukgit";
 
 /// Known absolute path drive and directory prefixes forbidden in release notes.
 pub const FORBIDDEN_ABSOLUTE_PREFIXES: &[&str] = &[
-    "c:\\", "c:/", "d:\\", "d:/", "e:\\", "e:/", "/home/", "/users/", "/etc/", "/var/",
-    "/tmp/", "/usr/", "/root/", "/opt/", "file://",
+    "c:\\", "c:/", "d:\\", "d:/", "e:\\", "e:/", "/home/", "/users/", "/etc/", "/var/", "/tmp/",
+    "/usr/", "/root/", "/opt/", "file://",
 ];
 
 /// Granular violations detected during GitHub release notes validation.
@@ -145,8 +145,8 @@ fn extract_absolute_paths_from_line(line: &str) -> Vec<String> {
             && bytes[i + 1] == b':'
             && (bytes[i + 2] == b'\\' || bytes[i + 2] == b'/')
         {
-            let is_start = i == 0
-                || (!bytes[i - 1].is_ascii_alphanumeric() && bytes[i - 1] != b'/');
+            let is_start =
+                i == 0 || (!bytes[i - 1].is_ascii_alphanumeric() && bytes[i - 1] != b'/');
             if is_start {
                 let token = extract_path_token(&line[i..]);
                 if !token.is_empty() && !results.contains(&token) {
@@ -194,9 +194,7 @@ fn extract_handles_from_line(line: &str) -> Vec<String> {
                 let start = i;
                 i += 1;
                 while i < len
-                    && (chars[i].is_ascii_alphanumeric()
-                        || chars[i] == '-'
-                        || chars[i] == '_')
+                    && (chars[i].is_ascii_alphanumeric() || chars[i] == '-' || chars[i] == '_')
                 {
                     i += 1;
                 }

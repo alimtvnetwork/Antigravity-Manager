@@ -35,7 +35,10 @@ fn test_replaces_lifo_desc_order() {
     let report = enforce_fifo_ordering(sql);
 
     match report.action() {
-        FifoEnforcementAction::ReplacedLIFOOrder { original_clause, canonical_clause } => {
+        FifoEnforcementAction::ReplacedLIFOOrder {
+            original_clause,
+            canonical_clause,
+        } => {
             assert!(original_clause.contains("updated_at DESC"));
             assert_eq!(canonical_clause, CANONICAL_FIFO_ORDER_BY);
         }
@@ -82,7 +85,10 @@ fn test_appends_canonical_order_when_missing() {
     let sql = "SELECT * FROM prompts_queue WHERE status = 'pending' LIMIT 5;";
     let report = enforce_fifo_ordering(sql);
 
-    assert_eq!(report.action(), &FifoEnforcementAction::AppendedCanonicalOrder);
+    assert_eq!(
+        report.action(),
+        &FifoEnforcementAction::AppendedCanonicalOrder
+    );
     assert!(report.is_modified());
     assert!(report.is_fifo_guaranteed());
     assert_eq!(
@@ -96,7 +102,10 @@ fn test_appends_order_at_end_of_query_without_limit() {
     let sql = "SELECT id, prompt_id FROM repo_prompts";
     let report = enforce_fifo_ordering(sql);
 
-    assert_eq!(report.action(), &FifoEnforcementAction::AppendedCanonicalOrder);
+    assert_eq!(
+        report.action(),
+        &FifoEnforcementAction::AppendedCanonicalOrder
+    );
     assert!(report.is_modified());
     assert!(report.is_fifo_guaranteed());
     assert_eq!(
@@ -110,7 +119,10 @@ fn test_non_target_table_passthrough() {
     let sql = "SELECT * FROM user_accounts ORDER BY last_login DESC LIMIT 10;";
     let report = enforce_fifo_ordering(sql);
 
-    assert_eq!(report.action(), &FifoEnforcementAction::NonTargetQueryPassThrough);
+    assert_eq!(
+        report.action(),
+        &FifoEnforcementAction::NonTargetQueryPassThrough
+    );
     assert!(!report.is_modified());
     assert!(report.is_fifo_guaranteed());
     assert_eq!(report.enforced_sql(), sql);

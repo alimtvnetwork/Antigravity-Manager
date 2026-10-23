@@ -283,9 +283,9 @@ impl StreamingFrameParser {
             }
 
             if let Some(end_idx) = line_end {
-                let line_bytes = &self.buffer[cursor..end_idx];
+                let line_bytes = self.buffer[cursor..end_idx].to_vec();
                 cursor = end_idx + delim_len;
-                if let Some(frame) = self.process_line(line_bytes) {
+                if let Some(frame) = self.process_line(&line_bytes) {
                     frames.push(frame);
                 }
             } else {

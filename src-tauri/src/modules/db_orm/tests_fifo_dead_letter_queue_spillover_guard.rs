@@ -101,7 +101,10 @@ fn test_record_dead_letter_spillover_compliant() {
             101,
             "2026-10-23T10:00:00Z",
             "Prompt A",
-            DeadLetterReason::RetryLimitExceeded { attempts: 5, max_retries: 5 },
+            DeadLetterReason::RetryLimitExceeded {
+                attempts: 5,
+                max_retries: 5,
+            },
             1_700_000_000_000,
         ),
         DeadLetterPromptItem::new(
@@ -135,21 +138,30 @@ fn test_record_dead_letter_spillover_tie_breaker_compliant() {
             101,
             "1700000000",
             "Prompt 1",
-            DeadLetterReason::RetryLimitExceeded { attempts: 3, max_retries: 3 },
+            DeadLetterReason::RetryLimitExceeded {
+                attempts: 3,
+                max_retries: 3,
+            },
             1_700_000_000,
         ),
         DeadLetterPromptItem::new(
             102,
             "1700000000", // Identical timestamp, higher ID (compliant)
             "Prompt 2",
-            DeadLetterReason::RetryLimitExceeded { attempts: 3, max_retries: 3 },
+            DeadLetterReason::RetryLimitExceeded {
+                attempts: 3,
+                max_retries: 3,
+            },
             1_700_000_000,
         ),
         DeadLetterPromptItem::new(
             105,
             "1700000000", // Identical timestamp, strictly higher ID (compliant)
             "Prompt 3",
-            DeadLetterReason::RetryLimitExceeded { attempts: 3, max_retries: 3 },
+            DeadLetterReason::RetryLimitExceeded {
+                attempts: 3,
+                max_retries: 3,
+            },
             1_700_000_000,
         ),
     ];
@@ -167,14 +179,20 @@ fn test_record_dead_letter_spillover_inverted_timestamps() {
             101,
             "2026-10-23T11:00:00Z",
             "Later prompt",
-            DeadLetterReason::RetryLimitExceeded { attempts: 5, max_retries: 5 },
+            DeadLetterReason::RetryLimitExceeded {
+                attempts: 5,
+                max_retries: 5,
+            },
             1_000,
         ),
         DeadLetterPromptItem::new(
             102,
             "2026-10-23T10:00:00Z", // Regressed timestamp!
             "Earlier prompt",
-            DeadLetterReason::RetryLimitExceeded { attempts: 5, max_retries: 5 },
+            DeadLetterReason::RetryLimitExceeded {
+                attempts: 5,
+                max_retries: 5,
+            },
             1_010,
         ),
     ];
@@ -194,14 +212,20 @@ fn test_record_dead_letter_spillover_tie_breaker_inversion() {
             205,
             "1700000000",
             "Prompt X",
-            DeadLetterReason::RetryLimitExceeded { attempts: 3, max_retries: 3 },
+            DeadLetterReason::RetryLimitExceeded {
+                attempts: 3,
+                max_retries: 3,
+            },
             1_000,
         ),
         DeadLetterPromptItem::new(
             204, // Lower ID on identical timestamp (inversion!)
             "1700000000",
             "Prompt Y",
-            DeadLetterReason::RetryLimitExceeded { attempts: 3, max_retries: 3 },
+            DeadLetterReason::RetryLimitExceeded {
+                attempts: 3,
+                max_retries: 3,
+            },
             1_000,
         ),
     ];
@@ -220,14 +244,20 @@ fn test_record_dead_letter_spillover_duplicate_id_inversion() {
             300,
             "1700000000",
             "Prompt A",
-            DeadLetterReason::RetryLimitExceeded { attempts: 3, max_retries: 3 },
+            DeadLetterReason::RetryLimitExceeded {
+                attempts: 3,
+                max_retries: 3,
+            },
             1_000,
         ),
         DeadLetterPromptItem::new(
             300, // Duplicate ID on same timestamp
             "1700000000",
             "Prompt B",
-            DeadLetterReason::RetryLimitExceeded { attempts: 3, max_retries: 3 },
+            DeadLetterReason::RetryLimitExceeded {
+                attempts: 3,
+                max_retries: 3,
+            },
             1_000,
         ),
     ];
@@ -241,15 +271,13 @@ fn test_record_dead_letter_spillover_duplicate_id_inversion() {
 
 #[test]
 fn test_record_dead_letter_spillover_missing_timestamp() {
-    let items = vec![
-        DeadLetterPromptItem::new(
-            401,
-            "   ", // Blank timestamp
-            "Prompt with missing timestamp",
-            DeadLetterReason::UnrecoverableSyntaxError("Corrupted payload".to_string()),
-            1_000,
-        ),
-    ];
+    let items = vec![DeadLetterPromptItem::new(
+        401,
+        "   ", // Blank timestamp
+        "Prompt with missing timestamp",
+        DeadLetterReason::UnrecoverableSyntaxError("Corrupted payload".to_string()),
+        1_000,
+    )];
 
     let report = record_dead_letter_spillover(&items);
     assert!(!report.is_compliant());
@@ -260,7 +288,10 @@ fn test_record_dead_letter_spillover_missing_timestamp() {
 
 #[test]
 fn test_dead_letter_reasons_and_formatting() {
-    let r1 = DeadLetterReason::RetryLimitExceeded { attempts: 4, max_retries: 3 };
+    let r1 = DeadLetterReason::RetryLimitExceeded {
+        attempts: 4,
+        max_retries: 3,
+    };
     let r2 = DeadLetterReason::UnrecoverableSyntaxError("Unexpected token".to_string());
     let r3 = DeadLetterReason::UpstreamPermanentRejection("Model decommissioned".to_string());
 
@@ -274,8 +305,14 @@ fn test_dead_letter_reasons_and_formatting() {
     assert!(!r3.is_retry_limit_exceeded());
 
     assert_eq!(r1.to_string(), "Retry limit exceeded (4/3)");
-    assert_eq!(r2.to_string(), "Unrecoverable syntax error: Unexpected token");
-    assert_eq!(r3.to_string(), "Upstream permanent rejection: Model decommissioned");
+    assert_eq!(
+        r2.to_string(),
+        "Unrecoverable syntax error: Unexpected token"
+    );
+    assert_eq!(
+        r3.to_string(),
+        "Upstream permanent rejection: Model decommissioned"
+    );
 }
 
 #[test]
@@ -293,7 +330,10 @@ fn test_json_serialization_roundtrip() {
         999,
         "2026-10-23T15:00:00Z",
         "Test Serialization",
-        DeadLetterReason::RetryLimitExceeded { attempts: 5, max_retries: 5 },
+        DeadLetterReason::RetryLimitExceeded {
+            attempts: 5,
+            max_retries: 5,
+        },
         1_700_000_123_456,
     );
 
@@ -311,7 +351,9 @@ fn test_violation_display_and_error() {
 
     assert!(v1.to_string().contains("Inverted spillover ordering"));
     assert!(v2.to_string().contains("Missing original timestamp"));
-    assert!(v3.to_string().contains("Missing mandatory secondary tie-breaker"));
+    assert!(v3
+        .to_string()
+        .contains("Missing mandatory secondary tie-breaker"));
 
     let err: &dyn std::error::Error = &v1;
     assert_eq!(format!("{err}"), v1.to_string());

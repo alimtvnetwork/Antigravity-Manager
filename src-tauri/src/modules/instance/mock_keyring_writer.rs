@@ -31,7 +31,10 @@ impl MockKeyringWriter {
             }
         }
 
-        info!("Wrote {} keyring bypass markers to {:?}", written_count, target_dir);
+        info!(
+            "Wrote {} keyring bypass markers to {:?}",
+            written_count, target_dir
+        );
         Ok(written_count)
     }
 }

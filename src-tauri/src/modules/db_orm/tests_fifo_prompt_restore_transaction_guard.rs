@@ -121,8 +121,8 @@ mod tests {
     #[test]
     fn test_inverted_created_at_desc_aborts_transaction() {
         let mut conn = setup_test_db();
-        let mut guard = FifoPromptRestoreTransactionGuard::begin(&mut conn)
-            .expect("Begin transaction failed");
+        let mut guard =
+            FifoPromptRestoreTransactionGuard::begin(&mut conn).expect("Begin transaction failed");
 
         let sql = "SELECT * FROM active_prompts ORDER BY created_at DESC";
         let err = guard
@@ -139,8 +139,8 @@ mod tests {
     #[test]
     fn test_missing_tie_breaker_id_asc_aborts_transaction() {
         let mut conn = setup_test_db();
-        let mut guard = FifoPromptRestoreTransactionGuard::begin(&mut conn)
-            .expect("Begin transaction failed");
+        let mut guard =
+            FifoPromptRestoreTransactionGuard::begin(&mut conn).expect("Begin transaction failed");
 
         let sql = "SELECT * FROM active_prompts ORDER BY created_at ASC";
         let err = guard
@@ -157,8 +157,8 @@ mod tests {
     #[test]
     fn test_missing_order_by_on_prompt_queue_table_aborts() {
         let mut conn = setup_test_db();
-        let mut guard = FifoPromptRestoreTransactionGuard::begin(&mut conn)
-            .expect("Begin transaction failed");
+        let mut guard =
+            FifoPromptRestoreTransactionGuard::begin(&mut conn).expect("Begin transaction failed");
 
         let sql = "SELECT id, prompt_text FROM active_prompts WHERE status = 'Pending'";
         let err = guard
@@ -175,8 +175,8 @@ mod tests {
     #[test]
     fn test_disallowed_sort_column_aborts() {
         let mut conn = setup_test_db();
-        let mut guard = FifoPromptRestoreTransactionGuard::begin(&mut conn)
-            .expect("Begin transaction failed");
+        let mut guard =
+            FifoPromptRestoreTransactionGuard::begin(&mut conn).expect("Begin transaction failed");
 
         let sql = "SELECT * FROM active_prompts ORDER BY status ASC, id ASC";
         let err = guard
@@ -193,8 +193,8 @@ mod tests {
     #[test]
     fn test_non_queue_table_passes_without_enforcement() {
         let mut conn = setup_test_db();
-        let mut guard = FifoPromptRestoreTransactionGuard::begin(&mut conn)
-            .expect("Begin transaction failed");
+        let mut guard =
+            FifoPromptRestoreTransactionGuard::begin(&mut conn).expect("Begin transaction failed");
 
         let sql = "SELECT * FROM users ORDER BY username ASC";
         guard
@@ -214,8 +214,8 @@ mod tests {
         )
         .expect("Seed insert failed");
 
-        let mut guard = FifoPromptRestoreTransactionGuard::begin(&mut conn)
-            .expect("Begin transaction failed");
+        let mut guard =
+            FifoPromptRestoreTransactionGuard::begin(&mut conn).expect("Begin transaction failed");
 
         let update_sql = "UPDATE active_prompts SET status = 'Completed' WHERE id = 'p1'";
         let affected = guard
@@ -236,8 +236,8 @@ mod tests {
         )
         .expect("Seed backups failed");
 
-        let mut guard = FifoPromptRestoreTransactionGuard::begin(&mut conn)
-            .expect("Begin transaction failed");
+        let mut guard =
+            FifoPromptRestoreTransactionGuard::begin(&mut conn).expect("Begin transaction failed");
 
         let restore_sql = "INSERT INTO active_prompts SELECT id, prompt_text, created_at, 'Restored' FROM prompt_backups ORDER BY created_at ASC, id ASC";
         let affected = guard
@@ -249,7 +249,11 @@ mod tests {
         guard.commit().expect("Commit should succeed");
 
         let restored_count: i64 = conn
-            .query_row("SELECT count(*) FROM active_prompts WHERE status = 'Restored'", [], |r| r.get(0))
+            .query_row(
+                "SELECT count(*) FROM active_prompts WHERE status = 'Restored'",
+                [],
+                |r| r.get(0),
+            )
             .expect("Query count failed");
         assert_eq!(restored_count, 2);
     }
@@ -263,10 +267,11 @@ mod tests {
         )
         .expect("Seed backups failed");
 
-        let mut guard = FifoPromptRestoreTransactionGuard::begin(&mut conn)
-            .expect("Begin transaction failed");
+        let mut guard =
+            FifoPromptRestoreTransactionGuard::begin(&mut conn).expect("Begin transaction failed");
 
-        let restore_lifo = "INSERT INTO active_prompts SELECT * FROM prompt_backups ORDER BY created_at DESC";
+        let restore_lifo =
+            "INSERT INTO active_prompts SELECT * FROM prompt_backups ORDER BY created_at DESC";
         let err = guard
             .execute_restore_batch(restore_lifo, &[])
             .expect_err("LIFO batch restore must be rejected");
@@ -294,7 +299,11 @@ mod tests {
         }
 
         let count: i64 = conn
-            .query_row("SELECT count(*) FROM active_prompts WHERE id = 'p_tmp'", [], |r| r.get(0))
+            .query_row(
+                "SELECT count(*) FROM active_prompts WHERE id = 'p_tmp'",
+                [],
+                |r| r.get(0),
+            )
             .expect("Count query failed");
         assert_eq!(count, 0, "RAII drop must roll back uncommitted changes");
     }

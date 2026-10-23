@@ -117,7 +117,11 @@ pub fn conforming_best_effort_snippet(op_expr: &str, context: &str, justificatio
 }
 
 /// Generates a conforming TypeScript catch snippet routing through error-store.
-pub fn conforming_typescript_catch_snippet(err_var: &str, source: &str, trigger_action: &str) -> String {
+pub fn conforming_typescript_catch_snippet(
+    err_var: &str,
+    source: &str,
+    trigger_action: &str,
+) -> String {
     format!(
         "catch ({}) {{\n    useErrorStore.getState().trackWarning({}, {{ source: '{}', triggerAction: '{}' }});\n}}",
         err_var.trim(),
@@ -190,7 +194,10 @@ pub fn lint_rust_code(content: &str) -> SilentErrorLintReport {
                 || trimmed.contains("sync_")
                 || trimmed.contains("flush(")
                 || trimmed.contains("Command::")
-                || (trimmed.contains('(') && trimmed.contains(')') && !trimmed.starts_with("let _ = &") && !trimmed.starts_with("let _ = format!"));
+                || (trimmed.contains('(')
+                    && trimmed.contains(')')
+                    && !trimmed.starts_with("let _ = &")
+                    && !trimmed.starts_with("let _ = format!"));
 
             if is_fallible_call {
                 violations.push(SilentErrorViolation {
@@ -314,7 +321,8 @@ pub fn lint_typescript_code(content: &str) -> SilentErrorLintReport {
         }
 
         // 2. Catch blocks
-        if trimmed.contains("catch {") || trimmed.contains("catch (") || trimmed.contains("catch(") {
+        if trimmed.contains("catch {") || trimmed.contains("catch (") || trimmed.contains("catch(")
+        {
             // Check if it's an empty catch block on the same line
             if trimmed.ends_with("{}") || trimmed.ends_with("{ }") {
                 violations.push(SilentErrorViolation {

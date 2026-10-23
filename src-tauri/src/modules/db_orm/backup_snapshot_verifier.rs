@@ -57,7 +57,11 @@ pub fn verify_sqlite_backup_file(path: &Path) -> BackupVerificationOutcome {
     }
 
     let raw_page_size = u16::from_be_bytes(page_size_bytes);
-    let page_size = if raw_page_size == 1 { 65536 } else { raw_page_size as u32 };
+    let page_size = if raw_page_size == 1 {
+        65536
+    } else {
+        raw_page_size as u32
+    };
 
     BackupVerificationOutcome::Valid {
         page_size: page_size as u16,

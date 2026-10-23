@@ -51,10 +51,7 @@ pub enum CallerProtectionVerdict {
     /// Safe to operate on target instance.
     Allowed,
     /// Operation blocked to prevent terminating the developer's working IDE session.
-    BlockedCallerProtection {
-        caller_id: String,
-        reason: String,
-    },
+    BlockedCallerProtection { caller_id: String, reason: String },
 }
 
 impl CallerProtectionVerdict {
@@ -113,7 +110,10 @@ pub fn create_transient_sandbox(
         fs::create_dir_all(base_root).map_err(|e| {
             AppError::Io(std::io::Error::new(
                 e.kind(),
-                format!("Failed to create base sandbox directory {:?}: {}", base_root, e),
+                format!(
+                    "Failed to create base sandbox directory {:?}: {}",
+                    base_root, e
+                ),
             ))
         })?;
     }
@@ -242,7 +242,9 @@ fn scrub_dir_contents_preserving(
     let entries = match fs::read_dir(current_dir) {
         Ok(e) => e,
         Err(err) => {
-            report.errors.push(format!("Failed to read dir {:?}: {}", current_dir, err));
+            report
+                .errors
+                .push(format!("Failed to read dir {:?}: {}", current_dir, err));
             return;
         }
     };
@@ -262,7 +264,9 @@ fn scrub_dir_contents_preserving(
                 report.bytes_reclaimed += meta.len();
             }
             if let Err(e) = fs::remove_dir_all(&p) {
-                report.errors.push(format!("Failed to remove subdir {:?}: {}", p, e));
+                report
+                    .errors
+                    .push(format!("Failed to remove subdir {:?}: {}", p, e));
             } else {
                 report.directories_removed += 1;
             }
@@ -271,7 +275,9 @@ fn scrub_dir_contents_preserving(
                 report.bytes_reclaimed += meta.len();
             }
             if let Err(e) = fs::remove_file(&p) {
-                report.errors.push(format!("Failed to remove file {:?}: {}", p, e));
+                report
+                    .errors
+                    .push(format!("Failed to remove file {:?}: {}", p, e));
             } else {
                 report.files_removed += 1;
             }
@@ -293,7 +299,10 @@ pub fn sweep_stale_sandboxes(
     let entries = fs::read_dir(base_root).map_err(|e| {
         AppError::Io(std::io::Error::new(
             e.kind(),
-            format!("Failed to read base sandbox directory {:?}: {}", base_root, e),
+            format!(
+                "Failed to read base sandbox directory {:?}: {}",
+                base_root, e
+            ),
         ))
     })?;
 
@@ -314,7 +323,9 @@ pub fn sweep_stale_sandboxes(
                 let mut record = TransientSandboxRecord {
                     sandbox_id: file_name,
                     profile_dir: path.clone(),
-                    workspace_storage_dir: path.join(SUBDIR_USER_DATA).join(SUBDIR_WORKSPACE_STORAGE),
+                    workspace_storage_dir: path
+                        .join(SUBDIR_USER_DATA)
+                        .join(SUBDIR_WORKSPACE_STORAGE),
                     assigned_port: 0,
                     allocated_pid: None,
                     created_at_epoch_s: modified,

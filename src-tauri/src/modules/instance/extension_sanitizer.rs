@@ -3,13 +3,8 @@
 
 use std::path::Path;
 
-pub const EXTENSION_LOCK_PATTERNS: &[&str] = &[
-    ".lock",
-    ".sock",
-    ".ipc",
-    "extension-lock",
-    "runtime.pid",
-];
+pub const EXTENSION_LOCK_PATTERNS: &[&str] =
+    &[".lock", ".sock", ".ipc", "extension-lock", "runtime.pid"];
 
 /// Outcome of extension directory sanitation.
 #[derive(Debug, Clone, Default)]
@@ -30,7 +25,9 @@ pub fn sanitize_extension_runtime_state(extensions_dir: &Path) -> ExtensionSanit
             let path = entry.path();
             if path.is_file() {
                 let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                let is_lock = EXTENSION_LOCK_PATTERNS.iter().any(|&ext| name.ends_with(ext));
+                let is_lock = EXTENSION_LOCK_PATTERNS
+                    .iter()
+                    .any(|&ext| name.ends_with(ext));
                 if is_lock {
                     match std::fs::remove_file(&path) {
                         Ok(_) => report.purged_files.push(path.to_string_lossy().to_string()),

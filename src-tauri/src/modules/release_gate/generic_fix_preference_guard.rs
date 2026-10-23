@@ -204,9 +204,7 @@ impl GeneralizationSuggestion {
                 format!("Use regex engine: `{recommended_pattern}`")
             }
             Self::UseDynamicRegistry => "Use dynamic registry lookup".to_string(),
-            Self::JustifiedExemptionAcknowledged => {
-                "Justified exemption acknowledged".to_string()
-            }
+            Self::JustifiedExemptionAcknowledged => "Justified exemption acknowledged".to_string(),
         }
     }
 }
@@ -348,8 +346,9 @@ pub fn evaluate_single_site(site: &MatchSite) -> GeneralizationFinding {
 fn evaluate_exact_chain(site: &MatchSite, branch_count: usize) -> GeneralizationFinding {
     if site.has_justification {
         let reason = site.justification.as_deref().unwrap_or("Exempted");
-        let explanation =
-            format!("Exact equality chain ({branch_count} branches) exempted by justification: {reason}");
+        let explanation = format!(
+            "Exact equality chain ({branch_count} branches) exempted by justification: {reason}"
+        );
         return GeneralizationFinding {
             site_id: site.site_id.clone(),
             is_generalization_required: false,
@@ -373,15 +372,18 @@ fn evaluate_exact_chain(site: &MatchSite, branch_count: usize) -> Generalization
         site_id: site.site_id.clone(),
         is_generalization_required: is_required,
         explanation,
-        suggested_generalization: GeneralizationSuggestion::UseWildcardGlob { recommended_pattern },
+        suggested_generalization: GeneralizationSuggestion::UseWildcardGlob {
+            recommended_pattern,
+        },
     }
 }
 
 fn evaluate_literal_table(site: &MatchSite, entry_count: usize) -> GeneralizationFinding {
     if site.has_justification {
         let reason = site.justification.as_deref().unwrap_or("Exempted");
-        let explanation =
-            format!("Literal lookup table ({entry_count} entries) exempted by justification: {reason}");
+        let explanation = format!(
+            "Literal lookup table ({entry_count} entries) exempted by justification: {reason}"
+        );
         return GeneralizationFinding {
             site_id: site.site_id.clone(),
             is_generalization_required: false,
@@ -489,8 +491,7 @@ fn evaluate_registry_lookup(site: &MatchSite) -> GeneralizationFinding {
 fn evaluate_single_exact_match(site: &MatchSite) -> GeneralizationFinding {
     if site.has_justification {
         let reason = site.justification.as_deref().unwrap_or("Justified");
-        let explanation =
-            format!("Single exact match exempted by justification: {reason}");
+        let explanation = format!("Single exact match exempted by justification: {reason}");
         return GeneralizationFinding {
             site_id: site.site_id.clone(),
             is_generalization_required: false,
@@ -506,7 +507,9 @@ fn evaluate_single_exact_match(site: &MatchSite) -> GeneralizationFinding {
         site_id: site.site_id.clone(),
         is_generalization_required: true,
         explanation,
-        suggested_generalization: GeneralizationSuggestion::UseWildcardGlob { recommended_pattern },
+        suggested_generalization: GeneralizationSuggestion::UseWildcardGlob {
+            recommended_pattern,
+        },
     }
 }
 
@@ -578,7 +581,10 @@ fn find_common_suffix(items: &[String]) -> String {
     let first = &items[0];
     let mut suffix_chars = Vec::new();
     for (i, ch) in first.chars().rev().enumerate() {
-        if items[1..].iter().all(|it| it.chars().rev().nth(i) == Some(ch)) {
+        if items[1..]
+            .iter()
+            .all(|it| it.chars().rev().nth(i) == Some(ch))
+        {
             suffix_chars.push(ch);
         } else {
             break;

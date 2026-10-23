@@ -65,7 +65,11 @@ pub struct SegmentButton {
 
 impl SegmentButton {
     /// Constructs a new segment button with defaults.
-    pub fn new(id: impl Into<String>, label: impl Into<String>, aria_label: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        label: impl Into<String>,
+        aria_label: impl Into<String>,
+    ) -> Self {
         Self {
             id: id.into(),
             label: label.into(),
@@ -140,7 +144,11 @@ impl Default for CapsuleGroupConfig {
 
 impl CapsuleGroupConfig {
     /// Constructs a custom capsule group configuration.
-    pub fn new(orientation: CapsuleOrientation, size_tier: impl Into<String>, is_dark_glass: bool) -> Self {
+    pub fn new(
+        orientation: CapsuleOrientation,
+        size_tier: impl Into<String>,
+        is_dark_glass: bool,
+    ) -> Self {
         Self {
             orientation,
             size_tier: size_tier.into(),
@@ -202,7 +210,11 @@ impl CapsuleViolationReport {
     }
 
     /// Adds a violation and remediation suggestion.
-    pub fn with_violation(mut self, violation: impl Into<String>, suggestion: impl Into<String>) -> Self {
+    pub fn with_violation(
+        mut self,
+        violation: impl Into<String>,
+        suggestion: impl Into<String>,
+    ) -> Self {
         self.is_compliant = false;
         self.violations.push(violation.into());
         self.suggestions.push(suggestion.into());
@@ -237,7 +249,9 @@ pub fn format_segmented_button_group(
 
     let divider_classes = match (config.orientation, config.is_dark_glass) {
         (CapsuleOrientation::Horizontal, true) => CANONICAL_SEGMENT_DIVIDER_CLASSES.to_string(),
-        (CapsuleOrientation::Vertical, true) => CANONICAL_SEGMENT_DIVIDER_VERTICAL_CLASSES.to_string(),
+        (CapsuleOrientation::Vertical, true) => {
+            CANONICAL_SEGMENT_DIVIDER_VERTICAL_CLASSES.to_string()
+        }
         (CapsuleOrientation::Horizontal, false) => "h-3.5 w-px bg-zinc-300".to_string(),
         (CapsuleOrientation::Vertical, false) => "w-3.5 h-px bg-zinc-300".to_string(),
     };
@@ -334,7 +348,10 @@ pub fn format_segmented_button_group(
         let disabled_attr = if btn.is_disabled { " disabled" } else { "" };
 
         let content = match (&btn.icon, btn.label.as_str()) {
-            (Some(icon), "") => format!("<span class=\"icon-{}\" aria-hidden=\"true\"></span>", escape_html(icon)),
+            (Some(icon), "") => format!(
+                "<span class=\"icon-{}\" aria-hidden=\"true\"></span>",
+                escape_html(icon)
+            ),
             (Some(icon), lbl) => format!(
                 "<span class=\"icon-{}\" aria-hidden=\"true\"></span><span>{}</span>",
                 escape_html(icon),
@@ -415,7 +432,10 @@ pub fn audit_button_group_markup(html_or_jsx: &str) -> CapsuleViolationReport {
             }
 
             let is_capsule = lower.contains("rounded-full")
-                && (lower.contains("border") || lower.contains("bg-zinc") || lower.contains("inline-flex") || lower.contains("flex"));
+                && (lower.contains("border")
+                    || lower.contains("bg-zinc")
+                    || lower.contains("inline-flex")
+                    || lower.contains("flex"));
 
             if is_capsule {
                 inside_capsule_depth += 1;
@@ -468,7 +488,8 @@ pub fn audit_button_group_markup(html_or_jsx: &str) -> CapsuleViolationReport {
             let has_transparent = lower.contains("bg-transparent");
             let has_border_0 = lower.contains("border-0") || lower.contains("border-none");
             let has_focus_ring = lower.contains("focus:ring-0");
-            let has_focus_outline = lower.contains("focus:outline-none") || lower.contains("outline-none");
+            let has_focus_outline =
+                lower.contains("focus:outline-none") || lower.contains("outline-none");
 
             if !(has_transparent && has_border_0 && has_focus_ring && has_focus_outline) {
                 violations.push(format!(
@@ -562,7 +583,8 @@ impl SegmentedGroupStylingReport {
 
     pub fn summary(&self) -> String {
         if self.is_compliant {
-            "Compliant: segmented button group satisfies all AGENTS.md capsule invariants".to_string()
+            "Compliant: segmented button group satisfies all AGENTS.md capsule invariants"
+                .to_string()
         } else {
             format!(
                 "Non-compliant: {} styling violation(s) detected",
@@ -584,7 +606,9 @@ pub fn validate_segmented_group_classes(classes: &str) -> SegmentedGroupStylingR
 
     let has_rounded_full = tokens.contains(&"rounded-full");
     let has_shared_border = tokens.contains(&"border")
-        || tokens.iter().any(|t| t.starts_with("border-") && *t != "border-none" && *t != "border-0");
+        || tokens
+            .iter()
+            .any(|t| t.starts_with("border-") && *t != "border-none" && *t != "border-0");
     let has_dark_glass_bg = tokens.iter().any(|t| {
         t.starts_with("bg-zinc-950")
             || t.starts_with("bg-zinc-900")
@@ -592,7 +616,9 @@ pub fn validate_segmented_group_classes(classes: &str) -> SegmentedGroupStylingR
             || t.starts_with("bg-black")
     }) && tokens.iter().any(|t| t.starts_with("backdrop-blur"));
 
-    let has_subtle_divider = tokens.iter().any(|t| t.starts_with("divide-") || *t == "h-3.5" || t.contains("divider"))
+    let has_subtle_divider = tokens
+        .iter()
+        .any(|t| t.starts_with("divide-") || *t == "h-3.5" || t.contains("divider"))
         || classes.contains("border-zinc-800")
         || classes.contains("bg-zinc-800");
 
@@ -602,13 +628,19 @@ pub fn validate_segmented_group_classes(classes: &str) -> SegmentedGroupStylingR
         violations.push("Missing mandatory 'rounded-full' pill capsule contour".to_string());
     }
     if !has_shared_border {
-        violations.push("Missing shared border enclosure ('border' or 'border-zinc-*')".to_string());
+        violations
+            .push("Missing shared border enclosure ('border' or 'border-zinc-*')".to_string());
     }
     if !has_dark_glass_bg {
-        violations.push("Missing dark-glass background styling ('bg-zinc-*' and 'backdrop-blur-*')".to_string());
+        violations.push(
+            "Missing dark-glass background styling ('bg-zinc-*' and 'backdrop-blur-*')".to_string(),
+        );
     }
     if !has_subtle_divider {
-        violations.push("Missing subtle divider configuration ('divide-zinc-*' or discrete divider)".to_string());
+        violations.push(
+            "Missing subtle divider configuration ('divide-zinc-*' or discrete divider)"
+                .to_string(),
+        );
     }
 
     if tokens.contains(&"space-x-2")
@@ -622,7 +654,11 @@ pub fn validate_segmented_group_classes(classes: &str) -> SegmentedGroupStylingR
         );
     }
 
-    if tokens.contains(&"bg-white") || tokens.iter().any(|t| t.starts_with("bg-zinc-100") || t.starts_with("bg-gray-100")) {
+    if tokens.contains(&"bg-white")
+        || tokens
+            .iter()
+            .any(|t| t.starts_with("bg-zinc-100") || t.starts_with("bg-gray-100"))
+    {
         violations.push("Detected forbidden light background in dark-glass capsule".to_string());
     }
 

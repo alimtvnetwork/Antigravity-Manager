@@ -29,13 +29,7 @@ mod tests {
     #[test]
     fn test_multiline_dot_all_unbounded_patterns_flagged() {
         let patterns = [
-            r"(?s).*",
-            r"(?s).+",
-            r"(?s:.*)",
-            r"[\s\S]*",
-            r"[\s\S]+",
-            r"[\w\W]*",
-            r"[\d\D]*",
+            r"(?s).*", r"(?s).+", r"(?s:.*)", r"[\s\S]*", r"[\s\S]+", r"[\w\W]*", r"[\d\D]*",
         ];
         let verifier = BoundedMatcherTimeoutVerifier::new();
         for pattern in patterns {
@@ -67,7 +61,10 @@ mod tests {
         let verifier = BoundedMatcherTimeoutVerifier::new();
         for pattern in patterns {
             let res = verifier.audit_pattern(pattern);
-            assert!(res.is_err(), "Tag boundary crossing must be flagged: {pattern}");
+            assert!(
+                res.is_err(),
+                "Tag boundary crossing must be flagged: {pattern}"
+            );
         }
     }
 
@@ -76,13 +73,19 @@ mod tests {
         let verifier = BoundedMatcherTimeoutVerifier::new();
         let zero = Duration::ZERO;
         let res_polling = verifier.validate_timeout(zero, TimeoutValidationType::PollingLoop);
-        assert!(res_polling.is_err(), "Zero timeout in polling loop must fail");
+        assert!(
+            res_polling.is_err(),
+            "Zero timeout in polling loop must fail"
+        );
         let res_retry = verifier.validate_timeout(zero, TimeoutValidationType::RetryLadder);
         assert!(res_retry.is_err(), "Zero timeout in retry ladder must fail");
         let res_net = verifier.validate_timeout(zero, TimeoutValidationType::NetworkWait);
         assert!(res_net.is_err(), "Zero timeout in network wait must fail");
         let res_fn = verify_wait_timeout(0, 30_000);
-        assert!(res_fn.is_err(), "Zero timeout in verify_wait_timeout must fail");
+        assert!(
+            res_fn.is_err(),
+            "Zero timeout in verify_wait_timeout must fail"
+        );
     }
 
     #[test]
@@ -91,9 +94,15 @@ mod tests {
         let d50 = Duration::from_millis(50);
         let d5000 = Duration::from_millis(5_000);
         let d60k = Duration::from_millis(60_000);
-        assert!(verifier.validate_timeout(d50, TimeoutValidationType::PollingLoop).is_ok());
-        assert!(verifier.validate_timeout(d5000, TimeoutValidationType::RetryLadder).is_ok());
-        assert!(verifier.validate_timeout(d60k, TimeoutValidationType::NetworkWait).is_ok());
+        assert!(verifier
+            .validate_timeout(d50, TimeoutValidationType::PollingLoop)
+            .is_ok());
+        assert!(verifier
+            .validate_timeout(d5000, TimeoutValidationType::RetryLadder)
+            .is_ok());
+        assert!(verifier
+            .validate_timeout(d60k, TimeoutValidationType::NetworkWait)
+            .is_ok());
         assert!(verify_wait_timeout(50, 1000).is_ok());
         assert!(verify_wait_timeout(5000, 30000).is_ok());
     }
@@ -125,7 +134,10 @@ mod tests {
         let verifier = BoundedMatcherTimeoutVerifier::new();
         let patterns = [r"^[a-z]+$", r"(?s).*"];
         let timeouts = [
-            (Duration::from_millis(1000), TimeoutValidationType::PollingLoop),
+            (
+                Duration::from_millis(1000),
+                TimeoutValidationType::PollingLoop,
+            ),
             (Duration::ZERO, TimeoutValidationType::NetworkWait),
         ];
         let report = verifier.audit_all(&patterns, &timeouts);
@@ -140,7 +152,10 @@ mod tests {
     fn test_report_positive_booleans_state() {
         let verifier = BoundedMatcherTimeoutVerifier::new();
         let clean_patterns = [r"^[a-z0-9_]+$"];
-        let clean_timeouts = [(Duration::from_millis(500), TimeoutValidationType::PollingLoop)];
+        let clean_timeouts = [(
+            Duration::from_millis(500),
+            TimeoutValidationType::PollingLoop,
+        )];
         let report = verifier.audit_all(&clean_patterns, &clean_timeouts);
         assert!(report.is_compliant());
         assert!(report.has_valid_boundaries());
@@ -152,10 +167,8 @@ mod tests {
 
     #[test]
     fn test_verifier_with_bounds_and_app_error() {
-        let zero_res = BoundedMatcherTimeoutVerifier::with_bounds(
-            Duration::ZERO,
-            Duration::from_millis(1000),
-        );
+        let zero_res =
+            BoundedMatcherTimeoutVerifier::with_bounds(Duration::ZERO, Duration::from_millis(1000));
         assert!(zero_res.is_err());
         let inv_res = BoundedMatcherTimeoutVerifier::with_bounds(
             Duration::from_millis(500),
@@ -191,8 +204,14 @@ mod tests {
 
     #[test]
     fn test_display_and_helpers_coverage() {
-        assert_eq!(MatcherBoundaryType::SingleLineOnly.to_string(), "SingleLineOnly");
-        assert_eq!(TimeoutValidationType::PollingLoop.to_string(), "PollingLoop");
+        assert_eq!(
+            MatcherBoundaryType::SingleLineOnly.to_string(),
+            "SingleLineOnly"
+        );
+        assert_eq!(
+            TimeoutValidationType::PollingLoop.to_string(),
+            "PollingLoop"
+        );
         let breach = MatcherViolationType::BoundaryBreach {
             boundary_type: MatcherBoundaryType::WithinTagBound,
             detail: "tag crossed".to_string(),

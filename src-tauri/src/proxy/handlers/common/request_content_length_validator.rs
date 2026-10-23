@@ -37,7 +37,11 @@ pub fn validate_content_length(
 
     let s = match header_val.to_str() {
         Ok(s) => s.trim(),
-        Err(_) => return ContentLengthValidation::Malformed("Non-ASCII Content-Length header".to_string()),
+        Err(_) => {
+            return ContentLengthValidation::Malformed(
+                "Non-ASCII Content-Length header".to_string(),
+            )
+        }
     };
 
     match s.parse::<usize>() {

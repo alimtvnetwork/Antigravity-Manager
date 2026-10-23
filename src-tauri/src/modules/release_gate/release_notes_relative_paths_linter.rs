@@ -28,8 +28,7 @@ static UNC_NETWORK_RE: Lazy<Regex> = Lazy::new(|| {
 });
 
 static POSIX_HOME_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"(?:^|[^\w/])(/(?:home|Users)/[^\s\)\"'`<>]+)"#)
-        .expect("valid posix home regex")
+    Regex::new(r#"(?:^|[^\w/])(/(?:home|Users)/[^\s\)\"'`<>]+)"#).expect("valid posix home regex")
 });
 
 static POSIX_SYSTEM_RE: Lazy<Regex> = Lazy::new(|| {

@@ -3,9 +3,9 @@
 #[cfg(test)]
 mod tests {
     use crate::modules::instance::side_effect_order_enforcer::{
-        validate_side_effect_order, validate_side_effect_order_with_policy, SideEffectExecutionTracker,
-        SideEffectKind, SideEffectOrderPolicy, SideEffectOrderViolation, SideEffectPlan,
-        SideEffectStage, DEFAULT_MAX_STAGE_TIMEOUT_MS,
+        validate_side_effect_order, validate_side_effect_order_with_policy,
+        SideEffectExecutionTracker, SideEffectKind, SideEffectOrderPolicy,
+        SideEffectOrderViolation, SideEffectPlan, SideEffectStage, DEFAULT_MAX_STAGE_TIMEOUT_MS,
     };
 
     #[test]
@@ -197,11 +197,8 @@ mod tests {
 
     #[test]
     fn test_timeout_bounds_unbounded_zero_fails() {
-        let stage = SideEffectStage::process_termination(
-            "zero_timeout_kill",
-            "Kill with zero timeout",
-            0,
-        );
+        let stage =
+            SideEffectStage::process_termination("zero_timeout_kill", "Kill with zero timeout", 0);
 
         let plan = SideEffectPlan::new("zero_timeout_plan").with_stage(stage);
         let result = validate_side_effect_order(&plan);
@@ -311,20 +308,35 @@ mod tests {
         assert!(!SideEffectKind::CredentialPersist.is_irreversible());
         assert!(SideEffectKind::CredentialPersist.is_safe_precursor());
         assert!(SideEffectKind::CredentialPersist.is_credential_persist());
-        assert_eq!(SideEffectKind::CredentialPersist.as_str(), "credential_persist");
-        assert_eq!(format!("{}", SideEffectKind::CredentialPersist), "credential_persist");
+        assert_eq!(
+            SideEffectKind::CredentialPersist.as_str(),
+            "credential_persist"
+        );
+        assert_eq!(
+            format!("{}", SideEffectKind::CredentialPersist),
+            "credential_persist"
+        );
 
         assert!(SideEffectKind::ProcessTermination.is_irreversible());
         assert!(!SideEffectKind::ProcessTermination.is_safe_precursor());
         assert!(SideEffectKind::ProcessTermination.is_process_termination());
-        assert_eq!(SideEffectKind::ProcessTermination.as_str(), "process_termination");
-        assert_eq!(format!("{}", SideEffectKind::ProcessTermination), "process_termination");
+        assert_eq!(
+            SideEffectKind::ProcessTermination.as_str(),
+            "process_termination"
+        );
+        assert_eq!(
+            format!("{}", SideEffectKind::ProcessTermination),
+            "process_termination"
+        );
 
         assert!(SideEffectKind::StorageDeletion.is_irreversible());
         assert!(!SideEffectKind::StorageDeletion.is_safe_precursor());
         assert!(SideEffectKind::StorageDeletion.is_storage_deletion());
         assert_eq!(SideEffectKind::StorageDeletion.as_str(), "storage_deletion");
-        assert_eq!(format!("{}", SideEffectKind::StorageDeletion), "storage_deletion");
+        assert_eq!(
+            format!("{}", SideEffectKind::StorageDeletion),
+            "storage_deletion"
+        );
     }
 
     #[test]

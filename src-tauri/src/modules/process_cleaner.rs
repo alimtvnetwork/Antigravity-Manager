@@ -28,7 +28,11 @@ pub fn is_verified_antigravity_pid(pid: u32) -> bool {
         .map(|p| p.to_string_lossy().to_lowercase().replace('\\', "/"))
         .unwrap_or_default();
 
-    if name.contains("agm") || exe.contains("agm") || name.contains("webview") || exe.contains("webview") {
+    if name.contains("agm")
+        || exe.contains("agm")
+        || name.contains("webview")
+        || exe.contains("webview")
+    {
         return false;
     }
 

@@ -23,9 +23,15 @@ pub enum WalHeaderValidation {
         salt2: u32,
     },
     FileNotFound,
-    FileTooSmall { bytes: u64 },
-    InvalidMagicNumber { found: u32 },
-    InvalidPageSize { page_size: u32 },
+    FileTooSmall {
+        bytes: u64,
+    },
+    InvalidMagicNumber {
+        found: u32,
+    },
+    InvalidPageSize {
+        page_size: u32,
+    },
     IoError(String),
 }
 
@@ -60,19 +66,38 @@ pub fn inspect_wal_header(wal_path: &Path) -> WalHeaderValidation {
 
     let magic = u32::from_be_bytes([header_buf[0], header_buf[1], header_buf[2], header_buf[3]]);
     if magic != WAL_MAGIC_LE && magic != WAL_MAGIC_BE {
-        warn!(magic = format!("{:#x}", magic), "Invalid WAL file magic number");
+        warn!(
+            magic = format!("{:#x}", magic),
+            "Invalid WAL file magic number"
+        );
         return WalHeaderValidation::InvalidMagicNumber { found: magic };
     }
 
-    let page_size = u32::from_be_bytes([header_buf[8], header_buf[9], header_buf[10], header_buf[11]]);
+    let page_size =
+        u32::from_be_bytes([header_buf[8], header_buf[9], header_buf[10], header_buf[11]]);
     if page_size < 512 || page_size > 65536 || !page_size.is_power_of_two() {
         warn!(page_size = page_size, "Invalid WAL page size in header");
         return WalHeaderValidation::InvalidPageSize { page_size };
     }
 
-    let checkpoint_seq = u32::from_be_bytes([header_buf[12], header_buf[13], header_buf[14], header_buf[15]]);
-    let salt1 = u32::from_be_bytes([header_buf[16], header_buf[17], header_buf[18], header_buf[19]]);
-    let salt2 = u32::from_be_bytes([header_buf[20], header_buf[21], header_buf[22], header_buf[23]]);
+    let checkpoint_seq = u32::from_be_bytes([
+        header_buf[12],
+        header_buf[13],
+        header_buf[14],
+        header_buf[15],
+    ]);
+    let salt1 = u32::from_be_bytes([
+        header_buf[16],
+        header_buf[17],
+        header_buf[18],
+        header_buf[19],
+    ]);
+    let salt2 = u32::from_be_bytes([
+        header_buf[20],
+        header_buf[21],
+        header_buf[22],
+        header_buf[23],
+    ]);
 
     debug!(
         path = ?wal_path,

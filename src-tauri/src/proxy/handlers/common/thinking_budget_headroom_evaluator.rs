@@ -273,7 +273,14 @@ fn adjust_insufficient_headroom(
             is_valid: true,
         }
     } else {
-        clamp_or_reject_budget(status, requested_max, budget, needed_output, min_headroom, ceiling)
+        clamp_or_reject_budget(
+            status,
+            requested_max,
+            budget,
+            needed_output,
+            min_headroom,
+            ceiling,
+        )
     }
 }
 

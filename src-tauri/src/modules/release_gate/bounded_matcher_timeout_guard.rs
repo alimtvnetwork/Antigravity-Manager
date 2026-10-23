@@ -18,8 +18,7 @@ use std::time::Duration;
 
 /// Regex detecting HTML/XML tags (e.g. `<div>`, `</span>`, `<br/>`, `<input ...>`).
 static HTML_TAG_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"</?[a-zA-Z][a-zA-Z0-9:-]*(?:\s+[^>]*)?/?>")
-        .expect("valid html tag regex")
+    Regex::new(r"</?[a-zA-Z][a-zA-Z0-9:-]*(?:\s+[^>]*)?/?>").expect("valid html tag regex")
 });
 
 /// Boundary check rules governing how narrowly a matcher effect must be bounded.
@@ -113,10 +112,7 @@ pub enum BoundaryViolation {
         text_length: usize,
     },
     /// The slice at `[start..end]` in full text does not match `matched_text`.
-    SpanContentMismatch {
-        expected: String,
-        actual: String,
-    },
+    SpanContentMismatch { expected: String, actual: String },
     /// Match span spans line breaks (`\n` or `\r`), violating `SingleLineOnly`.
     SpansLineBreaksForbidden {
         line_breaks_count: usize,
@@ -179,9 +175,7 @@ impl fmt::Display for BoundaryViolation {
                 )
             }
             Self::CrossesHtmlTagsForbidden {
-                tags,
-                matched_text,
-                ..
+                tags, matched_text, ..
             } => {
                 write!(
                     f,
@@ -360,7 +354,11 @@ pub fn validate_match_boundary(
     } else {
         match boundary_rule {
             BoundaryCheckType::SingleLineOnly => {
-                let count = span.matched_text.chars().filter(|&c| c == '\n' || c == '\r').count();
+                let count = span
+                    .matched_text
+                    .chars()
+                    .filter(|&c| c == '\n' || c == '\r')
+                    .count();
                 Err(BoundaryViolation::SpansLineBreaksForbidden {
                     line_breaks_count: count,
                     matched_text: span.matched_text.clone(),
@@ -415,7 +413,8 @@ pub fn validate_replacement_boundaries(
     validate_match_boundary(replacement, &replacement_span, boundary_rule)?;
 
     // 3. Assemble safely
-    let mut out = String::with_capacity(full_text.len().saturating_sub(span.len()) + replacement.len());
+    let mut out =
+        String::with_capacity(full_text.len().saturating_sub(span.len()) + replacement.len());
     out.push_str(&full_text[..span.start]);
     out.push_str(replacement);
     out.push_str(&full_text[span.end..]);
@@ -615,7 +614,8 @@ pub fn inspect_wait_timeout(config: &TimeoutConfig) -> TimeoutReport {
         violations.push("Operation description cannot be empty".to_string());
     }
 
-    let is_bounded = !is_unbounded_infinite && !exceeds_max && !config.operation_description.trim().is_empty();
+    let is_bounded =
+        !is_unbounded_infinite && !exceeds_max && !config.operation_description.trim().is_empty();
 
     TimeoutReport {
         is_bounded,
@@ -759,7 +759,10 @@ pub fn lint_wait_calls_in_source(source_code: &str) -> Vec<String> {
         }
 
         // 3. Check for unbounded loop waits
-        if trimmed.starts_with("loop {") || trimmed.starts_with("while true {") || trimmed.starts_with("while (true) {") {
+        if trimmed.starts_with("loop {")
+            || trimmed.starts_with("while true {")
+            || trimmed.starts_with("while (true) {")
+        {
             let mut loop_body = Vec::new();
             let mut lookahead = idx;
             let mut brace_depth = 0;

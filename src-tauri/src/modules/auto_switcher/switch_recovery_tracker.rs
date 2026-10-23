@@ -15,7 +15,10 @@ pub const DEFAULT_RECOVERY_PROBING_COUNT: usize = 3;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SwitchRecoveryStatus {
     /// In progress; currently completed N out of target clean requests.
-    Verifying { successful_requests: usize, target: usize },
+    Verifying {
+        successful_requests: usize,
+        target: usize,
+    },
     /// Successfully completed all required clean verification requests.
     Stabilized,
     /// Encountered failure during verification; immediate rollback recommended.
@@ -51,7 +54,12 @@ impl SwitchRecoveryTracker {
     }
 
     /// Begins monitoring an instance post-switch.
-    pub fn start_tracking(&self, instance_id: String, account_id: String, target_count: Option<usize>) {
+    pub fn start_tracking(
+        &self,
+        instance_id: String,
+        account_id: String,
+        target_count: Option<usize>,
+    ) {
         let state = InstanceRecoveryState {
             account_id,
             successful_requests: 0,
@@ -68,7 +76,12 @@ impl SwitchRecoveryTracker {
     }
 
     /// Records the outcome of a request on the switched instance.
-    pub fn record_outcome(&self, instance_id: &str, is_success: bool, error_message: Option<&str>) -> SwitchRecoveryStatus {
+    pub fn record_outcome(
+        &self,
+        instance_id: &str,
+        is_success: bool,
+        error_message: Option<&str>,
+    ) -> SwitchRecoveryStatus {
         let mut map = match self.states.lock() {
             Ok(g) => g,
             Err(p) => p.into_inner(),

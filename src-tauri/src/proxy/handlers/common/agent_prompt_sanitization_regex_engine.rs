@@ -10,9 +10,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Compiled regex to extract and protect markdown code blocks (fenced and inline).
-pub static RE_CODE_BLOCK: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?ms)(```[\s\S]*?```|`[^`\r\n]+`)").expect("valid code block regex")
-});
+pub static RE_CODE_BLOCK: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?ms)(```[\s\S]*?```|`[^`\r\n]+`)").expect("valid code block regex"));
 
 /// Compiled regex for detecting prompt override markers and pseudo-system tags.
 pub static RE_OVERRIDE_MARKERS: Lazy<Regex> = Lazy::new(|| {
@@ -153,10 +152,7 @@ impl fmt::Display for PromptSanitizationReport {
         write!(
             f,
             "PromptSanitizationReport(inspections={}, sanitized={}, count={}, rules={:?})",
-            self.total_inspections,
-            self.is_sanitized,
-            self.replacements_count,
-            self.matched_rules
+            self.total_inspections, self.is_sanitized, self.replacements_count, self.matched_rules
         )
     }
 }
@@ -243,10 +239,7 @@ fn restore_code_blocks(text: &str, placeholders: &[String]) -> String {
 }
 
 /// Applies a single compiled sanitization rule to prompt text.
-fn apply_rule_to_text(
-    current_text: &str,
-    rule: &SanitizationRule,
-) -> (String, usize, bool) {
+fn apply_rule_to_text(current_text: &str, rule: &SanitizationRule) -> (String, usize, bool) {
     let re = match regex::Regex::new(&rule.pattern) {
         Ok(compiled) => compiled,
         Err(_) => return (current_text.to_string(), 0, false),
@@ -257,7 +250,9 @@ fn apply_rule_to_text(
         return (current_text.to_string(), 0, false);
     }
 
-    let replaced = re.replace_all(current_text, rule.replacement.as_str()).into_owned();
+    let replaced = re
+        .replace_all(current_text, rule.replacement.as_str())
+        .into_owned();
     (replaced, count, true)
 }
 
@@ -370,10 +365,7 @@ impl AgentPromptSanitizationRegexEngine {
 }
 
 /// Sanitizes incoming prompt text using the provided rules.
-pub fn sanitize_prompt_text(
-    input: &str,
-    rules: &[SanitizationRule],
-) -> PromptSanitizationReport {
+pub fn sanitize_prompt_text(input: &str, rules: &[SanitizationRule]) -> PromptSanitizationReport {
     let engine = AgentPromptSanitizationRegexEngine::with_rules(rules.to_vec());
     engine.sanitize(input)
 }

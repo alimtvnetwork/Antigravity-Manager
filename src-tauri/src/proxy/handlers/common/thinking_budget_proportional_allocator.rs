@@ -329,10 +329,7 @@ pub enum ProportionalAllocationAction {
         headroom: u32,
     },
     /// Client-requested thinking budget was within safe bounds and preserved.
-    RequestedBudgetPreserved {
-        thinking_budget: u32,
-        headroom: u32,
-    },
+    RequestedBudgetPreserved { thinking_budget: u32, headroom: u32 },
     /// Requested budget was below minimum thinking floor and clamped upwards.
     ClampedUpToFloor {
         requested: u32,
@@ -481,10 +478,7 @@ pub enum ProportionalBudgetError {
         required_minimum: u32,
     },
     /// Invalid thinking budget ratio (must be strictly between 0.0 and 1.0 exclusive).
-    InvalidRatio {
-        ratio: String,
-        reason: String,
-    },
+    InvalidRatio { ratio: String, reason: String },
 }
 
 impl fmt::Display for ProportionalBudgetError {
@@ -543,12 +537,10 @@ pub fn allocate_proportional_thinking_budget(
 
     let remaining_context = profile.context_window.saturating_sub(request.prompt_tokens);
     if remaining_context < profile.min_headroom_tokens {
-        return Err(
-            ProportionalBudgetError::InsufficientContextForGeneration {
-                remaining_tokens: remaining_context,
-                required_minimum: profile.min_headroom_tokens,
-            },
-        );
+        return Err(ProportionalBudgetError::InsufficientContextForGeneration {
+            remaining_tokens: remaining_context,
+            required_minimum: profile.min_headroom_tokens,
+        });
     }
 
     // 3. Resolve allocation ratio
@@ -571,14 +563,12 @@ pub fn allocate_proportional_thinking_budget(
     let (effective_max_output, context_clamped_action) = if raw_max_output > remaining_context {
         (
             remaining_context,
-            Some(
-                ProportionalAllocationAction::ClampedDueToContextOverflow {
-                    requested_max_output: raw_max_output,
-                    clamped_max_output: remaining_context,
-                    prompt_tokens: request.prompt_tokens,
-                    context_window: profile.context_window,
-                },
-            ),
+            Some(ProportionalAllocationAction::ClampedDueToContextOverflow {
+                requested_max_output: raw_max_output,
+                clamped_max_output: remaining_context,
+                prompt_tokens: request.prompt_tokens,
+                context_window: profile.context_window,
+            }),
         )
     } else {
         (raw_max_output, None)
@@ -595,8 +585,7 @@ pub fn allocate_proportional_thinking_budget(
                 effective_max_output.saturating_sub(profile.min_headroom_tokens);
 
             if request.enforce_proportional {
-                let proportional_target =
-                    ((effective_max_output as f64) * ratio).round() as u32;
+                let proportional_target = ((effective_max_output as f64) * ratio).round() as u32;
                 let upper_limit = proportional_target.min(max_allowable_budget);
                 let lower_limit = profile.min_thinking_floor.min(upper_limit);
 
@@ -638,8 +627,7 @@ pub fn allocate_proportional_thinking_budget(
                     },
                 )
             } else if requested < profile.min_thinking_floor
-                && effective_max_output
-                    >= profile.min_thinking_floor + profile.min_headroom_tokens
+                && effective_max_output >= profile.min_thinking_floor + profile.min_headroom_tokens
             {
                 (
                     Some(profile.min_thinking_floor),
@@ -663,8 +651,7 @@ pub fn allocate_proportional_thinking_budget(
 
         // Thinking budget omitted: calculate proportional budget
         None => {
-            if effective_max_output
-                <= profile.min_headroom_tokens + profile.min_thinking_floor / 2
+            if effective_max_output <= profile.min_headroom_tokens + profile.min_thinking_floor / 2
             {
                 (None, ProportionalAllocationAction::ThinkingDisabled)
             } else {
@@ -690,8 +677,7 @@ pub fn allocate_proportional_thinking_budget(
 
     // If context clamping happened and thinking action was NoAdjustmentNeeded, prioritize context action
     let final_action = context_clamped_action.unwrap_or(action);
-    let final_headroom =
-        effective_max_output.saturating_sub(effective_thinking.unwrap_or(0));
+    let final_headroom = effective_max_output.saturating_sub(effective_thinking.unwrap_or(0));
 
     Ok(ProportionalAllocationOutcome {
         effective_max_output_tokens: effective_max_output,
@@ -713,7 +699,9 @@ pub fn evaluate_proportional_budget_default(
     requested_thinking_budget: Option<u32>,
 ) -> Result<ProportionalAllocationOutcome, ProportionalBudgetError> {
     let req = ProportionalBudgetRequest::new(model_name, prompt_tokens)
-        .with_max_output_tokens(requested_max_output.unwrap_or(DEFAULT_PROPORTIONAL_THINKING_RATIO as u32))
+        .with_max_output_tokens(
+            requested_max_output.unwrap_or(DEFAULT_PROPORTIONAL_THINKING_RATIO as u32),
+        )
         .with_enforce_proportional(true);
 
     let req = match requested_max_output {

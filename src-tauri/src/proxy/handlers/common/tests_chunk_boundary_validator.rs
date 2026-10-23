@@ -6,7 +6,10 @@ mod tests {
 
     #[test]
     fn test_chunk_boundary_empty() {
-        assert_eq!(validate_chunk_boundary(&[]), BoundaryValidationResult::Empty);
+        assert_eq!(
+            validate_chunk_boundary(&[]),
+            BoundaryValidationResult::Empty
+        );
     }
 
     #[test]

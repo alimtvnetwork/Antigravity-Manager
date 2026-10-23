@@ -91,7 +91,10 @@ impl StagingDecidingFactor {
                 "Release machinery or CI/CD workflow modified".to_string()
             }
             Self::MultiModuleChangeset { modules_count } => {
-                format!("Multi-module changeset spanning {} files/modules", modules_count)
+                format!(
+                    "Multi-module changeset spanning {} files/modules",
+                    modules_count
+                )
             }
             Self::NonTrivialCodebaseRefactor { lines_changed } => {
                 format!("Non-trivial refactor with {} lines changed", lines_changed)
@@ -260,11 +263,19 @@ fn build_required_report(summary: &ChangeSetSummary, lines_changed: usize) -> St
         factors.push(StagingDecidingFactor::SchemaMigrationDetected);
     }
     if summary.has_public_surface_change {
-        let surface = summary.surface_type.clone().unwrap_or_else(|| "Public API/IPC".to_string());
-        factors.push(StagingDecidingFactor::PublicSurfaceModified { surface_type: surface });
+        let surface = summary
+            .surface_type
+            .clone()
+            .unwrap_or_else(|| "Public API/IPC".to_string());
+        factors.push(StagingDecidingFactor::PublicSurfaceModified {
+            surface_type: surface,
+        });
     }
     if summary.has_feature_flag {
-        let flag = summary.flag_name.clone().unwrap_or_else(|| "feature_flag".to_string());
+        let flag = summary
+            .flag_name
+            .clone()
+            .unwrap_or_else(|| "feature_flag".to_string());
         factors.push(StagingDecidingFactor::FeatureFlagIntroduced { flag_name: flag });
     }
     if summary.has_release_machinery_change {
@@ -315,6 +326,7 @@ fn build_unnecessary_report() -> StagingReport {
         is_beta_staging_required: false,
         is_beta_staging_recommended: false,
         deciding_factors: Vec::new(),
-        guidance: "Low-risk localized changeset. Direct merge without beta staging is permitted.".to_string(),
+        guidance: "Low-risk localized changeset. Direct merge without beta staging is permitted."
+            .to_string(),
     }
 }

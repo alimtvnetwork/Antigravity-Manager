@@ -9,15 +9,19 @@ fn test_clean_converged_history_passes() {
     let commits = vec![
         CommitEntry {
             hash: "a1b2c3d".to_string(),
-            message: "feat(auth): implement OAuth2 token refresh with exponential backoff ladder".to_string(),
+            message: "feat(auth): implement OAuth2 token refresh with exponential backoff ladder"
+                .to_string(),
             author: "aukgit".to_string(),
             files_changed: vec!["src-tauri/src/modules/auth.rs".to_string()],
         },
         CommitEntry {
             hash: "e4f5g6h".to_string(),
-            message: "refactor(release_gate): extract risky path replacement fallback guard".to_string(),
+            message: "refactor(release_gate): extract risky path replacement fallback guard"
+                .to_string(),
             author: "aukgit".to_string(),
-            files_changed: vec!["src-tauri/src/modules/release_gate/risky_path_fallback_guard.rs".to_string()],
+            files_changed: vec![
+                "src-tauri/src/modules/release_gate/risky_path_fallback_guard.rs".to_string(),
+            ],
         },
     ];
 
@@ -31,19 +35,20 @@ fn test_clean_converged_history_passes() {
 
 #[test]
 fn test_wip_commit_detected() {
-    let commits = vec![
-        CommitEntry {
-            hash: "1111111".to_string(),
-            message: "wip: initial draft for switcher".to_string(),
-            author: "dev".to_string(),
-            files_changed: vec!["src/switcher.rs".to_string()],
-        },
-    ];
+    let commits = vec![CommitEntry {
+        hash: "1111111".to_string(),
+        message: "wip: initial draft for switcher".to_string(),
+        author: "dev".to_string(),
+        files_changed: vec!["src/switcher.rs".to_string()],
+    }];
 
     let report = audit_commit_history(&commits);
     assert!(!report.is_converged);
     assert_eq!(report.noise_commit_count, 1);
-    assert_eq!(report.flagged_commits[0].2, NoiseClassification::WipCheckpoint);
+    assert_eq!(
+        report.flagged_commits[0].2,
+        NoiseClassification::WipCheckpoint
+    );
 }
 
 #[test]
@@ -222,9 +227,18 @@ fn test_scattered_iterative_fixes_detected() {
     let report = audit_commit_history(&commits);
     assert!(!report.is_converged);
     assert_eq!(report.noise_commit_count, 3);
-    assert_eq!(report.flagged_commits[0].2, NoiseClassification::ScatteredFixes(3));
-    assert_eq!(report.flagged_commits[1].2, NoiseClassification::ScatteredFixes(3));
-    assert_eq!(report.flagged_commits[2].2, NoiseClassification::ScatteredFixes(3));
+    assert_eq!(
+        report.flagged_commits[0].2,
+        NoiseClassification::ScatteredFixes(3)
+    );
+    assert_eq!(
+        report.flagged_commits[1].2,
+        NoiseClassification::ScatteredFixes(3)
+    );
+    assert_eq!(
+        report.flagged_commits[2].2,
+        NoiseClassification::ScatteredFixes(3)
+    );
 }
 
 #[test]
@@ -237,14 +251,12 @@ fn test_empty_commit_history_is_converged() {
 
 #[test]
 fn test_serde_serialization_roundtrip() {
-    let report = audit_commit_history(&[
-        CommitEntry {
-            hash: "test_hash".to_string(),
-            message: "wip test".to_string(),
-            author: "dev".to_string(),
-            files_changed: vec!["file.rs".to_string()],
-        }
-    ]);
+    let report = audit_commit_history(&[CommitEntry {
+        hash: "test_hash".to_string(),
+        message: "wip test".to_string(),
+        author: "dev".to_string(),
+        files_changed: vec!["file.rs".to_string()],
+    }]);
 
     let json = serde_json::to_string(&report).unwrap();
     let deserialized: super::super::commit_convergence_auditor::CommitConvergenceReport =

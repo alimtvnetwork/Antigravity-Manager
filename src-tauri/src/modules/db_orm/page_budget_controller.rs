@@ -13,10 +13,7 @@ pub const MIN_CACHE_SIZE_KIB: i32 = 2000;
 pub const MAX_CACHE_SIZE_KIB: i32 = 64000;
 
 /// Calculates PRAGMA cache_size argument in KiB (negative integer format per SQLite convention).
-pub fn calculate_cache_size_budget(
-    available_ram_mb: usize,
-    active_db_count: usize,
-) -> i32 {
+pub fn calculate_cache_size_budget(available_ram_mb: usize, active_db_count: usize) -> i32 {
     let db_count = active_db_count.max(1);
 
     // Dedicate roughly 2% of available RAM divided equally across active databases

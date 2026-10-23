@@ -69,7 +69,9 @@ pub fn verify_split_db_integrity(conn: &Connection, db_name: &str) -> Result<boo
             &format!("SQLite database {db_name} integrity check failed: {result}"),
             "db_orm::connection",
             "verify_split_db_integrity",
-            Some(&format!(r#"{{"database":"{db_name}","result":"{result}"}}"#)),
+            Some(&format!(
+                r#"{{"database":"{db_name}","result":"{result}"}}"#
+            )),
         );
         Ok(false)
     }

@@ -12,7 +12,9 @@ pub const DEFAULT_PREAMBLE_PADDING_BYTES: usize = 2048;
 
 /// Generates an RFC-compliant SSE comment preamble frame exceeding the target size.
 pub fn generate_sse_preamble_padding(target_bytes: Option<usize>) -> Bytes {
-    let size = target_bytes.unwrap_or(DEFAULT_PREAMBLE_PADDING_BYTES).max(64);
+    let size = target_bytes
+        .unwrap_or(DEFAULT_PREAMBLE_PADDING_BYTES)
+        .max(64);
 
     let mut buf = String::with_capacity(size + 16);
     buf.push_str(": open-stream-preamble-padding ");

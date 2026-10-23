@@ -340,10 +340,7 @@ pub enum SideEffectOrderViolation {
     },
 
     /// Replacement stage lacks an explicit fallback to the verified path.
-    MissingVerifiedPathFallback {
-        stage_id: String,
-        operation: String,
-    },
+    MissingVerifiedPathFallback { stage_id: String, operation: String },
 }
 
 impl fmt::Display for SideEffectOrderViolation {
@@ -460,11 +457,9 @@ pub fn validate_side_effect_order_with_policy(
     if policy.enforce_credential_before_kill {
         for (kill_idx, kill_stage) in plan.stages.iter().enumerate() {
             if kill_stage.kind == SideEffectKind::ProcessTermination {
-                let late_credential = plan
-                    .stages
-                    .iter()
-                    .enumerate()
-                    .find(|(idx, s)| *idx > kill_idx && s.kind == SideEffectKind::CredentialPersist);
+                let late_credential = plan.stages.iter().enumerate().find(|(idx, s)| {
+                    *idx > kill_idx && s.kind == SideEffectKind::CredentialPersist
+                });
 
                 if let Some((cred_idx, cred_stage)) = late_credential {
                     return Err(SideEffectOrderViolation::InvertedCredentialKillOrder {

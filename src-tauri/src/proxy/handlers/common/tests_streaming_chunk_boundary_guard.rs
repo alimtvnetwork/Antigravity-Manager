@@ -22,7 +22,10 @@ fn test_validate_oversized_chunk_rejection() {
     let result = validate_streaming_chunk(&oversized, &config);
     assert!(result.is_err());
     match result.unwrap_err() {
-        ChunkBoundaryViolation::OversizedChunk { chunk_len, max_allowed } => {
+        ChunkBoundaryViolation::OversizedChunk {
+            chunk_len,
+            max_allowed,
+        } => {
             assert_eq!(chunk_len, 150);
             assert_eq!(max_allowed, 100);
         }
@@ -61,7 +64,11 @@ fn test_audit_streaming_stream_tail_closure() {
 
 #[test]
 fn test_contains_sse_frame_delimiter() {
-    assert!(contains_sse_frame_delimiter(b"event: message\ndata: 123\n\n"));
-    assert!(contains_sse_frame_delimiter(b"event: message\r\ndata: 123\r\n\r\n"));
+    assert!(contains_sse_frame_delimiter(
+        b"event: message\ndata: 123\n\n"
+    ));
+    assert!(contains_sse_frame_delimiter(
+        b"event: message\r\ndata: 123\r\n\r\n"
+    ));
     assert!(!contains_sse_frame_delimiter(b"data: incomplete chunk"));
 }

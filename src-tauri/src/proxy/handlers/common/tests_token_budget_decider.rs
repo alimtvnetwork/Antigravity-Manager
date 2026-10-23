@@ -6,8 +6,7 @@ mod tests {
 
     #[test]
     fn test_thinking_not_supported_clean_passthrough() {
-        let req = TokenBudgetRequest::new("gpt-4o", 2_000, 128_000)
-            .with_max_output_tokens(4_096);
+        let req = TokenBudgetRequest::new("gpt-4o", 2_000, 128_000).with_max_output_tokens(4_096);
         let cap = ModelThinkingCapability::ThinkingNotSupported;
 
         let res = decide_token_budget(&req, &cap).expect("Should allocate budget");
@@ -73,14 +72,14 @@ mod tests {
             default_budget: 8_192,
         };
 
-        let req_low = TokenBudgetRequest::new("gemini-thinking", 1_000, 100_000)
-            .with_thinking_budget(512);
+        let req_low =
+            TokenBudgetRequest::new("gemini-thinking", 1_000, 100_000).with_thinking_budget(512);
         let res_low = decide_token_budget(&req_low, &cap).expect("Should clamp low");
         assert_eq!(res_low.effective_thinking_budget, Some(1_024));
         assert!(!res_low.was_thinking_backfilled);
 
-        let req_high = TokenBudgetRequest::new("gemini-thinking", 1_000, 100_000)
-            .with_thinking_budget(65_536);
+        let req_high =
+            TokenBudgetRequest::new("gemini-thinking", 1_000, 100_000).with_thinking_budget(65_536);
         let res_high = decide_token_budget(&req_high, &cap).expect("Should clamp high");
         assert_eq!(res_high.effective_thinking_budget, Some(32_768));
         assert!(!res_high.was_thinking_backfilled);
@@ -105,8 +104,7 @@ mod tests {
 
     #[test]
     fn test_clamps_output_tokens_to_tight_context_window() {
-        let req = TokenBudgetRequest::new("gpt-4o", 7_000, 10_000)
-            .with_max_output_tokens(5_000);
+        let req = TokenBudgetRequest::new("gpt-4o", 7_000, 10_000).with_max_output_tokens(5_000);
         let cap = ModelThinkingCapability::ThinkingNotSupported;
 
         let res = decide_token_budget(&req, &cap).expect("Should clamp to headroom");
@@ -146,8 +144,7 @@ mod tests {
 
     #[test]
     fn test_rejects_explicit_zero_output_tokens() {
-        let req = TokenBudgetRequest::new("gpt-4o", 1_000, 128_000)
-            .with_max_output_tokens(0);
+        let req = TokenBudgetRequest::new("gpt-4o", 1_000, 128_000).with_max_output_tokens(0);
         let cap = ModelThinkingCapability::ThinkingNotSupported;
 
         let err = decide_token_budget(&req, &cap).unwrap_err();
@@ -196,15 +193,15 @@ mod tests {
     fn test_optional_thinking_behavior() {
         let cap = ModelThinkingCapability::OptionalThinking;
 
-        let req1 = TokenBudgetRequest::new("gemini-2.5-flash", 2_000, 100_000)
-            .with_thinking_budget(4_096);
+        let req1 =
+            TokenBudgetRequest::new("gemini-2.5-flash", 2_000, 100_000).with_thinking_budget(4_096);
         let res1 = decide_token_budget(&req1, &cap).expect("Should allocate");
         assert_eq!(res1.effective_thinking_budget, Some(4_096));
         assert!(!res1.was_thinking_backfilled);
         assert!(!res1.was_thinking_filtered);
 
-        let req2 = TokenBudgetRequest::new("gemini-2.5-flash", 2_000, 100_000)
-            .with_thinking_budget(0);
+        let req2 =
+            TokenBudgetRequest::new("gemini-2.5-flash", 2_000, 100_000).with_thinking_budget(0);
         let res2 = decide_token_budget(&req2, &cap).expect("Should allocate");
         assert_eq!(res2.effective_thinking_budget, None);
         assert!(res2.was_thinking_filtered);
@@ -218,8 +215,7 @@ mod tests {
 
     #[test]
     fn test_exact_headroom_arithmetic_invariant() {
-        let req = TokenBudgetRequest::new("model", 12_500, 64_000)
-            .with_max_output_tokens(10_000);
+        let req = TokenBudgetRequest::new("model", 12_500, 64_000).with_max_output_tokens(10_000);
         let cap = ModelThinkingCapability::ThinkingNotSupported;
 
         let res = decide_token_budget(&req, &cap).expect("Should allocate");

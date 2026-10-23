@@ -59,7 +59,8 @@ impl RouteLatencyCalculator {
 
         entry.total_samples += 1;
         // EMA: S_t = alpha * Y_t + (1 - alpha) * S_{t-1}
-        entry.ema_latency_ms = (self.config.alpha * sample_ms) + ((1.0 - self.config.alpha) * entry.ema_latency_ms);
+        entry.ema_latency_ms =
+            (self.config.alpha * sample_ms) + ((1.0 - self.config.alpha) * entry.ema_latency_ms);
     }
 
     /// Computes a normalized weight factor (0.1 to 2.0) for routing decisions.

@@ -20,7 +20,11 @@ pub struct ModelTimeoutConfig {
 pub fn get_timeout_for_model(model_id: &str) -> ModelTimeoutConfig {
     let lower = model_id.trim().to_lowercase();
 
-    let ttft_secs = if lower.contains("thinking") || lower.contains("claude-3-7") || lower.contains("o1") || lower.contains("o3") {
+    let ttft_secs = if lower.contains("thinking")
+        || lower.contains("claude-3-7")
+        || lower.contains("o1")
+        || lower.contains("o3")
+    {
         DEFAULT_THINKING_TTFT_SECS
     } else if lower.contains("pro") || lower.contains("opus") {
         DEFAULT_PRO_TTFT_SECS

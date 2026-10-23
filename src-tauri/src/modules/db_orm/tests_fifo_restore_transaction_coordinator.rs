@@ -1,10 +1,9 @@
 //! Comprehensive unit tests for `FifoRestoreTransactionCoordinator` (`Task-208`).
 
 use super::fifo_restore_transaction_coordinator::{
-    build_coordinated_restore_sql, coordinate_restore_transaction,
-    validate_coordinated_query_sql, validate_restore_stream_monotonicity,
-    CoordinatedRestoreReport, RestoreItemRecord, RestoreTableKind,
-    TransactionCoordinatorViolation, CANONICAL_FIFO_ORDER,
+    build_coordinated_restore_sql, coordinate_restore_transaction, validate_coordinated_query_sql,
+    validate_restore_stream_monotonicity, CoordinatedRestoreReport, RestoreItemRecord,
+    RestoreTableKind, TransactionCoordinatorViolation, CANONICAL_FIFO_ORDER,
 };
 
 #[test]
@@ -34,10 +33,7 @@ fn test_table_name_mappings_for_all_variants() {
         format!("{}", RestoreTableKind::PromptBackups),
         "prompt_backups"
     );
-    assert_eq!(
-        format!("{}", RestoreTableKind::RepoPrompts),
-        "repo_prompts"
-    );
+    assert_eq!(format!("{}", RestoreTableKind::RepoPrompts), "repo_prompts");
 
     let all = RestoreTableKind::all();
     assert_eq!(all.len(), 3);
@@ -151,10 +147,12 @@ fn test_inverted_timestamp_triggers_rollback_with_violation() {
     assert_eq!(report.total_restored(), 0);
     assert_eq!(
         report.violation(),
-        Some(&TransactionCoordinatorViolation::InvertedTimestampDetected {
-            previous_created_at: 1000,
-            current_created_at: 999,
-        })
+        Some(
+            &TransactionCoordinatorViolation::InvertedTimestampDetected {
+                previous_created_at: 1000,
+                current_created_at: 999,
+            }
+        )
     );
 }
 
@@ -174,17 +172,22 @@ fn test_out_of_order_sequence_tiebreaker_triggers_rollback() {
         }
     );
 
-    let streams = vec![(RestoreTableKind::PromptBackups, tiebreaker_violation_records)];
+    let streams = vec![(
+        RestoreTableKind::PromptBackups,
+        tiebreaker_violation_records,
+    )];
     let report = coordinate_restore_transaction(&streams);
 
     assert!(!report.is_committed());
     assert_eq!(report.total_restored(), 0);
     assert_eq!(
         report.violation(),
-        Some(&TransactionCoordinatorViolation::OutOrOrderSequenceDetected {
-            previous_id: 5,
-            current_id: 4,
-        })
+        Some(
+            &TransactionCoordinatorViolation::OutOrOrderSequenceDetected {
+                previous_id: 5,
+                current_id: 4,
+            }
+        )
     );
 }
 
@@ -264,7 +267,10 @@ fn test_multi_table_transaction_rolls_back_on_later_stream() {
     assert_eq!(report.total_restored(), 0);
     assert_eq!(
         report.processed_tables,
-        vec![RestoreTableKind::ActivePrompts, RestoreTableKind::RepoPrompts]
+        vec![
+            RestoreTableKind::ActivePrompts,
+            RestoreTableKind::RepoPrompts
+        ]
     );
     assert!(matches!(
         report.violation(),

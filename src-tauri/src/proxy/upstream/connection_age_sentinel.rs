@@ -115,7 +115,10 @@ impl ConnectionAgeSentinel {
         });
 
         if !to_retire.is_empty() {
-            debug!(count = to_retire.len(), "Swept expired upstream connections");
+            debug!(
+                count = to_retire.len(),
+                "Swept expired upstream connections"
+            );
         }
 
         to_retire

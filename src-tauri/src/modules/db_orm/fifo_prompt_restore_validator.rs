@@ -115,7 +115,8 @@ pub fn extract_table_name(sql: &str) -> Option<String> {
     let words: Vec<&str> = sql.split_whitespace().collect();
     for (i, word) in words.iter().enumerate() {
         if word.eq_ignore_ascii_case("FROM") && i + 1 < words.len() {
-            let table = words[i + 1].trim_matches(|c: char| !c.is_alphanumeric() && c != '_' && c != '.');
+            let table =
+                words[i + 1].trim_matches(|c: char| !c.is_alphanumeric() && c != '_' && c != '.');
             let table_clean = table.trim_end_matches(".db");
             if !table_clean.is_empty() {
                 return Some(table_clean.to_string());
@@ -131,9 +132,14 @@ fn find_order_by_boundary(upper: &str) -> Option<usize> {
     let mut search_from = 0;
     while let Some(pos) = upper[search_from..].find("ORDER") {
         let abs_order = search_from + pos;
-        let before_ok = abs_order == 0 || upper.as_bytes().get(abs_order - 1).map_or(true, |b| b.is_ascii_whitespace());
+        let before_ok = abs_order == 0
+            || upper
+                .as_bytes()
+                .get(abs_order - 1)
+                .map_or(true, |b| b.is_ascii_whitespace());
         let after_order = abs_order + 5;
-        let after_ok = after_order < upper.len() && upper.as_bytes()[after_order].is_ascii_whitespace();
+        let after_ok =
+            after_order < upper.len() && upper.as_bytes()[after_order].is_ascii_whitespace();
 
         if before_ok && after_ok {
             let rest = &upper[after_order..];
@@ -141,7 +147,8 @@ fn find_order_by_boundary(upper: &str) -> Option<usize> {
             let whitespace_len = rest.len() - trimmed.len();
             if trimmed.starts_with("BY") {
                 let after_by = 2;
-                let by_end_ok = after_by >= trimmed.len() || trimmed.as_bytes()[after_by].is_ascii_whitespace();
+                let by_end_ok =
+                    after_by >= trimmed.len() || trimmed.as_bytes()[after_by].is_ascii_whitespace();
                 if by_end_ok {
                     return Some(after_order + whitespace_len + 2);
                 }
@@ -165,9 +172,17 @@ fn find_clause_end_pos(upper_rem: &str) -> usize {
                 }
                 break;
             }
-            let before_ok = abs_pos == 0 || upper_rem.as_bytes().get(abs_pos - 1).map_or(false, |b| b.is_ascii_whitespace());
+            let before_ok = abs_pos == 0
+                || upper_rem
+                    .as_bytes()
+                    .get(abs_pos - 1)
+                    .map_or(false, |b| b.is_ascii_whitespace());
             let after_marker = abs_pos + marker.len();
-            let after_ok = after_marker >= upper_rem.len() || upper_rem.as_bytes().get(after_marker).map_or(false, |b| b.is_ascii_whitespace());
+            let after_ok = after_marker >= upper_rem.len()
+                || upper_rem
+                    .as_bytes()
+                    .get(after_marker)
+                    .map_or(false, |b| b.is_ascii_whitespace());
             if before_ok && after_ok {
                 if abs_pos < end_idx {
                     end_idx = abs_pos;
@@ -221,7 +236,8 @@ fn has_id_asc_tiebreaker(clause: &str) -> bool {
         let upper = part.to_uppercase();
         let tokens: Vec<&str> = upper.split_whitespace().collect();
         if tokens.len() == 2 && tokens[1] == "ASC" {
-            let col = tokens[0].trim_matches(|c: char| c == '`' || c == '"' || c == '[' || c == ']');
+            let col =
+                tokens[0].trim_matches(|c: char| c == '`' || c == '"' || c == '[' || c == ']');
             let bare_col = col.rsplit('.').next().unwrap_or(col);
             bare_col == "ID"
         } else {
@@ -419,9 +435,8 @@ fn extract_and_normalize_order_by(sql: &str) -> Option<String> {
 
 /// Detects forbidden LIFO sorting patterns (`DESC` on `created_at`, `updated_at`, or `rowid`).
 fn detect_forbidden_lifo(sql: &str) -> Option<String> {
-    let lifo_re = Regex::new(
-        r"(?i)\b(?:[a-zA-Z0-9_]+\.)?(?:created_at|updated_at|rowid)\s+desc\b",
-    ).ok()?;
+    let lifo_re =
+        Regex::new(r"(?i)\b(?:[a-zA-Z0-9_]+\.)?(?:created_at|updated_at|rowid)\s+desc\b").ok()?;
 
     if let Some(mat) = lifo_re.find(sql) {
         if let Some((start, end)) = find_order_by_span(sql) {
@@ -437,23 +452,26 @@ fn detect_forbidden_lifo(sql: &str) -> Option<String> {
 
 /// Verifies whether the `ORDER BY` clause designates `created_at ASC` as its primary sort expression.
 fn has_created_at_asc(order_clause: &str) -> bool {
-    let Ok(re) = Regex::new(
-        r"(?i)^order\s+by\s+(?:[a-zA-Z0-9_]+\.)?created_at\s+asc(?:\s*,|\s*$)",
-    ) else {
+    let Ok(re) = Regex::new(r"(?i)^order\s+by\s+(?:[a-zA-Z0-9_]+\.)?created_at\s+asc(?:\s*,|\s*$)")
+    else {
         return false;
     };
-    let single_line = order_clause.split_whitespace().collect::<Vec<_>>().join(" ");
+    let single_line = order_clause
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
     re.is_match(&single_line)
 }
 
 /// Verifies whether the `ORDER BY` clause contains the mandatory `id ASC` secondary tie-breaker.
 fn has_legacy_id_asc_tiebreaker(order_clause: &str) -> bool {
-    let Ok(re) = Regex::new(
-        r"(?i),\s*(?:[a-zA-Z0-9_]+\.)?id\s+asc(?:\s*,|\s*$)",
-    ) else {
+    let Ok(re) = Regex::new(r"(?i),\s*(?:[a-zA-Z0-9_]+\.)?id\s+asc(?:\s*,|\s*$)") else {
         return false;
     };
-    let single_line = order_clause.split_whitespace().collect::<Vec<_>>().join(" ");
+    let single_line = order_clause
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
     re.is_match(&single_line)
 }
 

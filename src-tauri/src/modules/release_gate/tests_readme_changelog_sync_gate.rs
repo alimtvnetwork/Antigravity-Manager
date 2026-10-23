@@ -230,7 +230,10 @@ mod tests {
         assert!(contains_version(sample, "v4.251.0"));
         assert!(contains_version(sample, "4.251.0"));
 
-        assert_eq!(extract_version("release-v4.251.0-final"), Some("v4.251.0".to_string()));
+        assert_eq!(
+            extract_version("release-v4.251.0-final"),
+            Some("v4.251.0".to_string())
+        );
     }
 
     #[test]

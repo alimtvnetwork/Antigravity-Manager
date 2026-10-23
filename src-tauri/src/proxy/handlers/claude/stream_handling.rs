@@ -151,14 +151,14 @@ pub(crate) async fn handle_stream_success(
 
     // We have data! Construct the combined stream
     let stream_rest = claude_stream;
-    let combined_stream = futures::stream::once(async move { Ok(bytes) }).chain(
-        stream_rest.map(|result| -> Result<Bytes, std::io::Error> {
+    let combined_stream = futures::stream::once(async move { Ok(bytes) }).chain(stream_rest.map(
+        |result| -> Result<Bytes, std::io::Error> {
             match result {
                 Ok(b) => Ok(b),
                 Err(e) => Ok(Bytes::from(format!("data: {{\"error\":\"{}\"}}\n\n", e))),
             }
-        }),
-    );
+        },
+    ));
 
     // [FIX #Bug1] 针对 Claude 流增加空闲超时保护，从 300s 降至 120s
     // 300s 会导致客户端等待长达 5 分钟；120s 仍有足够容错余量
@@ -227,14 +227,12 @@ pub(crate) async fn handle_stream_success(
                     .unwrap(),
             )
         }
-        Err(e) => {
-            StreamOutcome::Respond(
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Stream collection error: {}", e),
-                )
-                    .into_response(),
+        Err(e) => StreamOutcome::Respond(
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Stream collection error: {}", e),
             )
-        }
+                .into_response(),
+        ),
     }
 }

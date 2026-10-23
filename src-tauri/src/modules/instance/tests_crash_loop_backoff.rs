@@ -14,7 +14,10 @@ mod tests {
 
     #[test]
     fn test_short_lifespan_increments_crash_count() {
-        let mut guard = CrashLoopBackoffGuard::new(Some(Duration::from_secs(10)), Some(Duration::from_secs(30)));
+        let mut guard = CrashLoopBackoffGuard::new(
+            Some(Duration::from_secs(10)),
+            Some(Duration::from_secs(30)),
+        );
         guard.record_launch("inst-crash-1");
         // Immediate termination (<10s) increments crash count
         let count = guard.record_termination("inst-crash-1");
@@ -27,28 +30,46 @@ mod tests {
 
     #[test]
     fn test_escalating_backoff_progression() {
-        let mut guard = CrashLoopBackoffGuard::new(Some(Duration::from_secs(10)), Some(Duration::from_secs(30)));
+        let mut guard = CrashLoopBackoffGuard::new(
+            Some(Duration::from_secs(10)),
+            Some(Duration::from_secs(30)),
+        );
 
         guard.record_launch("inst-crash-loop");
         guard.record_termination("inst-crash-loop"); // count 1 -> 2s
-        assert_eq!(guard.required_backoff_delay("inst-crash-loop"), Duration::from_secs(2));
+        assert_eq!(
+            guard.required_backoff_delay("inst-crash-loop"),
+            Duration::from_secs(2)
+        );
 
         guard.record_launch("inst-crash-loop");
         guard.record_termination("inst-crash-loop"); // count 2 -> 4s
-        assert_eq!(guard.required_backoff_delay("inst-crash-loop"), Duration::from_secs(4));
+        assert_eq!(
+            guard.required_backoff_delay("inst-crash-loop"),
+            Duration::from_secs(4)
+        );
 
         guard.record_launch("inst-crash-loop");
         guard.record_termination("inst-crash-loop"); // count 3 -> 8s
-        assert_eq!(guard.required_backoff_delay("inst-crash-loop"), Duration::from_secs(8));
+        assert_eq!(
+            guard.required_backoff_delay("inst-crash-loop"),
+            Duration::from_secs(8)
+        );
 
         guard.record_launch("inst-crash-loop");
         guard.record_termination("inst-crash-loop"); // count 4 -> 16s
-        assert_eq!(guard.required_backoff_delay("inst-crash-loop"), Duration::from_secs(16));
+        assert_eq!(
+            guard.required_backoff_delay("inst-crash-loop"),
+            Duration::from_secs(16)
+        );
     }
 
     #[test]
     fn test_backoff_clamps_to_max() {
-        let mut guard = CrashLoopBackoffGuard::new(Some(Duration::from_secs(10)), Some(Duration::from_secs(30)));
+        let mut guard = CrashLoopBackoffGuard::new(
+            Some(Duration::from_secs(10)),
+            Some(Duration::from_secs(30)),
+        );
 
         for _ in 0..6 {
             guard.record_launch("inst-excessive");
@@ -63,11 +84,17 @@ mod tests {
     #[test]
     fn test_healthy_run_resets_counter() {
         // Use very short threshold so we can test healthy run without waiting long
-        let mut guard = CrashLoopBackoffGuard::new(Some(Duration::from_millis(5)), Some(Duration::from_secs(30)));
+        let mut guard = CrashLoopBackoffGuard::new(
+            Some(Duration::from_millis(5)),
+            Some(Duration::from_secs(30)),
+        );
 
         guard.record_launch("inst-recover");
         guard.record_termination("inst-recover"); // immediate -> count 1
-        assert_eq!(guard.required_backoff_delay("inst-recover"), Duration::from_secs(2));
+        assert_eq!(
+            guard.required_backoff_delay("inst-recover"),
+            Duration::from_secs(2)
+        );
 
         guard.record_launch("inst-recover");
         std::thread::sleep(Duration::from_millis(15));

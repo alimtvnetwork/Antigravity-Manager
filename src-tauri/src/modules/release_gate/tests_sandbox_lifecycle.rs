@@ -25,7 +25,10 @@ mod tests {
 
     #[test]
     fn test_validate_sandbox_cleanup_with_remnant_paths() {
-        let paths = &["data/test-sandbox-1/workspaceStorage", "data/test-sandbox-1/lock"];
+        let paths = &[
+            "data/test-sandbox-1/workspaceStorage",
+            "data/test-sandbox-1/lock",
+        ];
         let report = validate_sandbox_cleanup(paths, &[]);
         assert!(!report.is_clean);
         assert_eq!(report.orphan_paths.len(), 2);

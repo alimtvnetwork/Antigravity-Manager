@@ -271,12 +271,13 @@ fn live_prompt_status(conn: &Connection, prompt_id: &str) -> Option<String> {
     .ok()
 }
 
-/// RC-6: a live row that is already `running` or `completed` must never be
+/// RC-6: a live row that is already `completed` must never be
 /// overwritten by a backup re-injection (`save_or_requeue_prompt` upserts
-/// with INSERT OR REPLACE). Mirrors the live-status dedup in
-/// `resend_queued_prompts_for_instance`.
+/// with INSERT OR REPLACE). Stale 'running' rows left over from a terminated
+/// or quota-exhausted session are not preserved as live so restore re-injects
+/// and dispatches them on the newly active account.
 fn is_live_status_preserved(status: Option<&str>) -> bool {
-    matches!(status, Some("running") | Some("completed"))
+    matches!(status, Some("completed"))
 }
 
 /// Count unrestored backup records recorded under instance ids other than
@@ -306,7 +307,12 @@ pub fn count_unrestored_prompts_for_other_instances(
             |row| row.get(0),
         )
     }
-    .map_err(|e| format!("Failed to count unrestored prompts for other instances: {}", e))?;
+    .map_err(|e| {
+        format!(
+            "Failed to count unrestored prompts for other instances: {}",
+            e
+        )
+    })?;
     Ok(count as usize)
 }
 

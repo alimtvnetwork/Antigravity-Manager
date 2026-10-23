@@ -30,7 +30,11 @@ where
 
     while start.elapsed() < max_wait {
         if !is_pid_alive(pid) {
-            debug!(pid = pid, elapsed_ms = start.elapsed().as_millis(), "PID confirmed terminated");
+            debug!(
+                pid = pid,
+                elapsed_ms = start.elapsed().as_millis(),
+                "PID confirmed terminated"
+            );
             return PidReclaimStatus::TerminatedAndSafe;
         }
 
@@ -38,7 +42,11 @@ where
     }
 
     if is_pid_alive(pid) {
-        warn!(pid = pid, timeout_ms = max_wait.as_millis(), "PID stubborn, still active after wait limit");
+        warn!(
+            pid = pid,
+            timeout_ms = max_wait.as_millis(),
+            "PID stubborn, still active after wait limit"
+        );
         PidReclaimStatus::TimeoutStubborn { pid }
     } else {
         PidReclaimStatus::TerminatedAndSafe

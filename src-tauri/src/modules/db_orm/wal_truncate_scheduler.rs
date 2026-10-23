@@ -20,7 +20,9 @@ pub struct WalTruncateScheduler;
 
 impl WalTruncateScheduler {
     /// Executes a TRUNCATE checkpoint on the SQLite connection.
-    pub fn execute_truncate_checkpoint(conn: &Connection) -> Result<WalCheckpointResult, rusqlite::Error> {
+    pub fn execute_truncate_checkpoint(
+        conn: &Connection,
+    ) -> Result<WalCheckpointResult, rusqlite::Error> {
         let mut stmt = conn.prepare("PRAGMA wal_checkpoint(TRUNCATE);")?;
         let result = stmt.query_row([], |row| {
             let busy_code: i32 = row.get(0)?;

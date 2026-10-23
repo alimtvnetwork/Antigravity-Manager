@@ -105,8 +105,8 @@ pub fn import_from_json_with_password(
         let mut summary = ImportSummary {
             accounts_imported: 0,
             recipients_imported: 0,
-        recipients_skipped_duplicates: 0,
-        recipients_failed: 0,
+            recipients_skipped_duplicates: 0,
+            recipients_failed: 0,
             settings_updated: false,
             errors: Vec::new(),
         };

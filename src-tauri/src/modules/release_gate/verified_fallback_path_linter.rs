@@ -24,10 +24,7 @@ pub enum FallbackLinterViolation {
         construct: String,
     },
     /// A zero-matches branch returns silently without executing verified fallback.
-    SilentNoopOnZeroMatches {
-        file: String,
-        line: usize,
-    },
+    SilentNoopOnZeroMatches { file: String, line: usize },
 }
 
 impl fmt::Display for FallbackLinterViolation {
@@ -177,10 +174,12 @@ fn evaluate_zero_matches_site(
     if has_fallback_invocation(&block) {
         report.verified_fallbacks_found += 1;
     } else if has_silent_noop_return(&block) {
-        report.violations.push(FallbackLinterViolation::SilentNoopOnZeroMatches {
-            file: file_name.to_string(),
-            line: line_idx + 1,
-        });
+        report
+            .violations
+            .push(FallbackLinterViolation::SilentNoopOnZeroMatches {
+                file: file_name.to_string(),
+                line: line_idx + 1,
+            });
     }
 }
 
@@ -197,16 +196,20 @@ fn evaluate_pattern_match_site(
     if has_fallback_invocation(&block) {
         report.verified_fallbacks_found += 1;
     } else if has_silent_noop_return(&block) {
-        report.violations.push(FallbackLinterViolation::SilentNoopOnZeroMatches {
-            file: file_name.to_string(),
-            line: line_idx + 1,
-        });
+        report
+            .violations
+            .push(FallbackLinterViolation::SilentNoopOnZeroMatches {
+                file: file_name.to_string(),
+                line: line_idx + 1,
+            });
     } else {
-        report.violations.push(FallbackLinterViolation::MissingVerifiedFallbackBranch {
-            file: file_name.to_string(),
-            line: line_idx + 1,
-            construct: trimmed.to_string(),
-        });
+        report
+            .violations
+            .push(FallbackLinterViolation::MissingVerifiedFallbackBranch {
+                file: file_name.to_string(),
+                line: line_idx + 1,
+                construct: trimmed.to_string(),
+            });
     }
 }
 

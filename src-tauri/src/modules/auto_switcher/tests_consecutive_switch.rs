@@ -6,9 +6,7 @@ mod tests {
     use super::super::consecutive_switch_cooldown::{
         ConsecutiveSwitchCooldown, CooldownLadderConfig,
     };
-    use super::super::consecutive_switch_throttle::{
-        ConsecutiveSwitchThrottle, ThrottleConfig,
-    };
+    use super::super::consecutive_switch_throttle::{ConsecutiveSwitchThrottle, ThrottleConfig};
     use std::time::{Duration, Instant};
 
     #[test]
@@ -76,7 +74,9 @@ mod tests {
         let now = Instant::now();
 
         assert!(throttle.check_and_record(inst, now).is_ok());
-        assert!(throttle.check_and_record(inst, now + Duration::from_secs(1)).is_ok());
+        assert!(throttle
+            .check_and_record(inst, now + Duration::from_secs(1))
+            .is_ok());
 
         // 3rd switch in 2s exceeds max of 2: blocked
         let res = throttle.check_and_record(inst, now + Duration::from_secs(2));

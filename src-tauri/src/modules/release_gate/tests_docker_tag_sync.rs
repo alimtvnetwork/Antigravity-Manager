@@ -43,7 +43,9 @@ mod tests {
     fn test_invalid_preview_release_touching_latest() {
         let eval = evaluate_docker_tag_sync("beta", "v4.250.0-beta.1", true, true);
         assert!(!eval.is_valid);
-        assert!(eval.reason.contains("must NEVER update production 'latest' tag"));
+        assert!(eval
+            .reason
+            .contains("must NEVER update production 'latest' tag"));
     }
 
     #[test]

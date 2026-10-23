@@ -1,11 +1,10 @@
 #[cfg(test)]
 mod tests {
     use super::super::risky_path_fallback_guard::{
-        execute_with_fallback, inspect_code_for_silent_replacement,
-        lint_replacement_code_pattern, validate_replacement, validate_replacement_batch,
-        validate_replacement_strategy, FallbackStrategy, PathReplacementExecution,
-        ReplacementValidationReport, ReplacementViolation, RiskyPathReplacement,
-        SideEffectOrderGuard,
+        execute_with_fallback, inspect_code_for_silent_replacement, lint_replacement_code_pattern,
+        validate_replacement, validate_replacement_batch, validate_replacement_strategy,
+        FallbackStrategy, PathReplacementExecution, ReplacementValidationReport,
+        ReplacementViolation, RiskyPathReplacement, SideEffectOrderGuard,
     };
 
     #[test]
@@ -283,9 +282,14 @@ mod tests {
 
     #[test]
     fn test_validate_replacement_batch() {
-        let valid = PathReplacementExecution::new("op_1", "target 1", FallbackStrategy::VerifiedPathRestart)
-            .with_matches(2);
-        let invalid = PathReplacementExecution::new("op_2", "target 2", FallbackStrategy::SilentNoOp);
+        let valid = PathReplacementExecution::new(
+            "op_1",
+            "target 1",
+            FallbackStrategy::VerifiedPathRestart,
+        )
+        .with_matches(2);
+        let invalid =
+            PathReplacementExecution::new("op_2", "target 2", FallbackStrategy::SilentNoOp);
 
         let violations = validate_replacement_batch(&[valid, invalid]);
         assert_eq!(violations.len(), 1);

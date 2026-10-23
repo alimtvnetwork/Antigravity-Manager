@@ -143,7 +143,10 @@ impl StreamDelimiterNormalizer {
                 let tail = self.buffer[valid_up_to..].to_vec();
                 (valid_str, tail)
             }
-            Err(_) => (String::from_utf8_lossy(&self.buffer).to_string(), Vec::new()),
+            Err(_) => (
+                String::from_utf8_lossy(&self.buffer).to_string(),
+                Vec::new(),
+            ),
         }
     }
 

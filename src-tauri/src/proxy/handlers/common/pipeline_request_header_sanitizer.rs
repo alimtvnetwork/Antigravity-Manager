@@ -48,7 +48,10 @@ impl fmt::Display for SanitizedHeaderAction {
             Self::Stripped { reason, category } => {
                 write!(f, "stripped ({category}): {reason}")
             }
-            Self::NormalizedCasing { original, canonical } => {
+            Self::NormalizedCasing {
+                original,
+                canonical,
+            } => {
                 write!(f, "normalized casing: '{original}' -> '{canonical}'")
             }
         }

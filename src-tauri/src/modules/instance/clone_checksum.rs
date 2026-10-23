@@ -55,7 +55,12 @@ pub fn verify_clone_parity(
                 } else if s.len() == d.len() {
                     matched_files.push(rel_path.to_string());
                 } else {
-                    size_mismatches.push(format!("{}: src {}b vs dst {}b", rel_path, s.len(), d.len()));
+                    size_mismatches.push(format!(
+                        "{}: src {}b vs dst {}b",
+                        rel_path,
+                        s.len(),
+                        d.len()
+                    ));
                 }
             }
             _ => {

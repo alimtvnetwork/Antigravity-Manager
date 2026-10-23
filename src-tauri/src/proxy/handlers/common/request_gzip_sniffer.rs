@@ -24,7 +24,9 @@ impl RequestGzipSniffer {
         }
 
         // ZLIB magic bytes: 0x78 and (0x01, 0x5E, 0x9C, 0xDA)
-        if bytes[0] == 0x78 && (bytes[1] == 0x01 || bytes[1] == 0x5e || bytes[1] == 0x9c || bytes[1] == 0xda) {
+        if bytes[0] == 0x78
+            && (bytes[1] == 0x01 || bytes[1] == 0x5e || bytes[1] == 0x9c || bytes[1] == 0xda)
+        {
             return CompressionFormat::Deflate;
         }
 

@@ -48,7 +48,8 @@ impl ThrottleRecoveryObserver {
         entry.throttled_at = now;
         entry.consecutive_throttles += 1;
         // Escalate penalty proportionally to consecutive failures
-        entry.base_penalty = (penalty_val * (1.5_f64).powi(entry.consecutive_throttles.min(4) as i32)).min(100.0);
+        entry.base_penalty =
+            (penalty_val * (1.5_f64).powi(entry.consecutive_throttles.min(4) as i32)).min(100.0);
     }
 
     /// Computes the current effective decaying penalty (0.0 to 100.0) for an account.

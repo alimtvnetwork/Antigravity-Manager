@@ -131,7 +131,10 @@ pub fn classify_commit(commit: &CommitEntry, all_commits: &[CommitEntry]) -> Noi
         for other in all_commits {
             let other_lower = other.message.trim().to_ascii_lowercase();
             if is_generic_micro_fix(&other_lower) {
-                let shares_file = commit.files_changed.iter().any(|f| other.files_changed.contains(f));
+                let shares_file = commit
+                    .files_changed
+                    .iter()
+                    .any(|f| other.files_changed.contains(f));
                 if shares_file {
                     matching_scattered_commits += 1;
                 }
@@ -150,7 +153,17 @@ pub fn classify_commit(commit: &CommitEntry, all_commits: &[CommitEntry]) -> Noi
 fn is_generic_micro_fix(msg_lower: &str) -> bool {
     let trimmed = msg_lower.trim();
     if trimmed.len() <= 20 {
-        let generic_stems = &["fix", "tweak", "update", "patch", "adjust", "change", "styling", "small fix", "quick fix"];
+        let generic_stems = &[
+            "fix",
+            "tweak",
+            "update",
+            "patch",
+            "adjust",
+            "change",
+            "styling",
+            "small fix",
+            "quick fix",
+        ];
         for &stem in generic_stems {
             if trimmed == stem || trimmed.starts_with(stem) {
                 return true;
@@ -177,11 +190,7 @@ pub fn audit_commit_history(commits: &[CommitEntry]) -> CommitConvergenceReport 
     for commit in commits {
         let classification = classify_commit(commit, commits);
         if classification != NoiseClassification::CleanFinalState {
-            flagged_commits.push((
-                commit.hash.clone(),
-                commit.message.clone(),
-                classification,
-            ));
+            flagged_commits.push((commit.hash.clone(), commit.message.clone(), classification));
         }
     }
 

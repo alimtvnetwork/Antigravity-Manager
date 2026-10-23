@@ -10,9 +10,8 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 /// Regex matching GitHub handle mentions `@<handle>`.
-static HANDLE_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"@([a-zA-Z0-9_\-]+)").expect("valid handle regex")
-});
+static HANDLE_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"@([a-zA-Z0-9_\-]+)").expect("valid handle regex"));
 
 /// Standard attribution pattern required by release gate.
 pub const STANDARD_ATTRIBUTION_PATTERN: &str = "(Thanks to @aukgit)";
@@ -121,11 +120,7 @@ fn line_has_standard_attribution_format(line: &str) -> bool {
 }
 
 /// Audits a line for handles and validates compliance with sole contributor rules.
-fn audit_changelog_line(
-    line: &str,
-    line_number: usize,
-    report: &mut AttributionReport,
-) {
+fn audit_changelog_line(line: &str, line_number: usize, report: &mut AttributionReport) {
     let mut line_has_aukgit = false;
 
     for mat in HANDLE_REGEX.find_iter(line) {
@@ -139,30 +134,32 @@ fn audit_changelog_line(
             report.aukgit_attributions_found += 1;
         } else {
             report.has_third_party_handles = true;
-            report.violations.push(AttributionViolation::ThirdPartyHandleDetected {
-                handle: mat.as_str().to_string(),
-                line_number,
-            });
+            report
+                .violations
+                .push(AttributionViolation::ThirdPartyHandleDetected {
+                    handle: mat.as_str().to_string(),
+                    line_number,
+                });
         }
     }
 
     if line_has_aukgit && !line_has_standard_attribution_format(line) {
-        report.violations.push(
-            AttributionViolation::MissingStandardAttributionPattern {
+        report
+            .violations
+            .push(AttributionViolation::MissingStandardAttributionPattern {
                 line_number,
                 expected: STANDARD_ATTRIBUTION_PATTERN.to_string(),
-            },
-        );
+            });
     } else if !line_has_aukgit
         && line.to_ascii_lowercase().contains("thanks to")
         && !line_has_standard_attribution_format(line)
     {
-        report.violations.push(
-            AttributionViolation::MissingStandardAttributionPattern {
+        report
+            .violations
+            .push(AttributionViolation::MissingStandardAttributionPattern {
                 line_number,
                 expected: STANDARD_ATTRIBUTION_PATTERN.to_string(),
-            },
-        );
+            });
     }
 }
 
@@ -195,11 +192,11 @@ pub fn audit_release_notes(release_notes: &str) -> AttributionReport {
             report.aukgit_attributions_found += 1;
         } else {
             report.has_third_party_handles = true;
-            report.violations.push(
-                AttributionViolation::NonAukgitContributorInReleaseNotes {
+            report
+                .violations
+                .push(AttributionViolation::NonAukgitContributorInReleaseNotes {
                     handle: handle.clone(),
-                },
-            );
+                });
         }
     }
 

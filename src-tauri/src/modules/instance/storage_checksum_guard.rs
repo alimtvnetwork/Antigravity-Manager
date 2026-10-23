@@ -18,7 +18,10 @@ pub enum StorageValidationOutcome {
 
 /// Verifies `storage.json` file in target instance user data directory.
 pub fn verify_instance_storage_json(user_data_dir: &Path) -> StorageValidationOutcome {
-    let storage_path = user_data_dir.join("User").join("globalStorage").join("storage.json");
+    let storage_path = user_data_dir
+        .join("User")
+        .join("globalStorage")
+        .join("storage.json");
     if !storage_path.exists() {
         return StorageValidationOutcome::FileNotFound;
     }

@@ -26,9 +26,7 @@ pub enum FallbackStrategy {
         target_path: String,
     },
     /// Explicit abort with a structured diagnostic error reason rather than continuing silently.
-    FailExplicitly {
-        reason: String,
-    },
+    FailExplicitly { reason: String },
     /// Strictly forbidden: silent no-op (swallows failure or 0 matches silently).
     SilentNoOp,
     /// Strictly forbidden: no fallback strategy specified at all.
@@ -262,10 +260,7 @@ impl fmt::Display for ReplacementViolation {
                 )
             }
             Self::RedundantFallbackSamePath { path } => {
-                write!(
-                    f,
-                    "Speculative and fallback path are identical: '{path}'."
-                )
+                write!(f, "Speculative and fallback path are identical: '{path}'.")
             }
             Self::MissingExplicitFallback {
                 operation_id,
@@ -422,7 +417,9 @@ pub fn validate_replacement_strategy(
 }
 
 /// Validates that an execution parameters model complies with AGENTS.md rules.
-pub fn validate_replacement(execution: &PathReplacementExecution) -> Result<(), ReplacementViolation> {
+pub fn validate_replacement(
+    execution: &PathReplacementExecution,
+) -> Result<(), ReplacementViolation> {
     // 1. Silent no-op is strictly forbidden
     if execution.fallback_strategy.is_silent_no_op() {
         return Err(ReplacementViolation::SilentNoOpForbidden {
@@ -454,7 +451,9 @@ pub fn validate_replacement(execution: &PathReplacementExecution) -> Result<(), 
     if !execution.side_effects_prevalidated {
         return Err(ReplacementViolation::SideEffectsNotPrevalidated {
             operation_id: execution.operation_id.clone(),
-            details: "Pre-validation failed or was omitted prior to irreversible destructive operations.".to_string(),
+            details:
+                "Pre-validation failed or was omitted prior to irreversible destructive operations."
+                    .to_string(),
         });
     }
 
@@ -462,7 +461,8 @@ pub fn validate_replacement(execution: &PathReplacementExecution) -> Result<(), 
     if execution.timeout_ms.is_none() {
         return Err(ReplacementViolation::UnboundedWaitMissingTimeout {
             operation_id: execution.operation_id.clone(),
-            details: "Timeout bound is required (e.g. Some(5000) ms) to prevent deadlock hangs.".to_string(),
+            details: "Timeout bound is required (e.g. Some(5000) ms) to prevent deadlock hangs."
+                .to_string(),
         });
     }
 
@@ -470,7 +470,8 @@ pub fn validate_replacement(execution: &PathReplacementExecution) -> Result<(), 
     if !execution.narrow_scope_verified {
         return Err(ReplacementViolation::OverbroadScopeDetected {
             operation_id: execution.operation_id.clone(),
-            details: "Modification scope exceeded target entity boundary or leaked across clauses.".to_string(),
+            details: "Modification scope exceeded target entity boundary or leaked across clauses."
+                .to_string(),
         });
     }
 
@@ -505,10 +506,12 @@ where
                 match &execution.fallback_strategy {
                     FallbackStrategy::VerifiedPathRestart
                     | FallbackStrategy::ExplicitHandler { .. } => {
-                        verified_fallback_op().map_err(|err| ReplacementViolation::UnhandledZeroMatches {
-                            operation_id: execution.operation_id.clone(),
-                            target_description: format!("Fallback failed: {err}"),
-                            matches_found: 0,
+                        verified_fallback_op().map_err(|err| {
+                            ReplacementViolation::UnhandledZeroMatches {
+                                operation_id: execution.operation_id.clone(),
+                                target_description: format!("Fallback failed: {err}"),
+                                matches_found: 0,
+                            }
                         })
                     }
                     FallbackStrategy::FailExplicitly { reason } => {
@@ -531,8 +534,7 @@ where
             }
         }
         Ok(None) | Err(_) => match &execution.fallback_strategy {
-            FallbackStrategy::VerifiedPathRestart
-            | FallbackStrategy::ExplicitHandler { .. } => {
+            FallbackStrategy::VerifiedPathRestart | FallbackStrategy::ExplicitHandler { .. } => {
                 verified_fallback_op().map_err(|err| ReplacementViolation::UnhandledZeroMatches {
                     operation_id: execution.operation_id.clone(),
                     target_description: format!("Fallback execution failed: {err}"),
@@ -606,7 +608,8 @@ impl SideEffectOrderGuard {
         if !self.validation_passed {
             return Err(ReplacementViolation::SideEffectsNotPrevalidated {
                 operation_id: "side_effect_order_guard".to_string(),
-                details: "Cannot execute destructive action: validation was not performed".to_string(),
+                details: "Cannot execute destructive action: validation was not performed"
+                    .to_string(),
             });
         }
         if !self.credentials_written {
@@ -635,7 +638,9 @@ pub fn lint_replacement_code_pattern(source_code: &str) -> Vec<ReplacementViolat
                 || trimmed.ends_with("return None;"))
         {
             violations.push(ReplacementViolation::SilentNoOpForbidden {
-                context: format!("Suspicious silent no-op on zero matches without fallback: '{trimmed}'"),
+                context: format!(
+                    "Suspicious silent no-op on zero matches without fallback: '{trimmed}'"
+                ),
             });
         }
     }
@@ -654,10 +659,15 @@ pub fn inspect_code_for_silent_replacement(code: &str) -> Vec<ReplacementViolati
         if (trimmed.contains("// silent no-op")
             || trimmed.contains("// do nothing")
             || trimmed.contains("// ignore 0 matches"))
-            && (trimmed.contains("replace") || trimmed.contains("match") || trimmed.contains("fallback"))
+            && (trimmed.contains("replace")
+                || trimmed.contains("match")
+                || trimmed.contains("fallback"))
         {
             violations.push(ReplacementViolation::SilentNoOpForbidden {
-                context: format!("Found silent no-op directive in replacement logic on line {}: '{trimmed}'", line_idx + 1),
+                context: format!(
+                    "Found silent no-op directive in replacement logic on line {}: '{trimmed}'",
+                    line_idx + 1
+                ),
             });
         }
 

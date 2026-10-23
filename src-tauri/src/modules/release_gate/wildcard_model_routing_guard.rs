@@ -461,12 +461,11 @@ pub fn evaluate_model_match(
                 }
             }
             RoutingPatternType::Regex(pat) => {
-                let re = Regex::new(pat).map_err(|e| {
-                    ModelRoutingViolation::InvalidRegexPattern {
+                let re =
+                    Regex::new(pat).map_err(|e| ModelRoutingViolation::InvalidRegexPattern {
                         pattern: pat.clone(),
                         reason: e.to_string(),
-                    }
-                })?;
+                    })?;
                 if re.is_match(clean_model) {
                     return Ok(ModelMatchReport {
                         matched_adapter: Some(rule.protocol_adapter.clone()),

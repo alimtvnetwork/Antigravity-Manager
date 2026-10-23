@@ -71,7 +71,10 @@ impl RuntimeCrashCounter {
         };
 
         if let Some(list) = map.get(instance_id) {
-            let recent_count = list.iter().filter(|t| now.duration_since(**t) < CRASH_WINDOW_DURATION).count();
+            let recent_count = list
+                .iter()
+                .filter(|t| now.duration_since(**t) < CRASH_WINDOW_DURATION)
+                .count();
             match recent_count {
                 0 | 1 => Duration::ZERO,
                 2 => Duration::from_secs(2),

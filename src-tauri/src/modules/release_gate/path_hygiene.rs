@@ -17,15 +17,28 @@ pub fn lint_path_hygiene(content: &str) -> PathHygieneReport {
 
     for line in content.lines() {
         for word in line.split_whitespace() {
-            let trimmed = word.trim_matches(|c: char| c == '`' || c == '(' || c == ')' || c == '[' || c == ']' || c == '<' || c == '>' || c == '"' || c == '\'');
-            
+            let trimmed = word.trim_matches(|c: char| {
+                c == '`'
+                    || c == '('
+                    || c == ')'
+                    || c == '['
+                    || c == ']'
+                    || c == '<'
+                    || c == '>'
+                    || c == '"'
+                    || c == '\''
+            });
+
             // Check Windows absolute paths: e.g. C:\ or D:/
             if trimmed.len() >= 3 {
                 let first_char = trimmed.chars().next().unwrap_or('\0');
                 let second_char = trimmed.chars().nth(1).unwrap_or('\0');
                 let third_char = trimmed.chars().nth(2).unwrap_or('\0');
 
-                if first_char.is_ascii_alphabetic() && second_char == ':' && (third_char == '\\' || third_char == '/') {
+                if first_char.is_ascii_alphabetic()
+                    && second_char == ':'
+                    && (third_char == '\\' || third_char == '/')
+                {
                     violations.push(trimmed.to_string());
                     continue;
                 }

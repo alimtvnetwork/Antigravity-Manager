@@ -262,9 +262,14 @@ pub fn build_cursor_query_sql(
         ));
     }
     if table.to_uppercase().contains("DESC") {
-        return Err(CursorValidationError::LifoOrderingDetected(table.to_string()));
+        return Err(CursorValidationError::LifoOrderingDetected(
+            table.to_string(),
+        ));
     }
-    if !table.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.') {
+    if !table
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.')
+    {
         return Err(CursorValidationError::InvalidCursorTimestamp(format!(
             "Invalid characters in table name: '{table}'"
         )));

@@ -75,11 +75,11 @@ mod tests {
 
     #[test]
     fn test_default_proportional_allocation_75_percent_large1m() {
-        let req = ProportionalBudgetRequest::new("gemini-2.5-pro", 5_000)
-            .with_max_output_tokens(65_536);
+        let req =
+            ProportionalBudgetRequest::new("gemini-2.5-pro", 5_000).with_max_output_tokens(65_536);
 
-        let outcome = allocate_proportional_thinking_budget(&req)
-            .expect("Allocation should succeed");
+        let outcome =
+            allocate_proportional_thinking_budget(&req).expect("Allocation should succeed");
 
         assert_eq!(outcome.effective_max_output_tokens, 65_536);
         assert_eq!(outcome.effective_thinking_budget, Some(49_152)); // 75% of 65536
@@ -98,11 +98,11 @@ mod tests {
 
     #[test]
     fn test_default_proportional_allocation_75_percent_standard8k() {
-        let req = ProportionalBudgetRequest::new("gpt-3.5-turbo", 1_000)
-            .with_max_output_tokens(4_096);
+        let req =
+            ProportionalBudgetRequest::new("gpt-3.5-turbo", 1_000).with_max_output_tokens(4_096);
 
-        let outcome = allocate_proportional_thinking_budget(&req)
-            .expect("Allocation should succeed");
+        let outcome =
+            allocate_proportional_thinking_budget(&req).expect("Allocation should succeed");
 
         assert_eq!(outcome.effective_max_output_tokens, 4_096);
         assert_eq!(outcome.effective_thinking_budget, Some(3_072)); // 75% of 4096
@@ -116,8 +116,8 @@ mod tests {
             .with_max_output_tokens(10_000)
             .with_thinking_budget(9_500); // Exceeds required 2048 headroom
 
-        let outcome = allocate_proportional_thinking_budget(&req)
-            .expect("Allocation should succeed");
+        let outcome =
+            allocate_proportional_thinking_budget(&req).expect("Allocation should succeed");
 
         assert_eq!(outcome.effective_max_output_tokens, 10_000);
         // Min headroom for Large1M is 2048, so max allowable is 10000 - 2048 = 7952
@@ -136,8 +136,8 @@ mod tests {
             .with_max_output_tokens(32_768)
             .with_thinking_budget(500); // Below Large1M floor of 2048
 
-        let outcome = allocate_proportional_thinking_budget(&req)
-            .expect("Allocation should succeed");
+        let outcome =
+            allocate_proportional_thinking_budget(&req).expect("Allocation should succeed");
 
         assert_eq!(outcome.effective_thinking_budget, Some(2_048));
         assert!(outcome.is_clamped());
@@ -157,8 +157,8 @@ mod tests {
             .with_max_output_tokens(8_192)
             .with_thinking_budget(0);
 
-        let outcome = allocate_proportional_thinking_budget(&req)
-            .expect("Allocation should succeed");
+        let outcome =
+            allocate_proportional_thinking_budget(&req).expect("Allocation should succeed");
 
         assert_eq!(outcome.effective_thinking_budget, None);
         assert_eq!(outcome.headroom_tokens, 8_192);
@@ -175,8 +175,8 @@ mod tests {
             .with_max_output_tokens(8_000)
             .with_custom_ratio(0.50); // 50% ratio
 
-        let outcome = allocate_proportional_thinking_budget(&req)
-            .expect("Allocation should succeed");
+        let outcome =
+            allocate_proportional_thinking_budget(&req).expect("Allocation should succeed");
 
         assert_eq!(outcome.applied_ratio, 0.50);
         assert_eq!(outcome.effective_thinking_budget, Some(4_000));
@@ -185,12 +185,12 @@ mod tests {
 
     #[test]
     fn test_invalid_ratio_rejected() {
-        let req_zero = ProportionalBudgetRequest::new("claude-3-7-sonnet", 1_000)
-            .with_custom_ratio(0.0);
+        let req_zero =
+            ProportionalBudgetRequest::new("claude-3-7-sonnet", 1_000).with_custom_ratio(0.0);
         assert!(allocate_proportional_thinking_budget(&req_zero).is_err());
 
-        let req_over = ProportionalBudgetRequest::new("claude-3-7-sonnet", 1_000)
-            .with_custom_ratio(1.5);
+        let req_over =
+            ProportionalBudgetRequest::new("claude-3-7-sonnet", 1_000).with_custom_ratio(1.5);
         assert!(allocate_proportional_thinking_budget(&req_over).is_err());
     }
 
@@ -212,8 +212,8 @@ mod tests {
         // Standard8k context window is 8192
         // Prompt tokens: 6000, requested max output: 4096 (total 10096 > 8192)
         // Max output clamped to 8192 - 6000 = 2192
-        let req = ProportionalBudgetRequest::new("gpt-3.5-turbo", 6_000)
-            .with_max_output_tokens(4_096);
+        let req =
+            ProportionalBudgetRequest::new("gpt-3.5-turbo", 6_000).with_max_output_tokens(4_096);
 
         let outcome = allocate_proportional_thinking_budget(&req)
             .expect("Allocation should succeed with clamped output");
@@ -228,8 +228,9 @@ mod tests {
 
     #[test]
     fn test_evaluate_proportional_budget_default_helper() {
-        let outcome = evaluate_proportional_budget_default("gemini-2.5-pro", 10_000, Some(8_192), None)
-            .expect("Default evaluation should succeed");
+        let outcome =
+            evaluate_proportional_budget_default("gemini-2.5-pro", 10_000, Some(8_192), None)
+                .expect("Default evaluation should succeed");
 
         assert_eq!(outcome.effective_max_output_tokens, 8_192);
         assert!(outcome.has_thinking());

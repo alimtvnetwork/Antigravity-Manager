@@ -39,7 +39,8 @@ pub fn validate_changelog_release_entry(
         let trimmed = line.trim();
 
         // Heading check
-        if trimmed.starts_with("## [") || trimmed.starts_with("## v") || trimmed.starts_with("## ") {
+        if trimmed.starts_with("## [") || trimmed.starts_with("## v") || trimmed.starts_with("## ")
+        {
             if trimmed.contains(&clean_expected) {
                 has_valid_heading = true;
             }
@@ -52,7 +53,8 @@ pub fn validate_changelog_release_entry(
 
         // Handle checks (@user)
         for word in trimmed.split_whitespace() {
-            let clean_word = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '@' && c != '-');
+            let clean_word =
+                word.trim_matches(|c: char| !c.is_alphanumeric() && c != '@' && c != '-');
             if clean_word.starts_with('@') && clean_word.len() > 1 {
                 let handle = clean_word.trim_start_matches('@');
                 if handle != "aukgit" {
@@ -69,7 +71,10 @@ pub fn validate_changelog_release_entry(
     }
 
     if !has_valid_heading {
-        violation_reasons.push(format!("Missing heading matching expected version '{}'", clean_expected));
+        violation_reasons.push(format!(
+            "Missing heading matching expected version '{}'",
+            clean_expected
+        ));
     }
     if !has_aukgit_attribution {
         violation_reasons.push("Missing required attribution to '@aukgit'".to_string());

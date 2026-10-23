@@ -8,8 +8,11 @@ use crate::modules::release_gate::generic_fix_preference_guard::{
 
 #[test]
 fn test_five_branch_exact_chain_without_justification_is_flagged() {
-    let site = MatchSite::exact_chain("model_dispatch_ladder", 5)
-        .with_samples(vec!["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"]);
+    let site = MatchSite::exact_chain("model_dispatch_ladder", 5).with_samples(vec![
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
+        "gemini-2.0-flash",
+    ]);
 
     let report = evaluate_match_sites(&[site]);
     assert!(!report.is_clean, "Five-branch exact chain must be flagged");
@@ -28,8 +31,9 @@ fn test_five_branch_exact_chain_without_justification_is_flagged() {
 
 #[test]
 fn test_exact_chain_with_justification_passes_clean() {
-    let site = MatchSite::exact_chain("core_protocol_adapter_switch", 5)
-        .with_justification("Protocol adapters are closed set normalized to 4 protocols per AGENTS.md");
+    let site = MatchSite::exact_chain("core_protocol_adapter_switch", 5).with_justification(
+        "Protocol adapters are closed set normalized to 4 protocols per AGENTS.md",
+    );
 
     let report = evaluate_match_sites(&[site]);
     assert!(report.is_clean, "Justified exact chain must pass clean");
@@ -58,8 +62,7 @@ fn test_small_exact_chain_below_threshold_passes() {
 
 #[test]
 fn test_wildcard_pattern_matcher_passes_clean() {
-    let site = MatchSite::wildcard("gemini_wildcard_matcher")
-        .with_sample("gemini-*-flash-*");
+    let site = MatchSite::wildcard("gemini_wildcard_matcher").with_sample("gemini-*-flash-*");
 
     let report = evaluate_match_sites(&[site]);
     assert!(report.is_clean, "Wildcard pattern must pass clean");
@@ -76,8 +79,7 @@ fn test_wildcard_pattern_matcher_passes_clean() {
 
 #[test]
 fn test_regex_pattern_matcher_passes_clean() {
-    let site = MatchSite::regex("prompt_sanitizer_regex")
-        .with_sample(r"^sk-[a-zA-Z0-9]{20,}$");
+    let site = MatchSite::regex("prompt_sanitizer_regex").with_sample(r"^sk-[a-zA-Z0-9]{20,}$");
 
     let report = evaluate_match_sites(&[site]);
     assert!(report.is_clean, "Regex pattern must pass clean");
@@ -129,8 +131,7 @@ fn test_single_exact_match_with_justification_passes_clean() {
 
 #[test]
 fn test_single_exact_match_without_justification_is_flagged() {
-    let site = MatchSite::single_exact("hardcoded_model_check")
-        .with_sample("gemini-1.5-flash");
+    let site = MatchSite::single_exact("hardcoded_model_check").with_sample("gemini-1.5-flash");
 
     let report = evaluate_match_sites(&[site]);
     assert!(

@@ -59,7 +59,10 @@ impl AlertSeverity {
     pub fn target_channels(&self) -> &'static [NotificationChannelType] {
         match self {
             Self::Info => &[NotificationChannelType::Supabase],
-            Self::Warning => &[NotificationChannelType::Telegram, NotificationChannelType::Supabase],
+            Self::Warning => &[
+                NotificationChannelType::Telegram,
+                NotificationChannelType::Supabase,
+            ],
             Self::Critical => &[
                 NotificationChannelType::Email,
                 NotificationChannelType::Telegram,

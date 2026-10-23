@@ -292,9 +292,15 @@ pub(crate) fn email_arm_dedupe(args: &[String], is_json: bool) {
             groups.len()
         );
         for g in &groups {
-            println!("  {} — {} rows", mask_email(&g.normalized_email), g.row_count);
+            println!(
+                "  {} — {} rows",
+                mask_email(&g.normalized_email),
+                g.row_count
+            );
         }
-        println!("Dry run only. Re-run with --apply to merge (a timestamped DB backup is taken first).");
+        println!(
+            "Dry run only. Re-run with --apply to merge (a timestamped DB backup is taken first)."
+        );
         return;
     }
 

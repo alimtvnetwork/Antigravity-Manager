@@ -98,20 +98,26 @@ mod tests {
             json!({"role": "assistant", "content": "hello"}),
             json!({"role": "user", "content": "hi"}),
         ];
-        assert!(!MessageTurnValidator::verify_role_alternation(&start_assistant));
+        assert!(!MessageTurnValidator::verify_role_alternation(
+            &start_assistant
+        ));
 
         let consecutive_users = vec![
             json!({"role": "user", "content": "1"}),
             json!({"role": "user", "content": "2"}),
         ];
-        assert!(!MessageTurnValidator::verify_role_alternation(&consecutive_users));
+        assert!(!MessageTurnValidator::verify_role_alternation(
+            &consecutive_users
+        ));
 
         let consecutive_assistants = vec![
             json!({"role": "user", "content": "1"}),
             json!({"role": "assistant", "content": "2"}),
             json!({"role": "assistant", "content": "3"}),
         ];
-        assert!(!MessageTurnValidator::verify_role_alternation(&consecutive_assistants));
+        assert!(!MessageTurnValidator::verify_role_alternation(
+            &consecutive_assistants
+        ));
     }
 
     #[test]

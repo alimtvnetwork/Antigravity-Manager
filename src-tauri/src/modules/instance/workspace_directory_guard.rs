@@ -6,12 +6,7 @@ use std::fs;
 use std::path::Path;
 use tracing::debug;
 
-pub const REQUIRED_INSTANCE_SUBDIRS: &[&str] = &[
-    "User",
-    "logs",
-    "workspaceStorage",
-    "Backups",
-];
+pub const REQUIRED_INSTANCE_SUBDIRS: &[&str] = &["User", "logs", "workspaceStorage", "Backups"];
 
 pub struct WorkspaceDirectoryGuard;
 
@@ -37,6 +32,8 @@ impl WorkspaceDirectoryGuard {
     /// Verifies if all required subdirectories already exist.
     pub fn verify_subdirectories_exist<P: AsRef<Path>>(data_dir: P) -> bool {
         let base = data_dir.as_ref();
-        REQUIRED_INSTANCE_SUBDIRS.iter().all(|&subdir| base.join(subdir).exists())
+        REQUIRED_INSTANCE_SUBDIRS
+            .iter()
+            .all(|&subdir| base.join(subdir).exists())
     }
 }

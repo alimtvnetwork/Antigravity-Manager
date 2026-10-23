@@ -19,7 +19,8 @@ fn test_validate_workspace_nonexistent() {
 fn test_validate_workspace_valid_directory() {
     let temp = tempdir().expect("create temp dir");
 
-    let report = WorkspaceDirValidator::validate_workspace(temp.path()).expect("validate workspace");
+    let report =
+        WorkspaceDirValidator::validate_workspace(temp.path()).expect("validate workspace");
     assert!(report.exists);
     assert!(report.is_directory);
     assert!(report.is_writable);
@@ -33,9 +34,16 @@ fn test_validate_workspace_detects_markers() {
     std::fs::create_dir_all(temp.path().join(".git")).expect("create .git");
     std::fs::write(temp.path().join("Cargo.toml"), b"[package]").expect("create Cargo.toml");
 
-    let report = WorkspaceDirValidator::validate_workspace(temp.path()).expect("validate workspace");
+    let report =
+        WorkspaceDirValidator::validate_workspace(temp.path()).expect("validate workspace");
     assert!(report.exists);
-    assert!(report.detected_project_markers.contains(&".git".to_string()));
-    assert!(report.detected_project_markers.contains(&"Cargo.toml".to_string()));
-    assert!(!report.detected_project_markers.contains(&"package.json".to_string()));
+    assert!(report
+        .detected_project_markers
+        .contains(&".git".to_string()));
+    assert!(report
+        .detected_project_markers
+        .contains(&"Cargo.toml".to_string()));
+    assert!(!report
+        .detected_project_markers
+        .contains(&"package.json".to_string()));
 }

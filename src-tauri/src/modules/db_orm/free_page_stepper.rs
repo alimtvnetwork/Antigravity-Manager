@@ -54,14 +54,9 @@ impl FreePageStepper {
             .prepare("PRAGMA freelist_count;")
             .map_err(AppError::Database)?;
 
-        let mut rows = stmt
-            .query([])
-            .map_err(AppError::Database)?;
+        let mut rows = stmt.query([]).map_err(AppError::Database)?;
 
-        if let Some(row) = rows
-            .next()
-            .map_err(AppError::Database)?
-        {
+        if let Some(row) = rows.next().map_err(AppError::Database)? {
             Ok(row.get(0).unwrap_or(0))
         } else {
             Ok(0)

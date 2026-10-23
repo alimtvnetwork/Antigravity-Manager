@@ -203,20 +203,23 @@ pub(crate) fn cmd_supabase_push_settings(rt: &tokio::runtime::Runtime, args: &[S
     };
 
     let resolved = json_envelope::resolve_relative_json_path(&vault_path);
-    let report = rt.block_on(antigravity_tools_lib::modules::supabase_push::push_settings(
-        &resolved,
-    ));
+    let report =
+        rt.block_on(antigravity_tools_lib::modules::supabase_push::push_settings(&resolved));
 
     if is_json {
-        let envelope =
-            json_envelope::JsonEnvelope::new("agm/supabase-push-settings", &report);
+        let envelope = json_envelope::JsonEnvelope::new("agm/supabase-push-settings", &report);
         println!(
             "{}",
             serde_json::to_string_pretty(&envelope).unwrap_or_default()
         );
     } else {
         for s in &report.steps {
-            println!("{} [{}] {}", if s.is_ok { "✅" } else { "❌" }, s.name, s.message);
+            println!(
+                "{} [{}] {}",
+                if s.is_ok { "✅" } else { "❌" },
+                s.name,
+                s.message
+            );
         }
         println!(
             "Push settings: {} file(s) loaded, {} endpoint(s) imported, {} credential set(s), {} endpoint(s) total.",

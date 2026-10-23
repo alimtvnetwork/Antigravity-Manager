@@ -126,10 +126,7 @@ impl AuthorshipPreservationReport {
 /// Formats a standardized git `Co-authored-by:` trailer.
 pub fn format_coauthor_trailer(name: &str, email: &str) -> String {
     let clean_name = name.trim();
-    let clean_email = email
-        .trim()
-        .trim_start_matches('<')
-        .trim_end_matches('>');
+    let clean_email = email.trim().trim_start_matches('<').trim_end_matches('>');
     format!("Co-authored-by: {} <{}>", clean_name, clean_email)
 }
 

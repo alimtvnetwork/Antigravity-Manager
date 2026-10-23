@@ -10,7 +10,8 @@ mod tests {
     fn test_sanitize_openai_and_anthropic_keys() {
         let dummy_openai = format!("{}{}", "sk-", "abcdef1234567890abcdef123456");
         let dummy_anthropic = format!("{}{}", "sk-", "ant-api03-abcdef1234567890");
-        let text = format!("Here is my OpenAI key {dummy_openai} and Anthropic key {dummy_anthropic}.");
+        let text =
+            format!("Here is my OpenAI key {dummy_openai} and Anthropic key {dummy_anthropic}.");
         let report = sanitize_prompt_text(&text);
 
         assert!(report.has_redactions);
@@ -41,8 +42,12 @@ mod tests {
 
         assert!(report.has_redactions);
         assert!(report.sanitized_text.contains(REDACTED_AUTH));
-        assert!(!report.sanitized_text.contains("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"));
-        assert!(!report.sanitized_text.contains("dXNlcjpwYXNzd29yZDEyMzQ1Ng=="));
+        assert!(!report
+            .sanitized_text
+            .contains("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"));
+        assert!(!report
+            .sanitized_text
+            .contains("dXNlcjpwYXNzd29yZDEyMzQ1Ng=="));
     }
 
     #[test]
@@ -53,9 +58,15 @@ password = "ExtremelySecretPassword987!""#;
 
         assert!(report.has_redactions);
         assert!(!report.sanitized_text.contains("SuperSecretPass123"));
-        assert!(!report.sanitized_text.contains("ExtremelySecretPassword987!"));
-        assert!(report.sanitized_text.contains("postgres://admin:REDACTED_SECRET@db.prod.internal:5432/main"));
-        assert!(report.sanitized_text.contains(r#"password = "REDACTED_SECRET""#));
+        assert!(!report
+            .sanitized_text
+            .contains("ExtremelySecretPassword987!"));
+        assert!(report
+            .sanitized_text
+            .contains("postgres://admin:REDACTED_SECRET@db.prod.internal:5432/main"));
+        assert!(report
+            .sanitized_text
+            .contains(r#"password = "REDACTED_SECRET""#));
     }
 
     #[test]
@@ -66,7 +77,9 @@ password = "ExtremelySecretPassword987!""#;
         let report = sanitize_prompt_text(&pem);
 
         assert!(report.has_redactions);
-        assert!(!report.sanitized_text.contains("MIIEowIBAAKCAQEA0Y123456789abcdef"));
+        assert!(!report
+            .sanitized_text
+            .contains("MIIEowIBAAKCAQEA0Y123456789abcdef"));
         let redacted_header = format!("-----{}{}", "BEGIN ", "PRIVATE KEY-----");
         assert!(report.sanitized_text.contains(&redacted_header));
         assert!(report.sanitized_text.contains(REDACTED_SECRET));
@@ -113,7 +126,10 @@ password = "ExtremelySecretPassword987!""#;
     #[test]
     fn test_evaluate_prompt_integrity_detects_system_wipeout() {
         let original = PromptPayload {
-            system_prompt: Some("Essential system instructions that guide agent behavior across conversations.".to_string()),
+            system_prompt: Some(
+                "Essential system instructions that guide agent behavior across conversations."
+                    .to_string(),
+            ),
             user_query: "What is 2 + 2?".to_string(),
             context_messages: vec![],
         };
@@ -127,14 +143,18 @@ password = "ExtremelySecretPassword987!""#;
         let integrity = evaluate_prompt_integrity(&original, &corrupted);
         assert!(!integrity.is_intact);
         assert!(!integrity.system_prompt_preserved);
-        assert!(integrity.violations.iter().any(|v| v.contains("wiped out to empty")));
+        assert!(integrity
+            .violations
+            .iter()
+            .any(|v| v.contains("wiped out to empty")));
     }
 
     #[test]
     fn test_evaluate_prompt_integrity_detects_user_query_wipeout() {
         let original = PromptPayload {
             system_prompt: Some("System prompt".to_string()),
-            user_query: "Long user instruction with question details and background context.".to_string(),
+            user_query: "Long user instruction with question details and background context."
+                .to_string(),
             context_messages: vec![],
         };
 
@@ -147,18 +167,26 @@ password = "ExtremelySecretPassword987!""#;
         let integrity = evaluate_prompt_integrity(&original, &corrupted);
         assert!(!integrity.is_intact);
         assert!(!integrity.user_query_preserved);
-        assert!(integrity.violations.iter().any(|v| v.contains("User query was wiped out")));
+        assert!(integrity
+            .violations
+            .iter()
+            .any(|v| v.contains("User query was wiped out")));
     }
 
     #[test]
     fn test_detect_destructive_keyword_replacement_mangled_words() {
         let original = "Use the keyboard shortcuts to navigate and tokenize the output.";
-        let naive_mangled = "Use the REDACTED_SECRETboard shortcuts to navigate and REDACTED_SECRETize the output.";
+        let naive_mangled =
+            "Use the REDACTED_SECRETboard shortcuts to navigate and REDACTED_SECRETize the output.";
 
         let violations = detect_destructive_keyword_replacement(original, naive_mangled);
         assert!(!violations.is_empty());
-        assert!(violations.iter().any(|v| v.violation_type == DestructiveViolationType::MangledBenignWord));
-        assert!(violations.iter().any(|v| v.keyword == "REDACTED_SECRETboard"));
+        assert!(violations
+            .iter()
+            .any(|v| v.violation_type == DestructiveViolationType::MangledBenignWord));
+        assert!(violations
+            .iter()
+            .any(|v| v.keyword == "REDACTED_SECRETboard"));
     }
 
     #[test]
@@ -168,7 +196,9 @@ password = "ExtremelySecretPassword987!""#;
 
         let violations = detect_destructive_keyword_replacement(original, wiped);
         assert!(!violations.is_empty());
-        assert!(violations.iter().any(|v| v.violation_type == DestructiveViolationType::PromptWipeout));
+        assert!(violations
+            .iter()
+            .any(|v| v.violation_type == DestructiveViolationType::PromptWipeout));
     }
 
     #[test]

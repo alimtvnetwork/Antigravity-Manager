@@ -49,11 +49,7 @@ pub struct TokenBudgetRequest {
 
 impl TokenBudgetRequest {
     /// Constructs a basic token budget request with prompt tokens and context window.
-    pub fn new(
-        model_name: impl Into<String>,
-        prompt_tokens: u32,
-        max_context_window: u32,
-    ) -> Self {
+    pub fn new(model_name: impl Into<String>, prompt_tokens: u32, max_context_window: u32) -> Self {
         Self {
             model_name: model_name.into(),
             prompt_tokens,
@@ -130,7 +126,10 @@ pub enum BudgetViolation {
 impl std::fmt::Display for BudgetViolation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ContextWindowExceeded { prompt, context_window } => {
+            Self::ContextWindowExceeded {
+                prompt,
+                context_window,
+            } => {
                 write!(
                     f,
                     "Prompt token count ({prompt}) exceeds or exhausts context window ({context_window})"
@@ -248,20 +247,18 @@ pub fn decide_token_budget(
                 }
             }
         }
-        ModelThinkingCapability::OptionalThinking => {
-            match request.requested_thinking_budget {
-                Some(0) => {
-                    effective_thinking_budget = None;
-                    was_thinking_filtered = true;
-                }
-                Some(budget) => {
-                    effective_thinking_budget = Some(budget);
-                }
-                None => {
-                    effective_thinking_budget = None;
-                }
+        ModelThinkingCapability::OptionalThinking => match request.requested_thinking_budget {
+            Some(0) => {
+                effective_thinking_budget = None;
+                was_thinking_filtered = true;
             }
-        }
+            Some(budget) => {
+                effective_thinking_budget = Some(budget);
+            }
+            None => {
+                effective_thinking_budget = None;
+            }
+        },
     }
 
     // 5. Determine baseline max output tokens
@@ -317,8 +314,7 @@ pub fn decide_token_budget(
     }
 
     // 9. Compute remaining context headroom
-    let remaining_headroom_tokens =
-        available_headroom.saturating_sub(effective_max_output_tokens);
+    let remaining_headroom_tokens = available_headroom.saturating_sub(effective_max_output_tokens);
 
     Ok(TokenAllocation {
         effective_max_output_tokens,

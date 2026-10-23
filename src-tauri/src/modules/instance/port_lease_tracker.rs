@@ -61,7 +61,11 @@ impl PortLeaseTracker {
                     allocated_at: Instant::now(),
                 };
                 leases.insert(port, lease);
-                debug!(port = port, instance_id = instance_id, "Allocated instance port lease");
+                debug!(
+                    port = port,
+                    instance_id = instance_id,
+                    "Allocated instance port lease"
+                );
                 return Some(port);
             }
         }
@@ -86,7 +90,11 @@ impl PortLeaseTracker {
 
         if let Some(port) = port_to_remove {
             leases.remove(&port);
-            debug!(port = port, instance_id = instance_id, "Released instance port lease");
+            debug!(
+                port = port,
+                instance_id = instance_id,
+                "Released instance port lease"
+            );
             Some(port)
         } else {
             None

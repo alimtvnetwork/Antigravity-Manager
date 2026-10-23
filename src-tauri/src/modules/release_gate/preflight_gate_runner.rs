@@ -57,7 +57,8 @@ pub fn classify_preflight_requirements(changed_paths: &[&str]) -> PreflightRequi
     let mut planned_commands = Vec::new();
     if requires_rust {
         planned_commands.push("cd src-tauri && cargo fmt -- --check".to_string());
-        planned_commands.push("cd src-tauri && cargo clippy --all-targets --all-features".to_string());
+        planned_commands
+            .push("cd src-tauri && cargo clippy --all-targets --all-features".to_string());
     }
     if requires_frontend {
         planned_commands.push("npm run build".to_string());

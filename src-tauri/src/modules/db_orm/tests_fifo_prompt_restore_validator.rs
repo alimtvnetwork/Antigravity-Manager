@@ -3,8 +3,8 @@
 use super::fifo_prompt_restore_validator::{
     build_canonical_fifo_query, extract_order_by_clause, extract_table_name,
     sanitize_or_enforce_fifo_clause, validate_fifo_query, validate_prompt_restore_sql,
-    FifoOrderingViolation, FifoQueryValidationReport, FifoQueryViolation,
-    PromptRestoreQueryKind, MANDATORY_FIFO_ORDER_CLAUSE,
+    FifoOrderingViolation, FifoQueryValidationReport, FifoQueryViolation, PromptRestoreQueryKind,
+    MANDATORY_FIFO_ORDER_CLAUSE,
 };
 
 // ============================================================================
@@ -243,7 +243,9 @@ fn test_display_implementation() {
     let v2 = FifoQueryViolation::MissingTieBreakerIdAsc {
         clause: "created_at ASC".to_string(),
     };
-    assert!(v2.to_string().contains("Missing mandatory secondary tie-breaker"));
+    assert!(v2
+        .to_string()
+        .contains("Missing mandatory secondary tie-breaker"));
 
     let v3 = FifoQueryViolation::MissingOrderByClause;
     assert!(v3.to_string().contains("Missing ORDER BY clause"));
@@ -285,11 +287,15 @@ fn test_case_insensitive_query_handling() {
 
 #[test]
 fn test_legacy_valid_sql_canonical_fifo_passes() {
-    let sql = "SELECT id, prompt_text FROM active_prompts ORDER BY created_at ASC, id ASC LIMIT 50;";
+    let sql =
+        "SELECT id, prompt_text FROM active_prompts ORDER BY created_at ASC, id ASC LIMIT 50;";
     let report = validate_prompt_restore_sql(sql, PromptRestoreQueryKind::ActivePromptsRestore);
 
     assert!(report.is_valid);
-    assert_eq!(report.query_kind, PromptRestoreQueryKind::ActivePromptsRestore);
+    assert_eq!(
+        report.query_kind,
+        PromptRestoreQueryKind::ActivePromptsRestore
+    );
     assert_eq!(report.normalized_order_clause, MANDATORY_FIFO_ORDER_CLAUSE);
     assert!(report.violation.is_none());
 }
@@ -301,7 +307,9 @@ fn test_legacy_inverted_lifo_created_at_desc_rejected() {
 
     assert!(!report.is_valid);
     match report.violation {
-        Some(FifoOrderingViolation::ForbiddenLifoDetected { forbidden_clause, .. }) => {
+        Some(FifoOrderingViolation::ForbiddenLifoDetected {
+            forbidden_clause, ..
+        }) => {
             assert!(
                 forbidden_clause.contains("created_at DESC")
                     || forbidden_clause.contains("ORDER BY created_at DESC")

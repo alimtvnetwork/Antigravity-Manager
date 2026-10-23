@@ -210,10 +210,12 @@ fn test_fallback_audit_report_display() {
     let mut report = FallbackAuditReport::new();
     report.replacement_sites_scanned = 2;
     report.verified_fallbacks_found = 1;
-    report.violations.push(FallbackLinterViolation::SilentNoopOnZeroMatches {
-        file: "src-tauri/src/proxy/test.rs".to_string(),
-        line: 10,
-    });
+    report
+        .violations
+        .push(FallbackLinterViolation::SilentNoopOnZeroMatches {
+            file: "src-tauri/src/proxy/test.rs".to_string(),
+            line: 10,
+        });
     report.is_safe = false;
 
     let formatted = format!("{}", report);

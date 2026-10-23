@@ -125,12 +125,12 @@ mod tests {
         assert!(!report.is_clean);
         assert!(report.surviving_pids.is_empty());
         assert_eq!(report.surviving_paths.len(), 2);
-        assert!(report
-            .surviving_paths
-            .contains(&"data/sandboxes/agm-test-sandbox-leak-paths/workspaceStorage/state.vscdb".to_string()));
-        assert!(report
-            .surviving_paths
-            .contains(&"data/sandboxes/agm-test-sandbox-leak-paths/User/settings.json".to_string()));
+        assert!(report.surviving_paths.contains(
+            &"data/sandboxes/agm-test-sandbox-leak-paths/workspaceStorage/state.vscdb".to_string()
+        ));
+        assert!(report.surviving_paths.contains(
+            &"data/sandboxes/agm-test-sandbox-leak-paths/User/settings.json".to_string()
+        ));
         assert_eq!(report.violations.len(), 1);
         assert!(report.violations[0].contains("Filesystem remnants"));
         assert_eq!(sandbox.status, SandboxStatus::LeakedRemnants);

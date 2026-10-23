@@ -7,9 +7,7 @@ mod tests {
     use super::super::wal_passive_checkpoint_scheduler::{
         WalPassiveCheckpointScheduler, DEFAULT_IDLE_PASSIVE_INTERVAL_SECS,
     };
-    use super::super::wal_truncate_scheduler::{
-        WalTruncateScheduler, DEFAULT_MAX_WAL_PAGES,
-    };
+    use super::super::wal_truncate_scheduler::{WalTruncateScheduler, DEFAULT_MAX_WAL_PAGES};
     use rusqlite::Connection;
 
     #[test]

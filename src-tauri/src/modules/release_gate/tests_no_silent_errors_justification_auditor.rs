@@ -145,7 +145,9 @@ mod tests {
         assert!(is_comment_line("* inner block"));
         assert!(!is_comment_line("let x = 1;"));
 
-        assert!(is_fallible_let_expression("let _ = std::fs::remove_file(p);"));
+        assert!(is_fallible_let_expression(
+            "let _ = std::fs::remove_file(p);"
+        ));
         assert!(is_fallible_let_expression("let _ = invoke(\"cmd\");"));
         assert!(!is_fallible_let_expression("let _ = 123;"));
     }

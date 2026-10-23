@@ -83,8 +83,12 @@ fn test_cohesive_pr_single_functional_domain_with_docs() {
     assert!(report.is_cohesive);
     assert_eq!(report.primary_domain, Some(FunctionalDomain::GatewayProxy));
     assert_eq!(report.touched_domains.len(), 2);
-    assert!(report.touched_domains.contains(&FunctionalDomain::GatewayProxy));
-    assert!(report.touched_domains.contains(&FunctionalDomain::Documentation));
+    assert!(report
+        .touched_domains
+        .contains(&FunctionalDomain::GatewayProxy));
+    assert!(report
+        .touched_domains
+        .contains(&FunctionalDomain::Documentation));
     assert!(report.violations.is_empty());
     assert!(!report.has_violations());
     assert!(report.summary().contains("cohesive"));
@@ -105,7 +109,10 @@ fn test_entangled_pr_modifying_three_disjoint_domains() {
     assert_eq!(report.violations.len(), 1);
 
     match &report.violations[0] {
-        ScopeEntanglementViolation::UnrelatedDomainsMixed { domains, file_count } => {
+        ScopeEntanglementViolation::UnrelatedDomainsMixed {
+            domains,
+            file_count,
+        } => {
             assert_eq!(*file_count, 3);
             assert_eq!(domains.len(), 3);
             assert!(domains.contains(&FunctionalDomain::GatewayProxy));

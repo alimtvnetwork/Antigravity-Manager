@@ -1,18 +1,22 @@
 #[cfg(test)]
 mod tests {
-    use super::super::role_normalization_validator::{
-        validate_turn_order, CanonicalRole,
-    };
+    use super::super::role_normalization_validator::{validate_turn_order, CanonicalRole};
 
     #[test]
     fn test_parse_valid_roles() {
         assert_eq!(CanonicalRole::parse("user"), Some(CanonicalRole::User));
         assert_eq!(CanonicalRole::parse("human"), Some(CanonicalRole::User));
         assert_eq!(CanonicalRole::parse("model"), Some(CanonicalRole::Model));
-        assert_eq!(CanonicalRole::parse("assistant"), Some(CanonicalRole::Assistant));
+        assert_eq!(
+            CanonicalRole::parse("assistant"),
+            Some(CanonicalRole::Assistant)
+        );
         assert_eq!(CanonicalRole::parse("bot"), Some(CanonicalRole::Assistant));
         assert_eq!(CanonicalRole::parse("system"), Some(CanonicalRole::System));
-        assert_eq!(CanonicalRole::parse("developer"), Some(CanonicalRole::Developer));
+        assert_eq!(
+            CanonicalRole::parse("developer"),
+            Some(CanonicalRole::Developer)
+        );
         assert_eq!(CanonicalRole::parse("tool"), Some(CanonicalRole::Tool));
         assert_eq!(CanonicalRole::parse("function"), Some(CanonicalRole::Tool));
     }
@@ -20,8 +24,14 @@ mod tests {
     #[test]
     fn test_parse_case_and_whitespace() {
         assert_eq!(CanonicalRole::parse("  USER \n"), Some(CanonicalRole::User));
-        assert_eq!(CanonicalRole::parse("Assistant "), Some(CanonicalRole::Assistant));
-        assert_eq!(CanonicalRole::parse("DEVELOPER"), Some(CanonicalRole::Developer));
+        assert_eq!(
+            CanonicalRole::parse("Assistant "),
+            Some(CanonicalRole::Assistant)
+        );
+        assert_eq!(
+            CanonicalRole::parse("DEVELOPER"),
+            Some(CanonicalRole::Developer)
+        );
     }
 
     #[test]
@@ -66,7 +76,13 @@ mod tests {
         assert!(!validate_turn_order(&[]));
         assert!(!validate_turn_order(&[CanonicalRole::Model]));
         assert!(validate_turn_order(&[CanonicalRole::User]));
-        assert!(validate_turn_order(&[CanonicalRole::User, CanonicalRole::Model]));
-        assert!(validate_turn_order(&[CanonicalRole::System, CanonicalRole::Assistant]));
+        assert!(validate_turn_order(&[
+            CanonicalRole::User,
+            CanonicalRole::Model
+        ]));
+        assert!(validate_turn_order(&[
+            CanonicalRole::System,
+            CanonicalRole::Assistant
+        ]));
     }
 }

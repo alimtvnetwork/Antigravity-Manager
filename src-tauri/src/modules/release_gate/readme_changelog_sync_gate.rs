@@ -12,9 +12,8 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 /// Regex matching SemVer versions with optional leading 'v'.
-static VERSION_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"v?(\d+\.\d+\.\d+(-[a-zA-Z0-9\.]+)?)").expect("valid version regex")
-});
+static VERSION_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"v?(\d+\.\d+\.\d+(-[a-zA-Z0-9\.]+)?)").expect("valid version regex"));
 
 /// Section header for changelog in Chinese README.
 pub const CHINESE_CHANGELOG_HEADER: &str = "## 📝 更新日志";

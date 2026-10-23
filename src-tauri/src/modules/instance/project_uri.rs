@@ -18,11 +18,12 @@ pub fn format_project_folder_uri(path: &Path) -> String {
 /// Parses a `file:///...` URI back into a local PathBuf.
 pub fn parse_project_folder_uri(uri: &str) -> Option<PathBuf> {
     let stripped = uri.strip_prefix("file://")?;
-    let path_str = if cfg!(windows) && stripped.starts_with('/') && stripped.chars().nth(2) == Some(':') {
-        &stripped[1..]
-    } else {
-        stripped
-    };
+    let path_str =
+        if cfg!(windows) && stripped.starts_with('/') && stripped.chars().nth(2) == Some(':') {
+            &stripped[1..]
+        } else {
+            stripped
+        };
 
     Some(PathBuf::from(path_str))
 }

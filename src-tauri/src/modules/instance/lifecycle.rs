@@ -237,17 +237,18 @@ pub fn recover_stale_session_locks(data_path: &std::path::Path) -> usize {
 /// Probes the instance's DevTools active CDP port with a configurable backoff ladder.
 /// Returns the first responsive port or None if timed out across all steps.
 pub fn probe_instance_cdp_with_backoff(instance_id: &str, backoff_steps: &[u64]) -> Option<u16> {
-    let data_dir = if instance_id.is_empty() || instance_id == "default" || instance_id == "__default__" {
-        super::storage::get_default_antigravity_data_dir()
-    } else if let Ok(reg) = super::load_registry() {
-        reg.instances
-            .iter()
-            .find(|i| i.id == instance_id || i.name == instance_id)
-            .map(|i| std::path::PathBuf::from(&i.data_dir))
-            .unwrap_or_else(super::storage::get_default_antigravity_data_dir)
-    } else {
-        super::storage::get_default_antigravity_data_dir()
-    };
+    let data_dir =
+        if instance_id.is_empty() || instance_id == "default" || instance_id == "__default__" {
+            super::storage::get_default_antigravity_data_dir()
+        } else if let Ok(reg) = super::load_registry() {
+            reg.instances
+                .iter()
+                .find(|i| i.id == instance_id || i.name == instance_id)
+                .map(|i| std::path::PathBuf::from(&i.data_dir))
+                .unwrap_or_else(super::storage::get_default_antigravity_data_dir)
+        } else {
+            super::storage::get_default_antigravity_data_dir()
+        };
 
     let steps = if backoff_steps.is_empty() {
         &[500, 1000, 2000][..]

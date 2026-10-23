@@ -102,10 +102,7 @@ impl fmt::Display for JobBreakawayMode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LauncherSecurityViolation {
     /// Prohibited attempt to execute a raw Windows batch script directly.
-    DirectBatchFileExecutionDisallowed {
-        path: String,
-        extension: String,
-    },
+    DirectBatchFileExecutionDisallowed { path: String, extension: String },
     /// All configured stages in the fallback ladder failed or were disallowed.
     AllLaunchStagesFailed {
         attempted_stages: Vec<LaunchStage>,
@@ -302,10 +299,12 @@ fn resolve_stage1_target(
     in_restricted_job_object: bool,
 ) -> Result<Option<LaunchDispatchPlan>, LauncherSecurityViolation> {
     if is_disallowed_batch_script(target) {
-        return Err(LauncherSecurityViolation::DirectBatchFileExecutionDisallowed {
-            path: target.to_string(),
-            extension: extract_batch_extension(target),
-        });
+        return Err(
+            LauncherSecurityViolation::DirectBatchFileExecutionDisallowed {
+                path: target.to_string(),
+                extension: extract_batch_extension(target),
+            },
+        );
     }
     if target.is_empty() {
         return Ok(None);
@@ -325,10 +324,12 @@ fn resolve_stage2_base(
     in_restricted_job_object: bool,
 ) -> Result<Option<LaunchDispatchPlan>, LauncherSecurityViolation> {
     if is_disallowed_batch_script(base) {
-        return Err(LauncherSecurityViolation::DirectBatchFileExecutionDisallowed {
-            path: base.to_string(),
-            extension: extract_batch_extension(base),
-        });
+        return Err(
+            LauncherSecurityViolation::DirectBatchFileExecutionDisallowed {
+                path: base.to_string(),
+                extension: extract_batch_extension(base),
+            },
+        );
     }
     if base.is_empty() {
         return Ok(None);
@@ -342,10 +343,7 @@ fn resolve_stage2_base(
 }
 
 /// Attempts Stage 3 launch planning using Windows Shell dispatch (`cmd.exe /c start "" <args>`).
-fn resolve_stage3_shell(
-    allow_shell_fallback: bool,
-    args: &[String],
-) -> Option<LaunchDispatchPlan> {
+fn resolve_stage3_shell(allow_shell_fallback: bool, args: &[String]) -> Option<LaunchDispatchPlan> {
     if !allow_shell_fallback {
         return None;
     }
@@ -381,7 +379,9 @@ pub fn plan_multi_stage_launch(
     in_restricted_job_object: bool,
 ) -> Result<LaunchDispatchPlan, LauncherSecurityViolation> {
     if let Some(ref target) = spec.target_binary_path {
-        if let Some(plan) = resolve_stage1_target(target, &spec.arguments, in_restricted_job_object)? {
+        if let Some(plan) =
+            resolve_stage1_target(target, &spec.arguments, in_restricted_job_object)?
+        {
             return Ok(plan);
         }
     }

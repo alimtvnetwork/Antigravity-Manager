@@ -7,7 +7,7 @@ use super::account_switch_audit_emitter::{
     build_switch_audit_event, clear_audit_events, emit_account_switch_audit,
     export_buffered_events_json, format_audit_event_json, get_recent_audit_events,
     parse_audit_event_json, rank_candidate_scores, total_emitted_audit_events_count,
-    AccountSwitchAuditEvent, AccountSwitchAuditEmitter, CandidateAuditScore, SwitchTriggerReason,
+    AccountSwitchAuditEmitter, AccountSwitchAuditEvent, CandidateAuditScore, SwitchTriggerReason,
 };
 
 #[test]
@@ -29,7 +29,10 @@ fn test_switch_trigger_reason_variants_and_formatting() {
         assert_eq!(format!("{variant}"), expected_str);
 
         // Test parsing by uppercase identifier
-        assert_eq!(SwitchTriggerReason::from_str_name(expected_str), Some(variant));
+        assert_eq!(
+            SwitchTriggerReason::from_str_name(expected_str),
+            Some(variant)
+        );
     }
 
     // Test parsing by Rust variant name
@@ -64,14 +67,7 @@ fn test_switch_trigger_reason_variants_and_formatting() {
 
 #[test]
 fn test_candidate_audit_score_creation_and_fields() {
-    let candidate = CandidateAuditScore::new(
-        "acc_beta_001",
-        875.5,
-        0.85,
-        15.0,
-        5.0,
-        false,
-    );
+    let candidate = CandidateAuditScore::new("acc_beta_001", 875.5, 0.85, 15.0, 5.0, false);
 
     assert_eq!(candidate.candidate_account_id, "acc_beta_001");
     assert_eq!(candidate.final_score, 875.5);
@@ -115,7 +111,9 @@ fn test_candidate_scores_ranking_breakdown() {
     assert_eq!(event_ranked[3].candidate_account_id, "acc_4");
 
     // Target candidate lookup
-    let target_score = event.target_candidate_score().expect("target score present");
+    let target_score = event
+        .target_candidate_score()
+        .expect("target score present");
     assert_eq!(target_score.candidate_account_id, "acc_2");
     assert_eq!(target_score.final_score, 950.0);
 }
@@ -210,7 +208,8 @@ fn test_serialization_and_json_parsing_roundtrip() {
 #[test]
 fn test_parse_audit_event_json_error_propagation() {
     let invalid_json = "{ \"event_id\": \"not_closed_json\" ";
-    let err = parse_audit_event_json(invalid_json).expect_err("should return AppError on malformed JSON");
+    let err =
+        parse_audit_event_json(invalid_json).expect_err("should return AppError on malformed JSON");
 
     match err {
         crate::error::AppError::Config(msg) => {

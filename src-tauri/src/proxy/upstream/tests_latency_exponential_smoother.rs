@@ -1,8 +1,6 @@
 //! Unit tests for Upstream Latency Exponential Smoother (Imp-557).
 
-use super::latency_exponential_smoother::{
-    LatencyExponentialSmoother, LatencySmootherConfig,
-};
+use super::latency_exponential_smoother::{LatencyExponentialSmoother, LatencySmootherConfig};
 
 #[test]
 fn test_latency_smoother_initial_state() {

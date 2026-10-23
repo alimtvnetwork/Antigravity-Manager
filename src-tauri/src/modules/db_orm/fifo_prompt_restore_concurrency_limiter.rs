@@ -115,11 +115,18 @@ pub enum ConcurrencyLimiterViolation {
 impl fmt::Display for ConcurrencyLimiterViolation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ConcurrentRestoreConflict { table, current_holder, expires_in_ms } => {
+            Self::ConcurrentRestoreConflict {
+                table,
+                current_holder,
+                expires_in_ms,
+            } => {
                 write!(f, "Concurrent restore conflict on table '{table}': held by '{current_holder}' (expires in {expires_in_ms} ms)")
             }
             Self::MaxPermitsExceeded { table, max_permits } => {
-                write!(f, "Max concurrent restore permits ({max_permits}) exceeded for table '{table}'")
+                write!(
+                    f,
+                    "Max concurrent restore permits ({max_permits}) exceeded for table '{table}'"
+                )
             }
         }
     }
@@ -188,7 +195,9 @@ pub fn has_active_lease(state: &LimiterState, table: RestoreQueueTable, now_ms: 
 /// Releases the restore lease identified by `lease_id`.
 pub fn release_restore_lease(state: &mut LimiterState, lease_id: &str) -> bool {
     let initial_len = state.active_leases.len();
-    state.active_leases.retain(|lease| lease.lease_id != lease_id);
+    state
+        .active_leases
+        .retain(|lease| lease.lease_id != lease_id);
     state.active_leases.len() < initial_len
 }
 

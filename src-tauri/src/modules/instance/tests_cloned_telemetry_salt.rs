@@ -22,7 +22,11 @@ mod tests {
         let inner = &tokens.sqm_id[1..tokens.sqm_id.len() - 1];
         for c in inner.chars() {
             if c.is_alphabetic() {
-                assert!(c.is_uppercase(), "character {} should be uppercase in sqmId", c);
+                assert!(
+                    c.is_uppercase(),
+                    "character {} should be uppercase in sqmId",
+                    c
+                );
             }
         }
     }

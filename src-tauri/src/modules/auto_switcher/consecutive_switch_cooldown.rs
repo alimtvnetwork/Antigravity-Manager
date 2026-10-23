@@ -58,10 +58,12 @@ impl ConsecutiveSwitchCooldown {
             Err(_) => return self.config.base_penalty,
         };
 
-        let entry = map.entry(instance_id.to_string()).or_insert_with(|| InstanceCooldownState {
-            consecutive_count: 0,
-            last_switch_at: now,
-        });
+        let entry = map
+            .entry(instance_id.to_string())
+            .or_insert_with(|| InstanceCooldownState {
+                consecutive_count: 0,
+                last_switch_at: now,
+            });
 
         if now.duration_since(entry.last_switch_at) > self.config.reset_idle_duration {
             entry.consecutive_count = 1;
@@ -70,7 +72,10 @@ impl ConsecutiveSwitchCooldown {
         }
         entry.last_switch_at = now;
 
-        let multiplier = self.config.penalty_multiplier.powi((entry.consecutive_count.saturating_sub(1)) as i32);
+        let multiplier = self
+            .config
+            .penalty_multiplier
+            .powi((entry.consecutive_count.saturating_sub(1)) as i32);
         let penalty_millis = (self.config.base_penalty.as_millis() as f64 * multiplier) as u64;
         let clamped = Duration::from_millis(penalty_millis).min(self.config.max_penalty);
 

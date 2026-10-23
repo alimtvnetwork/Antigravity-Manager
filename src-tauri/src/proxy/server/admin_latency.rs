@@ -25,8 +25,14 @@ pub struct UpstreamBenchmarkReport {
 /// Probes upstream endpoints with lightweight HEAD or GET checks to determine live latency.
 pub async fn benchmark_upstream_endpoints() -> UpstreamBenchmarkReport {
     let endpoints = vec![
-        ("Google Daily", "https://daily-generativelanguage.sandbox.googleapis.com"),
-        ("Google Sandbox", "https://sandbox-generativelanguage.googleapis.com"),
+        (
+            "Google Daily",
+            "https://daily-generativelanguage.sandbox.googleapis.com",
+        ),
+        (
+            "Google Sandbox",
+            "https://sandbox-generativelanguage.googleapis.com",
+        ),
         ("Google Prod", "https://generativelanguage.googleapis.com"),
         ("Anthropic Claude", "https://api.anthropic.com"),
     ];

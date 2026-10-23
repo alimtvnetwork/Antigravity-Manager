@@ -54,8 +54,8 @@ pub fn collect_vault_files(vault_path: &Path) -> Result<Vec<PathBuf>, String> {
         let entries = std::fs::read_dir(vault_path)
             .map_err(|e| format!("Failed to read vault folder: {}", e))?;
         for entry in entries {
-            let entry = entry
-                .map_err(|e| format!("Failed to read an entry in the vault folder: {}", e))?;
+            let entry =
+                entry.map_err(|e| format!("Failed to read an entry in the vault folder: {}", e))?;
             let path = entry.path();
             let is_json = path
                 .extension()
@@ -68,9 +68,7 @@ pub fn collect_vault_files(vault_path: &Path) -> Result<Vec<PathBuf>, String> {
         }
         files.sort();
         if files.is_empty() {
-            return Err(
-                "No Supabase JSON files found in the given vault folder.".to_string(),
-            );
+            return Err("No Supabase JSON files found in the given vault folder.".to_string());
         }
         return Ok(files);
     }
@@ -120,9 +118,11 @@ pub async fn push_settings(vault_path: &Path) -> PushReport {
             Ok(c) => c,
             Err(e) => {
                 import_failed = true;
-                report
-                    .steps
-                    .push(step("import", false, format!("Failed to read '{}': {}", label, e)));
+                report.steps.push(step(
+                    "import",
+                    false,
+                    format!("Failed to read '{}': {}", label, e),
+                ));
                 continue;
             }
         };
@@ -190,7 +190,9 @@ pub async fn push_settings(vault_path: &Path) -> PushReport {
 
     // Step 2: sync the local node now.
     match supabase_sync::sync_local_node_now().await {
-        Ok(()) => report.steps.push(step("sync", true, "Sync completed successfully.")),
+        Ok(()) => report
+            .steps
+            .push(step("sync", true, "Sync completed successfully.")),
         Err(e) => {
             report
                 .steps

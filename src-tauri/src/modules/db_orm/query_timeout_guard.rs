@@ -14,10 +14,13 @@ impl QueryTimeoutGuard {
         let deadline = Instant::now() + timeout;
 
         // Callback every 1000 virtual machine opcodes
-        conn.progress_handler(1000, Some(move || {
-            // Return true to interrupt/abort query, false to continue
-            Instant::now() >= deadline
-        }));
+        conn.progress_handler(
+            1000,
+            Some(move || {
+                // Return true to interrupt/abort query, false to continue
+                Instant::now() >= deadline
+            }),
+        );
     }
 
     /// Clears any installed progress handler from the connection.

@@ -309,7 +309,9 @@ pub async fn trigger_manual_sync() -> Result<(), AppError> {
 pub fn spawn_background_telemetry_push() {
     tauri::async_runtime::spawn(async move {
         if let Err(e) = sync_local_node_now().await {
-            tracing::warn!("Background telemetry push to Supabase encountered non-fatal error: {e}");
+            tracing::warn!(
+                "Background telemetry push to Supabase encountered non-fatal error: {e}"
+            );
         }
     });
 }

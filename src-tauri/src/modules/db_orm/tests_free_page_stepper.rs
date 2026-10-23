@@ -7,11 +7,13 @@ use super::free_page_stepper::FreePageStepper;
 fn setup_test_db() -> Connection {
     let conn = Connection::open_in_memory().expect("Open in-memory db");
     // Incremental vacuum must be set before creating tables
-    conn.execute_batch("PRAGMA auto_vacuum = INCREMENTAL;").expect("Set auto_vacuum");
+    conn.execute_batch("PRAGMA auto_vacuum = INCREMENTAL;")
+        .expect("Set auto_vacuum");
     conn.execute_batch(
         "CREATE TABLE test_data (id INTEGER PRIMARY KEY, content TEXT);
-         CREATE INDEX idx_content ON test_data(content);"
-    ).expect("Create tables");
+         CREATE INDEX idx_content ON test_data(content);",
+    )
+    .expect("Create tables");
     conn
 }
 
@@ -32,14 +34,18 @@ fn test_step_vacuum_reclaims_freelist_pages() {
 
     // Populate data
     {
-        let mut stmt = conn.prepare("INSERT INTO test_data (content) VALUES (?)").unwrap();
+        let mut stmt = conn
+            .prepare("INSERT INTO test_data (content) VALUES (?)")
+            .unwrap();
         for i in 0..500 {
-            stmt.execute([format!("content_block_filler_string_data_{}", i)]).unwrap();
+            stmt.execute([format!("content_block_filler_string_data_{}", i)])
+                .unwrap();
         }
     }
 
     // Delete large portion of data to populate freelist
-    conn.execute_batch("DELETE FROM test_data WHERE id > 50;").unwrap();
+    conn.execute_batch("DELETE FROM test_data WHERE id > 50;")
+        .unwrap();
 
     // Run stepped vacuum with low threshold
     let result = FreePageStepper::step_vacuum(&conn, 1, 5).expect("Step vacuum should execute");

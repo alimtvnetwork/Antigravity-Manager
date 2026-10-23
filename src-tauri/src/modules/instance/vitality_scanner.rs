@@ -3,7 +3,11 @@
 
 #[cfg(windows)]
 extern "system" {
-    fn OpenProcess(dwDesiredAccess: u32, bInheritHandle: i32, dwProcessId: u32) -> *mut std::ffi::c_void;
+    fn OpenProcess(
+        dwDesiredAccess: u32,
+        bInheritHandle: i32,
+        dwProcessId: u32,
+    ) -> *mut std::ffi::c_void;
     fn CloseHandle(hObject: *mut std::ffi::c_void) -> i32;
     fn GetExitCodeProcess(hProcess: *mut std::ffi::c_void, lpExitCode: *mut u32) -> i32;
 }
@@ -41,5 +45,7 @@ pub fn is_process_alive(pid: u32) -> bool {
 
 /// Scans a list of candidate PIDs, returning their vitality statuses.
 pub fn verify_instance_pids(pids: &[u32]) -> Vec<(u32, bool)> {
-    pids.iter().map(|&pid| (pid, is_process_alive(pid))).collect()
+    pids.iter()
+        .map(|&pid| (pid, is_process_alive(pid)))
+        .collect()
 }

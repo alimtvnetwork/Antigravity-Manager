@@ -10,7 +10,10 @@ pub struct MessageTurnValidator;
 impl MessageTurnValidator {
     /// Affirmative predicate checking if a role is permitted in Claude messages.
     pub fn is_valid_role(role: &str) -> bool {
-        matches!(role.trim().to_ascii_lowercase().as_str(), "user" | "assistant")
+        matches!(
+            role.trim().to_ascii_lowercase().as_str(),
+            "user" | "assistant"
+        )
     }
 
     /// Checks if a role is 'user'.
@@ -38,7 +41,10 @@ impl MessageTurnValidator {
         for (i, msg) in messages.iter_mut().enumerate() {
             let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("");
             if !Self::is_valid_role(role) {
-                return Err(format!("Message at index {} has invalid role '{}'", i, role));
+                return Err(format!(
+                    "Message at index {} has invalid role '{}'",
+                    i, role
+                ));
             }
 
             // Clean content if it is a string

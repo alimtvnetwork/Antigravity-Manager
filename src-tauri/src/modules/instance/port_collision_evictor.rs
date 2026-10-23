@@ -2,7 +2,7 @@
 //! Tests whether a proposed CDP remote debugging port (e.g. 9222) is actively occupied,
 //! automatically evicting collisions and selecting an alternative vacant port in the safe range (9222-9399).
 
-use std::net::{TcpListener, SocketAddr};
+use std::net::{SocketAddr, TcpListener};
 
 /// Range of allowed debugging ports.
 pub const CDP_PORT_MIN: u16 = 9222;

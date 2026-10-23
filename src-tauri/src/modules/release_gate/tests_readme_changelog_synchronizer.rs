@@ -61,7 +61,10 @@ mod tests {
 
         let report = verify_readme_changelog_sync(tag, readme_zh, readme_en);
         assert!(report.is_synchronized);
-        assert_eq!(report.tag_type, ReleaseTagType::Stable("v4.251.0".to_string()));
+        assert_eq!(
+            report.tag_type,
+            ReleaseTagType::Stable("v4.251.0".to_string())
+        );
         assert!(report.violations.is_empty());
     }
 

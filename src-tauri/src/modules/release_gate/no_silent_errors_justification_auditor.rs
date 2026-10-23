@@ -43,14 +43,22 @@ impl std::fmt::Display for SilentErrorViolation {
                     file, line
                 )
             }
-            Self::BareLetUnderscoreResultDiscard { file, line, snippet } => {
+            Self::BareLetUnderscoreResultDiscard {
+                file,
+                line,
+                snippet,
+            } => {
                 write!(
                     f,
                     "{}:{}: bare 'let _ = ' discards fallible result: {}",
                     file, line, snippet
                 )
             }
-            Self::BareOkResultDiscard { file, line, snippet } => {
+            Self::BareOkResultDiscard {
+                file,
+                line,
+                snippet,
+            } => {
                 write!(
                     f,
                     "{}:{}: bare '.ok()' discards error without routing: {}",
@@ -190,23 +198,25 @@ fn audit_line(
 
     if trimmed.contains(".ok()") {
         report.total_sites_audited += 1;
-        report.violations.push(SilentErrorViolation::BareOkResultDiscard {
-            file: file_name.to_string(),
-            line: line_idx + 1,
-            snippet: trimmed.to_string(),
-        });
+        report
+            .violations
+            .push(SilentErrorViolation::BareOkResultDiscard {
+                file: file_name.to_string(),
+                line: line_idx + 1,
+                snippet: trimmed.to_string(),
+            });
         return;
     }
 
     if trimmed.contains("let _ =") && is_fallible_let_expression(trimmed) {
         report.total_sites_audited += 1;
-        report.violations.push(
-            SilentErrorViolation::BareLetUnderscoreResultDiscard {
+        report
+            .violations
+            .push(SilentErrorViolation::BareLetUnderscoreResultDiscard {
                 file: file_name.to_string(),
                 line: line_idx + 1,
                 snippet: trimmed.to_string(),
-            },
-        );
+            });
     }
 }
 

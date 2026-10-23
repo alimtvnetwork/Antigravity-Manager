@@ -34,7 +34,8 @@ pub fn evaluate_cache_invalidation_prompt(
         return CacheInvalidationPromptDecision {
             should_prompt_user: false,
             is_target_version_matched: true,
-            reason: "User has already acknowledged cache invalidation for target version".to_string(),
+            reason: "User has already acknowledged cache invalidation for target version"
+                .to_string(),
         };
     }
 

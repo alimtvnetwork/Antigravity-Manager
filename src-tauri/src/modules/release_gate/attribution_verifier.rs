@@ -19,11 +19,16 @@ pub fn verify_author_attribution(content: &str) -> AttributionAuditResult {
 
     for word in content.split_whitespace() {
         // Strip trailing punctuation like ',', '.', ')', ']'
-        let clean = word.trim_matches(|c: char| c == '(' || c == ')' || c == '[' || c == ']' || c == ',' || c == '.');
+        let clean = word.trim_matches(|c: char| {
+            c == '(' || c == ')' || c == '[' || c == ']' || c == ',' || c == '.'
+        });
         if clean.starts_with('@') && clean.len() > 1 {
             let handle = &clean[1..];
             // Valid handle characters (alphanumeric and hyphens)
-            if handle.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+            if handle
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-')
+            {
                 if handle.eq_ignore_ascii_case("aukgit") {
                     if !authorized.contains(&"@aukgit".to_string()) {
                         authorized.push("@aukgit".to_string());

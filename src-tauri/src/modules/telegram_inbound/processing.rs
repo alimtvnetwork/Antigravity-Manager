@@ -22,7 +22,9 @@ pub fn is_valid_node_identifier(prefix_candidate: &str, cmd_candidate: &str) -> 
     p_lower.starts_with('w')
         || p_lower.starts_with("node")
         || p_lower.starts_with("vm")
-        || prefix_candidate.chars().all(|c| c.is_ascii_digit() || c == '.')
+        || prefix_candidate
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '.')
         || prefix_candidate.eq_ignore_ascii_case("local")
 }
 

@@ -14,10 +14,7 @@ const FORBIDDEN_INTERNAL_HEADERS: &[&str] = &[
 ];
 
 /// Disallowed Google SDK/API headers stripped for prefix stability.
-const DISALLOWED_GOOG_HEADERS: &[&str] = &[
-    "x-goog-api-client",
-    "x-goog-api-key",
-];
+const DISALLOWED_GOOG_HEADERS: &[&str] = &["x-goog-api-client", "x-goog-api-key"];
 
 /// Policy controlling request header sanitization and deterministic formatting.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -20,7 +20,9 @@ pub struct WalPassiveCheckpointScheduler;
 
 impl WalPassiveCheckpointScheduler {
     /// Executes a PASSIVE checkpoint on the provided SQLite connection.
-    pub fn execute_passive_checkpoint(conn: &Connection) -> Result<PassiveCheckpointStats, rusqlite::Error> {
+    pub fn execute_passive_checkpoint(
+        conn: &Connection,
+    ) -> Result<PassiveCheckpointStats, rusqlite::Error> {
         let mut stmt = conn.prepare("PRAGMA wal_checkpoint(PASSIVE);")?;
         let stats = stmt.query_row([], |row| {
             let busy_code: i32 = row.get(0)?;

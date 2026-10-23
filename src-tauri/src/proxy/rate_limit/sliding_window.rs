@@ -86,7 +86,8 @@ impl SlidingWindowLimiter {
             }
         }
 
-        let is_allowed = (self.max_tokens_per_minute == 0 || tokens_minute <= self.max_tokens_per_minute)
+        let is_allowed = (self.max_tokens_per_minute == 0
+            || tokens_minute <= self.max_tokens_per_minute)
             && (self.max_tokens_per_hour == 0 || tokens_hour <= self.max_tokens_per_hour);
 
         SlidingWindowStatus {

@@ -1,8 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::super::rotation_brake::{
-        check_rotation_frequency, DEFAULT_MAX_SWITCHES_PER_HOUR,
-    };
+    use super::super::rotation_brake::{check_rotation_frequency, DEFAULT_MAX_SWITCHES_PER_HOUR};
 
     #[test]
     fn test_rotation_frequency_empty_history() {
@@ -28,13 +26,7 @@ mod tests {
     #[test]
     fn test_rotation_frequency_at_limit_blocks() {
         let now = 10_000;
-        let timestamps = vec![
-            now - 1000,
-            now - 800,
-            now - 600,
-            now - 400,
-            now - 200,
-        ]; // Exactly 5 switches
+        let timestamps = vec![now - 1000, now - 800, now - 600, now - 400, now - 200]; // Exactly 5 switches
         let check = check_rotation_frequency(&timestamps, now, None);
 
         assert!(!check.can_rotate);
@@ -66,10 +58,7 @@ mod tests {
         // one_hour_ago is 10_000 - 3600 = 6400.
         // Timestamps < 6400 are outside the 1-hour window.
         let timestamps = vec![
-            1000,
-            2000,
-            5000,
-            6399, // stale (< 6400)
+            1000, 2000, 5000, 6399, // stale (< 6400)
             6400, // exactly 1 hour ago (included)
             8000, // recent
             9500, // recent

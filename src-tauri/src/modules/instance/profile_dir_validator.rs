@@ -23,11 +23,15 @@ pub fn validate_profile_directory(
     allowed_base_root: &Path,
 ) -> Result<PathBuf, ProfileDirValidationError> {
     if !path.exists() {
-        return Err(ProfileDirValidationError::NotFound(path.display().to_string()));
+        return Err(ProfileDirValidationError::NotFound(
+            path.display().to_string(),
+        ));
     }
 
     if !path.is_dir() {
-        return Err(ProfileDirValidationError::NotADirectory(path.display().to_string()));
+        return Err(ProfileDirValidationError::NotADirectory(
+            path.display().to_string(),
+        ));
     }
 
     // Canonicalize to resolve symlinks and directory dots
@@ -35,9 +39,9 @@ pub fn validate_profile_directory(
         .canonicalize()
         .map_err(|_| ProfileDirValidationError::NotFound(path.display().to_string()))?;
 
-    let canonical_base = allowed_base_root
-        .canonicalize()
-        .map_err(|_| ProfileDirValidationError::NotFound(allowed_base_root.display().to_string()))?;
+    let canonical_base = allowed_base_root.canonicalize().map_err(|_| {
+        ProfileDirValidationError::NotFound(allowed_base_root.display().to_string())
+    })?;
 
     if !canonical_path.starts_with(&canonical_base) {
         return Err(ProfileDirValidationError::PathTraversalDetected {

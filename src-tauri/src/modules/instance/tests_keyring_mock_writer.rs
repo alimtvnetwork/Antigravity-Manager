@@ -24,7 +24,10 @@ mod tests {
         assert!(!temp_dir.exists());
 
         let res = KeyringMockWriter::ensure_keyring_marker(&temp_dir);
-        assert!(res.is_ok(), "Writing keyring marker in missing dir must succeed");
+        assert!(
+            res.is_ok(),
+            "Writing keyring marker in missing dir must succeed"
+        );
 
         let status = res.unwrap();
         assert!(status.is_present);
@@ -60,7 +63,10 @@ mod tests {
         let marker_file = temp_dir.join(KEYRING_MARKER_FILENAME);
         let custom_content = "custom-keyring-override=1\n";
         // Justification: Write custom test marker
-        crate::error::record_ignored(fs::write(&marker_file, custom_content), "write custom marker");
+        crate::error::record_ignored(
+            fs::write(&marker_file, custom_content),
+            "write custom marker",
+        );
 
         let res = KeyringMockWriter::ensure_keyring_marker(&temp_dir);
         assert!(res.is_ok());
@@ -69,7 +75,10 @@ mod tests {
         assert!(!status.created_new);
 
         let read_back = fs::read_to_string(&marker_file).unwrap();
-        assert_eq!(read_back, custom_content, "Existing marker content must not be overwritten");
+        assert_eq!(
+            read_back, custom_content,
+            "Existing marker content must not be overwritten"
+        );
 
         // Justification: Clean up test fixture directory
         crate::error::record_ignored(fs::remove_dir_all(&temp_dir), "clean test dir");

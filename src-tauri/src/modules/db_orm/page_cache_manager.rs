@@ -7,8 +7,8 @@ use rusqlite::Connection;
 /// Target memory profiles for page caching.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MemoryProfile {
-    LowMemory,     // 8 MB cache
-    Standard,      // 32 MB cache
+    LowMemory,      // 8 MB cache
+    Standard,       // 32 MB cache
     HighThroughput, // 128 MB cache
 }
 
@@ -16,7 +16,7 @@ impl MemoryProfile {
     /// Returns negative KiB value for `PRAGMA cache_size = -N;`.
     pub fn cache_size_kib(&self) -> i32 {
         match self {
-            Self::LowMemory => -8192,         // 8 MB
+            Self::LowMemory => -8192,        // 8 MB
             Self::Standard => -32768,        // 32 MB
             Self::HighThroughput => -131072, // 128 MB
         }

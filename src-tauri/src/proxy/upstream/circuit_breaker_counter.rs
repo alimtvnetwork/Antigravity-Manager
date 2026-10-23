@@ -8,9 +8,9 @@ use std::time::{Duration, Instant};
 /// Operational state of a circuit breaker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CircuitState {
-    Closed,  // Operating normally
-    Open,    // Tripped, fast-failing traffic
-    HalfOpen,// Probing upstream recovery
+    Closed,   // Operating normally
+    Open,     // Tripped, fast-failing traffic
+    HalfOpen, // Probing upstream recovery
 }
 
 /// Configuration thresholds for circuit breakers.
@@ -119,7 +119,9 @@ impl CircuitBreakerCounter {
         entry.last_failure_at = Some(now);
         entry.consecutive_failures += 1;
 
-        if entry.consecutive_failures >= self.config.failure_threshold || entry.state == CircuitState::HalfOpen {
+        if entry.consecutive_failures >= self.config.failure_threshold
+            || entry.state == CircuitState::HalfOpen
+        {
             entry.state = CircuitState::Open;
             entry.tripped_at = Some(now);
         }

@@ -29,18 +29,12 @@ fn test_classify_header() {
         classify_header("connection"),
         HeaderDisposition::StripHopByHop
     );
-    assert_eq!(
-        classify_header("alt-svc"),
-        HeaderDisposition::StripHopByHop
-    );
+    assert_eq!(classify_header("alt-svc"), HeaderDisposition::StripHopByHop);
     assert_eq!(
         classify_header("transfer-encoding"),
         HeaderDisposition::StripHopByHop
     );
-    assert_eq!(
-        classify_header("server"),
-        HeaderDisposition::StripInternal
-    );
+    assert_eq!(classify_header("server"), HeaderDisposition::StripInternal);
     assert_eq!(
         classify_header("set-cookie"),
         HeaderDisposition::StripInternal
@@ -53,14 +47,8 @@ fn test_classify_header() {
         classify_header("x-goog-ratelimit-remaining"),
         HeaderDisposition::StripInternal
     );
-    assert_eq!(
-        classify_header("date"),
-        HeaderDisposition::Keep
-    );
-    assert_eq!(
-        classify_header("etag"),
-        HeaderDisposition::Keep
-    );
+    assert_eq!(classify_header("date"), HeaderDisposition::Keep);
+    assert_eq!(classify_header("etag"), HeaderDisposition::Keep);
 }
 
 #[test]
@@ -120,7 +108,9 @@ fn test_sanitize_response_headers_strips_internal_and_hop_by_hop() {
     assert!(!report.final_headers.contains_key("server"));
     assert!(!report.final_headers.contains_key("alt-svc"));
     assert!(!report.final_headers.contains_key("x-goog-safety-ratings"));
-    assert!(!report.final_headers.contains_key("x-goog-ratelimit-remaining"));
+    assert!(!report
+        .final_headers
+        .contains_key("x-goog-ratelimit-remaining"));
     assert!(!report.final_headers.contains_key("set-cookie"));
     assert!(!report.final_headers.contains_key("connection"));
 

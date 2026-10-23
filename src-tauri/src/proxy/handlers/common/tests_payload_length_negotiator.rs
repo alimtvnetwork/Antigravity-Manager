@@ -128,10 +128,7 @@ fn test_headers_parsing_transfer_encoding_chunked() {
 
     // Multi-value or uppercase chunked
     let mut multi_headers = HeaderMap::new();
-    multi_headers.insert(
-        TRANSFER_ENCODING,
-        HeaderValue::from_static("gzip, Chunked"),
-    );
+    multi_headers.insert(TRANSFER_ENCODING, HeaderValue::from_static("gzip, Chunked"));
     assert_eq!(
         negotiate_payload_strategy_from_headers(&multi_headers, &config),
         PayloadLengthDecision::StreamDirectly
@@ -151,10 +148,7 @@ fn test_headers_parsing_content_length() {
 
     let mut headers_oversize = HeaderMap::new();
     let limit_str = (DEFAULT_MAX_BUFFERED_BYTES + 1024).to_string();
-    headers_oversize.insert(
-        CONTENT_LENGTH,
-        HeaderValue::from_str(&limit_str).unwrap(),
-    );
+    headers_oversize.insert(CONTENT_LENGTH, HeaderValue::from_str(&limit_str).unwrap());
     assert_eq!(
         negotiate_payload_strategy_from_headers(&headers_oversize, &config),
         PayloadLengthDecision::RejectOversized(

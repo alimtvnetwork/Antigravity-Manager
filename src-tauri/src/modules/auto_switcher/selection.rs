@@ -138,7 +138,11 @@ pub fn select_candidate_profiles(
         push_exclusion(&in_use_id);
     }
     // Strictly exclude the current instance's own account so it cannot rotate to itself
-    if let Some(cur_inst) = registry.instances.iter().find(|i| i.id == current_instance_id) {
+    if let Some(cur_inst) = registry
+        .instances
+        .iter()
+        .find(|i| i.id == current_instance_id)
+    {
         if let Some(ref acc_id) = cur_inst.bound_account_id {
             push_exclusion(acc_id);
             if let Ok(acc) = account::load_account(acc_id) {
@@ -151,7 +155,8 @@ pub fn select_candidate_profiles(
                 push_exclusion(&acc.id);
             }
         }
-        let is_default = cur_inst.is_default || cur_inst.id == "default" || cur_inst.id == "__default__";
+        let is_default =
+            cur_inst.is_default || cur_inst.id == "default" || cur_inst.id == "__default__";
         if is_default {
             if let Ok(Some(def_id)) = account::get_current_account_id() {
                 push_exclusion(&def_id);
@@ -420,7 +425,7 @@ pub fn select_candidate_profiles(
         // Sort by never-used first (last_used == 0), then by oldest last_used (ascending last_used timestamp: smallest first)
         cooldown_pool.sort_by(|(a_cand, a_last), (b_cand, b_last)| {
             match (*a_last == 0, *b_last == 0) {
-                (true, false) => std::cmp::Ordering::Less,    // a never used, prioritize a
+                (true, false) => std::cmp::Ordering::Less, // a never used, prioritize a
                 (false, true) => std::cmp::Ordering::Greater, // b never used, prioritize b
                 (true, true) => match b_cand.score.partial_cmp(&a_cand.score) {
                     Some(std::cmp::Ordering::Equal) | None => a_cand
@@ -504,7 +509,8 @@ pub async fn select_and_verify_next_best_profile(
                     }
                 }
             }
-            let is_default = cur_inst.is_default || cur_inst.id == "default" || cur_inst.id == "__default__";
+            let is_default =
+                cur_inst.is_default || cur_inst.id == "default" || cur_inst.id == "__default__";
             if is_default {
                 if let Ok(Some(def_id)) = account::get_current_account_id() {
                     if !effective_exclusions.contains(&def_id) {

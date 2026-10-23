@@ -9,8 +9,14 @@ fn test_format_window_control_capsule_normal_state() {
 
     assert_eq!(formatting.segment_count(), 3);
     assert!(!formatting.is_empty());
-    assert_eq!(formatting.container_classes, CANONICAL_CAPSULE_CONTAINER_CLASSES);
-    assert_eq!(formatting.divider_classes, CANONICAL_CAPSULE_DIVIDER_CLASSES);
+    assert_eq!(
+        formatting.container_classes,
+        CANONICAL_CAPSULE_CONTAINER_CLASSES
+    );
+    assert_eq!(
+        formatting.divider_classes,
+        CANONICAL_CAPSULE_DIVIDER_CLASSES
+    );
 
     // Segment 1: Minimize
     assert_eq!(formatting.segments[0].action, WindowControlAction::Minimize);
@@ -111,8 +117,12 @@ fn test_format_window_control_capsule_selective_toggles() {
 
 #[test]
 fn test_validate_capsule_classes() {
-    assert!(validate_capsule_classes(CANONICAL_CAPSULE_CONTAINER_CLASSES));
-    assert!(validate_capsule_classes("rounded-full border border-zinc-800"));
+    assert!(validate_capsule_classes(
+        CANONICAL_CAPSULE_CONTAINER_CLASSES
+    ));
+    assert!(validate_capsule_classes(
+        "rounded-full border border-zinc-800"
+    ));
     assert!(!validate_capsule_classes("rounded-md border"));
     assert!(!validate_capsule_classes("rounded-full bg-zinc-900"));
 }

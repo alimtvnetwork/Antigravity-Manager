@@ -20,7 +20,10 @@ impl CheckpointScheduler {
     pub const TRUNCATE_THRESHOLD_FRAMES: i32 = 4000;
 
     /// Evaluates current uncheckpointed WAL log frames and determines recommended action.
-    pub fn evaluate_action(uncheckpointed_frames: i32, is_idle_period: bool) -> ScheduledCheckpointAction {
+    pub fn evaluate_action(
+        uncheckpointed_frames: i32,
+        is_idle_period: bool,
+    ) -> ScheduledCheckpointAction {
         if uncheckpointed_frames >= Self::TRUNCATE_THRESHOLD_FRAMES {
             ScheduledCheckpointAction::Truncate
         } else if uncheckpointed_frames >= Self::RESTART_THRESHOLD_FRAMES {

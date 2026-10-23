@@ -53,7 +53,9 @@ mod tests {
     #[tokio::test]
     async fn test_resolver_invalid_host() {
         let resolver = DynamicDnsResolver::default();
-        let invalid = resolver.resolve("invalid.unresolvable.local.invalid", 80).await;
+        let invalid = resolver
+            .resolve("invalid.unresolvable.local.invalid", 80)
+            .await;
         assert!(invalid.is_err());
     }
 }

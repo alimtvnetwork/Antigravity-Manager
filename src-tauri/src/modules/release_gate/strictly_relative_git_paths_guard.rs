@@ -9,9 +9,8 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-static FILE_URI_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"file:///[^\s\)\"'`<>]+"#).expect("valid file uri regex")
-});
+static FILE_URI_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"file:///[^\s\)\"'`<>]+"#).expect("valid file uri regex"));
 
 static WINDOWS_DRIVE_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r#"(?i)\b[A-Za-z]:[\\/][^\s\)\"'`<>]+"#).expect("valid windows drive regex")
@@ -22,17 +21,13 @@ static POSIX_HOME_RE: Lazy<Regex> = Lazy::new(|| {
 });
 
 static POSIX_SYSTEM_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"(?:^|[^\w/])(/(?:var|etc|usr)/[^\s\)\"'`<>]+)"#).expect("valid posix system regex")
+    Regex::new(r#"(?:^|[^\w/])(/(?:var|etc|usr)/[^\s\)\"'`<>]+)"#)
+        .expect("valid posix system regex")
 });
 
 /// Permitted repository-relative path root prefixes.
-pub const VALID_RELATIVE_PATH_PREFIXES: &[&str] = &[
-    "02-spec/",
-    ".ai-memory/",
-    "src/",
-    "src-tauri/",
-    "cmd/",
-];
+pub const VALID_RELATIVE_PATH_PREFIXES: &[&str] =
+    &["02-spec/", ".ai-memory/", "src/", "src-tauri/", "cmd/"];
 
 /// Classification of absolute path violations.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -89,11 +84,7 @@ fn trim_trailing_punctuation(s: &str) -> &str {
     s.trim_end_matches(&['.', ',', ';', ':', '!', '?'][..])
 }
 
-fn detect_file_uris(
-    line_num: usize,
-    line: &mut String,
-    violations: &mut Vec<PathViolationKind>,
-) {
+fn detect_file_uris(line_num: usize, line: &mut String, violations: &mut Vec<PathViolationKind>) {
     for mat in FILE_URI_RE.find_iter(line) {
         let raw = trim_trailing_punctuation(mat.as_str());
         violations.push(PathViolationKind::FileUriAbsolute {
@@ -118,11 +109,7 @@ fn detect_windows_drive_paths(
     }
 }
 
-fn detect_posix_home_paths(
-    line_num: usize,
-    line: &str,
-    violations: &mut Vec<PathViolationKind>,
-) {
+fn detect_posix_home_paths(line_num: usize, line: &str, violations: &mut Vec<PathViolationKind>) {
     for cap in POSIX_HOME_RE.captures_iter(line) {
         if let Some(mat) = cap.get(1) {
             let raw = trim_trailing_punctuation(mat.as_str());
@@ -134,11 +121,7 @@ fn detect_posix_home_paths(
     }
 }
 
-fn detect_posix_system_paths(
-    line_num: usize,
-    line: &str,
-    violations: &mut Vec<PathViolationKind>,
-) {
+fn detect_posix_system_paths(line_num: usize, line: &str, violations: &mut Vec<PathViolationKind>) {
     for cap in POSIX_SYSTEM_RE.captures_iter(line) {
         if let Some(mat) = cap.get(1) {
             let raw = trim_trailing_punctuation(mat.as_str());
@@ -151,9 +134,9 @@ fn detect_posix_system_paths(
 }
 
 fn is_valid_relative_path(token: &str) -> bool {
-    VALID_RELATIVE_PATH_PREFIXES.iter().any(|&prefix| {
-        token.starts_with(prefix) || token.starts_with(&prefix.replace('/', "\\"))
-    })
+    VALID_RELATIVE_PATH_PREFIXES
+        .iter()
+        .any(|&prefix| token.starts_with(prefix) || token.starts_with(&prefix.replace('/', "\\")))
 }
 
 fn count_line_relative_paths(line: &str) -> usize {
@@ -170,11 +153,7 @@ fn count_line_relative_paths(line: &str) -> usize {
         .count()
 }
 
-fn scan_line_for_violations(
-    line_num: usize,
-    line: &str,
-    violations: &mut Vec<PathViolationKind>,
-) {
+fn scan_line_for_violations(line_num: usize, line: &str, violations: &mut Vec<PathViolationKind>) {
     let mut sanitized_line = line.to_string();
     detect_file_uris(line_num, &mut sanitized_line, violations);
     detect_windows_drive_paths(line_num, &sanitized_line, violations);

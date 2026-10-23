@@ -30,13 +30,10 @@ impl HeaderChecksumGuard {
             )));
         }
 
-        let mut file = File::open(db_path)
-            .map_err(AppError::Io)?;
+        let mut file = File::open(db_path).map_err(AppError::Io)?;
 
         let mut header = [0u8; 100];
-        let bytes_read = file
-            .read(&mut header)
-            .map_err(AppError::Io)?;
+        let bytes_read = file.read(&mut header).map_err(AppError::Io)?;
 
         if bytes_read < 100 {
             return Ok(HeaderValidationResult {
@@ -62,7 +59,11 @@ impl HeaderChecksumGuard {
 
         // Page size is a 2-byte big-endian integer at offset 16
         let raw_page_size = u16::from_be_bytes([header[16], header[17]]);
-        let page_size: u32 = if raw_page_size == 1 { 65536 } else { raw_page_size as u32 };
+        let page_size: u32 = if raw_page_size == 1 {
+            65536
+        } else {
+            raw_page_size as u32
+        };
 
         // File change counter is at offset 24 (4 bytes big-endian)
         let change_counter = u32::from_be_bytes([header[24], header[25], header[26], header[27]]);

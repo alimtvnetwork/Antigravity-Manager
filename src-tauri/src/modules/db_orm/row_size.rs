@@ -58,12 +58,7 @@ pub fn analyze_table_row_sizes(conn: &Connection, table_name: &str) -> Result<Ta
         Option<usize>,
         Option<usize>,
     ) = conn.query_row(&query_sql, [], |r| {
-        Ok((
-            r.get(0)?,
-            r.get(1)?,
-            r.get(2)?,
-            r.get(3)?,
-        ))
+        Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
     })?;
 
     Ok(TableRowSizeStats {

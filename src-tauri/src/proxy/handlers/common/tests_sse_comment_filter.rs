@@ -31,7 +31,8 @@ mod tests {
 
     #[test]
     fn test_sse_comment_filter_preserves_colons_inside_data_payload() {
-        let chunk = b"data: {\"url\": \"https://example.com:8080/api\", \"time\": \"12:30:00\"}\n\n";
+        let chunk =
+            b"data: {\"url\": \"https://example.com:8080/api\", \"time\": \"12:30:00\"}\n\n";
         assert!(!contains_sse_comment(chunk));
 
         let filtered = filter_sse_comments(chunk);

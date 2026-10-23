@@ -258,9 +258,7 @@ pub enum DecouplingViolation {
         generic_pipeline_recommendation: String,
     },
     /// Non-Gemini output protocol format attempted.
-    NonGeminiOutputProtocolForbidden {
-        attempted_format: String,
-    },
+    NonGeminiOutputProtocolForbidden { attempted_format: String },
     /// Incompatible operation declared for the specified processing stage.
     InvalidStageOperationCombination {
         stage: ProcessingStage,

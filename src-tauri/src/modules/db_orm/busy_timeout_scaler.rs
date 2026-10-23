@@ -25,7 +25,9 @@ impl Default for BusyTimeoutScaler {
 impl BusyTimeoutScaler {
     pub fn new(initial_ms: u32) -> Self {
         Self {
-            current_timeout_ms: AtomicU32::new(initial_ms.clamp(MIN_BUSY_TIMEOUT_MS, MAX_BUSY_TIMEOUT_MS)),
+            current_timeout_ms: AtomicU32::new(
+                initial_ms.clamp(MIN_BUSY_TIMEOUT_MS, MAX_BUSY_TIMEOUT_MS),
+            ),
         }
     }
 
@@ -39,10 +41,12 @@ impl BusyTimeoutScaler {
         } else {
             // Gradually decay back toward minimum
             let current = self.current_timeout_ms.load(Ordering::Relaxed);
-            ((current * 4 + MIN_BUSY_TIMEOUT_MS) / 5).clamp(MIN_BUSY_TIMEOUT_MS, MAX_BUSY_TIMEOUT_MS)
+            ((current * 4 + MIN_BUSY_TIMEOUT_MS) / 5)
+                .clamp(MIN_BUSY_TIMEOUT_MS, MAX_BUSY_TIMEOUT_MS)
         };
 
-        self.current_timeout_ms.store(new_timeout, Ordering::Relaxed);
+        self.current_timeout_ms
+            .store(new_timeout, Ordering::Relaxed);
         debug!(
             observed_wait_ms = wait_ms,
             scaled_timeout_ms = new_timeout,

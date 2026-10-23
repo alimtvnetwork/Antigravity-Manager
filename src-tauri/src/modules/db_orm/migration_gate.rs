@@ -53,7 +53,10 @@ pub fn verify_database_schema(
         }
 
         // Fetch existing columns for this table
-        let pragma_sql = format!("PRAGMA table_info('{}')", req.table_name.replace('\'', "''"));
+        let pragma_sql = format!(
+            "PRAGMA table_info('{}')",
+            req.table_name.replace('\'', "''")
+        );
         let mut stmt = conn.prepare(&pragma_sql)?;
         let col_names: Vec<String> = stmt
             .query_map([], |row| row.get::<_, String>(1))?

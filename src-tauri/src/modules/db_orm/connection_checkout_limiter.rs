@@ -22,7 +22,11 @@ impl Default for ConnectionCheckoutLimiter {
 impl ConnectionCheckoutLimiter {
     pub fn new(max_background: usize) -> Self {
         Self {
-            max_background_checkouts: if max_background == 0 { DEFAULT_MAX_BACKGROUND_CHECKOUTS } else { max_background },
+            max_background_checkouts: if max_background == 0 {
+                DEFAULT_MAX_BACKGROUND_CHECKOUTS
+            } else {
+                max_background
+            },
             active_background_checkouts: Arc::new(AtomicUsize::new(0)),
         }
     }
@@ -35,7 +39,8 @@ impl ConnectionCheckoutLimiter {
             if current >= self.max_background_checkouts {
                 return None;
             }
-            if self.active_background_checkouts
+            if self
+                .active_background_checkouts
                 .compare_exchange_weak(current, current + 1, Ordering::SeqCst, Ordering::Acquire)
                 .is_ok()
             {

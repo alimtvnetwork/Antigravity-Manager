@@ -103,9 +103,15 @@ impl StreamingTimeoutSentinel {
 #[derive(Debug, thiserror::Error, Clone, PartialEq, Eq)]
 pub enum StreamingTimeoutError {
     #[error("Streaming inactivity timeout: no chunk received for {silence_secs}s after {chunks_received} chunks")]
-    InactivityTimeout { silence_secs: u64, chunks_received: u64 },
+    InactivityTimeout {
+        silence_secs: u64,
+        chunks_received: u64,
+    },
     #[error("Total streaming duration limit reached: {total_secs}s elapsed with {bytes_received} bytes received")]
-    TotalDurationTimeout { total_secs: u64, bytes_received: u64 },
+    TotalDurationTimeout {
+        total_secs: u64,
+        bytes_received: u64,
+    },
     #[error("Stream was already aborted due to a previous timeout violation")]
     AlreadyAborted,
 }

@@ -16,7 +16,7 @@ pub struct Http2TunerConfig {
 pub fn get_optimal_h2_config() -> Http2TunerConfig {
     Http2TunerConfig {
         max_concurrent_streams: 64,
-        initial_stream_window_size: 1024 * 1024,      // 1 MB stream window
+        initial_stream_window_size: 1024 * 1024, // 1 MB stream window
         initial_connection_window_size: 4 * 1024 * 1024, // 4 MB connection window
         keepalive_interval_secs: 20,
         keepalive_timeout_secs: 10,

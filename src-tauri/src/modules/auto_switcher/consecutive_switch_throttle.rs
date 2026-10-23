@@ -62,7 +62,8 @@ impl ConsecutiveSwitchThrottle {
             // Throttled: calculate required wait duration until oldest event leaves window
             if let Some(&oldest) = timestamps.front() {
                 let elapsed = now.duration_since(oldest);
-                let wait = self.config.window_duration.saturating_sub(elapsed) + self.config.cooloff_penalty;
+                let wait = self.config.window_duration.saturating_sub(elapsed)
+                    + self.config.cooloff_penalty;
                 return Err(wait);
             }
             return Err(self.config.cooloff_penalty);

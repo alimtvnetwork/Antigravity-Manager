@@ -33,7 +33,10 @@ pub fn generate_reproducible_curl(
                 let compact = utf8_str.replace('\n', "\\n").replace('"', "\\\"");
                 parts.push(format!("  -d \"{}\"", compact));
             } else {
-                parts.push(format!("  --data-binary \"<binary {} bytes>\"", bytes.len()));
+                parts.push(format!(
+                    "  --data-binary \"<binary {} bytes>\"",
+                    bytes.len()
+                ));
             }
         }
     }

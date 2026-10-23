@@ -224,7 +224,8 @@ impl TransportBackoffStepper {
     /// Evaluates a failure with a pseudo-random seed derived from attempt counter and clock skew.
     pub fn step(&mut self, failure: &NetworkFailureType) -> BackoffStepResult {
         // Deterministic fallback pseudo-randomness in [0.15, 0.85] range if system entropy is unavailable
-        let pseudo = (((self.attempt as f64 * 37.0) + (self.last_delay_ms as f64 * 13.0)) % 100.0) / 100.0;
+        let pseudo =
+            (((self.attempt as f64 * 37.0) + (self.last_delay_ms as f64 * 13.0)) % 100.0) / 100.0;
         self.step_with_random(failure, pseudo)
     }
 }

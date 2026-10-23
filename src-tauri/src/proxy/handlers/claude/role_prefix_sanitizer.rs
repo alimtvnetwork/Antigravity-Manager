@@ -58,8 +58,14 @@ pub fn sanitize_claude_role_alternation(messages: &mut Vec<Value>) -> usize {
     let mut i = 0;
 
     while i + 1 < messages.len() {
-        let current_role = messages[i].get("role").and_then(|r| r.as_str()).unwrap_or("user");
-        let next_role = messages[i + 1].get("role").and_then(|r| r.as_str()).unwrap_or("user");
+        let current_role = messages[i]
+            .get("role")
+            .and_then(|r| r.as_str())
+            .unwrap_or("user");
+        let next_role = messages[i + 1]
+            .get("role")
+            .and_then(|r| r.as_str())
+            .unwrap_or("user");
 
         if !is_same_role(current_role, next_role) {
             i += 1;
@@ -70,7 +76,8 @@ pub fn sanitize_claude_role_alternation(messages: &mut Vec<Value>) -> usize {
         let current_content = messages[i].get("content").cloned();
         let next_content = messages[i + 1].get("content").cloned();
 
-        if let (Some(Value::String(c1)), Some(Value::String(c2))) = (current_content, next_content) {
+        if let (Some(Value::String(c1)), Some(Value::String(c2))) = (current_content, next_content)
+        {
             let merged = merge_text_contents(&c1, &c2);
             if let Some(obj) = messages[i].as_object_mut() {
                 obj.insert("content".to_string(), Value::String(merged));
@@ -92,7 +99,10 @@ pub fn sanitize_claude_role_alternation(messages: &mut Vec<Value>) -> usize {
     }
 
     if modifications > 0 {
-        debug!(modifications = modifications, "Sanitized Claude message role alternation");
+        debug!(
+            modifications = modifications,
+            "Sanitized Claude message role alternation"
+        );
     }
 
     modifications
@@ -119,9 +129,18 @@ mod tests {
 
     #[test]
     fn test_strip_leading_role_markers() {
-        assert_eq!(strip_leading_role_markers("Human: Hello world"), "Hello world");
-        assert_eq!(strip_leading_role_markers("Assistant: I am here"), "I am here");
-        assert_eq!(strip_leading_role_markers("Plain text without marker"), "Plain text without marker");
+        assert_eq!(
+            strip_leading_role_markers("Human: Hello world"),
+            "Hello world"
+        );
+        assert_eq!(
+            strip_leading_role_markers("Assistant: I am here"),
+            "I am here"
+        );
+        assert_eq!(
+            strip_leading_role_markers("Plain text without marker"),
+            "Plain text without marker"
+        );
     }
 
     #[test]

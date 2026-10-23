@@ -568,7 +568,11 @@ pub struct PlannedOperation {
 
 impl PlannedOperation {
     /// Creates a new planned operation.
-    pub fn new(id: impl Into<String>, name: impl Into<String>, category: OperationCategory) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        category: OperationCategory,
+    ) -> Self {
         let is_destructive = category.is_irreversible();
         Self {
             id: id.into(),
@@ -598,9 +602,7 @@ pub enum OrderingViolation {
         validate_index: usize,
     },
     /// Destructive operation occurs with no preceding validation anywhere in sequence.
-    MissingValidationBeforeIrreversibleOp {
-        op_name: String,
-    },
+    MissingValidationBeforeIrreversibleOp { op_name: String },
     /// Empty sequence provided for validation.
     EmptyOperationSequence,
 }
@@ -608,19 +610,28 @@ pub enum OrderingViolation {
 impl fmt::Display for OrderingViolation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::DestructiveActionBeforePreValidation { action_name, action_index } => {
+            Self::DestructiveActionBeforePreValidation {
+                action_name,
+                action_index,
+            } => {
                 write!(
                     f,
                     "Destructive action '{action_name}' at step {action_index} occurs before pre-validation"
                 )
             }
-            Self::ProcessKillBeforeCredentialWrite { kill_index, write_index } => {
+            Self::ProcessKillBeforeCredentialWrite {
+                kill_index,
+                write_index,
+            } => {
                 write!(
                     f,
                     "Process kill at step {kill_index} occurs before credential persistence at step {write_index}"
                 )
             }
-            Self::DeletionBeforeValidation { delete_index, validate_index } => {
+            Self::DeletionBeforeValidation {
+                delete_index,
+                validate_index,
+            } => {
                 write!(
                     f,
                     "Deletion at step {delete_index} occurs before validation at step {validate_index}"

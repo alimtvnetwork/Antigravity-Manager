@@ -182,8 +182,8 @@ pub(crate) fn extract_target_version(args: &[String]) -> Option<String> {
 }
 
 use antigravity_tools_lib::modules::update_checker::{
-    compare_versions, resolve_installable_release, GitHubRelease, ReleaseAssetInfo,
-    SkippedVersion, UpdateChannel,
+    compare_versions, resolve_installable_release, GitHubRelease, ReleaseAssetInfo, SkippedVersion,
+    UpdateChannel,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

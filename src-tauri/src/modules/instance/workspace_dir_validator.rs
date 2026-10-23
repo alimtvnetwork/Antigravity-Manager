@@ -36,7 +36,13 @@ impl WorkspaceDirValidator {
         let is_writable = Self::test_write_permission(workspace_dir);
 
         let mut markers = Vec::new();
-        let candidate_markers = [".git", "package.json", "Cargo.toml", "go.mod", "pyproject.toml"];
+        let candidate_markers = [
+            ".git",
+            "package.json",
+            "Cargo.toml",
+            "go.mod",
+            "pyproject.toml",
+        ];
 
         for marker in candidate_markers {
             if workspace_dir.join(marker).exists() {

@@ -351,7 +351,14 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
     const handleRerunConversation = (convoId: string, nudgeType: string) => {
         const targetInstId = selectedProject?.instance_id || instanceId || 'default';
         const targetRepoPath = selectedProject?.repo_path || '';
-        const msgOption: RerunMessageOption = nudgeType === 'is-it-published' ? 'is-it-published' : loadPersistedRerunMessageOption();
+        const msgOption: RerunMessageOption =
+            nudgeType === 'is-it-published' ||
+            nudgeType === 'is-it-done' ||
+            nudgeType === 'is-it-finished' ||
+            nudgeType === 'is-it-released' ||
+            nudgeType === 'randomized'
+                ? nudgeType
+                : loadPersistedRerunMessageOption();
         void dispatchRerunMessages({
             targetInstId,
             repoPath: targetRepoPath,

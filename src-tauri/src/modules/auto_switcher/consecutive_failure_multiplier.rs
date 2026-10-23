@@ -36,9 +36,11 @@ impl ConsecutiveFailureMultiplier {
             Err(p) => p.into_inner(),
         };
 
-        let entry = guard.entry(account_id.to_string()).or_insert(AccountFailureState {
-            consecutive_failures: 0,
-        });
+        let entry = guard
+            .entry(account_id.to_string())
+            .or_insert(AccountFailureState {
+                consecutive_failures: 0,
+            });
 
         entry.consecutive_failures = entry.consecutive_failures.saturating_add(1);
 
@@ -64,7 +66,10 @@ impl ConsecutiveFailureMultiplier {
             Ok(g) => g,
             Err(p) => p.into_inner(),
         };
-        guard.get(account_id).map(|s| s.consecutive_failures).unwrap_or(0)
+        guard
+            .get(account_id)
+            .map(|s| s.consecutive_failures)
+            .unwrap_or(0)
     }
 }
 

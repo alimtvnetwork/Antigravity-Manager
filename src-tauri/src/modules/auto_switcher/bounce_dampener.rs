@@ -64,7 +64,8 @@ impl RapidBounceDampener {
     pub fn sweep_expired(&mut self) -> usize {
         let initial_len = self.abandoned_accounts.len();
         let timeout = self.config.min_residence_time;
-        self.abandoned_accounts.retain(|_, time| time.elapsed() < timeout);
+        self.abandoned_accounts
+            .retain(|_, time| time.elapsed() < timeout);
         initial_len.saturating_sub(self.abandoned_accounts.len())
     }
 }

@@ -437,21 +437,23 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
     // RC-1: 'dispatched' rows transition at ANY age. A row still in
     // 'dispatched' was never marked 'completed', so the old 120s recency
     // window silently dropped long-running prompts from every restore query.
+    // Also include 'pending', 'queued', and 'blocked' prompts so quota exhaustion
+    // or auto-switching never drops prompts that were waiting to be executed.
     let transitioned = if instance_id == "all" {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched')",
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched', 'pending', 'queued', 'blocked')",
             params![now],
         )
         .unwrap_or(0)
     } else if is_all_or_default {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched') AND instance_id IN ('default', '__default__')",
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched', 'pending', 'queued', 'blocked') AND instance_id IN ('default', '__default__')",
             params![now],
         )
         .unwrap_or(0)
     } else {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched') AND instance_id = ?2",
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched', 'pending', 'queued', 'blocked') AND instance_id = ?2",
             params![now, instance_id],
         )
         .unwrap_or(0)
@@ -466,7 +468,10 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                     || p.instance_id == instance_id;
                 let is_inflight_status = p.status == "running"
                     || p.status == "in_flight"
-                    || p.status == "dispatched";
+                    || p.status == "dispatched"
+                    || p.status == "pending"
+                    || p.status == "queued"
+                    || p.status == "blocked";
                 if is_inflight_status && matches_inst {
                     p.status = "backed_up".to_string();
                     p.updated_at = now;
@@ -820,16 +825,16 @@ fn select_incomplete_prompt_ids(
     let is_unscoped = instance_id == "all" || is_default_scope;
     let sql = if instance_id == "all" {
         "SELECT id FROM active_prompts
-         WHERE status IN ('running', 'in_flight', 'dispatched')
+         WHERE status IN ('running', 'in_flight', 'dispatched', 'pending', 'queued', 'blocked')
          ORDER BY created_at ASC, id ASC"
     } else if is_default_scope {
         "SELECT id FROM active_prompts
-         WHERE status IN ('running', 'in_flight', 'dispatched')
+         WHERE status IN ('running', 'in_flight', 'dispatched', 'pending', 'queued', 'blocked')
            AND instance_id IN ('default', '__default__')
          ORDER BY created_at ASC, id ASC"
     } else {
         "SELECT id FROM active_prompts
-         WHERE status IN ('running', 'in_flight', 'dispatched') AND instance_id = ?1
+         WHERE status IN ('running', 'in_flight', 'dispatched', 'pending', 'queued', 'blocked') AND instance_id = ?1
          ORDER BY created_at ASC, id ASC"
     };
     let mut stmt = conn
@@ -881,7 +886,7 @@ pub fn sweep_incomplete_prompts_for_instance(instance_id: &str) -> Result<usize,
         let changed = conn
             .execute(
                 "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1
-                 WHERE id = ?2 AND status IN ('running', 'in_flight', 'dispatched')",
+                 WHERE id = ?2 AND status IN ('running', 'in_flight', 'dispatched', 'pending', 'queued', 'blocked')",
                 params![now, id],
             )
             .map_err(|e| format!("Failed to sweep incomplete prompt '{}': {}", id, e))?;

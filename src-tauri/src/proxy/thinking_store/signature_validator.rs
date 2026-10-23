@@ -37,9 +37,9 @@ pub fn validate_thought_signature(signature: &str) -> SignatureValidationResult 
     }
 
     // Validate characters are standard Base64 / Hex or URL-safe ASCII
-    let is_valid_charset = trimmed
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=' || c == '-' || c == '_');
+    let is_valid_charset = trimmed.chars().all(|c| {
+        c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=' || c == '-' || c == '_'
+    });
 
     if !is_valid_charset {
         return SignatureValidationResult {

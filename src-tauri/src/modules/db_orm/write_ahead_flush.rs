@@ -36,7 +36,10 @@ pub struct WriteAheadFlush;
 impl WriteAheadFlush {
     /// Executes a WAL checkpoint with the specified mode.
     /// PRAGMA wal_checkpoint returns (busy: 0|1, log: count, checkpointed: count).
-    pub fn flush_wal(conn: &Connection, mode: WalCheckpointMode) -> Result<WalFlushResult, rusqlite::Error> {
+    pub fn flush_wal(
+        conn: &Connection,
+        mode: WalCheckpointMode,
+    ) -> Result<WalFlushResult, rusqlite::Error> {
         let sql = format!("PRAGMA wal_checkpoint({});", mode.as_str());
         conn.query_row(&sql, [], |row| {
             let busy: i32 = row.get(0)?;

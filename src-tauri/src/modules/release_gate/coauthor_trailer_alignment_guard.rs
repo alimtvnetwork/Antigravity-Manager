@@ -90,10 +90,7 @@ pub fn format_coauthor_trailer(name: &str, email: &str) -> String {
 }
 
 /// Validates that contributor name does not contain bare handles.
-fn validate_contributor_name(
-    name: &str,
-    line_num: usize,
-) -> Result<(), TrailerValidationFinding> {
+fn validate_contributor_name(name: &str, line_num: usize) -> Result<(), TrailerValidationFinding> {
     if name.starts_with('@') {
         return Err(TrailerValidationFinding::DisallowedHandleInName {
             line: line_num,

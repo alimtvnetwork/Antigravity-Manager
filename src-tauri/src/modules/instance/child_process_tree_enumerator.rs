@@ -24,7 +24,10 @@ impl ChildProcessTreeEnumerator {
             let mut next_level = Vec::new();
             for parent in current_level {
                 for proc in all_processes {
-                    if proc.parent_pid == parent && proc.pid != root_pid && !descendants.contains(&proc.pid) {
+                    if proc.parent_pid == parent
+                        && proc.pid != root_pid
+                        && !descendants.contains(&proc.pid)
+                    {
                         descendants.push(proc.pid);
                         next_level.push(proc.pid);
                     }
@@ -37,7 +40,10 @@ impl ChildProcessTreeEnumerator {
     }
 
     /// Reverse order of descendants (deepest children first) for safe bottom-up termination.
-    pub fn bottom_up_termination_order(root_pid: u32, all_processes: &[ProcessTreeNode]) -> Vec<u32> {
+    pub fn bottom_up_termination_order(
+        root_pid: u32,
+        all_processes: &[ProcessTreeNode],
+    ) -> Vec<u32> {
         let mut list = Self::collect_descendants(root_pid, all_processes);
         list.reverse();
         list.push(root_pid);

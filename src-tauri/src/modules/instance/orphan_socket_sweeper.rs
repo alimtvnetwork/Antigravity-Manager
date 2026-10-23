@@ -24,7 +24,11 @@ impl OrphanSocketSweeper {
             let path = entry.path();
             if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 let ext_lower = ext.to_ascii_lowercase();
-                if ext_lower == "sock" || ext_lower == "socket" || ext_lower == "pipe" || ext_lower == "lock" {
+                if ext_lower == "sock"
+                    || ext_lower == "socket"
+                    || ext_lower == "pipe"
+                    || ext_lower == "lock"
+                {
                     if let Ok(metadata) = entry.metadata() {
                         if metadata.is_file() {
                             if let Err(e) = std::fs::remove_file(&path) {

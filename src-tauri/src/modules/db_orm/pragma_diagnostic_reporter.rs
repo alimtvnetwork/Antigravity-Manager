@@ -46,14 +46,9 @@ impl PragmaDiagnosticReporter {
             .prepare(&format!("PRAGMA {};", pragma))
             .map_err(AppError::Database)?;
 
-        let mut rows = stmt
-            .query([])
-            .map_err(AppError::Database)?;
+        let mut rows = stmt.query([]).map_err(AppError::Database)?;
 
-        if let Some(row) = rows
-            .next()
-            .map_err(AppError::Database)?
-        {
+        if let Some(row) = rows.next().map_err(AppError::Database)? {
             Ok(row.get(0).unwrap_or_default())
         } else {
             Ok(String::new())
@@ -65,14 +60,9 @@ impl PragmaDiagnosticReporter {
             .prepare(&format!("PRAGMA {};", pragma))
             .map_err(AppError::Database)?;
 
-        let mut rows = stmt
-            .query([])
-            .map_err(AppError::Database)?;
+        let mut rows = stmt.query([]).map_err(AppError::Database)?;
 
-        if let Some(row) = rows
-            .next()
-            .map_err(AppError::Database)?
-        {
+        if let Some(row) = rows.next().map_err(AppError::Database)? {
             Ok(row.get(0).unwrap_or(0))
         } else {
             Ok(0)

@@ -11,8 +11,8 @@
 //! 4. Renders standardized, clean GitHub Markdown tables with disposition badges.
 //! 5. Preserves git `Co-authored-by:` trailers per contributor attribution guidelines.
 
-use serde::{Deserialize, Serialize};
 use super::coauthor_attribution_verifier::format_coauthor_trailer;
+use serde::{Deserialize, Serialize};
 
 /// Disposition for an individual file changeset in a PR or patch review.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -109,7 +109,12 @@ impl FileBreakdownItem {
         rationale: impl Into<String>,
         suggested_action: impl Into<String>,
     ) -> Self {
-        Self::new(path, FileDisposition::Drop, rationale, Some(suggested_action.into()))
+        Self::new(
+            path,
+            FileDisposition::Drop,
+            rationale,
+            Some(suggested_action.into()),
+        )
     }
 
     /// Helper constructor for a partially accepted file.
@@ -118,7 +123,12 @@ impl FileBreakdownItem {
         rationale: impl Into<String>,
         suggested_action: impl Into<String>,
     ) -> Self {
-        Self::new(path, FileDisposition::PartialAccept, rationale, Some(suggested_action.into()))
+        Self::new(
+            path,
+            FileDisposition::PartialAccept,
+            rationale,
+            Some(suggested_action.into()),
+        )
     }
 }
 
@@ -195,13 +205,19 @@ impl RejectionBreakdownReport {
         if let Ok(trailer) = format_coauthor_trailer(name, email) {
             self.co_authored_by_trailer = Some(trailer);
         } else {
-            self.co_authored_by_trailer = Some(format!("Co-authored-by: {} <{}>", name.trim(), email.trim()));
+            self.co_authored_by_trailer = Some(format!(
+                "Co-authored-by: {} <{}>",
+                name.trim(),
+                email.trim()
+            ));
         }
     }
 
     /// Checks if the breakdown contains any rejections (`Drop` or `PartialAccept`).
     pub fn has_rejections(&self) -> bool {
-        self.file_breakdowns.iter().any(|item| item.disposition != FileDisposition::Accept)
+        self.file_breakdowns
+            .iter()
+            .any(|item| item.disposition != FileDisposition::Accept)
     }
 
     /// Total count of evaluated files.
@@ -211,17 +227,26 @@ impl RejectionBreakdownReport {
 
     /// Count of accepted files.
     pub fn accepted_count(&self) -> usize {
-        self.file_breakdowns.iter().filter(|i| i.disposition == FileDisposition::Accept).count()
+        self.file_breakdowns
+            .iter()
+            .filter(|i| i.disposition == FileDisposition::Accept)
+            .count()
     }
 
     /// Count of dropped files.
     pub fn dropped_count(&self) -> usize {
-        self.file_breakdowns.iter().filter(|i| i.disposition == FileDisposition::Drop).count()
+        self.file_breakdowns
+            .iter()
+            .filter(|i| i.disposition == FileDisposition::Drop)
+            .count()
     }
 
     /// Count of partially accepted files.
     pub fn partial_count(&self) -> usize {
-        self.file_breakdowns.iter().filter(|i| i.disposition == FileDisposition::PartialAccept).count()
+        self.file_breakdowns
+            .iter()
+            .filter(|i| i.disposition == FileDisposition::PartialAccept)
+            .count()
     }
 }
 
@@ -233,7 +258,10 @@ pub fn is_relative_git_path(path: &str) -> bool {
     }
     // Reject Windows drive letters
     if trimmed.len() >= 2
-        && trimmed.chars().next().map_or(false, |c| c.is_ascii_alphabetic())
+        && trimmed
+            .chars()
+            .next()
+            .map_or(false, |c| c.is_ascii_alphabetic())
         && trimmed.as_bytes()[1] == b':'
     {
         return false;
@@ -278,7 +306,9 @@ pub fn pattern_matches(path: &str, pattern: &str) -> bool {
 
 /// Escapes special Markdown table characters (`|`, linebreaks).
 fn escape_markdown_table_cell(text: &str) -> String {
-    text.replace('\r', "").replace('\n', " ").replace('|', "\\|")
+    text.replace('\r', "")
+        .replace('\n', " ")
+        .replace('|', "\\|")
 }
 
 /// Formats a complete Markdown report with file table, disposition badges, rationales,
@@ -303,7 +333,10 @@ pub fn generate_markdown_rejection_breakdown(report: &RejectionBreakdownReport) 
             if report.title.trim().is_empty() {
                 out.push_str("### Review Feedback: File-by-File Breakdown\n\n");
             } else {
-                out.push_str(&format!("### Review Feedback for `{}`\n\n", report.title.trim()));
+                out.push_str(&format!(
+                    "### Review Feedback for `{}`\n\n",
+                    report.title.trim()
+                ));
             }
         }
     }
@@ -395,7 +428,9 @@ pub fn parse_and_classify_changeset(
         let (mut disposition, mut rationale, mut suggested_action) = rationale_provider(file);
 
         // If file matches any drop pattern, enforce Drop
-        let matched_drop_pattern = drop_patterns.iter().find(|&&pat| pattern_matches(file, pat));
+        let matched_drop_pattern = drop_patterns
+            .iter()
+            .find(|&&pat| pattern_matches(file, pat));
         if let Some(&pat) = matched_drop_pattern {
             disposition = FileDisposition::Drop;
             if rationale.trim().is_empty() {

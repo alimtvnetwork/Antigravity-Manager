@@ -23,11 +23,17 @@ mod tests {
         let bound_port = listener.local_addr().unwrap().port();
 
         // While listener is held, port is not available
-        assert!(!is_port_available(bound_port), "Bound port must report unavailable");
+        assert!(
+            !is_port_available(bound_port),
+            "Bound port must report unavailable"
+        );
 
         // Once dropped, the port becomes available again
         drop(listener);
-        assert!(is_port_available(bound_port), "Released port must report available");
+        assert!(
+            is_port_available(bound_port),
+            "Released port must report available"
+        );
     }
 
     #[test]
@@ -48,7 +54,10 @@ mod tests {
             let resolved = resolve_collision_free_port(test_port);
             assert!(resolved.is_some());
             let alt_port = resolved.unwrap();
-            assert_ne!(alt_port, test_port, "Must evict collision and select alternative port");
+            assert_ne!(
+                alt_port, test_port,
+                "Must evict collision and select alternative port"
+            );
             assert!(alt_port >= CDP_PORT_MIN && alt_port <= CDP_PORT_MAX);
             drop(occupier);
         }

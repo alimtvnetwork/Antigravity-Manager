@@ -9,9 +9,8 @@ static TOKEN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)(ya29\.[a-zA-Z0-9_\-]+|bearer\s+[a-zA-Z0-9_\.\-]+)").unwrap()
 });
 
-static EMAIL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"([a-zA-Z0-9_\.\-]+)@([a-zA-Z0-9_\.\-]+\.[a-zA-Z]{2,})").unwrap()
-});
+static EMAIL_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"([a-zA-Z0-9_\.\-]+)@([a-zA-Z0-9_\.\-]+\.[a-zA-Z]{2,})").unwrap());
 
 pub struct SwitchReasonSanitizer;
 

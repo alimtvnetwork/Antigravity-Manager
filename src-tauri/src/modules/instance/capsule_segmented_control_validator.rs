@@ -189,10 +189,12 @@ fn check_window_control_compliance(
     violations: &mut Vec<CapsuleStylingViolation>,
 ) {
     if is_window_control_element(line) && capsule_depth == 0 {
-        violations.push(CapsuleStylingViolation::DisjointWindowControlsWithoutCapsule {
-            line: line_num,
-            snippet: line.to_string(),
-        });
+        violations.push(
+            CapsuleStylingViolation::DisjointWindowControlsWithoutCapsule {
+                line: line_num,
+                snippet: line.to_string(),
+            },
+        );
     }
 }
 

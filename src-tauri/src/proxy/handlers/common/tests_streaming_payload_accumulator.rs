@@ -21,7 +21,9 @@ fn test_normal_text_delta_stream_aggregation() {
     assert_eq!(turn.finish_reason(), Some("STOP"));
     assert_eq!(turn.full_text(), "Hello world, welcome to Gemini!");
     assert_eq!(turn.parts_count(), 1);
-    assert!(matches!(&turn.parts()[0], AccumulatedPart::Text(t) if t == "Hello world, welcome to Gemini!"));
+    assert!(
+        matches!(&turn.parts()[0], AccumulatedPart::Text(t) if t == "Hello world, welcome to Gemini!")
+    );
 }
 
 #[test]
@@ -36,7 +38,10 @@ fn test_detect_thought_tags_into_thought_part() {
     let turn = accumulator.finish_turn(Some("STOP".to_string()));
     assert_eq!(turn.parts_count(), 2);
     assert!(turn.has_thought());
-    assert_eq!(turn.full_thought(), "Analyzing the query and calculating response...");
+    assert_eq!(
+        turn.full_thought(),
+        "Analyzing the query and calculating response..."
+    );
     assert_eq!(turn.full_text(), "Here is the computed answer.");
 }
 
@@ -47,9 +52,13 @@ fn test_split_thought_tags_across_chunks() {
 
     // Split open tag across chunks
     accumulator.push_text_delta("<th").unwrap();
-    accumulator.push_text_delta("ought>Thinking step 1; ").unwrap();
+    accumulator
+        .push_text_delta("ought>Thinking step 1; ")
+        .unwrap();
     accumulator.push_text_delta("Thinking step 2.</th").unwrap();
-    accumulator.push_text_delta("ought>Now final response.").unwrap();
+    accumulator
+        .push_text_delta("ought>Now final response.")
+        .unwrap();
 
     let turn = accumulator.finish_turn(Some("STOP".to_string()));
     assert_eq!(turn.parts_count(), 2);
@@ -113,22 +122,22 @@ fn test_buffer_overflow_guard() {
 
 #[test]
 fn test_auto_repair_json_on_finish() {
-    let config = StreamingAccumulatorConfig::default()
-        .with_auto_repair_json(true);
+    let config = StreamingAccumulatorConfig::default().with_auto_repair_json(true);
     let mut accumulator = StreamingPayloadAccumulator::new(config);
 
     // Incomplete JSON with open bracket and brace
     accumulator
-        .push_function_call_chunk("search_database", "{\"query\": \"users\", \"filters\": [\"active\"")
+        .push_function_call_chunk(
+            "search_database",
+            "{\"query\": \"users\", \"filters\": [\"active\"",
+        )
         .unwrap();
 
     let turn = accumulator.finish_turn(Some("STOP".to_string()));
     assert_eq!(turn.parts_count(), 1);
     match &turn.parts()[0] {
         AccumulatedPart::FunctionCall {
-            args,
-            is_complete,
-            ..
+            args, is_complete, ..
         } => {
             assert!(*is_complete);
             assert!(serde_json::from_str::<serde_json::Value>(args).is_ok());

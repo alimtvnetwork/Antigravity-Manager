@@ -213,8 +213,7 @@ mod tests {
     #[test]
     fn test_validate_branch_release_channel_file_io_error() {
         let non_existent_path = "non_existent_changelog_file_9999.md";
-        let result =
-            validate_branch_release_channel_file("v4.251.0", "main", non_existent_path);
+        let result = validate_branch_release_channel_file("v4.251.0", "main", non_existent_path);
         assert!(result.is_err());
     }
 }

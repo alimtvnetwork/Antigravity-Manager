@@ -162,8 +162,7 @@ pub fn negotiate_payload_strategy(
             } else if len > stream_threshold {
                 debug!(
                     declared = len,
-                    stream_threshold,
-                    "Payload exceeds stream threshold; streaming directly"
+                    stream_threshold, "Payload exceeds stream threshold; streaming directly"
                 );
                 PayloadLengthDecision::StreamDirectly
             } else {

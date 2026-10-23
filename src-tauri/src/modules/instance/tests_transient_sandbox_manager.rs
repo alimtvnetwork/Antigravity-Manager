@@ -72,7 +72,10 @@ fn test_transient_sandbox_lifecycle() {
     assert!(record.profile_dir.exists());
     assert!(record.workspace_storage_dir.exists());
 
-    let settings_path = record.profile_dir.join(SUBDIR_USER_DATA).join("settings.json");
+    let settings_path = record
+        .profile_dir
+        .join(SUBDIR_USER_DATA)
+        .join("settings.json");
     assert!(settings_path.exists());
 
     // 2. Add sample file in workspaceStorage
@@ -80,7 +83,8 @@ fn test_transient_sandbox_lifecycle() {
     fs::write(&dummy_ws_file, b"sample db content").expect("write sample ws db");
 
     // 3. Clean with preserve_workspace_storage = true
-    let rep_preserved = clean_transient_sandbox(&mut record, true).expect("clean with preservation");
+    let rep_preserved =
+        clean_transient_sandbox(&mut record, true).expect("clean with preservation");
     assert!(rep_preserved.is_success);
     assert!(rep_preserved.workspace_storage_preserved);
     assert!(dummy_ws_file.exists());

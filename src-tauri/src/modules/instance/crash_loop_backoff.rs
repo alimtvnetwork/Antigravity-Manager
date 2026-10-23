@@ -34,22 +34,28 @@ impl CrashLoopBackoffGuard {
     /// Records when an instance was launched.
     pub fn record_launch(&mut self, instance_id: &str) {
         let now = Instant::now();
-        let entry = self.records.entry(instance_id.to_string()).or_insert_with(|| InstanceCrashRecord {
-            consecutive_crashes: 0,
-            last_launched_at: now,
-            last_crashed_at: now,
-        });
+        let entry = self
+            .records
+            .entry(instance_id.to_string())
+            .or_insert_with(|| InstanceCrashRecord {
+                consecutive_crashes: 0,
+                last_launched_at: now,
+                last_crashed_at: now,
+            });
         entry.last_launched_at = now;
     }
 
     /// Records process termination, incrementing crash count if lifespan was short.
     pub fn record_termination(&mut self, instance_id: &str) -> u32 {
         let now = Instant::now();
-        let entry = self.records.entry(instance_id.to_string()).or_insert_with(|| InstanceCrashRecord {
-            consecutive_crashes: 0,
-            last_launched_at: now,
-            last_crashed_at: now,
-        });
+        let entry = self
+            .records
+            .entry(instance_id.to_string())
+            .or_insert_with(|| InstanceCrashRecord {
+                consecutive_crashes: 0,
+                last_launched_at: now,
+                last_crashed_at: now,
+            });
 
         let lifespan = now.duration_since(entry.last_launched_at);
         if lifespan < self.short_lifespan_threshold {

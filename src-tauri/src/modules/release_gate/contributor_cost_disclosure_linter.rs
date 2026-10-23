@@ -16,8 +16,8 @@
 //! 2. Git `Co-authored-by:` trailer validation and proxy PR attribution enforcement.
 //! 3. Structured file-by-file Accept/Drop breakdown formatting and rejection response compliance linting.
 
+use super::coauthor_attribution_verifier::parse_coauthor_trailers;
 use serde::{Deserialize, Serialize};
-use super::coauthor_attribution_verifier::{parse_coauthor_trailers, CoAuthor};
 
 pub use super::coauthor_attribution_verifier::CoAuthor;
 
@@ -137,7 +137,9 @@ pub fn format_rejection_breakdown(breakdown: &RejectionBreakdown) -> String {
 pub fn lint_rejection_response(markdown: &str) -> RejectionReviewReport {
     let lower = markdown.to_ascii_lowercase();
 
-    let has_file_breakdown = (lower.contains("file-by-file") || lower.contains("file breakdown") || lower.contains("| file |"))
+    let has_file_breakdown = (lower.contains("file-by-file")
+        || lower.contains("file breakdown")
+        || lower.contains("| file |"))
         && (lower.contains("accept") || lower.contains("drop"));
 
     let has_actionable_path_forward = lower.contains("actionable path forward")
@@ -145,7 +147,10 @@ pub fn lint_rejection_response(markdown: &str) -> RejectionReviewReport {
         || lower.contains("next steps");
 
     let has_owned_tooling_gaps = lower.contains("tooling")
-        && (lower.contains("gap") || lower.contains("friction") || lower.contains("ownership") || lower.contains("maintainer owned"));
+        && (lower.contains("gap")
+            || lower.contains("friction")
+            || lower.contains("ownership")
+            || lower.contains("maintainer owned"));
 
     let mut missing_requirements = Vec::new();
     if !has_file_breakdown {
@@ -197,13 +202,21 @@ pub fn lint_contributor_pr(pr_body: &str, is_proxy_pr: bool) -> ContributorPrCom
     if !has_cost_disclosure {
         missing_sections.push("Cost Disclosure".to_string());
         violations.push("Missing required Cost Disclosure section in PR description".to_string());
-        recommendations.push("Add a '## Cost Disclosure' section detailing affected behaviors and unverified paths".to_string());
+        recommendations.push(
+            "Add a '## Cost Disclosure' section detailing affected behaviors and unverified paths"
+                .to_string(),
+        );
     }
 
     // 2. Affected Existing Behaviors Check
     let affected_content = extract_section_content(
         pr_body,
-        &["affected existing behaviors", "affected behaviors", "existing behaviors", "behavior alterations"],
+        &[
+            "affected existing behaviors",
+            "affected behaviors",
+            "existing behaviors",
+            "behavior alterations",
+        ],
     );
     let has_affected_behaviors = match affected_content {
         Some(ref content) if is_substantive(content) => true,
@@ -215,7 +228,9 @@ pub fn lint_contributor_pr(pr_body: &str, is_proxy_pr: bool) -> ContributorPrCom
         None => {
             missing_sections.push("Affected Existing Behaviors".to_string());
             violations.push("Missing 'Affected Existing Behaviors' disclosure".to_string());
-            recommendations.push("Specify which existing behaviors or defaults change with this PR".to_string());
+            recommendations.push(
+                "Specify which existing behaviors or defaults change with this PR".to_string(),
+            );
             false
         }
     };
@@ -223,7 +238,12 @@ pub fn lint_contributor_pr(pr_body: &str, is_proxy_pr: bool) -> ContributorPrCom
     // 3. Unverified Paths Check
     let unverified_content = extract_section_content(
         pr_body,
-        &["unverified paths", "unverified", "paths not covered", "untested edge cases"],
+        &[
+            "unverified paths",
+            "unverified",
+            "paths not covered",
+            "untested edge cases",
+        ],
     );
     let has_unverified_paths = match unverified_content {
         Some(ref content) if is_substantive(content) => true,
@@ -235,7 +255,10 @@ pub fn lint_contributor_pr(pr_body: &str, is_proxy_pr: bool) -> ContributorPrCom
         None => {
             missing_sections.push("Unverified Paths".to_string());
             violations.push("Missing 'Unverified Paths' disclosure".to_string());
-            recommendations.push("List paths, high-concurrency scenarios, or edge cases that remain unverified".to_string());
+            recommendations.push(
+                "List paths, high-concurrency scenarios, or edge cases that remain unverified"
+                    .to_string(),
+            );
             false
         }
     };
@@ -243,7 +266,13 @@ pub fn lint_contributor_pr(pr_body: &str, is_proxy_pr: bool) -> ContributorPrCom
     // 4. Improvements Check
     let improvements_content = extract_section_content(
         pr_body,
-        &["improvements", "key improvements", "benefits", "enhancements", "problem classification"],
+        &[
+            "improvements",
+            "key improvements",
+            "benefits",
+            "enhancements",
+            "problem classification",
+        ],
     );
     let has_improvements = match improvements_content {
         Some(ref content) if is_substantive(content) => true,
@@ -265,7 +294,8 @@ pub fn lint_contributor_pr(pr_body: &str, is_proxy_pr: bool) -> ContributorPrCom
 
     for inv in &trailer_report.invalid_trailers {
         violations.push(format!("Malformed Co-authored-by trailer: '{inv}'"));
-        recommendations.push("Format trailers as: Co-authored-by: Name <email@example.com>".to_string());
+        recommendations
+            .push("Format trailers as: Co-authored-by: Name <email@example.com>".to_string());
     }
 
     let is_proxy = is_proxy_pr || detect_is_proxy_pr(pr_body);
@@ -343,8 +373,17 @@ fn is_substantive(content: &str) -> bool {
         return false;
     }
     let trivial_placeholders = [
-        "n/a", "none", "no", "nil", "todo", "tbd", "nothing", "-", "not applicable",
-        "none so far", "n / a",
+        "n/a",
+        "none",
+        "no",
+        "nil",
+        "todo",
+        "tbd",
+        "nothing",
+        "-",
+        "not applicable",
+        "none so far",
+        "n / a",
     ];
     if trivial_placeholders
         .iter()

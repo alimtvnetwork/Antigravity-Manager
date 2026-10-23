@@ -19,11 +19,8 @@ use tracing::{debug, warn};
 pub const CANONICAL_FIFO_INDEX_COLUMNS: &[&str] = &["created_at", "id"];
 
 /// Canonical prompt queue tables subject to strict FIFO composite index validation.
-pub const DEFAULT_PROMPT_QUEUE_TABLES: &[&str] = &[
-    "active_prompts",
-    "prompt_backups",
-    "repo_prompts",
-];
+pub const DEFAULT_PROMPT_QUEUE_TABLES: &[&str] =
+    &["active_prompts", "prompt_backups", "repo_prompts"];
 
 /// Compliance status of a table's index schema relative to strict FIFO ordering requirements.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -107,7 +104,11 @@ pub struct IndexColumnDetail {
 
 impl IndexColumnDetail {
     pub fn new(seqno: i32, name: String, is_ascending: bool) -> Self {
-        Self { seqno, name, is_ascending }
+        Self {
+            seqno,
+            name,
+            is_ascending,
+        }
     }
 }
 
@@ -124,7 +125,11 @@ pub struct TableIndexDetail {
 
 impl TableIndexDetail {
     pub fn new(name: String, is_unique: bool, columns: Vec<IndexColumnDetail>) -> Self {
-        Self { name, is_unique, columns }
+        Self {
+            name,
+            is_unique,
+            columns,
+        }
     }
 }
 
@@ -223,7 +228,9 @@ impl FifoQueueIndexAnalyzer {
             .iter()
             .map(|&s| s.to_string())
             .collect();
-        Self { target_tables: tables }
+        Self {
+            target_tables: tables,
+        }
     }
 
     /// Constructs an analyzer configured for custom table targets.
@@ -246,7 +253,11 @@ impl FifoQueueIndexAnalyzer {
     }
 
     /// Inspects a single SQLite table and returns its FIFO composite index status.
-    pub fn analyze_table(&self, conn: &Connection, table_name: &str) -> Result<FifoTableIndexStatus, AppError> {
+    pub fn analyze_table(
+        &self,
+        conn: &Connection,
+        table_name: &str,
+    ) -> Result<FifoTableIndexStatus, AppError> {
         let is_present = check_table_exists(conn, table_name)?;
         if !is_present {
             return Ok(build_missing_table_status(table_name));
@@ -276,7 +287,10 @@ impl FifoQueueIndexAnalyzer {
             conn.execute(sql, [])?;
             applied_count += 1;
         }
-        debug!(applied_count, "Applied FIFO composite index remediation SQL");
+        debug!(
+            applied_count,
+            "Applied FIFO composite index remediation SQL"
+        );
         Ok(applied_count)
     }
 }
@@ -290,7 +304,10 @@ pub fn check_table_exists(conn: &Connection, table_name: &str) -> Result<bool, A
 }
 
 /// Queries `PRAGMA index_list` to discover all indexes declared on a table.
-pub fn fetch_index_list(conn: &Connection, table_name: &str) -> Result<Vec<(String, bool)>, AppError> {
+pub fn fetch_index_list(
+    conn: &Connection,
+    table_name: &str,
+) -> Result<Vec<(String, bool)>, AppError> {
     let list_sql = format!("PRAGMA index_list('{}');", table_name);
     let mut stmt = conn.prepare(&list_sql)?;
     let mut rows = stmt.query([])?;
@@ -304,21 +321,31 @@ pub fn fetch_index_list(conn: &Connection, table_name: &str) -> Result<Vec<(Stri
 }
 
 /// Helper function to parse an `index_xinfo` row into an `IndexColumnDetail`.
-fn parse_xinfo_row(row: &rusqlite::Row<'_>, current_len: usize) -> Result<Option<IndexColumnDetail>, rusqlite::Error> {
+fn parse_xinfo_row(
+    row: &rusqlite::Row<'_>,
+    current_len: usize,
+) -> Result<Option<IndexColumnDetail>, rusqlite::Error> {
     let cid: i32 = row.get(1)?;
     let col_name_opt: Option<String> = row.get(2)?;
     let desc: i32 = row.get(3)?;
     let key: i32 = row.get(5)?;
     if key == 1 && cid >= 0 {
         if let Some(col_name) = col_name_opt {
-            return Ok(Some(IndexColumnDetail::new(current_len as i32, col_name, desc == 0)));
+            return Ok(Some(IndexColumnDetail::new(
+                current_len as i32,
+                col_name,
+                desc == 0,
+            )));
         }
     }
     Ok(None)
 }
 
 /// Inspects index columns using `PRAGMA index_xinfo` (supporting sort direction inspection).
-pub fn fetch_columns_from_xinfo(conn: &Connection, index_name: &str) -> Result<Vec<IndexColumnDetail>, AppError> {
+pub fn fetch_columns_from_xinfo(
+    conn: &Connection,
+    index_name: &str,
+) -> Result<Vec<IndexColumnDetail>, AppError> {
     let xinfo_sql = format!("PRAGMA index_xinfo('{}');", index_name);
     let mut stmt = conn.prepare(&xinfo_sql)?;
     let mut rows = stmt.query([])?;
@@ -332,7 +359,10 @@ pub fn fetch_columns_from_xinfo(conn: &Connection, index_name: &str) -> Result<V
 }
 
 /// Fallback inspector using `PRAGMA index_info` when `index_xinfo` yields no key columns.
-pub fn fetch_columns_from_info(conn: &Connection, index_name: &str) -> Result<Vec<IndexColumnDetail>, AppError> {
+pub fn fetch_columns_from_info(
+    conn: &Connection,
+    index_name: &str,
+) -> Result<Vec<IndexColumnDetail>, AppError> {
     let info_sql = format!("PRAGMA index_info('{}');", index_name);
     let mut stmt = conn.prepare(&info_sql)?;
     let mut rows = stmt.query([])?;
@@ -346,7 +376,10 @@ pub fn fetch_columns_from_info(conn: &Connection, index_name: &str) -> Result<Ve
 }
 
 /// Retrieves complete index metadata including column sequences and sort orders.
-pub fn fetch_all_table_indices(conn: &Connection, table_name: &str) -> Result<Vec<TableIndexDetail>, AppError> {
+pub fn fetch_all_table_indices(
+    conn: &Connection,
+    table_name: &str,
+) -> Result<Vec<TableIndexDetail>, AppError> {
     let index_list = fetch_index_list(conn, table_name)?;
     let mut details = Vec::new();
     for (name, is_unique) in index_list {
@@ -381,7 +414,10 @@ pub fn is_partial_created_at_lead(columns: &[IndexColumnDetail]) -> bool {
 }
 
 /// Checks ordering and sort direction across the first two indexed columns.
-pub fn check_two_column_order(col0: &IndexColumnDetail, col1: &IndexColumnDetail) -> IndexMatchResultType {
+pub fn check_two_column_order(
+    col0: &IndexColumnDetail,
+    col1: &IndexColumnDetail,
+) -> IndexMatchResultType {
     let is_created_at_first = col0.name.eq_ignore_ascii_case("created_at");
     let is_id_second = col1.name.eq_ignore_ascii_case("id");
     let is_id_first = col0.name.eq_ignore_ascii_case("id");
@@ -457,16 +493,25 @@ fn apply_index_match(
     risk: &mut IndexRiskLevelType,
 ) -> bool {
     match evaluate_columns_for_fifo(&idx.columns) {
-        IndexMatchResultType::MatchesCompositeFifoType => record_full_compliance(idx, status, matching, risk),
-        IndexMatchResultType::ImproperSortDirectionType => record_improper_direction(idx, status, matching, risk),
-        IndexMatchResultType::InvertedColumnOrderType => record_inverted_order(idx, status, matching),
+        IndexMatchResultType::MatchesCompositeFifoType => {
+            record_full_compliance(idx, status, matching, risk)
+        }
+        IndexMatchResultType::ImproperSortDirectionType => {
+            record_improper_direction(idx, status, matching, risk)
+        }
+        IndexMatchResultType::InvertedColumnOrderType => {
+            record_inverted_order(idx, status, matching)
+        }
         IndexMatchResultType::PartialMatchType => record_partial_match(risk),
         IndexMatchResultType::NoMatchType => false,
     }
 }
 
 /// Evaluates all indexes on an existing table to determine FIFO composite compliance.
-pub fn evaluate_table_status(table_name: &str, indices: Vec<TableIndexDetail>) -> FifoTableIndexStatus {
+pub fn evaluate_table_status(
+    table_name: &str,
+    indices: Vec<TableIndexDetail>,
+) -> FifoTableIndexStatus {
     let mut status = FifoIndexStatusType::MissingCompositeIndexType;
     let mut matching = None;
     let mut risk = IndexRiskLevelType::HighType;
@@ -542,7 +587,9 @@ pub fn build_missing_table_status(table_name: &str) -> FifoTableIndexStatus {
 }
 
 /// Aggregates per-table statuses into a unified `FifoIndexAnalysisReport`.
-pub fn compile_analysis_report(inspected_tables: Vec<FifoTableIndexStatus>) -> FifoIndexAnalysisReport {
+pub fn compile_analysis_report(
+    inspected_tables: Vec<FifoTableIndexStatus>,
+) -> FifoIndexAnalysisReport {
     let missing_index_count = inspected_tables
         .iter()
         .filter(|s| !s.has_composite_index)

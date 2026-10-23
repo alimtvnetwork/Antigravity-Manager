@@ -71,10 +71,7 @@ impl std::fmt::Display for UnverifiedPathFinding {
                 )
             }
             Self::MissingAffectedBehaviorsSection => {
-                write!(
-                    f,
-                    "Missing mandatory 'Affected Existing Behaviors' section"
-                )
+                write!(f, "Missing mandatory 'Affected Existing Behaviors' section")
             }
         }
     }
@@ -122,9 +119,8 @@ pub fn audit_pr_cost_disclosures(pr_body: &str) -> CostDisclosureReport {
     audit_affected_behaviors(&seen, &items_map, &mut affected_behaviors, &mut findings);
     audit_supplementary_sections(&seen, &items_map, &mut known_gaps, &mut findings);
 
-    let is_disclosure_complete = findings.is_empty()
-        && !unverified_paths.is_empty()
-        && !affected_behaviors.is_empty();
+    let is_disclosure_complete =
+        findings.is_empty() && !unverified_paths.is_empty() && !affected_behaviors.is_empty();
     let guidance = generate_guidance(&findings, is_disclosure_complete);
 
     CostDisclosureReport {
@@ -169,7 +165,13 @@ fn parse_markdown_sections(
 /// Extracts header title from markdown headings or bold lead lines.
 fn extract_header_title(trimmed: &str) -> Option<&str> {
     if trimmed.starts_with('#') {
-        Some(trimmed.trim_start_matches('#').trim().trim_matches('*').trim())
+        Some(
+            trimmed
+                .trim_start_matches('#')
+                .trim()
+                .trim_matches('*')
+                .trim(),
+        )
     } else if (trimmed.starts_with("**") && trimmed.ends_with("**") && trimmed.len() > 4)
         || (trimmed.starts_with("__") && trimmed.ends_with("__") && trimmed.len() > 4)
     {

@@ -7,9 +7,16 @@ use crate::modules::release_gate::remote_branch_base_verifier::{
 
 #[test]
 fn test_valid_stable_main_origin_main() {
-    let req = BranchBaseVerification::new("hotfix/auth-leak", "origin/main", ReleaseChannel::StableMain);
+    let req = BranchBaseVerification::new(
+        "hotfix/auth-leak",
+        "origin/main",
+        ReleaseChannel::StableMain,
+    );
     let res = verify_branch_base(&req);
-    assert!(res.is_ok(), "Expected origin/main for StableMain to be valid");
+    assert!(
+        res.is_ok(),
+        "Expected origin/main for StableMain to be valid"
+    );
 
     let report = res.unwrap();
     assert!(report.is_base_valid);
@@ -21,7 +28,11 @@ fn test_valid_stable_main_origin_main() {
 
 #[test]
 fn test_valid_stable_main_upstream_main() {
-    let req = BranchBaseVerification::new("hotfix/crash-fix", "upstream/main", ReleaseChannel::StableMain);
+    let req = BranchBaseVerification::new(
+        "hotfix/crash-fix",
+        "upstream/main",
+        ReleaseChannel::StableMain,
+    );
     let report = verify_branch_base(&req).expect("upstream/main is allowed for StableMain");
     assert!(report.is_base_valid);
     assert_eq!(report.detected_remote.as_deref(), Some("upstream"));
@@ -30,9 +41,16 @@ fn test_valid_stable_main_upstream_main() {
 
 #[test]
 fn test_valid_preview_beta_origin_beta() {
-    let req = BranchBaseVerification::new("feat/thinking-modal", "origin/beta", ReleaseChannel::PreviewBeta);
+    let req = BranchBaseVerification::new(
+        "feat/thinking-modal",
+        "origin/beta",
+        ReleaseChannel::PreviewBeta,
+    );
     let res = verify_branch_base(&req);
-    assert!(res.is_ok(), "Expected origin/beta for PreviewBeta to be valid");
+    assert!(
+        res.is_ok(),
+        "Expected origin/beta for PreviewBeta to be valid"
+    );
 
     let report = res.unwrap();
     assert!(report.is_base_valid);
@@ -44,7 +62,11 @@ fn test_valid_preview_beta_origin_beta() {
 
 #[test]
 fn test_valid_preview_beta_upstream_beta() {
-    let req = BranchBaseVerification::new("feat/proxy-router", "upstream/beta", ReleaseChannel::PreviewBeta);
+    let req = BranchBaseVerification::new(
+        "feat/proxy-router",
+        "upstream/beta",
+        ReleaseChannel::PreviewBeta,
+    );
     let report = verify_branch_base(&req).expect("upstream/beta is allowed for PreviewBeta");
     assert!(report.is_base_valid);
     assert_eq!(report.detected_remote.as_deref(), Some("upstream"));
@@ -79,7 +101,11 @@ fn test_reject_local_beta_base() {
 
 #[test]
 fn test_reject_local_feature_branch() {
-    let req = BranchBaseVerification::new("feat/subtask", "feature/local-work", ReleaseChannel::PreviewBeta);
+    let req = BranchBaseVerification::new(
+        "feat/subtask",
+        "feature/local-work",
+        ReleaseChannel::PreviewBeta,
+    );
     let res = verify_branch_base(&req);
     match res {
         Err(BranchBaseViolation::LocalBranchBaseForbidden { base_ref, .. }) => {
@@ -91,10 +117,19 @@ fn test_reject_local_feature_branch() {
 
 #[test]
 fn test_channel_base_mismatch_preview_branching_from_main() {
-    let req = BranchBaseVerification::new("feat/new-pipeline", "origin/main", ReleaseChannel::PreviewBeta);
+    let req = BranchBaseVerification::new(
+        "feat/new-pipeline",
+        "origin/main",
+        ReleaseChannel::PreviewBeta,
+    );
     let res = verify_branch_base(&req);
     match res {
-        Err(BranchBaseViolation::ChannelBaseMismatch { channel, base_ref, expected, guidance }) => {
+        Err(BranchBaseViolation::ChannelBaseMismatch {
+            channel,
+            base_ref,
+            expected,
+            guidance,
+        }) => {
             assert_eq!(channel, ReleaseChannel::PreviewBeta);
             assert_eq!(base_ref, "origin/main");
             assert!(expected.contains("origin/beta"));
@@ -106,10 +141,16 @@ fn test_channel_base_mismatch_preview_branching_from_main() {
 
 #[test]
 fn test_channel_base_mismatch_stable_branching_from_beta() {
-    let req = BranchBaseVerification::new("hotfix/p0-prod", "origin/beta", ReleaseChannel::StableMain);
+    let req =
+        BranchBaseVerification::new("hotfix/p0-prod", "origin/beta", ReleaseChannel::StableMain);
     let res = verify_branch_base(&req);
     match res {
-        Err(BranchBaseViolation::ChannelBaseMismatch { channel, base_ref, expected, guidance }) => {
+        Err(BranchBaseViolation::ChannelBaseMismatch {
+            channel,
+            base_ref,
+            expected,
+            guidance,
+        }) => {
             assert_eq!(channel, ReleaseChannel::StableMain);
             assert_eq!(base_ref, "origin/beta");
             assert!(expected.contains("origin/main"));
@@ -124,7 +165,10 @@ fn test_normalize_git_ref_strips_heads_and_remotes() {
     assert_eq!(normalize_git_ref("refs/remotes/origin/main"), "origin/main");
     assert_eq!(normalize_git_ref("refs/heads/main"), "main");
     assert_eq!(normalize_git_ref("origin/beta"), "origin/beta");
-    assert_eq!(normalize_git_ref("  refs/remotes/upstream/beta  "), "upstream/beta");
+    assert_eq!(
+        normalize_git_ref("  refs/remotes/upstream/beta  "),
+        "upstream/beta"
+    );
 }
 
 #[test]
@@ -148,19 +192,33 @@ fn test_parse_remote_and_branch() {
 #[test]
 fn test_empty_branch_name_and_base_ref_rejected() {
     let empty_name = BranchBaseVerification::new("", "origin/main", ReleaseChannel::StableMain);
-    assert_eq!(verify_branch_base(&empty_name), Err(BranchBaseViolation::EmptyBranchName));
+    assert_eq!(
+        verify_branch_base(&empty_name),
+        Err(BranchBaseViolation::EmptyBranchName)
+    );
 
     let empty_base = BranchBaseVerification::new("feat/x", "   ", ReleaseChannel::PreviewBeta);
-    assert_eq!(verify_branch_base(&empty_base), Err(BranchBaseViolation::EmptyBaseRef));
+    assert_eq!(
+        verify_branch_base(&empty_base),
+        Err(BranchBaseViolation::EmptyBaseRef)
+    );
 }
 
 #[test]
 fn test_invalid_branch_name_characters() {
-    let bad_space = BranchBaseVerification::new("feat/my branch", "origin/beta", ReleaseChannel::PreviewBeta);
-    assert!(matches!(verify_branch_base(&bad_space), Err(BranchBaseViolation::InvalidBranchName { .. })));
+    let bad_space =
+        BranchBaseVerification::new("feat/my branch", "origin/beta", ReleaseChannel::PreviewBeta);
+    assert!(matches!(
+        verify_branch_base(&bad_space),
+        Err(BranchBaseViolation::InvalidBranchName { .. })
+    ));
 
-    let bad_dots = BranchBaseVerification::new("feat/foo..bar", "origin/beta", ReleaseChannel::PreviewBeta);
-    assert!(matches!(verify_branch_base(&bad_dots), Err(BranchBaseViolation::InvalidBranchName { .. })));
+    let bad_dots =
+        BranchBaseVerification::new("feat/foo..bar", "origin/beta", ReleaseChannel::PreviewBeta);
+    assert!(matches!(
+        verify_branch_base(&bad_dots),
+        Err(BranchBaseViolation::InvalidBranchName { .. })
+    ));
 }
 
 #[test]

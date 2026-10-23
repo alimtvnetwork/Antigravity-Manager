@@ -88,14 +88,26 @@ mod tests {
 
     #[test]
     fn test_canonical_predicates() {
-        assert!(StopReasonNormalizer::is_natural_stop(CanonicalStopReason::Stop));
-        assert!(!StopReasonNormalizer::is_natural_stop(CanonicalStopReason::Length));
+        assert!(StopReasonNormalizer::is_natural_stop(
+            CanonicalStopReason::Stop
+        ));
+        assert!(!StopReasonNormalizer::is_natural_stop(
+            CanonicalStopReason::Length
+        ));
 
-        assert!(StopReasonNormalizer::is_length_stop(CanonicalStopReason::Length));
-        assert!(!StopReasonNormalizer::is_length_stop(CanonicalStopReason::Stop));
+        assert!(StopReasonNormalizer::is_length_stop(
+            CanonicalStopReason::Length
+        ));
+        assert!(!StopReasonNormalizer::is_length_stop(
+            CanonicalStopReason::Stop
+        ));
 
-        assert!(StopReasonNormalizer::is_tool_stop(CanonicalStopReason::ToolUse));
-        assert!(!StopReasonNormalizer::is_tool_stop(CanonicalStopReason::Other));
+        assert!(StopReasonNormalizer::is_tool_stop(
+            CanonicalStopReason::ToolUse
+        ));
+        assert!(!StopReasonNormalizer::is_tool_stop(
+            CanonicalStopReason::Other
+        ));
     }
 
     #[test]
@@ -124,15 +136,33 @@ mod tests {
 
     #[test]
     fn test_canonical_to_openai() {
-        assert_eq!(StopReasonNormalizer::canonical_to_openai(CanonicalStopReason::Stop), "stop");
-        assert_eq!(StopReasonNormalizer::canonical_to_openai(CanonicalStopReason::ToolUse), "tool_calls");
-        assert_eq!(StopReasonNormalizer::canonical_to_openai(CanonicalStopReason::Length), "length");
+        assert_eq!(
+            StopReasonNormalizer::canonical_to_openai(CanonicalStopReason::Stop),
+            "stop"
+        );
+        assert_eq!(
+            StopReasonNormalizer::canonical_to_openai(CanonicalStopReason::ToolUse),
+            "tool_calls"
+        );
+        assert_eq!(
+            StopReasonNormalizer::canonical_to_openai(CanonicalStopReason::Length),
+            "length"
+        );
     }
 
     #[test]
     fn test_canonical_to_claude() {
-        assert_eq!(StopReasonNormalizer::canonical_to_claude(CanonicalStopReason::Stop), "end_turn");
-        assert_eq!(StopReasonNormalizer::canonical_to_claude(CanonicalStopReason::ToolUse), "tool_use");
-        assert_eq!(StopReasonNormalizer::canonical_to_claude(CanonicalStopReason::Length), "max_tokens");
+        assert_eq!(
+            StopReasonNormalizer::canonical_to_claude(CanonicalStopReason::Stop),
+            "end_turn"
+        );
+        assert_eq!(
+            StopReasonNormalizer::canonical_to_claude(CanonicalStopReason::ToolUse),
+            "tool_use"
+        );
+        assert_eq!(
+            StopReasonNormalizer::canonical_to_claude(CanonicalStopReason::Length),
+            "max_tokens"
+        );
     }
 }

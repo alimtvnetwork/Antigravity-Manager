@@ -119,7 +119,13 @@ impl CostDisclosureReport {
 /// Extracts title string from markdown header line.
 fn extract_header_title(trimmed: &str) -> Option<&str> {
     if trimmed.starts_with('#') {
-        Some(trimmed.trim_start_matches('#').trim().trim_matches('*').trim())
+        Some(
+            trimmed
+                .trim_start_matches('#')
+                .trim()
+                .trim_matches('*')
+                .trim(),
+        )
     } else if (trimmed.starts_with("**") && trimmed.ends_with("**") && trimmed.len() > 4)
         || (trimmed.starts_with("__") && trimmed.ends_with("__") && trimmed.len() > 4)
     {
@@ -190,9 +196,7 @@ fn summarize_lines(lines: Vec<String>) -> Option<String> {
 }
 
 /// Parses markdown body and extracts text for affected behaviors and unverified paths.
-fn parse_cost_disclosure_sections(
-    markdown: &str,
-) -> (Option<String>, Option<String>) {
+fn parse_cost_disclosure_sections(markdown: &str) -> (Option<String>, Option<String>) {
     let mut affected_lines = Vec::new();
     let mut unverified_lines = Vec::new();
     let mut current_section: Option<CostDisclosureSection> = None;
@@ -315,8 +319,7 @@ pub fn audit_cost_disclosure(
     pr_body_markdown: &str,
     is_high_risk_changeset: bool,
 ) -> CostDisclosureReport {
-    let (affected_behaviors, unverified_paths) =
-        parse_cost_disclosure_sections(pr_body_markdown);
+    let (affected_behaviors, unverified_paths) = parse_cost_disclosure_sections(pr_body_markdown);
 
     let mut findings = Vec::new();
     evaluate_section(
