@@ -42,6 +42,7 @@ if (typeof (globalThis as any).window === 'undefined') {
     };
     (globalThis as any).window = {
         localStorage: mockStorage,
+        location: { pathname: '/prompts', hash: '', search: '', href: 'http://localhost/prompts' },
         __TAURI_INTERNALS__: {
             invoke: async (cmd: string, args: any) => {
                 mockInvokeCalls.push({ cmd, args });

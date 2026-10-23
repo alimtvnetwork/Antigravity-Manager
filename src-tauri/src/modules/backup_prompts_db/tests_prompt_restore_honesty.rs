@@ -9,9 +9,8 @@
 
 use super::connect_backup_db;
 use super::restore::{
-    count_unrestored_prompts_for_instance_with_file,
-    count_unrestored_prompts_for_other_instances, is_live_status_preserved,
-    reattribute_unrestored_prompt_backups,
+    count_unrestored_prompts_for_instance_with_file, count_unrestored_prompts_for_other_instances,
+    is_live_status_preserved, reattribute_unrestored_prompt_backups,
     restore_running_prompts_scoped_with_fallback_with_outcome, RestoreOutcome,
 };
 use chrono::Utc;
@@ -166,12 +165,9 @@ fn test_reattribution_of_unrestored_prompt_backups_during_switch() {
     let now = Utc::now().timestamp();
     seed_reattribution_test_records(&conn, custom_file, now);
 
-    let changed = reattribute_unrestored_prompt_backups(
-        Some("inst-old"),
-        "inst-new",
-        Some(custom_file),
-    )
-    .expect("Must re-attribute prompt backups");
+    let changed =
+        reattribute_unrestored_prompt_backups(Some("inst-old"), "inst-new", Some(custom_file))
+            .expect("Must re-attribute prompt backups");
     assert_eq!(changed, 1, "Only unrestored row should be re-attributed");
 
     assert_reattribution_outcomes(&conn);
@@ -182,10 +178,8 @@ fn test_reattribution_of_unrestored_prompt_backups_during_switch() {
 
 #[test]
 fn test_reattribute_unrestored_prompt_backups_unscoped_and_scoped() {
-    let temp_dir = std::env::temp_dir().join(format!(
-        "agm_test_reattr_all_{}",
-        Uuid::new_v4().simple()
-    ));
+    let temp_dir =
+        std::env::temp_dir().join(format!("agm_test_reattr_all_{}", Uuid::new_v4().simple()));
     let db_path = temp_dir.join("test-reattr-all.db");
     let custom_file = db_path.to_str().expect("valid path");
 
@@ -221,32 +215,25 @@ fn test_reattribute_unrestored_prompt_backups_unscoped_and_scoped() {
     .expect("Must insert r-3");
 
     // Scoped re-attribution: from inst-a to inst-target
-    let changed_scoped = reattribute_unrestored_prompt_backups(
-        Some("inst-a"),
-        "inst-target",
-        Some(custom_file),
-    )
-    .expect("Must re-attribute inst-a");
+    let changed_scoped =
+        reattribute_unrestored_prompt_backups(Some("inst-a"), "inst-target", Some(custom_file))
+            .expect("Must re-attribute inst-a");
     assert_eq!(changed_scoped, 1, "Only r-1 was from inst-a and unrestored");
 
     // Unscoped re-attribution: from None to inst-target (should reattribute remaining r-2 from inst-b)
-    let changed_unscoped = reattribute_unrestored_prompt_backups(
-        None,
-        "inst-target",
-        Some(custom_file),
-    )
-    .expect("Must re-attribute all unrestored");
+    let changed_unscoped =
+        reattribute_unrestored_prompt_backups(None, "inst-target", Some(custom_file))
+            .expect("Must re-attribute all unrestored");
     assert_eq!(changed_unscoped, 2);
 
-    let count_target = count_unrestored_prompts_for_instance_with_file(
-        Some("inst-target"),
-        Some(custom_file),
-    )
-    .expect("Must count unrestored prompts for inst-target");
+    let count_target =
+        count_unrestored_prompts_for_instance_with_file(Some("inst-target"), Some(custom_file))
+            .expect("Must count unrestored prompts for inst-target");
     assert_eq!(count_target, 2);
 
-    let count_other = count_unrestored_prompts_for_other_instances("inst-target", Some(custom_file))
-        .expect("Must count other unrestored");
+    let count_other =
+        count_unrestored_prompts_for_other_instances("inst-target", Some(custom_file))
+            .expect("Must count other unrestored");
     assert_eq!(count_other, 0);
 
     // r-3 was already restored and remains inst-a

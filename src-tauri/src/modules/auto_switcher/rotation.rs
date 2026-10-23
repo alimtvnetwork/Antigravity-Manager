@@ -487,8 +487,17 @@ pub async fn execute_profile_rotation_with_context(
     let app_config = config::load_app_config().unwrap_or_default();
     let has_pending_backups = backed_up_count_val > 0
         || crate::modules::repo_db::count_backed_up_prompts(&target_inst_id_clone) > 0
-        || crate::modules::backup_prompts_db::count_unrestored_prompts_for_instance(Some(&target_inst_id_clone)).unwrap_or(0) > 0
-        || crate::modules::backup_prompts_db::count_unrestored_prompts_for_other_instances(&target_inst_id_clone, None).unwrap_or(0) > 0;
+        || crate::modules::backup_prompts_db::count_unrestored_prompts_for_instance(Some(
+            &target_inst_id_clone,
+        ))
+        .unwrap_or(0)
+            > 0
+        || crate::modules::backup_prompts_db::count_unrestored_prompts_for_other_instances(
+            &target_inst_id_clone,
+            None,
+        )
+        .unwrap_or(0)
+            > 0;
     if app_config.auto_profile_switcher.auto_reopen_on_switch || has_pending_backups {
         crate::modules::instance::schedule_prompt_restore_after_launch(
             target_inst_id_clone.clone(),

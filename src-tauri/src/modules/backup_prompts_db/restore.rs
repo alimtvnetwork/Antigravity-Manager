@@ -568,9 +568,7 @@ pub fn reattribute_unrestored_prompt_backups(
 }
 
 /// Count unrestored backup records for a given instance (or all unrestored if None).
-pub fn count_unrestored_prompts_for_instance(
-    instance_id: Option<&str>,
-) -> Result<usize, String> {
+pub fn count_unrestored_prompts_for_instance(instance_id: Option<&str>) -> Result<usize, String> {
     count_unrestored_prompts_for_instance_with_file(instance_id, None)
 }
 

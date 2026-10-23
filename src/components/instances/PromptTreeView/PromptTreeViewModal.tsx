@@ -12,7 +12,7 @@ import type { PromptTreeViewModalProps } from './types';
 import { usePromptTreeState } from './usePromptTreeState';
 import { usePromptTreeData, invalidatePromptTreeCache } from './usePromptTreeData';
 import { usePromptTreeCoreActions } from './usePromptTreeCoreActions';
-import { usePromptTreePromptActions, dispatchRerunMessages, loadPersistedRerunCount, loadPersistedRerunMessageOption } from './usePromptTreePromptActions';
+import { usePromptTreePromptActions, dispatchRerunMessages, loadPersistedRerunCount, loadPersistedRerunMessageOption, type RerunMessageOption } from './usePromptTreePromptActions';
 import { isGhostConversation, isStaleOrEmptyConversation, getConversationStatus } from './conversationGuards';
 import { classifyPromptTier } from './tierClassification';
 import { ModalHeader } from './ModalHeader';

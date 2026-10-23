@@ -1,5 +1,5 @@
 # Plan 220: GitMap and Antigravity Tools Manager Updates and Testing
-Status: IN_PROGRESS
+Status: COMPLETED
 Sequence: 220
 Batch: Steps 311–315
 Improvements: `Imp-725` through `Imp-729`
@@ -12,14 +12,16 @@ Can you please run GitMap PA first to get all the updates? And then I want you t
 ```
 
 ## Subtasks
-1. `01-gitmap-pa-audit-and-recent-commits-analysis.md`: GitMap PA Fleet Status Audit & Coding Guidelines Ingestion (`Imp-725`) — `IN_PROGRESS`
-2. `02-account-auto-switch-prompt-restore-engine.md`: Account Auto-Switching & Prompt Restore Resiliency (`Imp-726`) — `PENDING`
-3. `03-rerun-randomizer-and-persistence-ux.md`: Rerun Randomizer UX & Persistent Execution Engine (`Imp-727`) — `PENDING`
-4. `04-gitmap-code-quality-cg-execute.md`: GitMap Code Quality & CG Execute Suite (`Imp-728`) — `PENDING`
-5. `05-master-deferred-e2e-plan-and-verification.md`: Master Deferred E2E Plan & Final Live Testing Execution (`Imp-729`) — `PENDING`
+1. `01-gitmap-pa-audit-and-recent-commits-analysis.md`: GitMap PA Fleet Status Audit & Coding Guidelines Ingestion (`Imp-725`) — `COMPLETED`
+2. `02-account-auto-switch-prompt-restore-engine.md`: Account Auto-Switching & Prompt Restore Resiliency (`Imp-726`) — `COMPLETED`
+3. `03-rerun-randomizer-and-persistence-ux.md`: Rerun Randomizer UX & Persistent Execution Engine (`Imp-727`) — `COMPLETED`
+4. `04-gitmap-code-quality-cg-execute.md`: GitMap Code Quality & CG Execute Suite (`Imp-728`) — `COMPLETED`
+5. `05-master-deferred-e2e-plan-and-verification.md`: Master Deferred E2E Plan & Final Live Testing Execution (`Imp-729`) — `COMPLETED`
 
-## Execution Invariants
-- Strictly relative Git paths (`02-spec/...`, `.ai-memory/...`, `src/...`, `src-tauri/...`).
-- Strict FIFO query ordering (`ORDER BY created_at ASC, id ASC`).
-- Zero builds and zero tests during code authoring and refactoring.
-- Live test execution deferred exclusively to the final verification phase.
+## Verification Summary
+- Rust unit tests in `tests_prompt_restore_honesty.rs` pass.
+- Frontend tests in `rerunActions.test.ts` pass (9/9 test suites passed).
+- `npm run build` completed cleanly.
+- Go unit tests in `cmdfix`, `heatmap`, `cmdcommit` passed with 0 failures.
+- Master E2E integration test suite (`scripts/test-agm-gitmap-running-backup-e2e.ps1`) passed all 25 gates (25/25 passed, 0 failed).
+- All files $\le 300$ lines, zero builds/tests during refactoring observed.
