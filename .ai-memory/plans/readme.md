@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [211-implementing-next-five-tasks.md](./completed/211-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test windows shell dispatch argument escaper, FIFO queue drain monotonicity verifier, streaming chunk boundary guard, truncation omission banner formatter, and individually revertable commit guard (Steps 266–270). |
 | [210-implementing-next-five-tasks.md](./completed/210-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test unified context alignment guard, capsule segmented control styling validator, PR problem classification linter, FIFO prompt restore concurrency limiter, and verified fallback path linter (Steps 261–265). |
 | [209-implementing-next-five-tasks.md](./completed/209-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test protocol adapter divergence auditor, prompt tree branch hierarchy formatter, transcript full log reverse scanner, FIFO queue batch drain guard, and no silent errors justification auditor (Steps 256–260). |
 | [208-implementing-next-five-tasks.md](./completed/208-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test settings deep-merge validator, thinking block backfill pipeline guard, coauthor trailer alignment guard, FIFO multi-table restore transaction coordinator, and unverified paths disclosure guard (Final Milestone: Steps 251–255 of 255). |
