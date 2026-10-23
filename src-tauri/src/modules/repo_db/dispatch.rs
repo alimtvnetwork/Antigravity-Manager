@@ -308,6 +308,286 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
     Ok(dispatched_count)
 }
 
+/// Load every prompt in a dispatchable status, in FIFO order
+/// (`ORDER BY created_at ASC, id ASC` — the queue invariant).
+fn query_dispatchable_prompts(conn: &Connection) -> Result<Vec<ActivePrompt>, String> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload
+             FROM active_prompts
+             WHERE status IN ('backed_up', 'pending', 'in_progress', 'queued')
+             ORDER BY created_at ASC, id ASC",
+        )
+        .map_err(|e| format!("Failed to prepare dispatch query: {}", e))?;
+
+    let prompts = stmt
+        .query_map([], |row| {
+            Ok(ActivePrompt {
+                id: row.get(0)?,
+                project_id: row.get(1)?,
+                instance_id: row.get(2)?,
+                repo_path: row.get(3)?,
+                prompt_content: row.get(4)?,
+                model: row.get(5)?,
+                session_id: row.get(6)?,
+                status: row.get(7)?,
+                created_at: row.get(8)?,
+                updated_at: row.get(9)?,
+                image_payload: row.get(10).ok(),
+            })
+        })
+        .map_err(|e| format!("Failed to query backed-up prompts: {}", e))?
+        .flatten()
+        .collect::<Vec<ActivePrompt>>();
+    Ok(prompts)
+}
+
+/// Strict instance match for dispatch selection, with the same audit logging
+/// as `dispatch_running_prompts`. No flexible fallback: a prompt tagged for a
+/// different instance never matches here.
+fn prompt_matches_target(
+    prompt: &ActivePrompt,
+    target_inst: &str,
+    is_default_target: bool,
+    action: &str,
+) -> bool {
+    let prompt_inst = crate::modules::instance::resolve_instance_id(&prompt.instance_id)
+        .unwrap_or_else(|_| {
+            if prompt.instance_id == "__default__" || prompt.instance_id.is_empty() {
+                "default".to_string()
+            } else {
+                prompt.instance_id.clone()
+            }
+        });
+    let is_match = if is_default_target {
+        prompt_inst == "default" || prompt_inst == "__default__" || prompt_inst.is_empty()
+    } else {
+        prompt_inst == target_inst
+    };
+    let rationale = ProjectAuditRationaleType::from_dispatch(is_match);
+    crate::modules::logger::log_instance_prompt_audit(
+        target_inst,
+        action,
+        &prompt.id,
+        &prompt.repo_path,
+        "",
+        None,
+        PromptAuditCriteriaType::PromptDispatcherInstanceMatching.as_str(),
+        is_match,
+        rationale.as_str(),
+    );
+    is_match
+}
+
+/// Pick the single most recently active prompt: greatest `updated_at`, ties
+/// broken by greatest `created_at`, then greatest `id`. Candidates arrive in
+/// FIFO order; this is a one-row selection, not a queue reordering — the FIFO
+/// dispatch invariant for the backlog is unchanged.
+fn pick_latest_prompt(prompts: &[ActivePrompt]) -> Option<ActivePrompt> {
+    prompts
+        .iter()
+        .max_by(|a, b| {
+            a.updated_at
+                .cmp(&b.updated_at)
+                .then_with(|| a.created_at.cmp(&b.created_at))
+                .then_with(|| a.id.cmp(&b.id))
+        })
+        .cloned()
+}
+
+/// Send one prompt through the same resume-file + agy/CDP path as the
+/// per-prompt step of `dispatch_running_prompts`. Returns true only when the
+/// send landed and the row was marked `dispatched`.
+fn dispatch_one_prompt(
+    conn: &Connection,
+    prompt: &ActivePrompt,
+    target_inst: &str,
+    instance_id: &str,
+    now: i64,
+) -> bool {
+    let sig = format!("{}:{}", prompt.repo_path, prompt.prompt_content.trim());
+    let already_dispatched = if prompt.status == "backed_up"
+        || prompt.status == "pending"
+        || prompt.status == "in_progress"
+        || prompt.status == "queued"
+    {
+        false
+    } else {
+        let mut cache = match get_dispatched_prompts_cache().lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        let seen = cache.contains(&prompt.id) || cache.contains(&sig);
+        if !seen {
+            cache.insert(prompt.id.clone());
+            cache.insert(sig);
+        }
+        seen
+    };
+
+    if already_dispatched {
+        crate::modules::logger::log_info(&format!(
+            "[RepoDB] Skipping duplicate dispatch for prompt '{}' in '{}'",
+            prompt.id, prompt.repo_path
+        ));
+        // Justification: duplicate-suppression state update; a missed update leaves the prompt backed_up for retry on the next dispatch
+        crate::error::record_ignored(
+            conn.execute(
+                "UPDATE active_prompts SET status = 'dispatched', updated_at = ? WHERE id = ?",
+                rusqlite::params![now, &prompt.id],
+            ),
+            "mark duplicate prompt dispatched",
+        );
+        return false;
+    }
+
+    crate::modules::logger::log_info(&format!(
+        "[RepoDB] Directly dispatching prompt '{}' to project at '{}' without queuing",
+        prompt.id, prompt.repo_path
+    ));
+
+    // Keep the conversation id on the file the IDE reads. A later rewrite must not drop it.
+    let (extracted_img, img_paths) =
+        super::detection::extract_image_payload_or_path(&prompt.prompt_content);
+    let final_img = prompt.image_payload.clone().or(extracted_img);
+    let task_file = PathBuf::from(&prompt.repo_path).join(".antigravity_resume_task.json");
+    let mut payload = resume_task_document(prompt, "dispatched", now, &img_paths);
+    if final_img.is_some() {
+        payload["image_payload"] = serde_json::json!(final_img);
+    }
+    let file_written = if let Ok(json_str) = serde_json::to_string_pretty(&payload) {
+        fs::write(&task_file, json_str).is_ok()
+    } else {
+        false
+    };
+
+    let mut agy_sent = spawn_or_replace_prompt_via_agy(prompt, true);
+    if let Err(ref spawn_err) = agy_sent {
+        crate::modules::logger::log_warn(&format!(
+            "[RepoDB] agy dispatch failed for prompt '{}': {spawn_err}; attempting direct DevTools CDP fallback",
+            prompt.id
+        ));
+        let clean_prompt = super::text_utils::extract_clean_user_prompt(&prompt.prompt_content);
+        let fallback_prompt = if clean_prompt.trim().is_empty() {
+            prompt.prompt_content.trim()
+        } else {
+            clean_prompt.as_str()
+        };
+        if crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
+            target_inst,
+            fallback_prompt,
+            false,
+        )
+        .is_ok()
+        {
+            crate::modules::logger::log_info(&format!(
+                "[RepoDB] CDP prompt submission fallback succeeded for prompt '{}' on instance '{}'",
+                prompt.id, target_inst
+            ));
+            agy_sent = Ok(());
+        }
+    }
+    // The resume file is only a hint. A written file with a session id is not
+    // proof the IDE continued the prompt. Leave the row backed_up so the
+    // post-launch retry can push it once the process is accepting input.
+    if !prompt_push_landed(agy_sent.is_ok()) {
+        if file_written {
+            crate::modules::logger::log_warn(&format!(
+                "[RepoDB] Prompt '{}' resume file was written but agy/CDP did not accept it; left backed_up",
+                prompt.id
+            ));
+        }
+        crate::modules::logger::log_error(&format!(
+            "[RepoDB] Prompt '{}' was not re-pushed for instance '{}'; left backed_up",
+            prompt.id, instance_id
+        ));
+        return false;
+    }
+
+    let updated = conn.execute(
+        "UPDATE active_prompts SET status = 'dispatched', updated_at = ? WHERE id = ?",
+        params![now, &prompt.id],
+    );
+
+    if updated.is_ok() {
+        let byte_size = prompt.prompt_content.len();
+        let image_count = if !img_paths.is_empty() {
+            img_paths.len()
+        } else if final_img.is_some() {
+            1
+        } else {
+            0
+        };
+        tracing::info!(
+            "[PROMPT_RESTORE] Restoring running prompt for instance {} from backup (images: {}, bytes: {})",
+            prompt.instance_id,
+            image_count,
+            byte_size
+        );
+        if let Ok(mut map) = get_memory_prompts_map().lock() {
+            if let Some(p) = map.get_mut(&prompt.id) {
+                p.status = "dispatched".to_string();
+                p.updated_at = now;
+            }
+        }
+    }
+    updated.is_ok()
+}
+
+/// Post-switch / post-fast-forward resume (user decision, 2026-10-24):
+/// re-dispatch exactly ONE prompt — the most recently active backed-up prompt
+/// strictly belonging to `instance_id`. Every other backed-up prompt stays
+/// `backed_up` for a later manual or full dispatch. Unlike
+/// `dispatch_running_prompts` there is NO flexible cross-instance fallback:
+/// another instance's prompt is never dispatched from here.
+pub fn dispatch_single_latest_prompt(instance_id: &str) -> Result<usize, String> {
+    let conn = connect_db()?;
+    let now = Utc::now().timestamp();
+
+    let target_inst =
+        crate::modules::instance::resolve_instance_id(instance_id).unwrap_or_else(|_| {
+            if instance_id == "__default__" || instance_id.is_empty() {
+                "default".to_string()
+            } else {
+                instance_id.to_string()
+            }
+        });
+    let is_default_target = target_inst == "default" || target_inst == "__default__";
+
+    let all = query_dispatchable_prompts(&conn)?;
+    let candidates: Vec<ActivePrompt> = all
+        .iter()
+        .cloned()
+        .filter(|p| {
+            prompt_matches_target(
+                p,
+                &target_inst,
+                is_default_target,
+                "dispatch_single_latest_prompt",
+            )
+        })
+        .collect();
+
+    let Some(prompt) = pick_latest_prompt(&candidates) else {
+        crate::modules::logger::log_info(&format!(
+            "[RepoDB] Single-prompt resume: no backed-up prompt for instance '{}'; nothing to dispatch",
+            target_inst
+        ));
+        return Ok(0);
+    };
+
+    crate::modules::logger::log_info(&format!(
+        "[RepoDB] Single-prompt resume for instance '{}': dispatching only prompt '{}' ({} other backed-up prompt(s) stay backed up)",
+        target_inst,
+        prompt.id,
+        candidates.len().saturating_sub(1)
+    ));
+
+    let landed = dispatch_one_prompt(&conn, &prompt, &target_inst, instance_id, now);
+    invalidate_prompt_tree_cache(Some(&target_inst));
+    Ok(if landed { 1 } else { 0 })
+}
+
 /// Robust multi-format timestamp parsing handling RFC3339/ISO8601 with fractional seconds,
 /// timezones, ISO8601 without timezone, space-delimited with fractional seconds, standard seconds,
 /// and epoch integer timestamps.
@@ -482,5 +762,44 @@ mod tests {
     fn test_dispatch_backed_up_prompts_signature() {
         assert!(prompt_push_landed(true));
         assert!(!prompt_push_landed(false));
+    }
+
+    fn make_prompt(id: &str, created_at: i64, updated_at: i64) -> ActivePrompt {
+        ActivePrompt {
+            id: id.to_string(),
+            project_id: "proj".to_string(),
+            instance_id: "inst".to_string(),
+            repo_path: "/work/proj".to_string(),
+            prompt_content: "content".to_string(),
+            model: None,
+            session_id: None,
+            status: "backed_up".to_string(),
+            created_at,
+            updated_at,
+            image_payload: None,
+        }
+    }
+
+    #[test]
+    fn pick_latest_prompt_returns_none_for_empty() {
+        assert!(pick_latest_prompt(&[]).is_none());
+    }
+
+    #[test]
+    fn pick_latest_prompt_selects_most_recently_active() {
+        let prompts = vec![
+            make_prompt("old-active", 100, 500),
+            make_prompt("newest", 50, 900),
+            make_prompt("mid", 300, 700),
+        ];
+        let picked = pick_latest_prompt(&prompts).expect("candidate");
+        assert_eq!(picked.id, "newest");
+    }
+
+    #[test]
+    fn pick_latest_prompt_breaks_ties_by_creation_then_id() {
+        let prompts = vec![make_prompt("a", 100, 900), make_prompt("b", 200, 900)];
+        let picked = pick_latest_prompt(&prompts).expect("candidate");
+        assert_eq!(picked.id, "b");
     }
 }
