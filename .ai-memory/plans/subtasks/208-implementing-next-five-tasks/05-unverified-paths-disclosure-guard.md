@@ -1,5 +1,5 @@
 # Subtask 05: Unverified Paths & Cost Disclosure Guard (`Imp-669`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 208-implementing-next-five-tasks.md
 
 ## Scope & Objective

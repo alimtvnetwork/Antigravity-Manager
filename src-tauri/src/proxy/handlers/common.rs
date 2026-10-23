@@ -56,6 +56,7 @@ pub mod stream_boundary_guard;
 pub mod stream_drain_guard;
 pub mod stream_early_abort_sentinel;
 pub mod stream_flusher;
+pub mod thinking_block_backfill_pipeline;
 pub mod thinking_budget_filter_pipeline;
 pub mod thinking_budget_headroom_evaluator;
 pub mod thinking_budget_proportional_allocator;
@@ -114,6 +115,8 @@ pub mod tests_sse_heartbeat_generator;
 #[cfg(test)]
 pub mod tests_token_budget_decider;
 #[cfg(test)]
+pub mod tests_thinking_block_backfill_pipeline;
+#[cfg(test)]
 pub mod tests_thinking_budget_filter_pipeline;
 #[cfg(test)]
 pub mod tests_thinking_budget_headroom_evaluator;
@@ -170,6 +173,7 @@ pub use stream_boundary_guard::*;
 pub use stream_drain_guard::*;
 pub use stream_early_abort_sentinel::*;
 pub use stream_flusher::{StreamFlusher, SSE_KEEPALIVE_BYTES};
+pub use thinking_block_backfill_pipeline::*;
 pub use thinking_budget_filter_pipeline::*;
 pub use thinking_budget_headroom_evaluator::*;
 pub use thinking_budget_proportional_allocator::*;

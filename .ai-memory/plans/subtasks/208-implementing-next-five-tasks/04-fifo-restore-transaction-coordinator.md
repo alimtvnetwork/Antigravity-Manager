@@ -1,5 +1,5 @@
 # Subtask 04: FIFO Multi-Table Restore Transaction Coordinator (`Imp-668`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 208-implementing-next-five-tasks.md
 
 ## Scope & Objective

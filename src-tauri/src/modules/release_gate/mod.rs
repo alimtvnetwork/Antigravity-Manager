@@ -25,6 +25,7 @@ pub mod channel_gate;
 pub mod changelog_structure_validator;
 pub mod changelog_tag_monotonic_gate;
 pub mod coauthor_attribution_verifier;
+pub mod coauthor_trailer_alignment_guard;
 pub mod commit_convergence_auditor;
 pub mod contributor_cost_disclosure_linter;
 pub mod cross_platform_compat_guard;
@@ -70,6 +71,7 @@ pub mod thinking_cache_invalidation_guard;
 pub mod thinking_cache_target_version_guard;
 pub mod transcript_deep_inspection_scanner;
 pub mod truncation_callout_parser_guard;
+pub mod unverified_paths_disclosure_guard;
 pub mod wildcard_model_routing_guard;
 
 #[cfg(test)]
@@ -94,6 +96,8 @@ pub mod tests_changelog_structure;
 pub mod tests_changelog_tag_monotonic_gate;
 #[cfg(test)]
 pub mod tests_coauthor_attribution;
+#[cfg(test)]
+pub mod tests_coauthor_trailer_alignment_guard;
 #[cfg(test)]
 pub mod tests_commit_convergence;
 #[cfg(test)]
@@ -185,6 +189,8 @@ pub mod tests_transcript_deep_inspection;
 #[cfg(test)]
 pub mod tests_truncation_callout_parser;
 #[cfg(test)]
+pub mod tests_unverified_paths_disclosure_guard;
+#[cfg(test)]
 pub mod tests_version_manifest_sync;
 #[cfg(test)]
 pub mod tests_wildcard_model_routing;
@@ -201,6 +207,7 @@ pub use channel_gate::*;
 pub use changelog_structure_validator::*;
 pub use changelog_tag_monotonic_gate::*;
 pub use coauthor_attribution_verifier::*;
+pub use coauthor_trailer_alignment_guard::*;
 pub use commit_convergence_auditor::*;
 pub use contributor_cost_disclosure_linter::*;
 pub use cross_platform_compat_guard::*;
@@ -246,4 +253,5 @@ pub use thinking_cache_invalidation_guard::*;
 pub use thinking_cache_target_version_guard::*;
 pub use transcript_deep_inspection_scanner::*;
 pub use truncation_callout_parser_guard::*;
+pub use unverified_paths_disclosure_guard::*;
 pub use wildcard_model_routing_guard::*;

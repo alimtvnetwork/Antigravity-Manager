@@ -117,7 +117,7 @@ mod tests {
     fn test_protected_keys_validation_detects_erasure_and_degradation() {
         let original = json!({
             "workspaceStorage": {
-                "recent": ["/proj/alpha"]
+                "recent": ["workspace/alpha"]
             },
             "unprotected": "val"
         });
@@ -142,7 +142,7 @@ mod tests {
 
         let merged_valid = json!({
             "workspaceStorage": {
-                "recent": ["/proj/alpha", "/proj/beta"]
+                "recent": ["workspace/alpha", "workspace/beta"]
             }
         });
         assert!(validate_no_shallow_clobber(&original, &merged_valid, &protected).is_ok());

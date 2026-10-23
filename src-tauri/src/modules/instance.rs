@@ -375,6 +375,11 @@ pub mod caller_ide_heartbeat_watchdog;
 #[cfg(test)]
 #[path = "instance/tests_caller_ide_heartbeat_watchdog.rs"]
 pub mod tests_caller_ide_heartbeat_watchdog;
+#[path = "instance/settings_deep_merge_validator.rs"]
+pub mod settings_deep_merge_validator;
+#[cfg(test)]
+#[path = "instance/tests_settings_deep_merge_validator.rs"]
+pub mod tests_settings_deep_merge_validator;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use arg_normalizer::*;
@@ -572,3 +577,4 @@ pub use multi_stage_launcher_dispatcher::*;
 pub use multi_stage_launcher_engine::*;
 pub use side_effect_order_enforcer::*;
 pub use caller_ide_heartbeat_watchdog::*;
+pub use settings_deep_merge_validator::*;
