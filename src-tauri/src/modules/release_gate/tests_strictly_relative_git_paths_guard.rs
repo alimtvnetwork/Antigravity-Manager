@@ -1,8 +1,10 @@
 //! Unit tests for strictly relative git paths guard.
 
+use super::strictly_relative_git_paths_guard::*;
+
 #[cfg(test)]
 mod tests {
-    use super::strictly_relative_git_paths_guard::*;
+    use super::*;
 
     #[test]
     fn test_clean_relative_paths() {

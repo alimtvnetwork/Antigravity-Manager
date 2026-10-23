@@ -1,8 +1,10 @@
 //! Unit tests for agent prompt sanitization regex engine.
 
+use super::agent_prompt_sanitization_regex_engine::*;
+
 #[cfg(test)]
 mod tests {
-    use super::agent_prompt_sanitization_regex_engine::*;
+    use super::*;
 
     #[test]
     fn test_clean_prompt_preserved() {

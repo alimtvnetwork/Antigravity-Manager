@@ -1,8 +1,10 @@
 //! Unit Tests for Protocol Adapter Divergence Auditor (`Imp-256`).
 
+use super::protocol_adapter_divergence_auditor::*;
+
 #[cfg(test)]
 mod tests {
-    use super::protocol_adapter_divergence_auditor::*;
+    use super::*;
 
     #[test]
     fn test_clean_adapter_payload_transformation_passes() {

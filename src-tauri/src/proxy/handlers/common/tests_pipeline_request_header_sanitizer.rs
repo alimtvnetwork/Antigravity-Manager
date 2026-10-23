@@ -1,8 +1,10 @@
 //! Unit tests for pipeline request header sanitizer.
 
+use super::pipeline_request_header_sanitizer::*;
+
 #[cfg(test)]
 mod tests {
-    use super::pipeline_request_header_sanitizer::*;
+    use super::*;
     use std::collections::HashMap;
 
     #[test]

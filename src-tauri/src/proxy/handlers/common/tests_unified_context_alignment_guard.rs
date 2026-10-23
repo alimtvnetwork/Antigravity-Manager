@@ -1,8 +1,10 @@
 //! Unit tests for Unified Context Alignment Guard (`Imp-261`).
 
+use super::unified_context_alignment_guard::*;
+
 #[cfg(test)]
 mod tests {
-    use super::unified_context_alignment_guard::*;
+    use super::*;
 
     #[test]
     fn test_clean_alternating_turns_unchanged() {
