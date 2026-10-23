@@ -410,7 +410,7 @@ fn live_prompt_status(
         Err(rusqlite::Error::QueryReturnedNoRows) => {}
         Err(e) => {
             // Justification: probing live status by prompt id is best-effort; non-existence/read errors fall back to signature probe
-            crate::error::record_ignored(Err(e), "query live_prompt_status by id");
+            crate::error::record_ignored(Err::<(), _>(e), "query live_prompt_status by id");
         }
     }
 
@@ -425,7 +425,7 @@ fn live_prompt_status(
         Err(rusqlite::Error::QueryReturnedNoRows) => None,
         Err(e) => {
             // Justification: probing live status by signature is best-effort; fallback to None when row missing or query fails
-            crate::error::record_ignored(Err(e), "query live_prompt_status by signature");
+            crate::error::record_ignored(Err::<(), _>(e), "query live_prompt_status by signature");
             None
         }
     }
@@ -564,7 +564,7 @@ fn get_db_file_size(db_path: &Path) -> u64 {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => 0,
         Err(e) => {
             // Justification: metadata lookup for db path is non-fatal for storage stats; defaults to 0
-            crate::error::record_ignored(Err(e), "fs::metadata backup db");
+            crate::error::record_ignored(Err::<(), _>(e), "fs::metadata backup db");
             0
         }
     }
