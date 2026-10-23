@@ -9,8 +9,11 @@
 //! deep transcript inspection, FIFO queue query discipline, capsule styling,
 //! origin tier discrimination, truncation callout parsing, no-silent-errors rules,
 //! bounded matcher and timeout guards, commit history convergence, remote branch base precedence,
-//! risky path replacement fallback discipline, and side effect ordering around the point of no return.
+//! risky path replacement fallback discipline, side effect ordering around the point of no return,
+//! wildcard model routing, regex prompt sanitization, pipeline protocol decoupling,
+//! single problem scope cohesion, and contributor cost disclosure.
 
+pub mod agent_prompt_sanitizer_guard;
 pub mod attribution_verifier;
 pub mod batch_file_spawn_guard;
 pub mod bounded_matcher_timeout_guard;
@@ -20,6 +23,7 @@ pub mod channel_gate;
 pub mod changelog_structure_validator;
 pub mod coauthor_attribution_verifier;
 pub mod commit_convergence_auditor;
+pub mod contributor_cost_disclosure_linter;
 pub mod docker_sync_verifier;
 pub mod fifo_queue_ordering_guard;
 pub mod job_breakaway_fallback_ladder;
@@ -27,8 +31,10 @@ pub mod manifest_sync;
 pub mod no_silent_errors_linter;
 pub mod origin_tier_hierarchy_guard;
 pub mod path_hygiene;
+pub mod pipeline_protocol_decoupling_guard;
 pub mod preflight_gate_runner;
 pub mod profile_duplication_parity_guard;
+pub mod pr_scope_cohesion_verifier;
 pub mod pr_template_compliance_linter;
 pub mod remote_branch_base_verifier;
 pub mod risky_path_fallback_guard;
@@ -40,7 +46,10 @@ pub mod test_sandbox_lifecycle_verifier;
 pub mod thinking_cache_invalidation_guard;
 pub mod transcript_deep_inspection_scanner;
 pub mod truncation_callout_parser_guard;
+pub mod wildcard_model_routing_guard;
 
+#[cfg(test)]
+pub mod tests_agent_prompt_sanitizer;
 #[cfg(test)]
 pub mod tests_author_attribution;
 #[cfg(test)]
@@ -58,6 +67,8 @@ pub mod tests_coauthor_attribution;
 #[cfg(test)]
 pub mod tests_commit_convergence;
 #[cfg(test)]
+pub mod tests_contributor_cost_disclosure;
+#[cfg(test)]
 pub mod tests_docker_tag_sync;
 #[cfg(test)]
 pub mod tests_fifo_queue_ordering;
@@ -68,9 +79,13 @@ pub mod tests_no_silent_errors_linter;
 #[cfg(test)]
 pub mod tests_origin_tier_hierarchy;
 #[cfg(test)]
+pub mod tests_pipeline_protocol_decoupling;
+#[cfg(test)]
 pub mod tests_preflight_gate;
 #[cfg(test)]
 pub mod tests_profile_duplication_parity;
+#[cfg(test)]
+pub mod tests_pr_scope_cohesion;
 #[cfg(test)]
 pub mod tests_pr_template_linter;
 #[cfg(test)]
@@ -99,7 +114,10 @@ pub mod tests_transcript_deep_inspection;
 pub mod tests_truncation_callout_parser;
 #[cfg(test)]
 pub mod tests_version_manifest_sync;
+#[cfg(test)]
+pub mod tests_wildcard_model_routing;
 
+pub use agent_prompt_sanitizer_guard::*;
 pub use attribution_verifier::*;
 pub use batch_file_spawn_guard::*;
 pub use bounded_matcher_timeout_guard::*;
@@ -109,6 +127,7 @@ pub use channel_gate::*;
 pub use changelog_structure_validator::*;
 pub use coauthor_attribution_verifier::*;
 pub use commit_convergence_auditor::*;
+pub use contributor_cost_disclosure_linter::*;
 pub use docker_sync_verifier::*;
 pub use fifo_queue_ordering_guard::*;
 pub use job_breakaway_fallback_ladder::*;
@@ -116,8 +135,10 @@ pub use manifest_sync::*;
 pub use no_silent_errors_linter::*;
 pub use origin_tier_hierarchy_guard::*;
 pub use path_hygiene::*;
+pub use pipeline_protocol_decoupling_guard::*;
 pub use preflight_gate_runner::*;
 pub use profile_duplication_parity_guard::*;
+pub use pr_scope_cohesion_verifier::*;
 pub use pr_template_compliance_linter::*;
 pub use remote_branch_base_verifier::*;
 pub use risky_path_fallback_guard::*;
@@ -129,3 +150,4 @@ pub use test_sandbox_lifecycle_verifier::*;
 pub use thinking_cache_invalidation_guard::*;
 pub use transcript_deep_inspection_scanner::*;
 pub use truncation_callout_parser_guard::*;
+pub use wildcard_model_routing_guard::*;
