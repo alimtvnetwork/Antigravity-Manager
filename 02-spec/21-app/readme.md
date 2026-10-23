@@ -2,6 +2,7 @@
 
 | # | Specification File | Summary |
 | :--- | :--- | :--- |
+| `202-implementing-next-five-tasks` | [spec.md](./202-implementing-next-five-tasks/spec.md) | Enforces connection starvation watchdog, sole contributor attribution enforcer (@aukgit), tag changelog heading matcher gate, workspace storage continuity verification, and response stream delimiter normalization. |
 | `201-implementing-next-five-tasks` | [spec.md](./201-implementing-next-five-tasks/spec.md) | Enforces thinking cache invalidation control, readme changelog synchronization, sole contributor attribution (@aukgit), tag changelog heading matching, and prefix stability pipeline guarding. |
 | `200-implementing-next-five-tasks` | [spec.md](./200-implementing-next-five-tasks/spec.md) | Enforces pipeline prefix stability & header sanitization, unified context structural alignment, thinking cache target version guarding, multi-stage launcher job breakaway spawning, and split-DB lock timeout escalation. |
 | `199-implementing-next-five-tasks` | [spec.md](./199-implementing-next-five-tasks/spec.md) | Enforces cross-platform compatibility, maintainer staging protocol, published-tip rewrite safety, headless/CLI parity, and generic fix preference. |
