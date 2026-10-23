@@ -24,8 +24,11 @@ pub mod changelog_structure_validator;
 pub mod coauthor_attribution_verifier;
 pub mod commit_convergence_auditor;
 pub mod contributor_cost_disclosure_linter;
+pub mod cross_platform_compat_guard;
 pub mod docker_sync_verifier;
 pub mod fifo_queue_ordering_guard;
+pub mod generic_fix_preference_guard;
+pub mod headless_cli_parity_guard;
 pub mod job_breakaway_fallback_ladder;
 pub mod manifest_sync;
 pub mod no_silent_errors_linter;
@@ -36,6 +39,7 @@ pub mod preflight_gate_runner;
 pub mod profile_duplication_parity_guard;
 pub mod pr_scope_cohesion_verifier;
 pub mod pr_template_compliance_linter;
+pub mod published_tip_rewrite_guard;
 pub mod rejection_breakdown_generator;
 pub mod remote_branch_base_verifier;
 pub mod risky_path_fallback_guard;
@@ -43,6 +47,7 @@ pub mod rollback_ref_guard;
 pub mod semver_monotonic_validator;
 pub mod settings_deep_merge_synchronizer;
 pub mod side_effect_ordering_guard;
+pub mod staging_protocol_guard;
 pub mod test_sandbox_lifecycle_verifier;
 pub mod thinking_cache_invalidation_guard;
 pub mod transcript_deep_inspection_scanner;
@@ -70,9 +75,15 @@ pub mod tests_commit_convergence;
 #[cfg(test)]
 pub mod tests_contributor_cost_disclosure;
 #[cfg(test)]
+pub mod tests_cross_platform_compat;
+#[cfg(test)]
 pub mod tests_docker_tag_sync;
 #[cfg(test)]
 pub mod tests_fifo_queue_ordering;
+#[cfg(test)]
+pub mod tests_generic_fix_preference;
+#[cfg(test)]
+pub mod tests_headless_cli_parity;
 #[cfg(test)]
 pub mod tests_job_breakaway_fallback;
 #[cfg(test)]
@@ -89,6 +100,8 @@ pub mod tests_profile_duplication_parity;
 pub mod tests_pr_scope_cohesion;
 #[cfg(test)]
 pub mod tests_pr_template_linter;
+#[cfg(test)]
+pub mod tests_published_tip_rewrite;
 #[cfg(test)]
 pub mod tests_rejection_breakdown_generator;
 #[cfg(test)]
@@ -109,6 +122,8 @@ pub mod tests_semver_monotonic;
 pub mod tests_settings_deep_merge;
 #[cfg(test)]
 pub mod tests_side_effect_ordering;
+#[cfg(test)]
+pub mod tests_staging_protocol;
 #[cfg(test)]
 pub mod tests_thinking_cache_guard;
 #[cfg(test)]
@@ -131,8 +146,11 @@ pub use changelog_structure_validator::*;
 pub use coauthor_attribution_verifier::*;
 pub use commit_convergence_auditor::*;
 pub use contributor_cost_disclosure_linter::*;
+pub use cross_platform_compat_guard::*;
 pub use docker_sync_verifier::*;
 pub use fifo_queue_ordering_guard::*;
+pub use generic_fix_preference_guard::*;
+pub use headless_cli_parity_guard::*;
 pub use job_breakaway_fallback_ladder::*;
 pub use manifest_sync::*;
 pub use no_silent_errors_linter::*;
@@ -143,6 +161,7 @@ pub use preflight_gate_runner::*;
 pub use profile_duplication_parity_guard::*;
 pub use pr_scope_cohesion_verifier::*;
 pub use pr_template_compliance_linter::*;
+pub use published_tip_rewrite_guard::*;
 pub use rejection_breakdown_generator::*;
 pub use remote_branch_base_verifier::*;
 pub use risky_path_fallback_guard::*;
@@ -150,6 +169,7 @@ pub use rollback_ref_guard::*;
 pub use semver_monotonic_validator::*;
 pub use settings_deep_merge_synchronizer::*;
 pub use side_effect_ordering_guard::*;
+pub use staging_protocol_guard::*;
 pub use test_sandbox_lifecycle_verifier::*;
 pub use thinking_cache_invalidation_guard::*;
 pub use transcript_deep_inspection_scanner::*;
