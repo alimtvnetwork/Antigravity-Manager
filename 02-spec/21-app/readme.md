@@ -2,6 +2,7 @@
 
 | # | Specification File | Summary |
 | :--- | :--- | :--- |
+| `203-implementing-next-five-tasks` | [spec.md](./203-implementing-next-five-tasks/spec.md), [e2e_master_plan.md](./203-implementing-next-five-tasks/e2e_master_plan.md) | Enforces preflight checks gate, caller IDE exit code 2 enforcer, PR template compliance guard, thinking budget filter pipeline, and FIFO prompt restore query validator. |
 | `202-implementing-next-five-tasks` | [spec.md](./202-implementing-next-five-tasks/spec.md) | Enforces connection starvation watchdog, sole contributor attribution enforcer (@aukgit), tag changelog heading matcher gate, workspace storage continuity verification, and response stream delimiter normalization. |
 | `201-implementing-next-five-tasks` | [spec.md](./201-implementing-next-five-tasks/spec.md) | Enforces thinking cache invalidation control, readme changelog synchronization, sole contributor attribution (@aukgit), tag changelog heading matching, and prefix stability pipeline guarding. |
 | `200-implementing-next-five-tasks` | [spec.md](./200-implementing-next-five-tasks/spec.md) | Enforces pipeline prefix stability & header sanitization, unified context structural alignment, thinking cache target version guarding, multi-stage launcher job breakaway spawning, and split-DB lock timeout escalation. |
