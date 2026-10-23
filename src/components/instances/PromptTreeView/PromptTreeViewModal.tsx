@@ -356,6 +356,9 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             nudgeType === 'is-it-done' ||
             nudgeType === 'is-it-finished' ||
             nudgeType === 'is-it-released' ||
+            nudgeType === 'is-it-completed' ||
+            nudgeType === 'verify-and-finish' ||
+            nudgeType === 'check-pending-tasks' ||
             nudgeType === 'randomized'
                 ? nudgeType
                 : loadPersistedRerunMessageOption();

@@ -1073,67 +1073,86 @@ export { IMAGE_EXTENSIONS };
 // ============================================================================
 
 /** Message choice offered by the rerun UI picker. */
-export type RerunMessageOption = 'randomized' | 'is-it-done' | 'is-it-finished' | 'is-it-published' | 'is-it-released';
+export type RerunMessageOption =
+    | 'randomized'
+    | 'is-it-completed'
+    | 'is-it-finished'
+    | 'is-it-released'
+    | 'is-it-done'
+    | 'is-it-published'
+    | 'verify-and-finish'
+    | 'check-pending-tasks';
 
-/** Picker rows rendered by the rerun UI. The randomized row is explicitly labeled. */
+/** Picker rows rendered by the rerun UI. The randomized row is explicitly labeled and auto-picked. */
 export const RERUN_MESSAGE_OPTIONS: ReadonlyArray<{ value: RerunMessageOption; label: string; hint: string }> = [
     {
         value: 'randomized',
-        label: 'Randomized nudge (random pick)',
-        hint: 'Every dispatch picks ONE message at random from the built-in set',
+        label: 'Randomized nudge (auto-picked random variation)',
+        hint: 'Every dispatch picks ONE message at random from the 16 built-in variations',
     },
-    { value: 'is-it-done', label: 'Is it done?', hint: 'Send a completion-check nudge' },
-    { value: 'is-it-finished', label: 'Is it finished?', hint: 'Send a finished-check nudge' },
-    { value: 'is-it-published', label: 'Is it published?', hint: 'Send a publish-status nudge' },
+    { value: 'is-it-completed', label: 'Is it completed?', hint: 'Send a completion-check nudge' },
+    { value: 'is-it-finished', label: 'Is it finished?', hint: 'Send a finish-check nudge' },
     { value: 'is-it-released', label: 'Is it released?', hint: 'Send a release-status nudge' },
+    { value: 'is-it-done', label: 'Is it done?', hint: 'Send a standard done-check nudge' },
+    { value: 'is-it-published', label: 'Is it published?', hint: 'Send a publish-status nudge' },
+    { value: 'verify-and-finish', label: 'Verify and finish remaining items', hint: 'Send a verification reminder nudge' },
+    { value: 'check-pending-tasks', label: 'Check pending tasks and continue', hint: 'Send a task continuation nudge' },
 ];
 
-/** Built-in set of follow-up nudges used by the "randomized" option. */
+/** Built-in set of follow-up nudges used by the "randomized" option (16 distinct actionable variations). */
 export const RERUN_RANDOM_MESSAGE_SET: ReadonlyArray<string> = [
+    'Is it completed?',
+    'Is it finished?',
+    'Is it released?',
+    'Has this been fully implemented and verified?',
+    'Can you check the pending tasks and continue?',
+    'Is the implementation done and pushed?',
+    'Please verify and finish the remaining items.',
+    'Did all tests pass and is everything green?',
+    'Are all requirements satisfied?',
+    'Please double check completion and finalize.',
+    'Is there any pending work left?',
+    'Please confirm completion status and next steps.',
     'Quick status check — is it done yet?',
-    'Is it finished? Please confirm when complete.',
-    'Is it released? Let me know the release status.',
     'Please continue where you left off and confirm when finished.',
-    'Give me a brief progress update.',
-    'Checking in: how is it going? Any blockers?',
-    'Status update please: what is done and what is left?',
-    'Are we there yet? Let me know the current state.',
-    'Please keep working and report back when complete.',
-    'Quick check-in: is everything on track?',
-    'Have you finished? If not, please continue.',
-    'How is progress? Share a short summary of where things stand.',
-    'Still working on it? Wrap up and confirm once it is done.',
-    'Any update on this? Please confirm when it is published or finished.',
-    'Are you finished? Summarize the result.',
-    'Keep going — ping me when it is published.',
-    'Is it released? Share the release notes or version details.',
-    'Wrap up the pending tasks and confirm if it is finished.',
+    'Checking in: how is it going? Any blockers or pending items?',
+    'Status update please: what is done and what is left to complete?',
 ];
 
 export const RERUN_FIXED_MESSAGES: Record<Exclude<RerunMessageOption, 'randomized'>, string> = {
-    'is-it-done': 'Is it done?',
+    'is-it-completed': 'Is it completed?',
     'is-it-finished': 'Is it finished?',
-    'is-it-published': 'Is it published?',
     'is-it-released': 'Is it released?',
+    'is-it-done': 'Is it done?',
+    'is-it-published': 'Is it published?',
+    'verify-and-finish': 'Please verify and finish the remaining items.',
+    'check-pending-tasks': 'Can you check the pending tasks and continue?',
 };
 
 export const RERUN_DEFAULT_COUNT = 4;
 export const RERUN_MIN_COUNT = 1;
-export const RERUN_MAX_COUNT = 5;
+export const RERUN_MAX_COUNT = 8;
 
 /** Rerun option used when no choice has been persisted yet: the randomized nudge. */
 export const RERUN_DEFAULT_MESSAGE_OPTION: RerunMessageOption = 'randomized';
 
-const RERUN_MESSAGE_OPTION_STORAGE_KEY = 'agm_prompt_tree_rerun_message_option';
-const RERUN_COUNT_STORAGE_KEY = 'agm_prompt_tree_rerun_count';
+export const RERUN_MESSAGE_OPTION_STORAGE_KEY = 'agm:prompt-tree:rerun-option';
+export const RERUN_COUNT_STORAGE_KEY = 'agm:prompt-tree:rerun-count';
+
+// Legacy keys for seamless backward compatibility with existing browser sessions
+const LEGACY_RERUN_MESSAGE_OPTION_KEY = 'agm_prompt_tree_rerun_message_option';
+const LEGACY_RERUN_COUNT_KEY = 'agm_prompt_tree_rerun_count';
 
 function isRerunMessageOption(value: string | null): value is RerunMessageOption {
     return (
         value === 'randomized' ||
-        value === 'is-it-done' ||
+        value === 'is-it-completed' ||
         value === 'is-it-finished' ||
+        value === 'is-it-released' ||
+        value === 'is-it-done' ||
         value === 'is-it-published' ||
-        value === 'is-it-released'
+        value === 'verify-and-finish' ||
+        value === 'check-pending-tasks'
     );
 }
 
@@ -1143,7 +1162,8 @@ export function loadPersistedRerunMessageOption(): RerunMessageOption {
         if (typeof window === 'undefined' || !window.localStorage) {
             return RERUN_DEFAULT_MESSAGE_OPTION;
         }
-        const raw = window.localStorage.getItem(RERUN_MESSAGE_OPTION_STORAGE_KEY);
+        const raw = window.localStorage.getItem(RERUN_MESSAGE_OPTION_STORAGE_KEY)
+            || window.localStorage.getItem(LEGACY_RERUN_MESSAGE_OPTION_KEY);
         return isRerunMessageOption(raw) ? raw : RERUN_DEFAULT_MESSAGE_OPTION;
     } catch {
         return RERUN_DEFAULT_MESSAGE_OPTION;
@@ -1155,6 +1175,7 @@ export function savePersistedRerunMessageOption(option: RerunMessageOption): voi
     try {
         if (typeof window === 'undefined' || !window.localStorage) return;
         window.localStorage.setItem(RERUN_MESSAGE_OPTION_STORAGE_KEY, option);
+        window.localStorage.setItem(LEGACY_RERUN_MESSAGE_OPTION_KEY, option);
     } catch (err) {
         // Best-effort persist; localStorage may throw in restricted contexts. Tracked, in-memory choice still applies.
         useErrorStore.getState().trackWarning(err, {
@@ -1164,13 +1185,14 @@ export function savePersistedRerunMessageOption(option: RerunMessageOption): voi
     }
 }
 
-/** Load the persisted rerun count (defaults to RERUN_DEFAULT_COUNT, clamped to the picker range). */
+/** Load the persisted rerun count (defaults to RERUN_DEFAULT_COUNT = 4, clamped to the picker range 1..8). */
 export function loadPersistedRerunCount(): number {
     try {
         if (typeof window === 'undefined' || !window.localStorage) {
             return RERUN_DEFAULT_COUNT;
         }
-        const raw = window.localStorage.getItem(RERUN_COUNT_STORAGE_KEY);
+        const raw = window.localStorage.getItem(RERUN_COUNT_STORAGE_KEY)
+            || window.localStorage.getItem(LEGACY_RERUN_COUNT_KEY);
         const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
         if (!Number.isFinite(parsed)) return RERUN_DEFAULT_COUNT;
         return Math.min(RERUN_MAX_COUNT, Math.max(RERUN_MIN_COUNT, parsed));
@@ -1185,6 +1207,7 @@ export function savePersistedRerunCount(count: number): void {
         if (typeof window === 'undefined' || !window.localStorage) return;
         const clamped = Math.min(RERUN_MAX_COUNT, Math.max(RERUN_MIN_COUNT, count));
         window.localStorage.setItem(RERUN_COUNT_STORAGE_KEY, String(clamped));
+        window.localStorage.setItem(LEGACY_RERUN_COUNT_KEY, String(clamped));
     } catch (err) {
         // Best-effort persist; localStorage may throw in restricted contexts. Tracked, in-memory state still applied.
         useErrorStore.getState().trackWarning(err, {
@@ -1200,7 +1223,8 @@ export function resolveRerunMessage(option: RerunMessageOption): { message: stri
         const pickedIndex = Math.floor(Math.random() * RERUN_RANDOM_MESSAGE_SET.length);
         return { message: RERUN_RANDOM_MESSAGE_SET[pickedIndex], pickedIndex };
     }
-    return { message: RERUN_FIXED_MESSAGES[option], pickedIndex: null };
+    const fixed = RERUN_FIXED_MESSAGES[option as Exclude<RerunMessageOption, 'randomized'>];
+    return { message: fixed || RERUN_RANDOM_MESSAGE_SET[0], pickedIndex: null };
 }
 
 export interface RerunDispatchContext {

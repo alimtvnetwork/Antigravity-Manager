@@ -42,7 +42,7 @@ Synchronize and audit recent updates across `Antigravity-Manager` and `GitMap`, 
 | **Step 286** | `Subtask 01` | Git & Audit | `02-spec/21-app/215-gitmap-and-antigravity-tools-manager-updates-and-testing/audit_report.md` | Run `gitmap pa`, analyze last 50-80 commits across AGM and GitMap, audit prompt/skill changes. |
 | **Step 287** | `Subtask 02` | AGM Backend | `src-tauri/src/modules/backup_prompts_db/restore.rs`, `src-tauri/src/modules/instance/switch.rs` | Fix prompt restore on auto-switch and quota completion; implement incomplete-prompt sweep and honest outcome reporting. |
 | **Step 288** | `Subtask 03` | AGM Frontend | `src/components/instances/PromptTreeView/DetailHeader.tsx`, `usePromptTreePromptActions.ts` | Implement rerun randomized auto-pick by default, enlarge prompt sets (12+ variations), and persist selections. |
-| **Step 289** | `Subtask 04` | GitMap CG | `d:/work/gitmap/` | Drain completed pending plans in GitMap, verify coding guideline adherence, eliminate boolean comparisons, and migrate AppError. |
+| **Step 289** | `Subtask 04` | GitMap CG | `../gitmap/` | Drain completed pending plans in GitMap, verify coding guideline adherence, eliminate boolean comparisons, and migrate AppError. |
 | **Step 290** | `Subtask 05` | E2E Testing | `02-spec/21-app/215-gitmap-and-antigravity-tools-manager-updates-and-testing/e2e_master_plan.md` | Author deferred E2E test catalog covering auto-switch prompt restore, quota drop recovery, rerun randomizer, and GitMap commands. |
 
 ---

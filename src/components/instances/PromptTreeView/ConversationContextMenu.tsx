@@ -453,6 +453,7 @@ export function ConversationContextMenu({
     // Rerun uses the same persisted option + count as the DetailHeader rerun
     // picker (default: randomized nudge) instead of a hardcoded nudge.
     const persistedRerunOption = loadPersistedRerunMessageOption();
+    const persistedRerunCount = loadPersistedRerunCount();
     const persistedRerunOptionLabel =
         RERUN_MESSAGE_OPTIONS.find((opt) => opt.value === persistedRerunOption)?.label ?? persistedRerunOption;
 
@@ -826,13 +827,13 @@ export function ConversationContextMenu({
                 disabled={isRerunning}
                 className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-sky-500/10 hover:text-sky-600 dark:hover:text-sky-400 cursor-pointer disabled:opacity-50"
                 onClick={handleDoRerun}
-                title={`Dispatch a fast rerun nudge (${persistedRerunOptionLabel}) to this conversation`}
+                title={`Dispatch a fast rerun nudge (${persistedRerunOptionLabel} ×${persistedRerunCount}) to this conversation`}
             >
                 <div className="flex items-center gap-2.5">
                     <Repeat className={cn("w-3.5 h-3.5 text-sky-500 shrink-0", isRerunning && "animate-spin")} />
-                    <span className="font-medium">{isRerunning ? 'Rerunning…' : `Rerun Nudge (${persistedRerunOptionLabel})`}</span>
+                    <span className="font-medium">{isRerunning ? 'Rerunning…' : `Rerun Nudge (×${persistedRerunCount})`}</span>
                 </div>
-                <span className="text-[9px] font-mono text-sky-400 font-bold">Rerun</span>
+                <span className="text-[9px] font-mono text-sky-400 font-bold">{persistedRerunOption === 'randomized' ? 'Random' : 'Rerun'}</span>
             </button>
 
             {/* Core Action 5: Copy Prompt Text */}

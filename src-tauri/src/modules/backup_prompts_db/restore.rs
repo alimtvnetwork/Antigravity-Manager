@@ -20,13 +20,77 @@ pub fn restore_running_prompts(
 /// preserved because their live row is already `running`/`completed` (RC-6);
 /// `failed` counts re-injection failures plus a failed dispatch pass, with
 /// `last_error` carrying the most recent failure message.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct RestoreOutcome {
     pub restored: usize,
     pub dispatched: usize,
     pub failed: usize,
     pub skipped_live: usize,
+    pub restored_count: usize,
+    pub dispatched_count: usize,
+    pub failed_count: usize,
     pub last_error: Option<String>,
+}
+
+impl RestoreOutcome {
+    pub fn new(restored_count: usize, dispatched_count: usize, failed_count: usize) -> Self {
+        Self {
+            restored: restored_count,
+            dispatched: dispatched_count,
+            failed: failed_count,
+            skipped_live: 0,
+            restored_count,
+            dispatched_count,
+            failed_count,
+            last_error: None,
+        }
+    }
+
+    #[inline]
+    pub fn record_restored(&mut self) {
+        self.restored += 1;
+        self.restored_count = self.restored;
+    }
+
+    #[inline]
+    pub fn record_dispatched(&mut self, count: usize) {
+        self.dispatched = count;
+        self.dispatched_count = count;
+    }
+
+    #[inline]
+    pub fn record_failed(&mut self, err: Option<String>) {
+        self.failed += 1;
+        self.failed_count = self.failed;
+        if err.is_some() {
+            self.last_error = err;
+        }
+    }
+
+    #[inline]
+    pub fn record_skipped_live(&mut self) {
+        self.skipped_live += 1;
+    }
+
+    #[inline]
+    pub fn restored_count(&self) -> usize {
+        self.restored
+    }
+
+    #[inline]
+    pub fn dispatched_count(&self) -> usize {
+        self.dispatched
+    }
+
+    #[inline]
+    pub fn failed_count(&self) -> usize {
+        self.failed
+    }
+
+    #[inline]
+    pub fn is_success(&self) -> bool {
+        self.failed == 0
+    }
 }
 
 /// Restore running prompts: re-inserts them into repo_db and updates restoration flags.
@@ -163,12 +227,12 @@ pub fn restore_running_prompts_for_instance_with_outcome(
             updated_at: now,
             image_payload: rec.images_payload.clone(),
         };
-        let live_status = live_conn
-            .as_ref()
-            .and_then(|c| live_prompt_status(c, &rec.prompt_id));
+        let live_status = live_conn.as_ref().and_then(|c| {
+            live_prompt_status(c, &rec.prompt_id, &rec.project_path, &rec.prompt_text)
+        });
         let has_live_final_status = is_live_status_preserved(live_status.as_deref());
         if has_live_final_status {
-            outcome.skipped_live += 1;
+            outcome.record_skipped_live();
             crate::modules::logger::log_info(&format!(
                 "[BackupDB] Restore preserving live prompt {} on {} (live status: {})",
                 rec.prompt_id,
@@ -178,14 +242,13 @@ pub fn restore_running_prompts_for_instance_with_outcome(
             continue;
         }
         match repo_db::save_or_requeue_prompt(&active_p) {
-            Ok(()) => outcome.restored += 1,
+            Ok(()) => outcome.record_restored(),
             Err(e) => {
-                outcome.failed += 1;
+                outcome.record_failed(Some(e.clone()));
                 crate::modules::logger::log_error(&format!(
                     "[BackupDB] Restore failed to re-inject prompt {} on {}: {}",
                     rec.prompt_id, eff_inst, e
                 ));
-                outcome.last_error = Some(e);
             }
         }
     }
@@ -219,14 +282,13 @@ pub fn restore_running_prompts_for_instance_with_outcome(
         if unscoped { None } else { Some(target_inst) },
         20,
     ) {
-        Ok(sent) => outcome.dispatched = sent.len(),
+        Ok(sent) => outcome.record_dispatched(sent.len()),
         Err(e) => {
-            outcome.failed += 1;
+            outcome.record_failed(Some(e.clone()));
             crate::modules::logger::log_error(&format!(
                 "[BackupDB] Restore dispatch pass failed for instance '{}': {}",
                 target_inst, e
             ));
-            outcome.last_error = Some(e);
         }
     }
     // Re-arm prompt-goal heartbeats for every instance that received restored prompts.
@@ -260,24 +322,34 @@ pub(crate) fn prompt_status_after_restore(saved: &str) -> &'static str {
     }
 }
 
-/// RC-6 dedup probe: current live `active_prompts` status for a prompt id,
+/// RC-6 dedup probe: current live `active_prompts` status for a prompt id or signature,
 /// when a live row already exists.
-fn live_prompt_status(conn: &Connection, prompt_id: &str) -> Option<String> {
-    conn.query_row(
+fn live_prompt_status(
+    conn: &Connection,
+    prompt_id: &str,
+    repo_path: &str,
+    prompt_text: &str,
+) -> Option<String> {
+    if let Ok(st) = conn.query_row(
         "SELECT status FROM active_prompts WHERE id = ?1",
         params![prompt_id],
+        |row| row.get::<_, String>(0),
+    ) {
+        return Some(st);
+    }
+    conn.query_row(
+        "SELECT status FROM active_prompts WHERE repo_path = ?1 AND prompt_content = ?2 LIMIT 1",
+        params![repo_path, prompt_text],
         |row| row.get::<_, String>(0),
     )
     .ok()
 }
 
-/// RC-6: a live row that is already `completed` must never be
+/// RC-6: a live row that is already `running` or `completed` must never be
 /// overwritten by a backup re-injection (`save_or_requeue_prompt` upserts
-/// with INSERT OR REPLACE). Stale 'running' rows left over from a terminated
-/// or quota-exhausted session are not preserved as live so restore re-injects
-/// and dispatches them on the newly active account.
-fn is_live_status_preserved(status: Option<&str>) -> bool {
-    matches!(status, Some("completed"))
+/// with INSERT OR REPLACE).
+pub(crate) fn is_live_status_preserved(status: Option<&str>) -> bool {
+    matches!(status, Some("running") | Some("completed"))
 }
 
 /// Count unrestored backup records recorded under instance ids other than
@@ -316,6 +388,34 @@ pub fn count_unrestored_prompts_for_other_instances(
     Ok(count as usize)
 }
 
+/// Same restore as [`restore_running_prompts_scoped_with_fallback`], additionally returning
+/// the honest [`RestoreOutcome`].
+pub fn restore_running_prompts_scoped_with_fallback_with_outcome(
+    instance_id: &str,
+    keep_backup: bool,
+    custom_file: Option<&str>,
+) -> Result<(Vec<PromptBackupRecord>, RestoreOutcome), String> {
+    let (records, outcome) = restore_running_prompts_for_instance_with_outcome(
+        Some(instance_id),
+        keep_backup,
+        custom_file,
+    )?;
+    let has_restored = !records.is_empty();
+    if has_restored {
+        return Ok((records, outcome));
+    }
+    let other_count = count_unrestored_prompts_for_other_instances(instance_id, custom_file)?;
+    let has_orphaned = other_count > 0;
+    if !has_orphaned {
+        return Ok((records, outcome));
+    }
+    crate::modules::logger::log_info(&format!(
+        "[BackupDB] Scoped restore for instance '{}' found nothing; {} unrestored record(s) exist under other instances — falling back to unscoped restore",
+        instance_id, other_count
+    ));
+    restore_running_prompts_for_instance_with_outcome(None, keep_backup, custom_file)
+}
+
 /// Scoped restore with the RC-2 fallback: when the strictly scoped pass
 /// restores nothing but unrestored records exist under other instance ids,
 /// retry with unscoped semantics so backups recorded under a previous
@@ -325,22 +425,12 @@ pub fn restore_running_prompts_scoped_with_fallback(
     keep_backup: bool,
     custom_file: Option<&str>,
 ) -> Result<Vec<PromptBackupRecord>, String> {
-    let records =
-        restore_running_prompts_for_instance(Some(instance_id), keep_backup, custom_file)?;
-    let has_restored = !records.is_empty();
-    if has_restored {
-        return Ok(records);
-    }
-    let other_count = count_unrestored_prompts_for_other_instances(instance_id, custom_file)?;
-    let has_orphaned = other_count > 0;
-    if !has_orphaned {
-        return Ok(records);
-    }
-    crate::modules::logger::log_info(&format!(
-        "[BackupDB] Scoped restore for instance '{}' found nothing; {} unrestored record(s) exist under other instances — falling back to unscoped restore",
-        instance_id, other_count
-    ));
-    restore_running_prompts_for_instance(None, keep_backup, custom_file)
+    let (records, _outcome) = restore_running_prompts_scoped_with_fallback_with_outcome(
+        instance_id,
+        keep_backup,
+        custom_file,
+    )?;
+    Ok(records)
 }
 
 /// Query storage information of the split database

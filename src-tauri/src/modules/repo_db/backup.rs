@@ -431,7 +431,6 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
 
     let is_all_or_default =
         instance_id == "all" || instance_id == "__default__" || instance_id == "default";
-    let recent_dispatched_cutoff = now - 120;
 
     // Transition in-flight and active prompts in active_prompts to 'backed_up' before switch (scoped to target instance).
     // RC-1: 'dispatched' rows transition at ANY age. A row still in
@@ -641,8 +640,7 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                                         let is_active_status = file_status == "running"
                                             || file_status == "in_flight"
                                             || file_status == "backed_up"
-                                            || (file_status == "dispatched"
-                                                && file_ts >= recent_dispatched_cutoff);
+                                            || file_status == "dispatched";
                                         let is_active_task = is_active_status && is_fresh_timestamp;
                                         if is_instance_matched && is_active_task {
                                             if let Some(txt) =

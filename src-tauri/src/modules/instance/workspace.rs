@@ -149,20 +149,21 @@ pub(crate) fn push_backed_up_prompts_after_channel(instance_id: &str) -> usize {
         ));
     }
     let before = crate::modules::repo_db::count_backed_up_prompts(instance_id);
-    // Rehydrate the snapshot first. A failed agy push leaves the row backed_up.
+    // Rehydrate the snapshot first with scoped-restore fallback: if target instance
+    // finds 0 records, it falls back to unrestored records under other instances.
     // The outcome counts are real (RC-3): a failed restore or dispatch is
     // logged with its counts here, never presented as success.
-    match crate::modules::backup_prompts_db::restore_running_prompts_for_instance_with_outcome(
-        Some(instance_id),
+    match crate::modules::backup_prompts_db::restore_running_prompts_scoped_with_fallback_with_outcome(
+        instance_id,
         false,
         None,
     ) {
         Ok((_records, outcome)) => {
             crate::modules::logger::log_info(&format!(
                 "[INSTANCE_SWITCH:STAGE_5_RESTORE] Restore outcome for '{instance_id}': {} restored, {} dispatched, {} failed, {} skipped-live{}",
-                outcome.restored,
-                outcome.dispatched,
-                outcome.failed,
+                outcome.restored_count,
+                outcome.dispatched_count,
+                outcome.failed_count,
                 outcome.skipped_live,
                 outcome
                     .last_error

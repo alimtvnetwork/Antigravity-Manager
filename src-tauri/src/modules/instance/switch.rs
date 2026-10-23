@@ -159,6 +159,13 @@ pub async fn switch_account_to_instance(
         instance.id.clone()
     };
 
+    // Incomplete-prompt sweep: transition ALL uncompleted prompts (running, in_flight, dispatched, any age)
+    // to backed_up so long-running prompts are never dropped when switching or when quota expires.
+    crate::error::record_ignored(
+        crate::modules::repo_db::backup::sweep_incomplete_prompts_for_instance(&source_instance_id),
+        "sweep incomplete prompts before switch",
+    );
+
     let existing_backed_up = crate::modules::repo_db::count_backed_up_prompts(&source_instance_id);
     let newly_backed_up = match crate::modules::repo_db::backup_running_prompts(&source_instance_id)
     {
@@ -182,17 +189,28 @@ pub async fn switch_account_to_instance(
     );
 
     // Re-attribute backed-up prompts from source instance to target instance prior to closing IDE
-    if source_instance_id != instance.id && backed_up_count > 0 {
+    if source_instance_id != instance.id {
         if let Ok(conn) = crate::modules::repo_db::connect_db() {
             let now = chrono::Utc::now().timestamp();
+            let is_source_default = source_instance_id == "default" || source_instance_id == "__default__";
             // Justification: prompt re-attribution to target instance during switch
-            crate::error::record_ignored(
-                conn.execute(
-                    "UPDATE active_prompts SET instance_id = ?1, updated_at = ?2 WHERE instance_id = ?3 AND status = 'backed_up'",
-                    rusqlite::params![&instance.id, now, &source_instance_id],
-                ),
-                "re-attribute active prompts to target instance",
-            );
+            if is_source_default {
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE active_prompts SET instance_id = ?1, updated_at = ?2 WHERE (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL) AND status = 'backed_up'",
+                        rusqlite::params![&instance.id, now],
+                    ),
+                    "re-attribute active prompts to target instance",
+                );
+            } else {
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE active_prompts SET instance_id = ?1, updated_at = ?2 WHERE instance_id = ?3 AND status = 'backed_up'",
+                        rusqlite::params![&instance.id, now, &source_instance_id],
+                    ),
+                    "re-attribute active prompts to target instance",
+                );
+            }
         }
     }
 
@@ -201,14 +219,25 @@ pub async fn switch_account_to_instance(
     // backups recorded under the source instance.
     if source_instance_id != instance.id {
         if let Ok(conn) = crate::modules::backup_prompts_db::connect_db() {
+            let is_source_default = source_instance_id == "default" || source_instance_id == "__default__";
             // Justification: prompt re-attribution to target instance during switch
-            crate::error::record_ignored(
-                conn.execute(
-                    "UPDATE prompt_backups SET instance_id = ?1 WHERE instance_id = ?2 AND is_restored = 0",
-                    rusqlite::params![&instance.id, &source_instance_id],
-                ),
-                "re-attribute prompt backups to target instance",
-            );
+            if is_source_default {
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE prompt_backups SET instance_id = ?1 WHERE (instance_id = 'default' OR instance_id = '__default__' OR instance_id IS NULL OR instance_id = '') AND is_restored = 0",
+                        rusqlite::params![&instance.id],
+                    ),
+                    "re-attribute prompt backups to target instance",
+                );
+            } else {
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE prompt_backups SET instance_id = ?1 WHERE instance_id = ?2 AND is_restored = 0",
+                        rusqlite::params![&instance.id, &source_instance_id],
+                    ),
+                    "re-attribute prompt backups to target instance",
+                );
+            }
         }
     }
 
@@ -635,11 +664,19 @@ pub async fn switch_account_to_instance(
     }
 
     let target_inst_id = instance.id.clone();
-    let channel_wait = crate::modules::repo_db::needs_prompt_channel_wait(backed_up_count);
+    let target_backed_up = crate::modules::repo_db::count_backed_up_prompts(&target_inst_id);
+    let total_pending_restore = backed_up_count.max(target_backed_up);
+    let has_unrestored_backups = crate::modules::backup_prompts_db::list_prompt_backups(Some(&target_inst_id), None)
+        .map(|list| list.iter().any(|r| !r.is_restored))
+        .unwrap_or(false)
+        || crate::modules::backup_prompts_db::count_unrestored_prompts_for_other_instances(&target_inst_id, None)
+            .map(|c| c > 0)
+            .unwrap_or(false);
+    let channel_wait = crate::modules::repo_db::needs_prompt_channel_wait(total_pending_restore) || has_unrestored_backups;
     if channel_wait {
         crate::modules::logger::log_info(&format!(
-            "[INSTANCE_SWITCH:STAGE_5_RESTORE] Scheduling prompt restore for instance '{}' after the IDE is up ({} backed up)",
-            target_inst_id, backed_up_count
+            "[INSTANCE_SWITCH:STAGE_5_RESTORE] Scheduling prompt restore for instance '{}' after the IDE is up ({} backed up, unrestored available: {})",
+            target_inst_id, total_pending_restore, has_unrestored_backups
         ));
         crate::modules::instance::schedule_prompt_restore_after_launch(target_inst_id.clone());
     } else {

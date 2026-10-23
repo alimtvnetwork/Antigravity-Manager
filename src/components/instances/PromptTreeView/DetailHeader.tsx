@@ -152,6 +152,9 @@ export function DetailHeader(props: DetailHeaderProps) {
     const handleSwitchDispatchMode = (mode: 'send' | 'enqueue' | 'rerun') => {
         setPrimaryDispatchAction(mode);
         propSetDispatchMode?.(mode);
+        if (mode === 'rerun') {
+            setRerunMessageOption('randomized');
+        }
     };
 
     const [localCopiedText, setLocalCopiedText] = useState(false);
@@ -382,6 +385,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                 );
             } else if (result.dispatched > 0) {
                 setRerunFlash(`Sent ×${result.dispatched}`);
+                setActionMsg?.(`Rerun ×${result.dispatched} dispatched successfully!`);
                 setTimeout(() => setRerunFlash(null), 2500);
                 setAttachedImage(null);
             }
@@ -984,7 +988,26 @@ export function DetailHeader(props: DetailHeaderProps) {
                             <span>{isEnqueueing ? 'Queueing…' : 'Enqueue'}</span>
                         </button>
 
-                        {/* 3. Dropdown Chevron for Unified Dispatch Menu (Rerun, Target, Templates) */}
+                        {/* 3. Rerun (Randomized): Directly dispatches auto-picked randomized completion/release check */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                void handleRerun().catch((err) => {
+                                    reportPromptActionError(err, 'DetailHeader.rerunSection');
+                                });
+                            }}
+                            disabled={isRerunning}
+                            data-ui-name="prompt-rerun-btn"
+                            data-ui-id={`prompt-rerun-${selectedConversation.conversation_id}`}
+                            className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold text-sky-700 dark:text-sky-300 hover:bg-sky-100/80 dark:hover:bg-sky-950/40 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                            title={`Rerun (${rerunMessageOption}): Dispatches auto-picked completion/release nudge (Hotkey: R)`}
+                            aria-label="Rerun: Dispatches auto-picked completion/release nudge"
+                        >
+                            <Repeat className={cn('w-3 h-3 text-sky-500 shrink-0', isRerunning && 'animate-spin')} />
+                            <span>{isRerunning ? 'Rerunning…' : (rerunFlash ?? `Rerun ×${rerunCount}`)}</span>
+                        </button>
+
+                        {/* 4. Dropdown Chevron for Unified Dispatch Menu (Rerun, Target, Templates) */}
                         <button
                             type="button"
                             onClick={handleToggleDispatchMenu}
@@ -1265,9 +1288,9 @@ export function DetailHeader(props: DetailHeaderProps) {
 
                                         {/* Built-in randomized set preview */}
                                         {rerunMessageOption === 'randomized' && (
-                                            <div className="mx-2 px-2 py-1.5 rounded-lg bg-slate-50/80 dark:bg-purple-950/20 border border-slate-200/60 dark:border-purple-500/20">
-                                                <div className="text-[9.5px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
-                                                    Built-in set (one picked per dispatch)
+                                            <div className="mx-2 px-2 py-1.5 rounded-lg bg-slate-50/80 dark:bg-purple-950/20 border border-slate-200/60 dark:border-purple-500/20 max-h-36 overflow-y-auto">
+                                                <div className="text-[9.5px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1 sticky top-0 bg-slate-50 dark:bg-[#1a0e2e]">
+                                                    Built-in set ({RERUN_RANDOM_MESSAGE_SET.length} variations — picked per dispatch)
                                                 </div>
                                                 <ul className="space-y-0.5 text-[10.5px] text-slate-500 dark:text-slate-400 list-disc list-inside">
                                                     {RERUN_RANDOM_MESSAGE_SET.map((m) => (

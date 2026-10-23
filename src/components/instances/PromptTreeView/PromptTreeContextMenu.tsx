@@ -24,6 +24,7 @@ import {
     exportConversationAsYaml,
     exportConversationAsSqlite,
     loadPersistedRerunMessageOption,
+    loadPersistedRerunCount,
 } from './usePromptTreePromptActions';
 import { copyPromptWithRichImages } from './clipboard';
 import { stripImagesFromPrompt } from './formatters';
@@ -440,7 +441,7 @@ export function PromptTreeContextMenu(props: PromptTreeContextMenuProps) {
                             className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left hover:bg-slate-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer text-xs"
                         >
                             <Repeat className="w-3.5 h-3.5 text-sky-500" />
-                            <span>Rerun Nudge (1x)</span>
+                            <span>Rerun Nudge (×{loadPersistedRerunCount()})</span>
                         </button>
                     )}
 
