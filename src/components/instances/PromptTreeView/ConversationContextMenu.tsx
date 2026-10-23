@@ -881,19 +881,85 @@ export function ConversationContextMenu({
             </button>
 
             {/* Core Action 4: Rerun Nudge Action */}
-            <button
-                type="button"
-                disabled={isRerunning}
-                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-sky-500/10 hover:text-sky-600 dark:hover:text-sky-400 cursor-pointer disabled:opacity-50"
-                onClick={handleDoRerun}
-                title={`Dispatch a fast rerun nudge (${persistedRerunOptionLabel} ×${persistedRerunCount}) to this conversation`}
-            >
-                <div className="flex items-center gap-2.5">
-                    <Repeat className={cn("w-3.5 h-3.5 text-sky-500 shrink-0", isRerunning && "animate-spin")} />
-                    <span className="font-medium">{isRerunning ? 'Rerunning…' : `Rerun Nudge (×${persistedRerunCount})`}</span>
+            <div className="flex items-center justify-between w-full hover:bg-sky-500/10 transition-colors group">
+                <button
+                    type="button"
+                    disabled={isRerunning}
+                    className="flex-1 flex items-center justify-between px-3 py-1.5 text-left text-sky-700 dark:text-sky-300 cursor-pointer disabled:opacity-50"
+                    onClick={handleDoRerun}
+                    title={`Dispatch a fast rerun nudge (${persistedRerunOptionLabel} ×${persistedRerunCount}) to this conversation`}
+                >
+                    <div className="flex items-center gap-2.5">
+                        <Repeat className={cn("w-3.5 h-3.5 text-sky-500 shrink-0", isRerunning && "animate-spin")} />
+                        <span className="font-medium">{isRerunning ? 'Rerunning…' : `Rerun Nudge (×${persistedRerunCount})`}</span>
+                    </div>
+                    <span className="text-[9px] font-mono text-sky-400 font-bold">{persistedRerunOption === 'randomized' ? 'Random' : 'Rerun'}</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsRerunSubmenuOpen((prev) => !prev);
+                    }}
+                    className="px-2 py-1.5 text-slate-400 hover:text-sky-500 cursor-pointer transition-colors"
+                    title="Toggle rerun options and message selector"
+                >
+                    {isRerunSubmenuOpen ? (
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                    ) : (
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                    )}
+                </button>
+            </div>
+
+            {isRerunSubmenuOpen && (
+                <div className="mx-2 my-1 pl-3 border-l-2 border-sky-500/40 space-y-1 animate-in fade-in duration-100 max-h-56 overflow-y-auto">
+                    <div className="flex items-center justify-between px-1 text-[10px] text-slate-400 font-mono">
+                        <span>COUNT:</span>
+                        <div className="flex items-center gap-1">
+                            {[1, 2, 4, 8].map((cnt) => (
+                                <button
+                                    key={cnt}
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        savePersistedRerunCount(cnt);
+                                    }}
+                                    className={cn(
+                                        "px-1.5 py-0.5 rounded text-[10px] font-bold font-mono cursor-pointer transition-colors",
+                                        persistedRerunCount === cnt
+                                            ? "bg-sky-500 text-white"
+                                            : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                                    )}
+                                >
+                                    ×{cnt}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    {RERUN_MESSAGE_OPTIONS.map((opt) => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            className={cn(
+                                "flex w-full items-center justify-between px-2 py-1 text-left rounded text-[11px] cursor-pointer transition-colors",
+                                opt.value === 'randomized'
+                                    ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 font-semibold hover:bg-sky-500/25"
+                                    : "hover:bg-sky-500/10 text-slate-700 dark:text-slate-200"
+                            )}
+                            onClick={() => void handleRerunWithOption(opt.value)}
+                            title={opt.hint}
+                        >
+                            <span className="truncate pr-1">{opt.label}</span>
+                            {opt.value === 'randomized' && (
+                                <span className="text-[9px] font-mono font-bold uppercase px-1 py-0.2 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+                                    Random
+                                </span>
+                            )}
+                        </button>
+                    ))}
                 </div>
-                <span className="text-[9px] font-mono text-sky-400 font-bold">{persistedRerunOption === 'randomized' ? 'Random' : 'Rerun'}</span>
-            </button>
+            )}
 
             {/* Core Action 5: Copy Prompt Text */}
             <button
