@@ -1,7 +1,7 @@
 # Subtask 02: Segmented Capsule Toggle Switch Styler & Linter (`Imp-711`)
 Sequence: 217
 Step: 297
-Status: IN_PROGRESS
+Status: COMPLETED
 Module: `src-tauri/src/modules/instance/segmented_capsule_toggle_switch_styler.rs`
 
 ## Description
@@ -11,3 +11,10 @@ Implement the Segmented Capsule Toggle Switch Styler & Linter adhering to specif
 2. Implement `CapsuleSegmentOption`, `CapsuleStyleConfig`, `SegmentedCapsuleFormatting`, and `CapsuleAuditReport`.
 3. Provide `format_segmented_capsule_toggle` and `audit_capsule_markup_compliance`.
 4. Create companion unit tests in `src-tauri/src/modules/instance/tests_segmented_capsule_toggle_switch_styler.rs`.
+
+## Verification & Outcomes
+- Implemented `CapsuleSegmentOption`, `CapsuleStyleConfig`, and `SegmentedCapsuleFormatting`.
+- Implemented `CapsuleAuditFinding` and `CapsuleAuditReport` with detailed recommendations.
+- Implemented `format_segmented_capsule_toggle` generating contiguous dark-glass segmented pill capsules (`rounded-full`, subtle divider lines, active state styling).
+- Implemented `audit_capsule_markup_compliance` detecting disjoint button layouts, missing `rounded-full` boundaries, and non-borderless `<select>` dropdowns.
+- Unit tests written in `tests_segmented_capsule_toggle_switch_styler.rs` verifying capsule generation and markup auditing.

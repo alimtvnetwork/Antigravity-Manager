@@ -1,15 +1,15 @@
 # Plan 217: Implementing Next Five Tasks (Steps 296–300)
-Status: IN_PROGRESS
+Status: COMPLETED
 Sequence: 217
 Total Steps in Batch: 5
 Remaining Backlog after Batch: 0
 
 ## Subtasks
-1. `01-streaming-thought-signature-validator.md`: Streaming Thought Signature & Delimiter Validator (`Imp-710`) — `IN_PROGRESS`
-2. `02-segmented-capsule-toggle-switch-styler.md`: Segmented Capsule Toggle Switch Styler & Linter (`Imp-711`) — `IN_PROGRESS`
-3. `03-fifo-prompt-queue-partition-allocator.md`: FIFO Prompt Queue Partition & Priority Allocator (`Imp-712`) — `IN_PROGRESS`
-4. `04-transient-sandbox-cleanup-sentinel.md`: Transient Sandbox Lifecycle & Cleanup Sentinel (`Imp-713`) — `IN_PROGRESS`
-5. `05-sole-contributor-attribution-audit-guard.md`: Sole Contributor Attribution & No Silent Errors Audit Guard (`Imp-714`) — `IN_PROGRESS`
+1. `01-streaming-thought-signature-validator.md`: Streaming Thought Signature & Delimiter Validator (`Imp-710`) — `COMPLETED`
+2. `02-segmented-capsule-toggle-switch-styler.md`: Segmented Capsule Toggle Switch Styler & Linter (`Imp-711`) — `COMPLETED`
+3. `03-fifo-prompt-queue-partition-allocator.md`: FIFO Prompt Queue Partition & Priority Allocator (`Imp-712`) — `COMPLETED`
+4. `04-transient-sandbox-cleanup-sentinel.md`: Transient Sandbox Lifecycle & Cleanup Sentinel (`Imp-713`) — `COMPLETED`
+5. `05-sole-contributor-attribution-audit-guard.md`: Sole Contributor Attribution & No Silent Errors Audit Guard (`Imp-714`) — `COMPLETED`
 
 ## Execution Invariants
 - Zero builds and zero tests during implementation.

@@ -64,6 +64,7 @@ pub mod rollback_reference_drift_verifier;
 pub mod semver_monotonic_validator;
 pub mod settings_deep_merge_synchronizer;
 pub mod side_effect_ordering_guard;
+pub mod sole_contributor_attribution_audit_guard;
 pub mod sole_contributor_attribution_enforcer;
 pub mod sole_contributor_attribution_guard;
 pub mod staging_protocol_guard;
@@ -185,6 +186,8 @@ pub mod tests_settings_deep_merge;
 #[cfg(test)]
 pub mod tests_side_effect_ordering;
 #[cfg(test)]
+pub mod tests_sole_contributor_attribution_audit_guard;
+#[cfg(test)]
 pub mod tests_sole_contributor_attribution_enforcer;
 #[cfg(test)]
 pub mod tests_sole_contributor_attribution_guard;
@@ -270,6 +273,7 @@ pub use rollback_reference_drift_verifier::*;
 pub use semver_monotonic_validator::*;
 pub use settings_deep_merge_synchronizer::*;
 pub use side_effect_ordering_guard::*;
+pub use sole_contributor_attribution_audit_guard::*;
 pub use sole_contributor_attribution_enforcer::*;
 pub use sole_contributor_attribution_guard::*;
 pub use staging_protocol_guard::*;

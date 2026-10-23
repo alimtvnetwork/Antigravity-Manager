@@ -1,7 +1,7 @@
 # Subtask 04: Transient Sandbox Lifecycle & Cleanup Sentinel (`Imp-713`)
 Sequence: 217
 Step: 299
-Status: IN_PROGRESS
+Status: COMPLETED
 Module: `src-tauri/src/modules/instance/transient_sandbox_cleanup_sentinel.rs`
 
 ## Description
@@ -11,3 +11,10 @@ Implement the Transient Sandbox Lifecycle & Cleanup Sentinel adhering to specifi
 2. Implement `TransientSandboxState`, `SandboxInstanceDescriptor`, `SandboxEvictionVerdict`, and `SandboxCleanupReport`.
 3. Provide `evaluate_sandbox_eviction_safety` and `plan_transient_sandbox_cleanup`.
 4. Create companion unit tests in `src-tauri/src/modules/instance/tests_transient_sandbox_cleanup_sentinel.rs`.
+
+## Verification & Outcomes
+- Implemented `TransientSandboxState` enum (`Created`, `Active`, `PendingCleanup`, `Purged`, `OrphanRemnantsDetected`).
+- Implemented `SandboxInstanceDescriptor`, `SandboxEvictionVerdict`, and `SandboxCleanupReport`.
+- Implemented `evaluate_sandbox_eviction_safety` enforcing exit code 2 fail-fast when caller IDE is targeted without `--force`.
+- Implemented `plan_transient_sandbox_cleanup` planning complete eradication of sandbox directories and processes.
+- Unit tests written in `tests_transient_sandbox_cleanup_sentinel.rs` verifying caller self-preservation, exit code 2 fail-fast, and zero-orphan cleanup.

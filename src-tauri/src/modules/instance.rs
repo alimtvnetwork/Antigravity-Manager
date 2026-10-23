@@ -191,6 +191,8 @@ pub mod runtime_crash_counter;
 pub mod sandbox_purger;
 #[path = "instance/sandboxed_storage_cleaner.rs"]
 pub mod sandboxed_storage_cleaner;
+#[path = "instance/segmented_capsule_toggle_switch_styler.rs"]
+pub mod segmented_capsule_toggle_switch_styler;
 #[path = "instance/session_cleanup_worker.rs"]
 pub mod session_cleanup_worker;
 #[path = "instance/session_file_reclaimer.rs"]
@@ -345,6 +347,9 @@ pub mod tests_sandboxed_environment;
 #[path = "instance/tests_sandboxed_storage_cleaner.rs"]
 pub mod tests_sandboxed_storage_cleaner;
 #[cfg(test)]
+#[path = "instance/tests_segmented_capsule_toggle_switch_styler.rs"]
+pub mod tests_segmented_capsule_toggle_switch_styler;
+#[cfg(test)]
 #[path = "instance/tests_session_file_reclaimer.rs"]
 pub mod tests_session_file_reclaimer;
 #[cfg(test)]
@@ -359,6 +364,9 @@ pub mod tests_side_effect_order_enforcer;
 #[cfg(test)]
 #[path = "instance/tests_stale_pid_reaper.rs"]
 pub mod tests_stale_pid_reaper;
+#[cfg(test)]
+#[path = "instance/tests_transient_sandbox_cleanup_sentinel.rs"]
+pub mod tests_transient_sandbox_cleanup_sentinel;
 #[cfg(test)]
 #[path = "instance/tests_transient_sandbox_lifecycle_verifier.rs"]
 pub mod tests_transient_sandbox_lifecycle_verifier;
@@ -389,6 +397,8 @@ pub mod tests_workspace_dir_validator;
 #[cfg(test)]
 #[path = "instance/tests_workspace_storage_continuity_verifier.rs"]
 pub mod tests_workspace_storage_continuity_verifier;
+#[path = "instance/transient_sandbox_cleanup_sentinel.rs"]
+pub mod transient_sandbox_cleanup_sentinel;
 #[path = "instance/transient_sandbox_lifecycle_verifier.rs"]
 pub mod transient_sandbox_lifecycle_verifier;
 #[path = "instance/transient_sandbox_manager.rs"]
@@ -577,6 +587,7 @@ pub use remote_port_guard::*;
 pub use runtime_crash_counter::*;
 pub use sandboxed_storage_cleaner::*;
 pub use session_cleanup_worker::*;
+pub use segmented_capsule_toggle_switch_styler::*;
 pub use session_file_reclaimer::*;
 pub use session_trace_uuid::*;
 pub use settings::{
@@ -609,6 +620,7 @@ pub(crate) use switch_guards::check_switch_lease_guard;
 pub use sync::{sync_all_instances_and_quotas_logic, sync_instance_pid_and_quota_logic};
 pub use telemetry_storage_cleaner::*;
 pub use terminate_fallback_ladder::*;
+pub use transient_sandbox_cleanup_sentinel::*;
 pub use transient_sandbox_lifecycle_verifier::*;
 pub use transient_sandbox_manager::*;
 pub use truncation_omission_banner_formatter::*;

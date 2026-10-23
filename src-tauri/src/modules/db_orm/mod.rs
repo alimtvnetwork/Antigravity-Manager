@@ -25,6 +25,7 @@ pub mod dump;
 pub mod fifo_dead_letter_queue_spillover_guard;
 pub mod fifo_prompt_order_enforcer;
 pub mod fifo_prompt_queue_coordinator;
+pub mod fifo_prompt_queue_partition_allocator;
 pub mod fifo_prompt_restore_concurrency_limiter;
 pub mod fifo_prompt_restore_cursor_stepper;
 pub mod fifo_prompt_restore_transaction_guard;
@@ -141,6 +142,8 @@ pub mod tests_fifo_prompt_order_enforcer;
 #[cfg(test)]
 pub mod tests_fifo_prompt_queue_coordinator;
 #[cfg(test)]
+pub mod tests_fifo_prompt_queue_partition_allocator;
+#[cfg(test)]
 pub mod tests_fifo_prompt_restore_concurrency_limiter;
 #[cfg(test)]
 pub mod tests_fifo_prompt_restore_cursor_stepper;
@@ -219,6 +222,7 @@ pub use dump::*;
 pub use fifo_dead_letter_queue_spillover_guard::*;
 pub use fifo_prompt_order_enforcer::*;
 pub use fifo_prompt_queue_coordinator::*;
+pub use fifo_prompt_queue_partition_allocator::*;
 pub use fifo_prompt_restore_concurrency_limiter::*;
 pub use fifo_prompt_restore_cursor_stepper::*;
 pub use fifo_prompt_restore_transaction_guard::*;

@@ -61,6 +61,7 @@ pub mod stream_flusher;
 pub mod streaming_chunk_boundary_guard;
 pub mod streaming_event_frame_parser;
 pub mod streaming_payload_accumulator;
+pub mod streaming_thought_signature_validator;
 #[cfg(test)]
 pub mod tests_agent_prompt_sanitization_regex_engine;
 #[cfg(test)]
@@ -123,6 +124,8 @@ pub mod tests_streaming_chunk_boundary_guard;
 pub mod tests_streaming_event_frame_parser;
 #[cfg(test)]
 pub mod tests_streaming_payload_accumulator;
+#[cfg(test)]
+pub mod tests_streaming_thought_signature_validator;
 #[cfg(test)]
 pub mod tests_thinking_block_backfill_pipeline;
 #[cfg(test)]
@@ -196,6 +199,7 @@ pub use stream_flusher::{StreamFlusher, SSE_KEEPALIVE_BYTES};
 pub use streaming_chunk_boundary_guard::*;
 pub use streaming_event_frame_parser::*;
 pub use streaming_payload_accumulator::*;
+pub use streaming_thought_signature_validator::*;
 pub use thinking_block_backfill_pipeline::*;
 pub use thinking_budget_filter_pipeline::*;
 pub use thinking_budget_headroom_evaluator::*;
