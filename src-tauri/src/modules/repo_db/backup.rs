@@ -815,7 +815,8 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
 }
 
 /// FIFO-ordered ids of incomplete prompts for an instance scope: rows in
-/// 'running' / 'in_flight' / 'dispatched' (never 'completed', any age).
+/// 'running' / 'in_flight' / 'dispatched' / 'pending' / 'queued' / 'blocked'
+/// (not marked 'completed' or 'succeeded', at ANY age).
 /// 'default' and '__default__' share one scope; 'all' is unscoped.
 fn select_incomplete_prompt_ids(
     conn: &Connection,
@@ -825,16 +826,16 @@ fn select_incomplete_prompt_ids(
     let is_unscoped = instance_id == "all" || is_default_scope;
     let sql = if instance_id == "all" {
         "SELECT id FROM active_prompts
-         WHERE status IN ('running', 'in_flight', 'dispatched', 'pending', 'queued', 'blocked')
+         WHERE status NOT IN ('completed', 'succeeded', 'backed_up')
          ORDER BY created_at ASC, id ASC"
     } else if is_default_scope {
         "SELECT id FROM active_prompts
-         WHERE status IN ('running', 'in_flight', 'dispatched', 'pending', 'queued', 'blocked')
-           AND instance_id IN ('default', '__default__')
+         WHERE status NOT IN ('completed', 'succeeded', 'backed_up')
+           AND (instance_id IN ('default', '__default__') OR instance_id IS NULL OR instance_id = '')
          ORDER BY created_at ASC, id ASC"
     } else {
         "SELECT id FROM active_prompts
-         WHERE status IN ('running', 'in_flight', 'dispatched', 'pending', 'queued', 'blocked') AND instance_id = ?1
+         WHERE status NOT IN ('completed', 'succeeded', 'backed_up') AND instance_id = ?1
          ORDER BY created_at ASC, id ASC"
     };
     let mut stmt = conn
@@ -886,7 +887,7 @@ pub fn sweep_incomplete_prompts_for_instance(instance_id: &str) -> Result<usize,
         let changed = conn
             .execute(
                 "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1
-                 WHERE id = ?2 AND status IN ('running', 'in_flight', 'dispatched', 'pending', 'queued', 'blocked')",
+                 WHERE id = ?2 AND status NOT IN ('completed', 'succeeded')",
                 params![now, id],
             )
             .map_err(|e| format!("Failed to sweep incomplete prompt '{}': {}", id, e))?;

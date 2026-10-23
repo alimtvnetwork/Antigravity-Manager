@@ -3,7 +3,7 @@
  *
  * Verifies:
  * 1. Default rerun option is 'randomized' and count defaults to 4.
- * 2. RERUN_RANDOM_MESSAGE_SET contains at least 12 distinct actionable variations.
+ * 2. RERUN_RANDOM_MESSAGE_SET contains at least 16 distinct actionable variations.
  * 3. resolveRerunMessage correctly picks random items or fixed phrases.
  * 4. loadPersistedRerunMessageOption and savePersistedRerunMessageOption work with both
  *    primary and legacy localStorage keys.
@@ -86,8 +86,8 @@ test('verifies default rerun options and count constants', () => {
     assertEqual(RERUN_COUNT_STORAGE_KEY, 'agm:prompt-tree:rerun-count');
 });
 
-test('verifies randomized message set contains at least 12 distinct actionable variations', () => {
-    assertTrue(RERUN_RANDOM_MESSAGE_SET.length >= 12);
+test('verifies randomized message set contains at least 16 distinct actionable variations', () => {
+    assertTrue(RERUN_RANDOM_MESSAGE_SET.length >= 16);
 
     const requiredPhrases = [
         'Is it completed?',
@@ -102,6 +102,10 @@ test('verifies randomized message set contains at least 12 distinct actionable v
         'Please double check completion and finalize.',
         'Is there any pending work left?',
         'Please confirm completion status and next steps.',
+        'Run comprehensive verification and report status.',
+        'Check pending tasks and proceed with the next one.',
+        'Verify build cleanliness and finalize.',
+        'Confirm all changes are committed and pushed.',
     ];
 
     for (const phrase of requiredPhrases) {
@@ -137,6 +141,14 @@ test('verifies resolveRerunMessage returns expected fixed messages for non-rando
     assertEqual(
         resolveRerunMessage('check-pending-tasks').message,
         'Can you check the pending tasks and continue?'
+    );
+    assertEqual(
+        resolveRerunMessage('run-verification').message,
+        'Run comprehensive verification and report status.'
+    );
+    assertEqual(
+        resolveRerunMessage('confirm-pushed').message,
+        'Confirm all changes are committed and pushed.'
     );
 });
 

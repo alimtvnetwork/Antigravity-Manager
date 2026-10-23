@@ -43,6 +43,7 @@ fn test_restore_outcome_honesty_struct_and_accessors() {
 
     outcome.record_skipped_live();
     assert_eq!(outcome.skipped_live, 1);
+    assert_eq!(outcome.skipped_live_count(), 1);
 
     outcome.record_failed(Some("Dispatch failure: connection dropped".to_string()));
     assert_eq!(outcome.failed_count(), 2);
@@ -59,6 +60,22 @@ fn test_restore_outcome_honesty_struct_and_accessors() {
     assert_eq!(clean.restored_count(), 3);
     assert_eq!(clean.dispatched_count(), 3);
     assert_eq!(clean.failed_count(), 0);
+    assert_eq!(clean.skipped_live_count(), 0);
+
+    // Detailed outcome constructor
+    let detailed = RestoreOutcome::with_details(
+        10,
+        8,
+        2,
+        3,
+        Some("connection reset".to_string()),
+    );
+    assert_eq!(detailed.restored_count(), 10);
+    assert_eq!(detailed.dispatched_count(), 8);
+    assert_eq!(detailed.failed_count(), 2);
+    assert_eq!(detailed.skipped_live_count(), 3);
+    assert_eq!(detailed.last_error.as_deref(), Some("connection reset"));
+    assert!(!detailed.is_success());
 }
 
 #[test]
@@ -145,7 +162,7 @@ fn test_scoped_restore_fallback_when_scoped_returns_zero_and_other_exists() {
     assert_eq!(records[1].prompt_id, "prompt-fb-2");
     assert_eq!(outcome.restored_count(), 2);
 
-    // Clean up
+    // Justification: test cleanup of temporary directory
     crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove temp dir");
 }
 
@@ -211,5 +228,111 @@ fn test_reattribution_of_unrestored_prompt_backups_during_switch() {
         "Already restored row remains on inst-old"
     );
 
+    // Justification: test cleanup of temporary directory
+    crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove temp dir");
+}
+
+#[test]
+fn test_incomplete_prompt_sweep_selection_and_status_transition() {
+    let temp_dir =
+        std::env::temp_dir().join(format!("agm_test_sweep_{}", Uuid::new_v4().simple()));
+    // Justification: test cleanup of temporary directory
+    crate::error::record_ignored(fs::create_dir_all(&temp_dir), "create test temp dir");
+    let db_path = temp_dir.join("test-sweep.db");
+    let conn = rusqlite::Connection::open(&db_path).expect("Must open temp test DB");
+
+    conn.execute_batch(
+        "CREATE TABLE active_prompts (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            instance_id TEXT NOT NULL,
+            repo_path TEXT NOT NULL,
+            prompt_content TEXT NOT NULL,
+            model TEXT,
+            session_id TEXT,
+            status TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            image_payload TEXT
+        );",
+    )
+    .expect("Must create active_prompts table");
+
+    let now = Utc::now().timestamp();
+    let ten_hours_ago = now - 36000;
+
+    // Insert prompts across various uncompleted statuses with older timestamps
+    let test_rows = [
+        ("p-running", "running", ten_hours_ago),
+        ("p-inflight", "in_flight", ten_hours_ago),
+        ("p-dispatched", "dispatched", ten_hours_ago),
+        ("p-pending", "pending", ten_hours_ago),
+        ("p-queued", "queued", ten_hours_ago),
+        ("p-blocked", "blocked", ten_hours_ago),
+        ("p-completed", "completed", ten_hours_ago),
+    ];
+
+    for (id, st, t) in test_rows {
+        conn.execute(
+            "INSERT INTO active_prompts (id, project_id, instance_id, repo_path, prompt_content, status, created_at, updated_at)
+             VALUES (?1, 'proj-1', 'inst-test', '/work/proj', 'Test prompt', ?2, ?3, ?3)",
+            params![id, st, t],
+        )
+        .expect("Must insert test prompt");
+    }
+
+    // Run sweep query selecting incomplete prompts (ignoring age)
+    let mut stmt = conn
+        .prepare(
+            "SELECT id FROM active_prompts
+             WHERE status NOT IN ('completed', 'succeeded', 'backed_up') AND instance_id = ?1
+             ORDER BY created_at ASC, id ASC",
+        )
+        .expect("Must prepare sweep select");
+
+    let ids: Vec<String> = stmt
+        .query_map(params!["inst-test"], |r| r.get(0))
+        .expect("Must query ids")
+        .flatten()
+        .collect();
+
+    assert_eq!(
+        ids.len(),
+        6,
+        "All 6 uncompleted prompts must be selected regardless of age"
+    );
+    assert!(!ids.contains(&"p-completed".to_string()));
+
+    // Perform the status transition to backed_up
+    for id in &ids {
+        conn.execute(
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1
+             WHERE id = ?2 AND status NOT IN ('completed', 'succeeded')",
+            params![now, id],
+        )
+        .expect("Must sweep prompt");
+    }
+
+    // Verify all 6 are now backed_up
+    let backed_up_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM active_prompts WHERE status = 'backed_up'",
+            [],
+            |r| r.get(0),
+        )
+        .expect("Must count backed up");
+    assert_eq!(backed_up_count, 6);
+
+    // Verify completed prompt remained untouched
+    let completed_status: String = conn
+        .query_row(
+            "SELECT status FROM active_prompts WHERE id = 'p-completed'",
+            [],
+            |r| r.get(0),
+        )
+        .expect("Must query completed status");
+    assert_eq!(completed_status, "completed");
+
+    // Justification: test cleanup of temporary directory
     crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove temp dir");
 }

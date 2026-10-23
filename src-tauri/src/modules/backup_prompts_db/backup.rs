@@ -42,24 +42,13 @@ pub fn backup_active_running_prompts_for_instance(
             || p.instance_id == target_inst
             || (target_inst == "default"
                 && (p.instance_id == "default" || p.instance_id.is_empty()));
-        // RC-5: queued, pending, and blocked rows are backup candidates at any age — the 2h
-        // freshness window silently dropped long-queued prompts before a
-        // switch. Running / backed_up rows keep the freshness filter to
-        // bound stale-row backup load.
-        let is_fresh_enough = p.status == "queued"
-            || p.status == "pending"
-            || p.status == "blocked"
-            || p.updated_at >= freshness_cutoff;
-        let is_candidate_status = p.status == "running"
-            || p.status == "queued"
-            || p.status == "backed_up"
-            || p.status == "pending"
-            || p.status == "in_flight"
-            || p.status == "dispatched"
-            || p.status == "blocked";
+        // Uncompleted-prompt sweep: all prompts not marked completed or succeeded
+        // (running, queued, backed_up, pending, in_flight, dispatched, blocked) are backup candidates
+        // at any age — removing restrictive time windows so prompts interrupted by quota exhaustion
+        // or account switches are never dropped.
+        let is_candidate_status = p.status != "completed" && p.status != "succeeded";
         if is_inst_match
             && is_candidate_status
-            && is_fresh_enough
             && !candidate_prompts.iter().any(|c| {
                 c.id == p.id
                     || (c.repo_path.to_lowercase().replace('\\', "/")

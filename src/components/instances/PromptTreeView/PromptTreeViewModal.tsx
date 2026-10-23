@@ -12,7 +12,7 @@ import type { PromptTreeViewModalProps } from './types';
 import { usePromptTreeState } from './usePromptTreeState';
 import { usePromptTreeData, invalidatePromptTreeCache } from './usePromptTreeData';
 import { usePromptTreeCoreActions } from './usePromptTreeCoreActions';
-import { usePromptTreePromptActions, dispatchRerunMessages, loadPersistedRerunCount, loadPersistedRerunMessageOption, type RerunMessageOption } from './usePromptTreePromptActions';
+import { usePromptTreePromptActions, dispatchRerunMessages, loadPersistedRerunCount, loadPersistedRerunMessageOption, isRerunMessageOption, type RerunMessageOption } from './usePromptTreePromptActions';
 import { isGhostConversation, isStaleOrEmptyConversation, getConversationStatus } from './conversationGuards';
 import { classifyPromptTier } from './tierClassification';
 import { ModalHeader } from './ModalHeader';
@@ -348,30 +348,6 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         void promptActions.handleEnqueuePrompt();
     };
 
-    const handleRerunConversation = (convoId: string, nudgeType: string) => {
-        const targetInstId = selectedProject?.instance_id || instanceId || 'default';
-        const targetRepoPath = selectedProject?.repo_path || '';
-        const msgOption: RerunMessageOption =
-            nudgeType === 'is-it-published' ||
-            nudgeType === 'is-it-done' ||
-            nudgeType === 'is-it-finished' ||
-            nudgeType === 'is-it-released' ||
-            nudgeType === 'is-it-completed' ||
-            nudgeType === 'verify-and-finish' ||
-            nudgeType === 'check-pending-tasks' ||
-            nudgeType === 'randomized'
-                ? nudgeType
-                : loadPersistedRerunMessageOption();
-        void dispatchRerunMessages({
-            targetInstId,
-            repoPath: targetRepoPath,
-            convId: convoId,
-            count: loadPersistedRerunCount(),
-            messageOption: msgOption,
-            source: 'PromptTreeViewModal.onRerunConversation',
-        });
-    };
-
     // "Now Running + Up Next" strip (spec 154 §1): data hook + row-action handlers.
     const runningUpNext = useRunningAndUpNext(instanceId, isOpen);
 
@@ -381,6 +357,28 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             if (conv) return { conv, proj };
         }
         return null;
+    };
+
+    const handleRerunConversation = (convoId: string, nudgeType: string) => {
+        const targetInstId = selectedProject?.instance_id || instanceId || 'default';
+        const targetRepoPath = selectedProject?.repo_path || '';
+        const msgOption: RerunMessageOption = isRerunMessageOption(nudgeType)
+            ? nudgeType
+            : loadPersistedRerunMessageOption();
+        const found = findStripConversation(convoId);
+        const originalPrompt = found?.conv
+            ? (found.conv.full_prompt_text || found.conv.prompt_preview_200w || found.conv.title)
+            : undefined;
+
+        void dispatchRerunMessages({
+            targetInstId,
+            repoPath: targetRepoPath,
+            convId: convoId,
+            count: loadPersistedRerunCount(),
+            messageOption: msgOption,
+            originalPrompt,
+            source: 'PromptTreeViewModal.onRerunConversation',
+        });
     };
 
     const handleStripSelectPrompt = (promptId: string) => {
@@ -598,12 +596,17 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             if (e.key === 'n' || e.key === 'N') {
                 e.preventDefault();
                 promptActions.handleResendPrompt();
+            } else if (e.key === 'r' || e.key === 'R') {
+                if (selectedConversation) {
+                    e.preventDefault();
+                    handleRerunConversation(selectedConversation.conversation_id, loadPersistedRerunMessageOption());
+                }
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, promptActions]);
+    }, [isOpen, promptActions, selectedConversation]);
 
     const archivedCount = useMemo(() => {
         return treeData.filter((p) => archivedProjectIds.includes(p.project_id)).length;

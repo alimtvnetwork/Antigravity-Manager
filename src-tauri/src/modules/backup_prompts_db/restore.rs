@@ -46,6 +46,25 @@ impl RestoreOutcome {
         }
     }
 
+    pub fn with_details(
+        restored_count: usize,
+        dispatched_count: usize,
+        failed_count: usize,
+        skipped_live: usize,
+        last_error: Option<String>,
+    ) -> Self {
+        Self {
+            restored: restored_count,
+            dispatched: dispatched_count,
+            failed: failed_count,
+            skipped_live,
+            restored_count,
+            dispatched_count,
+            failed_count,
+            last_error,
+        }
+    }
+
     #[inline]
     pub fn record_restored(&mut self) {
         self.restored += 1;
@@ -85,6 +104,11 @@ impl RestoreOutcome {
     #[inline]
     pub fn failed_count(&self) -> usize {
         self.failed
+    }
+
+    #[inline]
+    pub fn skipped_live_count(&self) -> usize {
+        self.skipped_live
     }
 
     #[inline]
@@ -147,7 +171,7 @@ pub fn restore_running_prompts_for_instance_with_outcome(
                     images_payload, status, created_at, is_restored, restored_at, instance_id
              FROM prompt_backups
              WHERE is_restored = 0
-             ORDER BY created_at ASC, sequence_id ASC",
+             ORDER BY created_at ASC, id ASC",
             "UPDATE prompt_backups SET is_restored = 1, restored_at = ?1 WHERE is_restored = 0",
         )
     } else if is_target_default {
@@ -158,7 +182,7 @@ pub fn restore_running_prompts_for_instance_with_outcome(
              FROM prompt_backups 
              WHERE is_restored = 0
                AND (instance_id = 'default' OR instance_id IS NULL OR instance_id = '')
-             ORDER BY created_at ASC, sequence_id ASC",
+             ORDER BY created_at ASC, id ASC",
             "UPDATE prompt_backups SET is_restored = 1, restored_at = ?1 WHERE is_restored = 0 AND (instance_id = 'default' OR instance_id IS NULL OR instance_id = '')",
         )
     } else {
@@ -169,7 +193,7 @@ pub fn restore_running_prompts_for_instance_with_outcome(
              FROM prompt_backups 
              WHERE is_restored = 0
                AND instance_id = ?1
-             ORDER BY created_at ASC, sequence_id ASC",
+             ORDER BY created_at ASC, id ASC",
             "UPDATE prompt_backups SET is_restored = 1, restored_at = ?1 WHERE is_restored = 0 AND instance_id = ?2",
         )
     };
@@ -337,9 +361,11 @@ fn live_prompt_status(
     ) {
         return Some(st);
     }
+    let norm_slash = repo_path.trim().replace('\\', "/");
+    let norm_bslash = repo_path.trim().replace('/', "\\");
     conn.query_row(
-        "SELECT status FROM active_prompts WHERE repo_path = ?1 AND prompt_content = ?2 LIMIT 1",
-        params![repo_path, prompt_text],
+        "SELECT status FROM active_prompts WHERE (repo_path = ?1 OR repo_path = ?2 OR repo_path = ?3) AND prompt_content = ?4 LIMIT 1",
+        params![repo_path, norm_slash, norm_bslash, prompt_text],
         |row| row.get::<_, String>(0),
     )
     .ok()

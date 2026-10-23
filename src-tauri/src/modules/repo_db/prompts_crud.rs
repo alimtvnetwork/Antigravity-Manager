@@ -127,6 +127,40 @@ pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
         .map_err(|e| format!("Failed to upsert running project: {e}"))?;
     }
 
+    // Live-status dedup invariant: never clobber an actively running or completed prompt with queued/backed_up
+    let live_status: Option<String> = tx
+        .query_row(
+            "SELECT status FROM active_prompts WHERE id = ?1",
+            params![&prompt.id],
+            |r| r.get(0),
+        )
+        .ok()
+        .or_else(|| {
+            let norm_path_slash = prompt.repo_path.trim().replace('\\', "/");
+            let norm_path_bslash = prompt.repo_path.trim().replace('/', "\\");
+            tx.query_row(
+                "SELECT status FROM active_prompts WHERE (repo_path = ?1 OR repo_path = ?2 OR repo_path = ?3) AND prompt_content = ?4 LIMIT 1",
+                params![&prompt.repo_path, &norm_path_slash, &norm_path_bslash, &prompt.prompt_content],
+                |r| r.get(0),
+            )
+            .ok()
+        });
+
+    if matches!(live_status.as_deref(), Some("running") | Some("completed"))
+        && prompt.status != "completed"
+        && prompt.status != "running"
+    {
+        crate::modules::logger::log_info(&format!(
+            "[RepoDB] Preserving live prompt '{}' (status '{}') - skipping overwrite with incoming '{}'",
+            prompt.id,
+            live_status.as_deref().unwrap_or("unknown"),
+            prompt.status
+        ));
+        tx.commit()
+            .map_err(|e| format!("Failed to commit active prompt transaction: {e}"))?;
+        return Ok(());
+    }
+
     tx.execute(
         "INSERT OR REPLACE INTO active_prompts 
          (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)

@@ -288,22 +288,46 @@ pub async fn execute_profile_rotation_with_context(
         );
         // Re-attribute backed-up prompts from depleted instance to target instance so post-switch restore finds them
         if let Ok(conn) = crate::modules::repo_db::connect_db() {
-            let reattributed = conn
-                .execute(
+            let is_source_default =
+                current_instance_id == "default" || current_instance_id == "__default__";
+            let reattributed = if is_source_default {
+                conn.execute(
+                    "UPDATE active_prompts SET instance_id = ?1 WHERE (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL) AND status = 'backed_up'",
+                    rusqlite::params![&target.instance_id],
+                )
+            } else {
+                conn.execute(
                     "UPDATE active_prompts SET instance_id = ?1 WHERE instance_id = ?2 AND status = 'backed_up'",
                     rusqlite::params![&target.instance_id, &current_instance_id],
                 )
-                .unwrap_or(0);
+            }
+            .unwrap_or(0);
             logger::log_info(&format!(
                 "[AutoSwitcher] Re-attributed {} backed-up prompts from '{}' to target '{}'",
                 reattributed, current_instance_id, target.instance_id
             ));
         }
         if let Ok(conn) = crate::modules::backup_prompts_db::connect_db() {
-            let _ = conn.execute(
-                "UPDATE prompt_backups SET instance_id = ?1 WHERE instance_id = ?2 AND is_restored = 0",
-                rusqlite::params![&target.instance_id, &current_instance_id],
-            );
+            let is_source_default =
+                current_instance_id == "default" || current_instance_id == "__default__";
+            // Justification: prompt re-attribution to target instance during switch
+            if is_source_default {
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE prompt_backups SET instance_id = ?1 WHERE (instance_id = 'default' OR instance_id = '__default__' OR instance_id IS NULL OR instance_id = '') AND is_restored = 0",
+                        rusqlite::params![&target.instance_id],
+                    ),
+                    "re-attribute prompt backups to target instance in auto-switcher",
+                );
+            } else {
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE prompt_backups SET instance_id = ?1 WHERE instance_id = ?2 AND is_restored = 0",
+                        rusqlite::params![&target.instance_id, &current_instance_id],
+                    ),
+                    "re-attribute prompt backups to target instance in auto-switcher",
+                );
+            }
         }
         for ws in &active_workspaces {
             // Justification: best-effort call; failure logged without changing control flow

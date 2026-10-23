@@ -1081,14 +1081,16 @@ export type RerunMessageOption =
     | 'is-it-done'
     | 'is-it-published'
     | 'verify-and-finish'
-    | 'check-pending-tasks';
+    | 'check-pending-tasks'
+    | 'run-verification'
+    | 'confirm-pushed';
 
 /** Picker rows rendered by the rerun UI. The randomized row is explicitly labeled and auto-picked. */
 export const RERUN_MESSAGE_OPTIONS: ReadonlyArray<{ value: RerunMessageOption; label: string; hint: string }> = [
     {
         value: 'randomized',
         label: 'Randomized nudge (auto-picked random variation)',
-        hint: 'Every dispatch picks ONE message at random from the 16 built-in variations',
+        hint: 'Every dispatch picks ONE message at random from the 16+ built-in variations',
     },
     { value: 'is-it-completed', label: 'Is it completed?', hint: 'Send a completion-check nudge' },
     { value: 'is-it-finished', label: 'Is it finished?', hint: 'Send a finish-check nudge' },
@@ -1097,9 +1099,11 @@ export const RERUN_MESSAGE_OPTIONS: ReadonlyArray<{ value: RerunMessageOption; l
     { value: 'is-it-published', label: 'Is it published?', hint: 'Send a publish-status nudge' },
     { value: 'verify-and-finish', label: 'Verify and finish remaining items', hint: 'Send a verification reminder nudge' },
     { value: 'check-pending-tasks', label: 'Check pending tasks and continue', hint: 'Send a task continuation nudge' },
+    { value: 'run-verification', label: 'Run comprehensive verification', hint: 'Send a verification request nudge' },
+    { value: 'confirm-pushed', label: 'Confirm committed and pushed', hint: 'Send a commit and push confirmation nudge' },
 ];
 
-/** Built-in set of follow-up nudges used by the "randomized" option (16 distinct actionable variations). */
+/** Built-in set of follow-up nudges used by the "randomized" option (16+ distinct actionable variations). */
 export const RERUN_RANDOM_MESSAGE_SET: ReadonlyArray<string> = [
     'Is it completed?',
     'Is it finished?',
@@ -1113,6 +1117,10 @@ export const RERUN_RANDOM_MESSAGE_SET: ReadonlyArray<string> = [
     'Please double check completion and finalize.',
     'Is there any pending work left?',
     'Please confirm completion status and next steps.',
+    'Run comprehensive verification and report status.',
+    'Check pending tasks and proceed with the next one.',
+    'Verify build cleanliness and finalize.',
+    'Confirm all changes are committed and pushed.',
     'Quick status check — is it done yet?',
     'Please continue where you left off and confirm when finished.',
     'Checking in: how is it going? Any blockers or pending items?',
@@ -1127,6 +1135,8 @@ export const RERUN_FIXED_MESSAGES: Record<Exclude<RerunMessageOption, 'randomize
     'is-it-published': 'Is it published?',
     'verify-and-finish': 'Please verify and finish the remaining items.',
     'check-pending-tasks': 'Can you check the pending tasks and continue?',
+    'run-verification': 'Run comprehensive verification and report status.',
+    'confirm-pushed': 'Confirm all changes are committed and pushed.',
 };
 
 export const RERUN_DEFAULT_COUNT = 4;
@@ -1143,7 +1153,7 @@ export const RERUN_COUNT_STORAGE_KEY = 'agm:prompt-tree:rerun-count';
 const LEGACY_RERUN_MESSAGE_OPTION_KEY = 'agm_prompt_tree_rerun_message_option';
 const LEGACY_RERUN_COUNT_KEY = 'agm_prompt_tree_rerun_count';
 
-function isRerunMessageOption(value: string | null): value is RerunMessageOption {
+export function isRerunMessageOption(value: string | null): value is RerunMessageOption {
     return (
         value === 'randomized' ||
         value === 'is-it-completed' ||
@@ -1152,7 +1162,9 @@ function isRerunMessageOption(value: string | null): value is RerunMessageOption
         value === 'is-it-done' ||
         value === 'is-it-published' ||
         value === 'verify-and-finish' ||
-        value === 'check-pending-tasks'
+        value === 'check-pending-tasks' ||
+        value === 'run-verification' ||
+        value === 'confirm-pushed'
     );
 }
 
@@ -1234,7 +1246,7 @@ export interface RerunDispatchContext {
     repoPath: string;
     /** Conversation the nudge lands in (undefined = instance default). */
     convId?: string;
-    /** How many times the message is dispatched (clamped to 1..5). */
+    /** How many times the message is dispatched (clamped to 1..8). */
     count: number;
     messageOption: RerunMessageOption;
     /** Full original prompt text to embed into Chapter 4. */
