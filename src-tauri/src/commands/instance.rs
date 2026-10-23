@@ -169,7 +169,9 @@ pub async fn fast_forward_instance(instance_id: String) -> Result<String, String
             trigger: crate::modules::audit::InteractionTrigger::Click,
             params: Some(serde_json::json!({
                 "instance_id": instance_id,
-                "stepSummary": format!("User executed Fast-Forward profile rotation on instance '{instance_id}'"),
+                "stepSummary": format!(
+                    "User executed Fast-Forward profile rotation on instance '{instance_id}'"
+                ),
                 "cleanMethodLabel": "Fast-Forward Profile Rotation",
                 "elementHierarchy": [
                     format!("Instance: {instance_id}"),
@@ -180,7 +182,12 @@ pub async fn fast_forward_instance(instance_id: String) -> Result<String, String
                 "container": format!("Instance Card: {instance_id}"),
                 "textSnippet": "Fast Forward Shortcut",
                 "tag": "action-button",
-                "action_description": format!("Initiated manual 4-tier fast-forward account evaluation for instance '{instance_id}'. Candidate selection enforces 15% weekly quota floor, 100% 4-hour headroom, zero cross-instance fleet usage, and earliest reset timestamp prioritization."),
+                "action_description": format!(
+                    "Initiated manual 4-tier fast-forward account evaluation for instance '{}'. \
+                     Candidate selection enforces 15% weekly quota floor, 100% 4-hour headroom, \
+                     zero cross-instance fleet usage, and earliest reset timestamp prioritization.",
+                    instance_id
+                ),
                 "executive_briefing": {
                     "headline": format!("Fast-Forward Profile Rotation: {}", instance_id),
                     "operation": "Manual Fast-Forward Account Switch",
@@ -428,6 +435,9 @@ pub async fn switch_account_to_instance(
         }
     }
     // Justification: UI audit recording is observability; never block account switch on it.
+    let target_label = instance_id
+        .as_deref()
+        .unwrap_or("auto-detected active instance");
     crate::error::record_ignored(
         crate::modules::audit::record_interaction(crate::modules::audit::RecordInteractionInput {
             actor: crate::modules::audit::InteractionActor::User,
@@ -438,24 +448,30 @@ pub async fn switch_account_to_instance(
             trigger: crate::modules::audit::InteractionTrigger::Click,
             params: Some(serde_json::json!({
                 "account_id": account_id,
-                "instance_id": instance_id,
-                "stepSummary": format!("User switched account '{account_id}' to instance '{instance_id}'"),
+                "instance_id": target_label,
+                "stepSummary": format!(
+                    "User switched account '{account_id}' to instance '{target_label}'"
+                ),
                 "cleanMethodLabel": "Switch Profile to Instance",
                 "elementHierarchy": [
                     "/accounts".to_string(),
                     "Accounts Table".to_string(),
                     format!("Account Row: {account_id}"),
-                    format!("Target Instance: {instance_id}"),
+                    format!("Target Instance: {target_label}"),
                 ],
                 "container": format!("Account Row: {account_id}"),
-                "textSnippet": format!("Switch to {instance_id}"),
+                "textSnippet": format!("Switch to {target_label}"),
                 "tag": "action-button",
-                "action_description": format!("Explicit user profile switch binding account '{account_id}' to instance '{instance_id}'. Running prompts and active state snapshotted, post-switch 10s settling window armed."),
+                "action_description": format!(
+                    "Explicit user profile switch binding account '{}' to instance '{}'. \
+                     Running prompts and active state snapshotted, post-switch 10s settling window armed.",
+                    account_id, target_label
+                ),
                 "executive_briefing": {
-                    "headline": format!("Account Switch: {} → {}", account_id, instance_id),
+                    "headline": format!("Account Switch: {} → {}", account_id, target_label),
                     "operation": "Manual Account Profile Switch",
                     "rationale": "Direct user selection from accounts management table",
-                    "instance_id": instance_id,
+                    "instance_id": target_label,
                     "safeguard": "Prompt Continuity Preservation & Settling Delay",
                 }
             })),
@@ -650,7 +666,9 @@ pub async fn send_prompt_now(
                 "conversation_id": audit_conv,
                 "prompt_id": res.as_ref().ok().map(|p| p.id.clone()),
                 "media_count": media_count,
-                "stepSummary": format!("User dispatched immediate prompt to instance '{send_inst_for_audit}' ({send_repo_for_audit})"),
+                "stepSummary": format!(
+                    "User dispatched immediate prompt to instance '{send_inst_for_audit}' ({send_repo_for_audit})"
+                ),
                 "cleanMethodLabel": "Send Prompt Now (Immediate Dispatch)",
                 "elementHierarchy": [
                     "/instances".to_string(),
@@ -661,7 +679,11 @@ pub async fn send_prompt_now(
                 "container": format!("Instance Prompt Tree: {send_inst_for_audit}"),
                 "textSnippet": "Send Now",
                 "tag": "action-button",
-                "action_description": format!("Direct interactive dispatch bypassing FIFO backlog queue for immediate execution in instance '{send_inst_for_audit}' (Repository: {send_repo_for_audit}, Attached Media: {media_count})."),
+                "action_description": format!(
+                    "Direct interactive dispatch bypassing FIFO backlog queue for immediate \
+                     execution in instance '{}' (Repository: {}, Attached Media: {}).",
+                    send_inst_for_audit, send_repo_for_audit, media_count
+                ),
                 "executive_briefing": {
                     "headline": format!("Prompt Dispatched: {}", send_inst_for_audit),
                     "operation": "Immediate Prompt Execution",
@@ -738,7 +760,9 @@ pub async fn enqueue_prompt(
                 "conversation_id": audit_conv,
                 "prompt_id": res.as_ref().ok().map(|p| p.id.clone()),
                 "media_count": enq_media_count,
-                "stepSummary": format!("User enqueued prompt for sequential FIFO processing on instance '{enq_inst_for_audit}' ({enq_repo_for_audit})"),
+                "stepSummary": format!(
+                    "User enqueued prompt for sequential FIFO processing on instance '{enq_inst_for_audit}' ({enq_repo_for_audit})"
+                ),
                 "cleanMethodLabel": "Enqueue Prompt (FIFO Queue)",
                 "elementHierarchy": [
                     "/instances".to_string(),
@@ -749,7 +773,12 @@ pub async fn enqueue_prompt(
                 "container": format!("Instance Prompt Tree: {enq_inst_for_audit}"),
                 "textSnippet": "Enqueue for Later",
                 "tag": "action-button",
-                "action_description": format!("Appended prompt turn to persistent SQLite FIFO queue on instance '{enq_inst_for_audit}' (Repository: {enq_repo_for_audit}, Attached Media: {enq_media_count}). Execution will occur sequentially via background queue dispatcher."),
+                "action_description": format!(
+                    "Appended prompt turn to persistent SQLite FIFO queue on instance '{}' \
+                     (Repository: {}, Attached Media: {}). Execution will occur sequentially via \
+                     background queue dispatcher.",
+                    enq_inst_for_audit, enq_repo_for_audit, enq_media_count
+                ),
                 "executive_briefing": {
                     "headline": format!("Prompt Enqueued: {}", enq_inst_for_audit),
                     "operation": "FIFO Background Queue Insertion",
