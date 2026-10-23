@@ -316,7 +316,7 @@ pub fn lint_ui_markup_for_capsules_and_dropdowns(content: &str) -> CapsuleDropdo
             let class_str = extract_class_attribute(select_snippet);
             let select_issues = validate_inline_select_classes(
                 &class_str,
-                &format!("Line {line_num}: {line.trim()}"),
+                &format!("Line {line_num}: {}", line.trim()),
             );
             dropdown_violations.extend(select_issues);
         }

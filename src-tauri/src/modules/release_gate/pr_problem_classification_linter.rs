@@ -219,9 +219,9 @@ fn determine_primary_domain(file_paths: &[String]) -> Option<FunctionalDomain> {
 
     non_doc_max.or_else(|| {
         counts
-            .into_iter()
-            .max_by_key(|(_, count)| count)
-            .map(|(domain, _)| domain)
+            .iter()
+            .max_by_key(|(_, count)| *count)
+            .map(|(domain, _)| *domain)
     })
 }
 
