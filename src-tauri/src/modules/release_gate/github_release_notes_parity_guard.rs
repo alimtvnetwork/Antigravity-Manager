@@ -5,6 +5,8 @@
 //! (`(Thanks to @aukgit)`) in `changelog.md` and `changelog_en.md`. Do NOT include any other
 //! GitHub user handles (`@...`) in release changelogs or release notes, ensuring the GitHub
 //! release page contributors list only contains `aukgit` and none else.
+//! Synchronize README Changelog: For stable releases, you MUST update the release summary in both
+//! `README.md` and `README_EN.md`.
 //! Strictly Relative Git Paths Invariant: Never output or record absolute filesystem paths
 //! (e.g. `D:\...`, `C:\...`, `/home/...`) in specifications, plans, commit messages, `changelog.md`,
 //! `changelog_en.md`, `README.md`, `README_EN.md`, or GitHub release notes."
@@ -18,127 +20,308 @@ pub const SOLE_PERMITTED_AUTHOR_HANDLE: &str = "@aukgit";
 /// Known absolute path drive and directory prefixes forbidden in release notes.
 pub const FORBIDDEN_ABSOLUTE_PREFIXES: &[&str] = &[
     "c:\\", "c:/", "d:\\", "d:/", "e:\\", "e:/", "/home/", "/users/", "/etc/", "/var/",
+    "/tmp/", "/usr/", "/root/", "/opt/", "file://",
 ];
 
-/// Violations detected when auditing GitHub release notes content.
+/// Granular violations detected during GitHub release notes validation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReleaseNotesViolation {
-    /// An absolute filesystem path was detected in release notes text.
-    AbsolutePathDetected {
-        line_number: usize,
-        detected_path: String,
-    },
     /// A third-party GitHub handle other than `@aukgit` was found.
-    ForeignContributorHandle {
-        line_number: usize,
-        detected_handle: String,
+    UnauthorizedContributorHandle(String),
+    /// An absolute filesystem path or file URI was found in release notes text.
+    AbsolutePathFound {
+        /// Extracted absolute path snippet.
+        path: String,
+        /// 1-indexed line number where the path was detected.
+        line: usize,
     },
-    /// Top heading fails to match the expected Git release tag character-for-character.
-    TagHeadingMismatch {
-        expected_tag: String,
-        found_heading: Option<String>,
+    /// Mandatory attribution to `@aukgit` was missing.
+    MissingAukgitAttribution,
+    /// Release notes or changelog heading failed to match the targeted Git tag.
+    MissingChangelogHeadingMatch {
+        /// Targeted release tag.
+        tag: String,
     },
 }
 
 impl fmt::Display for ReleaseNotesViolation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::AbsolutePathDetected { line_number, detected_path } => {
-                write!(f, "Absolute path at line {line_number}: '{detected_path}'")
-            }
-            Self::ForeignContributorHandle { line_number, detected_handle } => {
+            Self::UnauthorizedContributorHandle(handle) => {
                 write!(
                     f,
-                    "Foreign contributor handle '{detected_handle}' at line {line_number}; only '{SOLE_PERMITTED_AUTHOR_HANDLE}' is permitted"
+                    "Unauthorized contributor handle '{handle}'. Attribution must attribute strictly '{SOLE_PERMITTED_AUTHOR_HANDLE}'."
                 )
             }
-            Self::TagHeadingMismatch { expected_tag, found_heading } => {
+            Self::AbsolutePathFound { path, line } => {
                 write!(
                     f,
-                    "Release heading mismatch: expected '{expected_tag}', found '{:?}'",
-                    found_heading
+                    "Absolute filesystem path '{path}' detected at line {line}. Strictly relative paths invariant violated."
+                )
+            }
+            Self::MissingAukgitAttribution => {
+                write!(
+                    f,
+                    "Missing mandatory attribution to '{SOLE_PERMITTED_AUTHOR_HANDLE}' ('(Thanks to {SOLE_PERMITTED_AUTHOR_HANDLE})')."
+                )
+            }
+            Self::MissingChangelogHeadingMatch { tag } => {
+                write!(
+                    f,
+                    "Release heading mismatch: release notes or changelog heading does not match tag '{tag}'."
                 )
             }
         }
     }
 }
 
-/// Audit report produced after inspecting GitHub release notes markdown text.
+/// Audit report produced after validating GitHub release notes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ReleaseNotesAuditReport {
-    /// True if release notes satisfy all path hygiene and single-contributor rules.
+pub struct ReleaseNotesParityReport {
+    /// Targeted Git release tag.
+    pub tag: String,
+    /// True if release notes satisfy all path hygiene, single attribution, and heading rules.
     pub is_compliant: bool,
-    /// Total lines evaluated.
-    pub total_lines_audited: usize,
-    /// Detected tag heading.
-    pub detected_heading: Option<String>,
-    /// Granular list of detected violations.
+    /// Granular list of detected policy violations.
     pub violations: Vec<ReleaseNotesViolation>,
+    /// True if the mandatory `@aukgit` attribution is present.
+    pub authorized_attribution: bool,
 }
 
-/// Audits release notes markdown content for strictly relative paths and single attribution.
-pub fn audit_release_notes_parity(
-    release_notes_content: &str,
-    expected_tag: &str,
-) -> ReleaseNotesAuditReport {
-    let mut violations = Vec::new();
-    let mut detected_heading = None;
-    let lines: Vec<&str> = release_notes_content.lines().collect();
+impl fmt::Display for ReleaseNotesParityReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ReleaseNotesParityReport: tag={}, compliant={}, authorized_attribution={}, violations={}",
+            self.tag,
+            self.is_compliant,
+            self.authorized_attribution,
+            self.violations.len()
+        )
+    }
+}
 
-    for (idx, line) in lines.iter().enumerate() {
-        let line_num = idx + 1;
-        let trimmed = line.trim();
+/// Helper function to trim and extract a path token from a snippet.
+fn extract_path_token(snippet: &str) -> String {
+    let end = snippet
+        .find(|c: char| {
+            c.is_whitespace()
+                || c == '"'
+                || c == '\''
+                || c == ')'
+                || c == ']'
+                || c == '`'
+                || c == '>'
+                || c == '<'
+        })
+        .unwrap_or(snippet.len());
 
-        // 1. Tag heading match (first markdown heading)
-        if detected_heading.is_none() && (trimmed.starts_with("# ") || trimmed.starts_with("## ")) {
-            let heading_text = trimmed.trim_start_matches('#').trim();
-            detected_heading = Some(heading_text.to_string());
-            if heading_text != expected_tag {
-                violations.push(ReleaseNotesViolation::TagHeadingMismatch {
-                    expected_tag: expected_tag.to_string(),
-                    found_heading: Some(heading_text.to_string()),
-                });
-            }
+    snippet[..end]
+        .trim_end_matches(|c: char| c == '.' || c == ',' || c == ';')
+        .to_string()
+}
+
+/// Extracts all absolute filesystem paths and file URIs from a line of text.
+fn extract_absolute_paths_from_line(line: &str) -> Vec<String> {
+    let mut results = Vec::new();
+    let lower = line.to_ascii_lowercase();
+    let bytes = line.as_bytes();
+
+    // 1. file:// scheme detection
+    let mut search_start = 0;
+    while let Some(pos) = lower[search_start..].find("file://") {
+        let actual_pos = search_start + pos;
+        let token = extract_path_token(&line[actual_pos..]);
+        if !token.is_empty() && !results.contains(&token) {
+            results.push(token.clone());
         }
+        search_start = actual_pos + token.len().max(1);
+    }
 
-        // 2. Absolute path check
-        let lower = trimmed.to_ascii_lowercase();
-        for prefix in FORBIDDEN_ABSOLUTE_PREFIXES {
-            if let Some(pos) = lower.find(prefix) {
-                let snippet = &trimmed[pos..(pos + 30).min(trimmed.len())];
-                violations.push(ReleaseNotesViolation::AbsolutePathDetected {
-                    line_number: line_num,
-                    detected_path: snippet.to_string(),
-                });
-                break;
-            }
-        }
-
-        // 3. Contributor attribution check (detect foreign @handles)
-        for word in trimmed.split_whitespace() {
-            let clean_word = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '@' && c != '-');
-            if clean_word.starts_with('@') && clean_word.len() > 1 {
-                if clean_word != SOLE_PERMITTED_AUTHOR_HANDLE {
-                    violations.push(ReleaseNotesViolation::ForeignContributorHandle {
-                        line_number: line_num,
-                        detected_handle: clean_word.to_string(),
-                    });
+    // 2. Windows drive letters (e.g. C:\, C:/, D:\, D:/)
+    for i in 0..bytes.len() {
+        if bytes[i].is_ascii_alphabetic()
+            && i + 2 < bytes.len()
+            && bytes[i + 1] == b':'
+            && (bytes[i + 2] == b'\\' || bytes[i + 2] == b'/')
+        {
+            let is_start = i == 0
+                || (!bytes[i - 1].is_ascii_alphanumeric() && bytes[i - 1] != b'/');
+            if is_start {
+                let token = extract_path_token(&line[i..]);
+                if !token.is_empty() && !results.contains(&token) {
+                    results.push(token);
                 }
             }
         }
     }
 
-    if detected_heading.is_none() {
-        violations.push(ReleaseNotesViolation::TagHeadingMismatch {
-            expected_tag: expected_tag.to_string(),
-            found_heading: None,
+    // 3. Unix root prefixes (/home/, /users/, /etc/, /var/, etc.)
+    let unix_prefixes = [
+        "/home/", "/users/", "/etc/", "/var/", "/tmp/", "/usr/", "/root/", "/opt/",
+    ];
+    for prefix in unix_prefixes {
+        let mut u_start = 0;
+        while let Some(pos) = lower[u_start..].find(prefix) {
+            let actual_pos = u_start + pos;
+            let token = extract_path_token(&line[actual_pos..]);
+            if !token.is_empty() && !results.contains(&token) {
+                results.push(token.clone());
+            }
+            u_start = actual_pos + token.len().max(1);
+        }
+    }
+
+    results
+}
+
+/// Extracts all GitHub-style `@handle` mentions from a line of text, ignoring emails.
+fn extract_handles_from_line(line: &str) -> Vec<String> {
+    let mut handles = Vec::new();
+    let chars: Vec<char> = line.chars().collect();
+    let len = chars.len();
+
+    let mut i = 0;
+    while i < len {
+        if chars[i] == '@' {
+            let is_boundary = i == 0
+                || (!chars[i - 1].is_ascii_alphanumeric()
+                    && chars[i - 1] != '.'
+                    && chars[i - 1] != '_'
+                    && chars[i - 1] != '-');
+
+            if is_boundary && i + 1 < len && chars[i + 1].is_ascii_alphanumeric() {
+                let start = i;
+                i += 1;
+                while i < len
+                    && (chars[i].is_ascii_alphanumeric()
+                        || chars[i] == '-'
+                        || chars[i] == '_')
+                {
+                    i += 1;
+                }
+                let handle: String = chars[start..i].iter().collect();
+                handles.push(handle);
+                continue;
+            }
+        }
+        i += 1;
+    }
+
+    handles
+}
+
+/// Validates GitHub release notes content against tag matching, author attribution, and path hygiene.
+pub fn validate_release_notes(
+    tag: &str,
+    release_notes: &str,
+    changelog_heading: Option<&str>,
+) -> ReleaseNotesParityReport {
+    let mut violations = Vec::new();
+    let mut authorized_attribution = false;
+    let lines: Vec<&str> = release_notes.lines().collect();
+
+    // 1. Scan line-by-line for absolute paths and author handles
+    for (idx, line) in lines.iter().enumerate() {
+        let line_num = idx + 1;
+
+        // Path scanning
+        let found_paths = extract_absolute_paths_from_line(line);
+        for path in found_paths {
+            violations.push(ReleaseNotesViolation::AbsolutePathFound {
+                path,
+                line: line_num,
+            });
+        }
+
+        // Handle scanning
+        let found_handles = extract_handles_from_line(line);
+        for handle in found_handles {
+            if handle.eq_ignore_ascii_case(SOLE_PERMITTED_AUTHOR_HANDLE) {
+                authorized_attribution = true;
+            } else {
+                violations.push(ReleaseNotesViolation::UnauthorizedContributorHandle(handle));
+            }
+        }
+    }
+
+    // 2. Ensure authorized attribution is present
+    if !authorized_attribution {
+        violations.push(ReleaseNotesViolation::MissingAukgitAttribution);
+    }
+
+    // 3. Heading and tag parity validation
+    let top_release_heading = lines.iter().find_map(|line| {
+        let trimmed = line.trim();
+        if trimmed.starts_with('#') {
+            Some(
+                trimmed
+                    .trim_start_matches('#')
+                    .trim()
+                    .trim_matches('[')
+                    .trim_matches(']')
+                    .trim()
+                    .to_string(),
+            )
+        } else {
+            None
+        }
+    });
+
+    let mut heading_matched = false;
+
+    if let Some(ch_heading) = changelog_heading {
+        let clean_ch = ch_heading
+            .trim()
+            .trim_start_matches('#')
+            .trim()
+            .trim_matches('[')
+            .trim_matches(']')
+            .trim();
+
+        if clean_ch == tag.trim() {
+            heading_matched = true;
+        } else {
+            violations.push(ReleaseNotesViolation::MissingChangelogHeadingMatch {
+                tag: tag.to_string(),
+            });
+        }
+    } else if let Some(ref rel_h) = top_release_heading {
+        if rel_h == tag.trim() {
+            heading_matched = true;
+        } else {
+            violations.push(ReleaseNotesViolation::MissingChangelogHeadingMatch {
+                tag: tag.to_string(),
+            });
+        }
+    } else {
+        violations.push(ReleaseNotesViolation::MissingChangelogHeadingMatch {
+            tag: tag.to_string(),
         });
     }
 
-    ReleaseNotesAuditReport {
-        is_compliant: violations.is_empty(),
-        total_lines_audited: lines.len(),
-        detected_heading,
-        violations,
+    if heading_matched {
+        if let Some(ref rel_h) = top_release_heading {
+            if rel_h != tag.trim() {
+                violations.push(ReleaseNotesViolation::MissingChangelogHeadingMatch {
+                    tag: tag.to_string(),
+                });
+            }
+        }
     }
+
+    ReleaseNotesParityReport {
+        tag: tag.to_string(),
+        is_compliant: violations.is_empty(),
+        violations,
+        authorized_attribution,
+    }
+}
+
+/// Convenience backward-compatible wrapper auditing release notes against an expected tag.
+pub fn audit_release_notes_parity(
+    release_notes: &str,
+    expected_tag: &str,
+) -> ReleaseNotesParityReport {
+    validate_release_notes(expected_tag, release_notes, None)
 }
