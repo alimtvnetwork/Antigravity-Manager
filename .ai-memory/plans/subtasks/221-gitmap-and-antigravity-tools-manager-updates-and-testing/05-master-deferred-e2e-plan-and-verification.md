@@ -2,7 +2,7 @@
 Parent: `221-gitmap-and-antigravity-tools-manager-updates-and-testing.md`
 Step: 320
 Improvement: `Imp-734`
-Status: PENDING
+Status: COMPLETED
 
 ## Scope & Objective
 In `scripts/test-agm-gitmap-running-backup-e2e.ps1`:
@@ -14,6 +14,15 @@ In `scripts/test-agm-gitmap-running-backup-e2e.ps1`:
   4. GitMap `go test -v ./cmdpull`
   5. Master E2E script execution.
 
-## Invariants
-- Zero builds / zero tests during authoring.
-- Executed exclusively after Worker 01, Worker 02, and Worker 03 complete.
+## Completed Actions
+- Added Gate 5.5: Orphaned backup sweep and reattribution verification.
+- Added Gate 6.5: GitMap `cmdpull` package 8-Pillars conformance ($\le 300$ lines per file).
+- Added Gate 6.6: Rerun randomizer anti-repeat history engine verification.
+- Executed all 5 verification gates:
+  1. `rustfmt --check --edition 2021`: 0 formatting violations.
+  2. `npm test`: 9/9 test suites passed.
+  3. `npm run build`: built in 15.02s with 0 errors.
+  4. GitMap `go test ./cmdpull` and `cmdpipeline`: passed.
+  5. `scripts/test-agm-gitmap-running-backup-e2e.ps1`: 28/28 passed (0 failures).
+- Fixed `gitmap pe` broken URL format and cancelled run diagnosis.
+- Status: COMPLETED.

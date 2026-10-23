@@ -356,7 +356,7 @@ Assert-Condition "Gate 5.4: Strict FIFO queue order enforced (ORDER BY created_a
 # Verify orphaned backup sweep and reattribution
 $orphanUnique = (Get-Random -Minimum 100000000 -Maximum 999999999)
 $orphanPromptId = "prompt-orphan-$orphanUnique"
-$insertOrphanSql = "INSERT INTO prompt_backups (id, backup_batch_id, prompt_id, project_id, instance_id, prompt_text, has_images, is_restored, status, created_at, updated_at) VALUES ('bk-$orphanUnique', 'batch-$orphanUnique', '$orphanPromptId', 'Antigravity-Manager', 'inst-crashed-$orphanUnique', 'Orphaned prompt to sweep', 0, 0, 'backed_up', $now, $now)"
+$insertOrphanSql = "INSERT INTO prompt_backups (id, backup_batch_id, prompt_id, project_name, project_path, project_id, conversation_id, sequence_id, prompt_text, has_images, is_restored, status, created_at, instance_id) VALUES ('bk-$orphanUnique', 'batch-$orphanUnique', '$orphanPromptId', 'Antigravity-Manager', '$normRepoPath', 'Antigravity-Manager', 'conv-$orphanUnique', 1, 'Orphaned prompt to sweep', 0, 0, 'backed_up', $now, 'inst-crashed-$orphanUnique')"
 $null = Invoke-SqlitePython -DbPath $backupDbPath -Query $insertOrphanSql
 
 $sweepRestoreRaw = & $agm restore running --json 2>&1

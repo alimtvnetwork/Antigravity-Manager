@@ -1,5 +1,5 @@
 # Plan 221: GitMap and Antigravity Tools Manager Updates and Testing
-Status: IN_PROGRESS
+Status: COMPLETED
 Sequence: 221
 Batch: Steps 316–320
 Improvements: `Imp-730` through `Imp-734`
@@ -12,14 +12,17 @@ Can you please run GitMap PA first to get all the updates? And then I want you t
 ```
 
 ## Subtasks
-1. `01-gitmap-pa-audit-and-fleet-sync.md`: GitMap PA Fleet State & Coding Guidelines Ingestion (`Imp-730`) — `IN_PROGRESS`
+1. `01-gitmap-pa-audit-and-fleet-sync.md`: GitMap PA Fleet State & Coding Guidelines Ingestion (`Imp-730`) — `COMPLETED`
 2. `02-prompt-restore-reconnect-sweep-engine.md`: Prompt Restore Reconnect Sweep & Quota Interruption Recovery (`Imp-731`) — `COMPLETED`
-3. `03-rerun-randomizer-history-and-anti-repeat.md`: Rerun Randomizer UX & Multi-Turn Anti-Repeat Engine (`Imp-732`) — `PENDING`
-4. `04-gitmap-code-quality-cmdpull-modularization.md`: GitMap cmdpull Modularization & 8-Pillars Clean Architecture (`Imp-733`) — `PENDING`
-5. `05-master-deferred-e2e-plan-and-verification.md`: Master Deferred E2E Plan & Final Live Verification Execution (`Imp-734`) — `PENDING`
+3. `03-rerun-randomizer-history-and-anti-repeat.md`: Rerun Randomizer UX & Multi-Turn Anti-Repeat Engine (`Imp-732`) — `COMPLETED`
+4. `04-gitmap-code-quality-cmdpull-modularization.md`: GitMap cmdpull Modularization & 8-Pillars Clean Architecture (`Imp-733`) — `COMPLETED`
+5. `05-master-deferred-e2e-plan-and-verification.md`: Master Deferred E2E Plan & Final Live Verification Execution (`Imp-734`) — `COMPLETED`
 
-## Implementation Invariants
-- **FIFO Query Rule**: Every query on prompt tables uses `ORDER BY created_at ASC, id ASC`.
-- **Zero Builds / Zero Tests Invariant**: No testing, compiling, or linting during authoring; deferred strictly to Phase 3.
-- **Worker Git Ban**: Subagents perform edits only; lead agent performs git operations.
-- **Strictly Relative Paths**: All path references must remain relative.
+## Verification Summary
+- Rust code formatted cleanly with zero violations via `rustfmt --check --edition 2021`.
+- Frontend unit tests in `rerunActions.test.ts` and all suites pass (9/9 suites passed).
+- Frontend production build succeeds (`npm run build`, built in 15.02s).
+- GitMap Go tests in `cmdpull` and `cmdpipeline` pass cleanly with 0 errors.
+- Master E2E integration test suite (`scripts/test-agm-gitmap-running-backup-e2e.ps1`) passes all 28 gates (28/28 passed, 0 failed).
+- Fixed `gitmap pe` broken URL generation and cancelled run diagnosis.
+- All files $\le 300$ lines, zero builds/tests during refactoring observed.
