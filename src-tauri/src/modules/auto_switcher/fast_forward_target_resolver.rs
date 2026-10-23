@@ -258,8 +258,8 @@ pub fn resolve_fast_forward_target(
             });
 
             let best = primary_candidates[0];
-            let score = best.tier_multiplier
-                * (best.weekly_quota_percent + best.rolling_4h_quota_percent);
+            let score =
+                best.tier_multiplier * (best.weekly_quota_percent + best.rolling_4h_quota_percent);
             return FfResolutionOutcome::FoundCandidate {
                 account_id: best.id.clone(),
                 email: best.email.clone(),
@@ -272,10 +272,8 @@ pub fn resolve_fast_forward_target(
     // Step 3: Degraded Fallback (Highest Combined Credits)
     let mut fallback_candidates = baseline_eligible;
     fallback_candidates.sort_by(|a, b| {
-        let score_a =
-            a.tier_multiplier * (a.weekly_quota_percent + a.rolling_4h_quota_percent);
-        let score_b =
-            b.tier_multiplier * (b.weekly_quota_percent + b.rolling_4h_quota_percent);
+        let score_a = a.tier_multiplier * (a.weekly_quota_percent + a.rolling_4h_quota_percent);
+        let score_b = b.tier_multiplier * (b.weekly_quota_percent + b.rolling_4h_quota_percent);
 
         score_b
             .partial_cmp(&score_a)
@@ -294,8 +292,7 @@ pub fn resolve_fast_forward_target(
     });
 
     let best = fallback_candidates[0];
-    let score =
-        best.tier_multiplier * (best.weekly_quota_percent + best.rolling_4h_quota_percent);
+    let score = best.tier_multiplier * (best.weekly_quota_percent + best.rolling_4h_quota_percent);
     FfResolutionOutcome::FoundCandidate {
         account_id: best.id.clone(),
         email: best.email.clone(),

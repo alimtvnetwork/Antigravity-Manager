@@ -420,7 +420,10 @@ fn test_current_instance_account_excluded() {
     }
 
     // If only current instance account is in the candidate pool, result is NoEligibleCandidates
-    let only_current = vec![FfCandidateAccount::new("acc-current-active", "active@test.com")];
+    let only_current = vec![FfCandidateAccount::new(
+        "acc-current-active",
+        "active@test.com",
+    )];
     let outcome = resolve_fast_forward_target(&only_current, Some("acc-current-active"), &config);
     assert!(!outcome.is_found());
 }
