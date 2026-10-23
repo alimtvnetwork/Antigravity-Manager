@@ -2,6 +2,7 @@
 
 | # | Specification File | Summary |
 | :--- | :--- | :--- |
+| `200-implementing-next-five-tasks` | [spec.md](./200-implementing-next-five-tasks/spec.md) | Enforces thinking cache invalidation control, readme changelog synchronization, sole contributor attribution (@aukgit), tag changelog heading matching, and prefix stability pipeline preservation. |
 | `199-implementing-next-five-tasks` | [spec.md](./199-implementing-next-five-tasks/spec.md) | Enforces cross-platform compatibility, maintainer staging protocol, published-tip rewrite safety, headless/CLI parity, and generic fix preference. |
 | `198-implementing-next-five-tasks` | [spec.md](./198-implementing-next-five-tasks/spec.md) | Enforces transport backoff stepping, transient sandbox management, FIFO prompt queue coordination, account switch audit emission, and rejection breakdown generation. |
 | `197-implementing-next-five-tasks` | [spec.md](./197-implementing-next-five-tasks/spec.md), [e2e_master_plan.md](./197-implementing-next-five-tasks/e2e_master_plan.md) | Enforces request payload length negotiation, sse heartbeat keepalive generation, token budget allocation with thinking backfill/filtering, quota exhaustion velocity prediction, and dynamic candidate scoring. |
