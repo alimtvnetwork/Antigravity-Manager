@@ -231,6 +231,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             return DEFAULT_TREE_WIDTH;
         }
     });
+    const [rerunHistory, setRerunHistory] = useState<string[]>([]);
     const [isResizingTree, setIsResizingTree] = useState(false);
     const treeSplitterRef = useRef<HTMLDivElement>(null);
     const dragStartXRef = useRef<number>(0);
@@ -413,8 +414,10 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             originalPrompt,
             source: 'PromptTreeViewModal.onRerunConversation',
             mediaPaths: convMedia.length > 0 ? convMedia : undefined,
+            history: rerunHistory,
         }).then((res) => {
             if (res.dispatched > 0) {
+                setRerunHistory((prev) => [...prev, ...(res.messages || [])].slice(-10));
                 const previewMsg = res.messages?.[0] ? ` ("${res.messages[0]}")` : '';
                 setActionMsg(`Rerun ×${res.dispatched} dispatched successfully!${previewMsg}`);
                 setTimeout(() => setActionMsg(null), 3500);

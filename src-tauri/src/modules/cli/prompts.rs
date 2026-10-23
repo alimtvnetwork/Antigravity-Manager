@@ -337,11 +337,35 @@ pub(crate) fn execute_prompts_backup(sub_args: &[String]) {
 
 pub(crate) fn execute_prompts_restore(sub_args: &[String]) {
     let is_json = is_flag_present(sub_args, &["--json", "-j"]);
-    let instance_opt = extract_flag_value(sub_args, &["--instance", "-i", "--profile"]);
+    let positional = extract_positional_args(sub_args);
+    let instance_opt = extract_flag_value(sub_args, &["--instance", "-i", "--profile"])
+        .or_else(|| positional.iter().find(|p| p.as_str() != "running").cloned());
     let limit = extract_flag_value(sub_args, &["--limit", "-l"])
         .and_then(|v| v.parse::<usize>().ok())
         .unwrap_or(20);
     let target_inst = instance_opt.as_deref();
+    let target_instance_name = target_inst.unwrap_or("default");
+
+    if let Ok(conn) = crate::modules::backup_prompts_db::connect_backup_db(None) {
+        // Justification: sweep and reattribute orphaned backups during CLI restore; failure logged
+        crate::error::record_ignored(
+            crate::modules::backup_prompts_db::sweep_and_reattribute_orphaned_backups(
+                &conn,
+                target_instance_name,
+            )
+            .map_err(|e| e.to_string()),
+            "sweep_and_reattribute_orphaned_backups in execute_prompts_restore",
+        );
+    }
+    // Justification: restore running prompts from durable backup DB; failure logged
+    crate::error::record_ignored(
+        crate::modules::backup_prompts_db::restore_running_prompts_scoped_with_fallback(
+            target_instance_name,
+            false,
+            None,
+        ),
+        "restore_running_prompts_scoped_with_fallback in execute_prompts_restore",
+    );
 
     match repo_db::resend_running_commands_for_instance(target_inst, limit) {
         Ok(restored) => {

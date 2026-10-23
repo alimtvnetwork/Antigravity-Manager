@@ -442,22 +442,35 @@ export function PromptTreeContextMenu(props: PromptTreeContextMenuProps) {
 
                     {onRerunConversation && (
                         <div>
-                            <button
-                                type="button"
-                                onClick={() => setIsRerunSubmenuOpen((prev) => !prev)}
-                                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left hover:bg-slate-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer text-xs"
-                            >
-                                <div className="flex items-center gap-2">
+                            <div className="flex items-center justify-between w-full rounded-lg hover:bg-slate-100 dark:hover:bg-[#40285e] transition-colors">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onRerunConversation(conversationId, persistedOption || 'randomized');
+                                        onClose();
+                                    }}
+                                    className="flex-1 flex items-center gap-2 px-2.5 py-1.5 text-left cursor-pointer text-xs"
+                                    title="Immediately dispatch rerun with auto-picked random completion/release nudge"
+                                >
                                     <Repeat className="w-3.5 h-3.5 text-sky-500" />
                                     <span>Rerun Nudge (×{persistedCount})</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <span className="text-[10px] font-mono text-sky-600 dark:text-sky-400 capitalize">
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setIsRerunSubmenuOpen((prev) => !prev);
+                                    }}
+                                    className="flex items-center gap-1 px-2 py-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer text-[10px]"
+                                    title="Choose rerun message and repetition count"
+                                    aria-label="Toggle rerun options submenu"
+                                >
+                                    <span className="font-mono text-sky-600 dark:text-sky-400 capitalize">
                                         {persistedOption === 'randomized' ? 'Random' : persistedOption.replace(/-/g, ' ')}
                                     </span>
                                     <ChevronRight className={cn("w-3 h-3 text-slate-400 transition-transform", isRerunSubmenuOpen && "rotate-90")} />
-                                </div>
-                            </button>
+                                </button>
+                            </div>
 
                             {isRerunSubmenuOpen && (
                                 <div className="mx-2 my-1 pl-2.5 border-l-2 border-sky-500/40 space-y-1 max-h-52 overflow-y-auto">

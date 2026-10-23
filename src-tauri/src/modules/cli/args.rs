@@ -155,7 +155,7 @@ pub fn handle_cli_arguments() -> bool {
                     "auto-switch" | "autoswitch" | "auto" => print_auto_switch_cli_help(),
                     "agy" | "cache" | "clean" => print_agy_cli_help(),
                     "supabase" | "sb" => print_supabase_cli_help(),
-                    "prompts" | "prompt" | "tree" => print_prompts_cli_help(),
+                    "prompts" | "prompt" | "tree" | "restore" => print_prompts_cli_help(),
                     "doctor" | "check" | "health" => print_doctor_cli_help(),
                     _ => print_all_cli_help(),
                 }
@@ -218,6 +218,13 @@ pub fn handle_cli_arguments() -> bool {
         // Prompt management commands
         "prompts" | "prompt" | "tree" => {
             handle_prompts_subcommand(&rest_args, cmd.as_str());
+            true
+        }
+
+        "restore" => {
+            let mut prompt_args = vec!["restore".to_string()];
+            prompt_args.extend(rest_args);
+            handle_prompts_subcommand(&prompt_args, "prompts");
             true
         }
 
