@@ -45,6 +45,7 @@ pub mod lock_contention_profiler;
 pub mod lock_contention_watchdog;
 pub mod lock_detector;
 pub mod lock_escalation_guard;
+pub mod lock_timeout_escalator;
 pub mod migration_checksum;
 pub mod migration_gate;
 pub mod migration_version_stamp;
@@ -111,6 +112,8 @@ pub mod tests_busy_timeout_scaler;
 pub mod tests_wal_fragmentation_surveyor;
 #[cfg(test)]
 pub mod tests_lock_contention_watchdog;
+#[cfg(test)]
+pub mod tests_lock_timeout_escalator;
 #[cfg(test)]
 pub mod tests_index_fragmentation_scorer;
 #[cfg(test)]
@@ -200,6 +203,7 @@ pub use lock_contention_profiler::*;
 pub use lock_contention_watchdog::*;
 pub use lock_detector::*;
 pub use lock_escalation_guard::*;
+pub use lock_timeout_escalator::*;
 pub use migration_checksum::*;
 pub use migration_gate::*;
 pub use migration_version_stamp::*;

@@ -25,6 +25,8 @@ mod handle_detect_model;
 pub mod header_allowlist_filter;
 pub mod header_anonymizer;
 pub mod json_payload_sanitizer;
+pub mod prefix_stability_pipeline_guard;
+pub mod prefix_stability_sanitizer;
 pub mod request_cancellation_watcher;
 pub mod request_content_encoding_negotiator;
 pub mod request_content_length_validator;
@@ -53,6 +55,7 @@ pub mod stream_early_abort_sentinel;
 pub mod stream_flusher;
 pub mod token_budget_decider;
 pub mod tool_response_formatter;
+pub mod unified_context_structural_aligner;
 pub mod user_agent_normalizer;
 #[cfg(test)]
 pub mod tests_request_gzip_sniffer;
@@ -98,6 +101,12 @@ pub mod tests_payload_length_negotiator;
 pub mod tests_sse_heartbeat_generator;
 #[cfg(test)]
 pub mod tests_token_budget_decider;
+#[cfg(test)]
+pub mod tests_prefix_stability_pipeline_guard;
+#[cfg(test)]
+pub mod tests_prefix_stability_sanitizer;
+#[cfg(test)]
+pub mod tests_unified_context_structural_aligner;
 
 pub use abort_sentinel::*;
 pub use boundary_normalizer::StreamBoundaryNormalizer;
@@ -113,6 +122,8 @@ pub use frame_length_clamper::*;
 pub use header_allowlist_filter::*;
 pub use header_anonymizer::anonymize_forwarded_headers;
 pub use json_payload_sanitizer::*;
+pub use prefix_stability_pipeline_guard::*;
+pub use prefix_stability_sanitizer::*;
 pub use request_cancellation_watcher::*;
 pub use request_content_encoding_negotiator::*;
 pub use request_content_length_validator::*;
@@ -140,6 +151,7 @@ pub use stream_early_abort_sentinel::*;
 pub use stream_flusher::{StreamFlusher, SSE_KEEPALIVE_BYTES};
 pub use token_budget_decider::*;
 pub use tool_response_formatter::*;
+pub use unified_context_structural_aligner::*;
 pub use user_agent_normalizer::*;
 
 pub use handle_detect_model::build_dual_track_error;

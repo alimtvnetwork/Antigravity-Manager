@@ -289,6 +289,11 @@ pub mod transient_sandbox_manager;
 #[cfg(test)]
 #[path = "instance/tests_transient_sandbox_manager.rs"]
 pub mod tests_transient_sandbox_manager;
+#[path = "instance/job_breakaway_process_spawner.rs"]
+pub mod job_breakaway_process_spawner;
+#[cfg(test)]
+#[path = "instance/tests_job_breakaway_process_spawner.rs"]
+pub mod tests_job_breakaway_process_spawner;
 #[path = "instance/tuning.rs"]
 pub mod tuning;
 #[path = "instance/vitality_scanner.rs"]
@@ -524,3 +529,4 @@ pub use binary_execution_probe::*;
 pub use remote_port_guard::*;
 pub use directory_permission_guard::*;
 pub use transient_sandbox_manager::*;
+pub use job_breakaway_process_spawner::*;

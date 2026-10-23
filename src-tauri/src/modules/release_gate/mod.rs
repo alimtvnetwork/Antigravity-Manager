@@ -40,6 +40,7 @@ pub mod profile_duplication_parity_guard;
 pub mod pr_scope_cohesion_verifier;
 pub mod pr_template_compliance_linter;
 pub mod published_tip_rewrite_guard;
+pub mod readme_changelog_synchronizer;
 pub mod rejection_breakdown_generator;
 pub mod remote_branch_base_verifier;
 pub mod risky_path_fallback_guard;
@@ -47,9 +48,13 @@ pub mod rollback_ref_guard;
 pub mod semver_monotonic_validator;
 pub mod settings_deep_merge_synchronizer;
 pub mod side_effect_ordering_guard;
+pub mod sole_contributor_attribution_guard;
 pub mod staging_protocol_guard;
+pub mod tag_changelog_heading_matcher;
 pub mod test_sandbox_lifecycle_verifier;
+pub mod thinking_cache_invalidation_controller;
 pub mod thinking_cache_invalidation_guard;
+pub mod thinking_cache_target_version_guard;
 pub mod transcript_deep_inspection_scanner;
 pub mod truncation_callout_parser_guard;
 pub mod wildcard_model_routing_guard;
@@ -103,6 +108,8 @@ pub mod tests_pr_template_linter;
 #[cfg(test)]
 pub mod tests_published_tip_rewrite;
 #[cfg(test)]
+pub mod tests_readme_changelog_synchronizer;
+#[cfg(test)]
 pub mod tests_rejection_breakdown_generator;
 #[cfg(test)]
 pub mod tests_release_channel_gate;
@@ -123,9 +130,17 @@ pub mod tests_settings_deep_merge;
 #[cfg(test)]
 pub mod tests_side_effect_ordering;
 #[cfg(test)]
+pub mod tests_sole_contributor_attribution_guard;
+#[cfg(test)]
 pub mod tests_staging_protocol;
 #[cfg(test)]
+pub mod tests_tag_changelog_heading_matcher;
+#[cfg(test)]
 pub mod tests_thinking_cache_guard;
+#[cfg(test)]
+pub mod tests_thinking_cache_invalidation_controller;
+#[cfg(test)]
+pub mod tests_thinking_cache_target_version_guard;
 #[cfg(test)]
 pub mod tests_transcript_deep_inspection;
 #[cfg(test)]
@@ -169,9 +184,13 @@ pub use rollback_ref_guard::*;
 pub use semver_monotonic_validator::*;
 pub use settings_deep_merge_synchronizer::*;
 pub use side_effect_ordering_guard::*;
+pub use sole_contributor_attribution_guard::*;
 pub use staging_protocol_guard::*;
+pub use tag_changelog_heading_matcher::*;
 pub use test_sandbox_lifecycle_verifier::*;
+pub use thinking_cache_invalidation_controller::*;
 pub use thinking_cache_invalidation_guard::*;
+pub use thinking_cache_target_version_guard::*;
 pub use transcript_deep_inspection_scanner::*;
 pub use truncation_callout_parser_guard::*;
 pub use wildcard_model_routing_guard::*;
