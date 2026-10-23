@@ -144,8 +144,8 @@ mod tests {
 
         match &err {
             LauncherSecurityViolation::DirectBatchFileExecutionDisallowed { path, extension } => {
-                assert_eq!(path, "scripts/launch.bat");
-                assert_eq!(extension, ".bat");
+                assert_eq!(path.as_str(), "scripts/launch.bat");
+                assert_eq!(extension.as_str(), ".bat");
             }
             _ => panic!("Expected DirectBatchFileExecutionDisallowed"),
         }
