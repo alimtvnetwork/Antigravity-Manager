@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use super::transient_sandbox_cleanup_sentinel::{
+    use super::super::transient_sandbox_cleanup_sentinel::{
         evaluate_sandbox_eviction_safety, generate_transient_sandbox_id, is_transient_sandbox_id,
         plan_transient_sandbox_cleanup, plan_transient_sandbox_cleanup_with_options,
         SandboxCleanupReport, SandboxEvictionVerdict, SandboxInstanceDescriptor,

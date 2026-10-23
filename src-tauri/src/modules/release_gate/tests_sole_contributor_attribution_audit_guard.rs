@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use super::sole_contributor_attribution_audit_guard::{
+    use super::super::sole_contributor_attribution_audit_guard::{
         audit_release_attribution, audit_silent_error_patterns, count_absolute_paths,
         generate_governance_report, AttributionFinding, ReleaseGovernanceReport,
         SilentErrorFinding, STANDARD_ATTRIBUTION_PATTERN,
