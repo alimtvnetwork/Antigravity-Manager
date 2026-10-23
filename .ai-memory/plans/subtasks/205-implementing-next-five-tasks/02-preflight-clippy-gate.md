@@ -1,5 +1,5 @@
 # Subtask 02: Cargo Clippy All-Features Preflight Gate (`Imp-651`)
-Status: IN_PROGRESS
+Status: COMPLETED
 Parent Plan: 205-implementing-next-five-tasks.md
 
 ## Scope & Objective

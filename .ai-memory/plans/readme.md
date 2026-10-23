@@ -4,7 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
-| [205-implementing-next-five-tasks.md](./pending/205-implementing-next-five-tasks.md) | `IN PROGRESS` | Execution of 5 tasks: author & test multi-stage launcher engine, preflight clippy gate, PR unverified paths linter, thinking budget headroom evaluator, and FIFO prompt order enforcer (10 steps remaining). |
+| [205-implementing-next-five-tasks.md](./completed/205-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test multi-stage launcher engine, preflight clippy gate, PR unverified paths linter, thinking budget headroom evaluator, and FIFO prompt order enforcer (10 steps remaining). |
 | [204-implementing-next-five-tasks.md](./completed/204-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test pipeline request header sanitizer, strictly relative Git paths guard, transient sandbox lifecycle verifier, rollback reference drift verifier, and multi-stage launcher dispatcher (15 steps remaining). |
 | [203-implementing-next-five-tasks.md](./completed/203-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test preflight checks gate, caller IDE exit code 2 enforcer, PR template compliance guard, thinking budget filter pipeline, and FIFO prompt restore query validator (20 steps remaining). |
 | [202-implementing-next-five-tasks.md](./completed/202-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test connection starvation watchdog, sole contributor attribution enforcer (@aukgit), tag changelog heading matcher gate, workspace storage continuity verifier, and response stream delimiter normalizer (25 steps remaining). |
