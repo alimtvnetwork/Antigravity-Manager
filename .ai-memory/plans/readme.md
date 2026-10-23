@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [198-implementing-next-five-tasks.md](./pending/198-implementing-next-five-tasks.md) | `IN PROGRESS` | Execution of 5 tasks: author & test transport backoff stepper, transient sandbox manager, FIFO prompt queue coordinator, account switch audit emitter, and rejection breakdown generator; enqueue deferred master E2E test plan (45 steps remaining). |
 | [197-implementing-next-five-tasks.md](./completed/197-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test request payload length negotiator, sse heartbeat generator, token budget decider, quota exhaustion predictor, and candidate dynamic scorer; enqueue deferred master E2E test plan (50 steps remaining). |
 | [196-implementing-next-five-tasks.md](./completed/196-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test wildcard model routing guard, agent-client prompt sanitization regex guard, pipeline protocol decoupling guard, single problem scope & PR cohesion verifier, and contributor cost disclosure & attribution linter; enqueue deferred master E2E test plan (55 steps remaining). |
 | [195-implementing-next-five-tasks.md](./completed/195-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test risky path replacement fallback guard, side effect ordering guard, bounded matcher and wait timeout guard, remote branch base verifier, and local commit convergence auditor; enqueue deferred master E2E test plan (60 steps remaining). |
