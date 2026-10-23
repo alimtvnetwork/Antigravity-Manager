@@ -859,6 +859,15 @@ export function buildRerunPrompt(
                 clean.startsWith('did all tests') ||
                 clean.startsWith('are all requirements') ||
                 clean.startsWith('please confirm') ||
+                clean.startsWith('please double check') ||
+                clean.startsWith('is there any pending') ||
+                clean.startsWith('run comprehensive verification') ||
+                clean.startsWith('check pending tasks') ||
+                clean.startsWith('verify build cleanliness') ||
+                clean.startsWith('confirm all changes') ||
+                clean.startsWith('did you finish') ||
+                clean.startsWith('is the build clean') ||
+                clean.startsWith('please review and finalize') ||
                 clean.startsWith('checking in') ||
                 clean.startsWith('status update') ||
                 clean.startsWith('# 🔄 rerun execution nudge') ||

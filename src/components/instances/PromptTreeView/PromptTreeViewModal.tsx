@@ -360,24 +360,42 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
     };
 
     const handleRerunConversation = (convoId: string, nudgeType: string) => {
-        const targetInstId = selectedProject?.instance_id || instanceId || 'default';
-        const targetRepoPath = selectedProject?.repo_path || '';
+        const found = findStripConversation(convoId);
+        const targetInstId = found?.conv?.instance_id || found?.proj?.instance_id || selectedProject?.instance_id || instanceId || 'default';
+        const targetRepoPath = found?.proj?.repo_path || selectedProject?.repo_path || '';
         const msgOption: RerunMessageOption = isRerunMessageOption(nudgeType)
             ? nudgeType
             : loadPersistedRerunMessageOption();
-        const found = findStripConversation(convoId);
+        const count = loadPersistedRerunCount();
         const originalPrompt = found?.conv
             ? (found.conv.full_prompt_text || found.conv.prompt_preview_200w || found.conv.title)
             : undefined;
+        const convMedia = Array.from(new Set([
+            ...(found?.conv?.media_paths || []),
+            ...(found?.conv?.media_thumbnails || []),
+            ...(found?.conv?.prompts?.flatMap((p) => p.media_paths || []) || []),
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
 
+        setActionMsg(`Dispatching rerun nudge (×${count})...`);
         void dispatchRerunMessages({
             targetInstId,
             repoPath: targetRepoPath,
             convId: convoId,
-            count: loadPersistedRerunCount(),
+            count,
             messageOption: msgOption,
             originalPrompt,
             source: 'PromptTreeViewModal.onRerunConversation',
+            mediaPaths: convMedia.length > 0 ? convMedia : undefined,
+        }).then((res) => {
+            if (res.dispatched > 0) {
+                setActionMsg(`Rerun ×${res.dispatched} dispatched successfully!`);
+                setTimeout(() => setActionMsg(null), 3000);
+            } else if (res.failed > 0) {
+                setActionMsg(`Rerun failed (${res.failed} error(s))`);
+            }
+        }).catch((err: unknown) => {
+            const msg = err instanceof Error ? err.message : String(err) || 'rerun failed';
+            setActionMsg(`Rerun failed: ${msg}`);
         });
     };
 
@@ -1067,6 +1085,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                         isExportMenuOpen={isExportMenuOpen}
                                         setIsExportMenuOpen={setIsExportMenuOpen}
                                         hasImages={hasImages}
+                                        instanceId={instanceId || selectedConversation?.instance_id || selectedProject?.instance_id}
                                         instancePid={instancePid}
                                         instanceSeqNum={instanceSeqNum}
                                         instanceExeName={instanceExeName}

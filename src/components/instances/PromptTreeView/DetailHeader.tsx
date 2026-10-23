@@ -73,6 +73,7 @@ export interface DetailHeaderProps {
     dispatchMode?: DispatchActionMode;
     setDispatchMode?: (mode: DispatchActionMode) => void;
     hasImages: boolean;
+    instanceId?: string;
     instancePid?: number;
     instanceSeqNum: number;
     instanceExeName: string;
@@ -115,7 +116,7 @@ export function DetailHeader(props: DetailHeaderProps) {
         isExportMenuOpen, setIsExportMenuOpen,
         isDispatchMenuOpen: propIsDispatchMenuOpen, setIsDispatchMenuOpen: propSetIsDispatchMenuOpen,
         dispatchMode: propDispatchMode, setDispatchMode: propSetDispatchMode,
-        hasImages, instancePid,
+        hasImages, instanceId: propInstanceId, instancePid,
         formatDuration, elapsedSeconds,
         onCopyAllWithRichImages, onCopyCleanText, onCopyImageAsText,
         onCopyImageForOneNoteOrIde, onCopySingleImagePng,
@@ -315,7 +316,7 @@ export function DetailHeader(props: DetailHeaderProps) {
         setIsRerunning(true);
         setRerunFlash(null);
         try {
-            const targetInstId = selectedConversation.instance_id || 'default';
+            const targetInstId = selectedConversation.instance_id?.trim() || propInstanceId?.trim() || 'default';
             const targetConvId = conversationTargetMode === 'new'
                 ? (newConversationTitle?.trim() || undefined)
                 : selectedConversation.conversation_id;
@@ -1254,7 +1255,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         <div className="px-2 pt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
                                             Message:
                                         </div>
-                                        <div className="space-y-1">
+                                        <div className="space-y-1 max-h-52 overflow-y-auto pr-0.5">
                                             {RERUN_MESSAGE_OPTIONS.map((opt) => {
                                                 const active = rerunMessageOption === opt.value;
                                                 const isRandom = opt.value === 'randomized';

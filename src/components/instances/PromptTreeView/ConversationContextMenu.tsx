@@ -36,6 +36,9 @@ import {
     dispatchRerunMessages,
     loadPersistedRerunCount,
     loadPersistedRerunMessageOption,
+    savePersistedRerunMessageOption,
+    savePersistedRerunCount,
+    type RerunMessageOption,
     RERUN_MESSAGE_OPTIONS,
 } from './usePromptTreePromptActions';
 import { enqueuePrompt } from '../../../services/instanceService';
@@ -121,6 +124,7 @@ export function ConversationContextMenu({
     const [isExportSubmenuOpen, setIsExportSubmenuOpen] = useState(false);
     const [isEnqueueing, setIsEnqueueing] = useState(false);
     const [isRerunning, setIsRerunning] = useState(false);
+    const [isRerunSubmenuOpen, setIsRerunSubmenuOpen] = useState(false);
     const [isResendSubmenuOpen, setIsResendSubmenuOpen] = useState(false);
     const [isCustomNDialogOpen, setIsCustomNDialogOpen] = useState(false);
     const [customNCount, setCustomNCount] = useState<number>(5);
@@ -457,16 +461,17 @@ export function ConversationContextMenu({
     const persistedRerunOptionLabel =
         RERUN_MESSAGE_OPTIONS.find((opt) => opt.value === persistedRerunOption)?.label ?? persistedRerunOption;
 
-    const handleDoRerun = async (e: React.MouseEvent) => {
-        e.stopPropagation();
+    const handleDoRerun = async (e?: React.MouseEvent) => {
+        e?.stopPropagation();
         if (isRerunning) return;
+        const currentOption = loadPersistedRerunMessageOption();
         if (onRerun) {
             onRerun();
             onClose();
             return;
         }
         if (onRerunConversation) {
-            onRerunConversation(conversationId, loadPersistedRerunMessageOption());
+            onRerunConversation(conversationId, currentOption);
             onClose();
             return;
         }
@@ -475,14 +480,23 @@ export function ConversationContextMenu({
             const originalPrompt = conversationNode
                 ? (conversationNode.full_prompt_text || conversationNode.prompt_preview_200w || currentTitle)
                 : currentTitle;
+            const targetInstId = conversationNode?.instance_id || instanceId || 'default';
+            const targetRepoPath = repoPath || (conversationNode as { repo_path?: string })?.repo_path || '';
+            const convMedia = Array.from(new Set([
+                ...(conversationNode?.media_paths || []),
+                ...(conversationNode?.media_thumbnails || []),
+                ...(conversationNode?.prompts?.flatMap((p) => p.media_paths || []) || []),
+            ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+
             await dispatchRerunMessages({
-                targetInstId: instanceId || 'default',
-                repoPath: repoPath || '',
+                targetInstId,
+                repoPath: targetRepoPath,
                 convId: conversationId,
                 count: loadPersistedRerunCount(),
-                messageOption: loadPersistedRerunMessageOption(),
+                messageOption: currentOption,
                 originalPrompt,
                 source: 'ConversationContextMenu.handleDoRerun',
+                mediaPaths: convMedia.length > 0 ? convMedia : undefined,
             });
             onClose();
         } catch (err) {
@@ -490,6 +504,51 @@ export function ConversationContextMenu({
                 err instanceof Error ? err : new Error(String(err)),
                 {
                     source: 'ConversationContextMenu.handleDoRerun',
+                    triggerAction: 'rerun_conversation',
+                }
+            );
+        } finally {
+            setIsRerunning(false);
+        }
+    };
+
+    const handleRerunWithOption = async (option: RerunMessageOption) => {
+        savePersistedRerunMessageOption(option);
+        if (isRerunning) return;
+        if (onRerunConversation) {
+            onRerunConversation(conversationId, option);
+            onClose();
+            return;
+        }
+        setIsRerunning(true);
+        try {
+            const originalPrompt = conversationNode
+                ? (conversationNode.full_prompt_text || conversationNode.prompt_preview_200w || currentTitle)
+                : currentTitle;
+            const targetInstId = conversationNode?.instance_id || instanceId || 'default';
+            const targetRepoPath = repoPath || (conversationNode as { repo_path?: string })?.repo_path || '';
+            const convMedia = Array.from(new Set([
+                ...(conversationNode?.media_paths || []),
+                ...(conversationNode?.media_thumbnails || []),
+                ...(conversationNode?.prompts?.flatMap((p) => p.media_paths || []) || []),
+            ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+
+            await dispatchRerunMessages({
+                targetInstId,
+                repoPath: targetRepoPath,
+                convId: conversationId,
+                count: loadPersistedRerunCount(),
+                messageOption: option,
+                originalPrompt,
+                source: 'ConversationContextMenu.handleRerunWithOption',
+                mediaPaths: convMedia.length > 0 ? convMedia : undefined,
+            });
+            onClose();
+        } catch (err) {
+            useErrorStore.getState().captureException(
+                err instanceof Error ? err : new Error(String(err)),
+                {
+                    source: 'ConversationContextMenu.handleRerunWithOption',
                     triggerAction: 'rerun_conversation',
                 }
             );

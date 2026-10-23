@@ -1083,14 +1083,21 @@ export type RerunMessageOption =
     | 'verify-and-finish'
     | 'check-pending-tasks'
     | 'run-verification'
-    | 'confirm-pushed';
+    | 'confirm-pushed'
+    | 'fully-implemented-verified'
+    | 'all-tests-passed'
+    | 'double-check-completion'
+    | 'pending-work-left'
+    | 'confirm-status-next-steps'
+    | 'check-pending-proceed'
+    | 'verify-build-cleanliness';
 
 /** Picker rows rendered by the rerun UI. The randomized row is explicitly labeled and auto-picked. */
 export const RERUN_MESSAGE_OPTIONS: ReadonlyArray<{ value: RerunMessageOption; label: string; hint: string }> = [
     {
         value: 'randomized',
         label: 'Randomized nudge (auto-picked random variation)',
-        hint: 'Every dispatch picks ONE message at random from the 16+ built-in variations',
+        hint: 'Every dispatch picks ONE message at random from the 20+ built-in variations',
     },
     { value: 'is-it-completed', label: 'Is it completed?', hint: 'Send a completion-check nudge' },
     { value: 'is-it-finished', label: 'Is it finished?', hint: 'Send a finish-check nudge' },
@@ -1101,9 +1108,16 @@ export const RERUN_MESSAGE_OPTIONS: ReadonlyArray<{ value: RerunMessageOption; l
     { value: 'check-pending-tasks', label: 'Check pending tasks and continue', hint: 'Send a task continuation nudge' },
     { value: 'run-verification', label: 'Run comprehensive verification', hint: 'Send a verification request nudge' },
     { value: 'confirm-pushed', label: 'Confirm committed and pushed', hint: 'Send a commit and push confirmation nudge' },
+    { value: 'fully-implemented-verified', label: 'Fully implemented and verified?', hint: 'Send an implementation and verification audit nudge' },
+    { value: 'all-tests-passed', label: 'Did all tests pass and is everything green?', hint: 'Send a test suite verification nudge' },
+    { value: 'double-check-completion', label: 'Double check completion and finalize', hint: 'Send a final review and sign-off nudge' },
+    { value: 'pending-work-left', label: 'Is there any pending work left?', hint: 'Send a pending items inquiry nudge' },
+    { value: 'confirm-status-next-steps', label: 'Confirm completion status and next steps', hint: 'Send a status and next steps nudge' },
+    { value: 'check-pending-proceed', label: 'Check pending tasks and proceed with next', hint: 'Send a sequential task progression nudge' },
+    { value: 'verify-build-cleanliness', label: 'Verify build cleanliness and finalize', hint: 'Send a build cleanliness verification nudge' },
 ];
 
-/** Built-in set of follow-up nudges used by the "randomized" option (16+ distinct actionable variations). */
+/** Built-in set of follow-up nudges used by the "randomized" option (20+ distinct actionable variations). */
 export const RERUN_RANDOM_MESSAGE_SET: ReadonlyArray<string> = [
     'Is it completed?',
     'Is it finished?',
@@ -1121,6 +1135,12 @@ export const RERUN_RANDOM_MESSAGE_SET: ReadonlyArray<string> = [
     'Check pending tasks and proceed with the next one.',
     'Verify build cleanliness and finalize.',
     'Confirm all changes are committed and pushed.',
+    'Did you finish all remaining requirements?',
+    'Is the build clean and all tests passing?',
+    'Please check if anything is pending and complete it.',
+    'Please review and finalize the implementation.',
+    'Are all changes committed and tests green?',
+    'Has everything been tested and verified to completion?',
     'Quick status check — is it done yet?',
     'Please continue where you left off and confirm when finished.',
     'Checking in: how is it going? Any blockers or pending items?',
@@ -1137,6 +1157,13 @@ export const RERUN_FIXED_MESSAGES: Record<Exclude<RerunMessageOption, 'randomize
     'check-pending-tasks': 'Can you check the pending tasks and continue?',
     'run-verification': 'Run comprehensive verification and report status.',
     'confirm-pushed': 'Confirm all changes are committed and pushed.',
+    'fully-implemented-verified': 'Has this been fully implemented and verified?',
+    'all-tests-passed': 'Did all tests pass and is everything green?',
+    'double-check-completion': 'Please double check completion and finalize.',
+    'pending-work-left': 'Is there any pending work left?',
+    'confirm-status-next-steps': 'Please confirm completion status and next steps.',
+    'check-pending-proceed': 'Check pending tasks and proceed with the next one.',
+    'verify-build-cleanliness': 'Verify build cleanliness and finalize.',
 };
 
 export const RERUN_DEFAULT_COUNT = 4;
@@ -1164,7 +1191,14 @@ export function isRerunMessageOption(value: string | null): value is RerunMessag
         value === 'verify-and-finish' ||
         value === 'check-pending-tasks' ||
         value === 'run-verification' ||
-        value === 'confirm-pushed'
+        value === 'confirm-pushed' ||
+        value === 'fully-implemented-verified' ||
+        value === 'all-tests-passed' ||
+        value === 'double-check-completion' ||
+        value === 'pending-work-left' ||
+        value === 'confirm-status-next-steps' ||
+        value === 'check-pending-proceed' ||
+        value === 'verify-build-cleanliness'
     );
 }
 
@@ -1303,14 +1337,27 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
             ...images.map((img) => img.dataUri),
         ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
         try {
-            // Canonical dispatch path — identical call handleResendPrompt makes.
-            await (sendPromptNow as any)(
-                ctx.targetInstId,
-                ctx.repoPath,
-                rewrittenPrompt,
-                ctx.convId,
-                rerunMedia.length > 0 ? rerunMedia : undefined
-            );
+            // Canonical dispatch path: First round cancels active tasks and starts immediately
+            // via sendPromptNow. Subsequent rounds are enqueued into the FIFO queue via enqueuePrompt
+            // so they execute sequentially without prematurely aborting previous rounds.
+            if (i === 0) {
+                await (sendPromptNow as any)(
+                    ctx.targetInstId,
+                    ctx.repoPath,
+                    rewrittenPrompt,
+                    ctx.convId,
+                    rerunMedia.length > 0 ? rerunMedia : undefined
+                );
+            } else {
+                await (enqueuePrompt as any)(
+                    ctx.targetInstId,
+                    ctx.repoPath,
+                    rewrittenPrompt,
+                    ctx.convId,
+                    undefined,
+                    rerunMedia.length > 0 ? rerunMedia : undefined
+                );
+            }
             result.dispatched += 1;
             try {
                 await copyPromptWithRichImages(message, undefined, undefined, rerunMedia.length > 0 ? rerunMedia : undefined);
@@ -1357,10 +1404,9 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
             });
         }
 
-        // Add an async pause (1 second) between iterations if rerunCount > 1,
-        // preventing the second iteration from immediately cancelling the first via send_prompt_now's preemption logic.
+        // Add a small async interval between iterations to pace queue placement
         if (i < requested - 1) {
-            await new Promise((r) => setTimeout(r, 1000));
+            await new Promise((r) => setTimeout(r, 300));
         }
     }
     return result;
