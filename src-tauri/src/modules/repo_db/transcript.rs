@@ -52,10 +52,77 @@ pub(crate) fn is_tool_execution_step(
     is_tool_type || is_tool_source || has_tool_call_id
 }
 
-/// Determines if a status token represents a terminal turn state (DONE, COMPLETED, IDLE, ERROR).
+/// Determines if a status token represents a successful terminal turn state (DONE, COMPLETED, IDLE).
+/// Errors and quota exhaustion are explicitly excluded so that interrupted turns are not treated as done.
 pub(crate) fn is_terminal_status(status: &str) -> bool {
-    const TERMINAL_STATUSES: &[&str] = &["done", "completed", "idle", "error"];
+    const TERMINAL_STATUSES: &[&str] = &["done", "completed", "idle"];
     status.trim().equals_any_ignore_case(TERMINAL_STATUSES)
+}
+
+/// Evaluates whether a status token represents an error, failure, or quota exhaustion.
+pub(crate) fn is_error_or_quota_status(status: &str) -> bool {
+    let s = status.trim().to_ascii_lowercase();
+    const ERROR_STATUSES: &[&str] = &[
+        "error",
+        "failed",
+        "failure",
+        "resource_exhausted",
+        "quota_exhausted",
+        "quota_depleted",
+        "exhausted",
+        "rate_limited",
+        "429",
+    ];
+    s.equals_any_ignore_case(ERROR_STATUSES)
+        || s.contains("quota")
+        || s.contains("resource_exhausted")
+        || s.contains("exhaust")
+        || s.contains("rate_limit")
+}
+
+/// Checks if text content or error payload indicates quota or resource exhaustion.
+pub(crate) fn contains_quota_or_rate_limit_error(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    lower.contains("resource_exhausted")
+        || lower.contains("quota")
+        || lower.contains("429")
+        || lower.contains("rate limit")
+        || lower.contains("rate_limit")
+        || lower.contains("exhausted")
+        || lower.contains("credit")
+}
+
+/// Evaluates whether a transcript step records an error, failure, or quota exhaustion.
+pub(crate) fn is_step_error_or_quota(val: &serde_json::Value) -> bool {
+    let s_type = val.get("type").and_then(|v| v.as_str()).unwrap_or("");
+    let s_source = val.get("source").and_then(|v| v.as_str()).unwrap_or("");
+    if is_genuine_user_input(s_type, s_source) {
+        return false;
+    }
+
+    if s_type.eq_ignore_ascii_case("ERROR") || s_type.eq_ignore_ascii_case("SYSTEM_ERROR") {
+        return true;
+    }
+
+    let s_status = val.get("status").and_then(|v| v.as_str()).unwrap_or("");
+    if is_error_or_quota_status(s_status) {
+        return true;
+    }
+
+    if let Some(err_val) = val.get("error") {
+        let err_str = err_val.to_string();
+        if contains_quota_or_rate_limit_error(&err_str) {
+            return true;
+        }
+    }
+
+    if let Some(content) = val.get("content").and_then(|v| v.as_str()) {
+        if contains_quota_or_rate_limit_error(content) {
+            return true;
+        }
+    }
+
+    false
 }
 
 /// Evaluates whether a planner response has completed without pending tool invocations.
@@ -64,8 +131,11 @@ pub(crate) fn is_planner_turn_completed(has_open_tools: bool, s_status: &str) ->
         return false;
     }
     // An empty s_status indicates an in-flight, streaming, or non-finalized turn.
-    // Only explicit terminal statuses (done, completed, idle, error) indicate turn completion.
-    !s_status.trim().is_empty() && is_terminal_status(s_status)
+    // Only explicit successful terminal statuses (done, completed, idle) indicate turn completion.
+    // Error or quota depletion is NOT treated as a completed turn.
+    !s_status.trim().is_empty()
+        && is_terminal_status(s_status)
+        && !is_error_or_quota_status(s_status)
 }
 
 /// Determines whether an entry represents genuine user input rather than internal system events.
@@ -360,12 +430,14 @@ pub(crate) fn inspect_conversation_transcript(
             is_recent_active: false,
             is_non_prompt: true,
             is_terminal_done: false,
+            is_error_or_quota: false,
         };
     }
 
     // Check if the conversation turn has completed or is waiting for user.
     // Invariant: Differentiate step-level tool completion from turn-level assistant completion.
     let mut is_completed_or_waiting = false;
+    let mut is_latest_turn_error_or_quota = false;
     let mut checked_first_meaningful = false;
     for line in lines.iter().rev().take(25) {
         if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
@@ -385,6 +457,14 @@ pub(crate) fn inspect_conversation_transcript(
 
             if !checked_first_meaningful {
                 checked_first_meaningful = true;
+
+                // Error or quota exhaustion steps must NOT be treated as terminal completion
+                if is_step_error_or_quota(&val) {
+                    is_latest_turn_error_or_quota = true;
+                    is_completed_or_waiting = false;
+                    break;
+                }
+
                 // Explicit turn-level terminal completion: Planner/Model response with ZERO tool calls
                 if s_type == "PLANNER_RESPONSE" || s_source == "MODEL" {
                     let has_tool_calls = val
@@ -517,6 +597,7 @@ pub(crate) fn inspect_conversation_transcript(
     }
 
     let mut is_terminal_done = false;
+    let mut checked_terminal_meaningful = false;
 
     // DEEP SCAN: Inspect up to 25 lines in reverse order to bypass telemetry noise
     for line in lines.iter().rev().take(25) {
@@ -541,9 +622,24 @@ pub(crate) fn inspect_conversation_transcript(
                 .unwrap_or(step_count as u64);
             let s_status = val.get("status").and_then(|v| v.as_str()).unwrap_or("");
 
+            if !checked_terminal_meaningful {
+                checked_terminal_meaningful = true;
+                if is_step_error_or_quota(&val) {
+                    is_latest_turn_error_or_quota = true;
+                    is_terminal_done = false;
+                    if latest_step_summary.is_none() {
+                        latest_step_summary = Some(format!(
+                            "Step {} · Interrupted (Quota/Error: {})",
+                            step_idx, s_status
+                        ));
+                    }
+                    break;
+                }
+            }
+
             // Inspect for terminal completion:
             // Only if PLANNER_RESPONSE (or non-tool MODEL text output) has ZERO tool calls
-            // and explicit terminal status (DONE, COMPLETED, IDLE, ERROR), set is_terminal_done = true.
+            // and explicit successful terminal status (DONE, COMPLETED, IDLE), set is_terminal_done = true.
             // If has_open_tools is true (the model called tools), explicitly ensure is_terminal_done = false and break!
             if s_type == "PLANNER_RESPONSE" || s_source == "MODEL" {
                 let tool_calls = val.get("tool_calls").and_then(|tc| tc.as_array());
@@ -589,7 +685,8 @@ pub(crate) fn inspect_conversation_transcript(
                     }
                     break;
                 } else {
-                    let is_explicit_done = is_terminal_status(s_status);
+                    let is_explicit_done =
+                        is_terminal_status(s_status) && !is_error_or_quota_status(s_status);
                     // Guard: Intermediate planner turns without tool calls must NOT set is_terminal_done = true
                     // when subsequent turns or steps exist in the transcript.
                     // Only flag is_terminal_done if this step is at the very tail of the transcript.
@@ -729,7 +826,8 @@ pub(crate) fn inspect_conversation_transcript(
 
     let has_identified_prompt = has_real_user_prompt || is_subagent;
     let is_non_prompt = !has_identified_prompt;
-    let terminal_done = is_terminal_done || is_completed_or_waiting;
+    let terminal_done =
+        !is_latest_turn_error_or_quota && (is_terminal_done || is_completed_or_waiting);
     let effective_recent_active = if terminal_done {
         false
     } else {
@@ -747,6 +845,7 @@ pub(crate) fn inspect_conversation_transcript(
         is_recent_active: effective_recent_active,
         is_non_prompt,
         is_terminal_done: terminal_done,
+        is_error_or_quota: is_latest_turn_error_or_quota,
     }
 }
 
@@ -1041,10 +1140,25 @@ mod tests {
         assert!(is_terminal_status("completed"));
         assert!(is_terminal_status("IDLE"));
         assert!(is_terminal_status("idle"));
-        assert!(is_terminal_status("ERROR"));
-        assert!(is_terminal_status("error"));
+        assert!(!is_terminal_status("ERROR"));
+        assert!(!is_terminal_status("error"));
         assert!(!is_terminal_status("RUNNING"));
         assert!(!is_terminal_status(""));
+    }
+
+    #[test]
+    fn test_is_error_or_quota_status() {
+        assert!(is_error_or_quota_status("ERROR"));
+        assert!(is_error_or_quota_status("error"));
+        assert!(is_error_or_quota_status("failed"));
+        assert!(is_error_or_quota_status("RESOURCE_EXHAUSTED"));
+        assert!(is_error_or_quota_status("resource_exhausted"));
+        assert!(is_error_or_quota_status("quota_depleted"));
+        assert!(is_error_or_quota_status("429"));
+        assert!(!is_error_or_quota_status("done"));
+        assert!(!is_error_or_quota_status("completed"));
+        assert!(!is_error_or_quota_status("idle"));
+        assert!(!is_error_or_quota_status("running"));
     }
 
     #[test]
@@ -1053,6 +1167,31 @@ mod tests {
         assert!(!is_planner_turn_completed(false, ""));
         assert!(!is_planner_turn_completed(true, "DONE"));
         assert!(!is_planner_turn_completed(false, "RUNNING"));
+        assert!(!is_planner_turn_completed(false, "ERROR"));
+    }
+
+    #[test]
+    fn test_is_step_error_or_quota() {
+        let err_step = serde_json::json!({
+            "type": "PLANNER_RESPONSE",
+            "status": "error",
+            "content": "429 Resource Exhausted: Quota limit exceeded"
+        });
+        assert!(is_step_error_or_quota(&err_step));
+
+        let ok_step = serde_json::json!({
+            "type": "PLANNER_RESPONSE",
+            "status": "done",
+            "content": "All items completed successfully."
+        });
+        assert!(!is_step_error_or_quota(&ok_step));
+
+        let user_step = serde_json::json!({
+            "type": "USER_INPUT",
+            "source": "USER",
+            "content": "What is my quota limit?"
+        });
+        assert!(!is_step_error_or_quota(&user_step));
     }
 
     #[test]

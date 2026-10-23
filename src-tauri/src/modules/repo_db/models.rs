@@ -328,6 +328,7 @@ pub struct TranscriptInspection {
     pub is_recent_active: bool,
     pub is_non_prompt: bool,
     pub is_terminal_done: bool,
+    pub is_error_or_quota: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

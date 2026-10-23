@@ -2,18 +2,19 @@
 Task ID: `Imp-717`
 Sequence: 218
 Step: 303
-Status: COMPLETED
+Status: IN_PROGRESS
 
 ## Scope
 - Set default `rerunMessageOption` to `'randomized'` across DetailHeader, context menus, and modals.
-- Elevate default rerun count to 4 (range 1–8).
-- Expand actionable variation set to 16+ distinct nudges in `RERUN_RANDOM_MESSAGE_SET` and add extended options to `RERUN_MESSAGE_OPTIONS`.
+- Expand actionable variation set to 25+ distinct nudges in `RERUN_RANDOM_MESSAGE_SET` and add extended options to `RERUN_MESSAGE_OPTIONS`.
+- Ensure clicking Rerun automatically picks a random nudge from the bunch ("Is it finished?", "Is it released?", "Is it completed?", "Please verify and finish the remaining items.", "Did all tests pass and is everything green?", etc.).
+- Fix original prompt extraction in `DetailHeader.tsx`, `PromptTreeViewModal.tsx`, and `verificationTemplates.ts` so original user prompt is losslessly extracted without recursive header nesting or accidental clearing.
 - Persist user rerun preference in `localStorage` under `agm:prompt-tree:rerun-option` and `agm:prompt-tree:rerun-count`.
-- Ensure DetailHeader modal/popover, tree context menu, and keyboard shortcut 'R' all pick from the randomized set when `rerunMessageOption === 'randomized'`.
+- Update unit tests in `rerunActions.test.ts`.
 
-## Completed Verifications
-- `RERUN_DEFAULT_MESSAGE_OPTION`: `'randomized'`
-- `RERUN_DEFAULT_COUNT`: `4` (min `1`, max `8`)
-- `RERUN_RANDOM_MESSAGE_SET`: Contains 20 items (including all 16 specified actionable prompts)
-- `RERUN_MESSAGE_OPTIONS`: Expanded with 'run-verification' and 'confirm-pushed'
-- `rerunActions.test.ts`: Verified 16+ items and random pick validation.
+## Files Touched
+- `src/components/instances/PromptTreeView/usePromptTreePromptActions.ts`
+- `src/components/instances/PromptTreeView/DetailHeader.tsx`
+- `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx`
+- `src/components/instances/PromptTreeView/verificationTemplates.ts`
+- `src/components/instances/PromptTreeView/__tests__/rerunActions.test.ts`

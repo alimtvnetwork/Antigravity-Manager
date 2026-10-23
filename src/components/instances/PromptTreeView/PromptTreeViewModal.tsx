@@ -12,7 +12,7 @@ import type { PromptTreeViewModalProps } from './types';
 import { usePromptTreeState } from './usePromptTreeState';
 import { usePromptTreeData, invalidatePromptTreeCache } from './usePromptTreeData';
 import { usePromptTreeCoreActions } from './usePromptTreeCoreActions';
-import { usePromptTreePromptActions, dispatchRerunMessages, loadPersistedRerunCount, loadPersistedRerunMessageOption, isRerunMessageOption, type RerunMessageOption } from './usePromptTreePromptActions';
+import { usePromptTreePromptActions, dispatchRerunMessages, loadPersistedRerunCount, loadPersistedRerunMessageOption } from './usePromptTreePromptActions';
 import { isGhostConversation, isStaleOrEmptyConversation, getConversationStatus } from './conversationGuards';
 import { classifyPromptTier } from './tierClassification';
 import { ModalHeader } from './ModalHeader';
@@ -359,21 +359,47 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         return null;
     };
 
-    const handleRerunConversation = (convoId: string, nudgeType: string) => {
+    const handleRerunConversation = (convoId: string, nudgeType?: string) => {
         const found = findStripConversation(convoId);
-        const targetInstId = found?.conv?.instance_id || found?.proj?.instance_id || selectedProject?.instance_id || instanceId || 'default';
-        const targetRepoPath = found?.proj?.repo_path || selectedProject?.repo_path || '';
-        const msgOption: RerunMessageOption = isRerunMessageOption(nudgeType)
-            ? nudgeType
-            : loadPersistedRerunMessageOption();
+        const conv = (selectedConversation?.conversation_id === convoId ? selectedConversation : null) || found?.conv;
+        const proj = found?.proj || selectedProject;
+        const targetInstId = conv?.instance_id || proj?.instance_id || instanceId || 'default';
+        const targetRepoPath = proj?.repo_path || (conv as { repo_path?: string })?.repo_path || '.';
         const count = loadPersistedRerunCount();
-        const originalPrompt = found?.conv
-            ? (found.conv.full_prompt_text || found.conv.prompt_preview_200w || found.conv.title)
-            : undefined;
-        const convMedia = Array.from(new Set([
-            ...(found?.conv?.media_paths || []),
-            ...(found?.conv?.media_thumbnails || []),
-            ...(found?.conv?.prompts?.flatMap((p) => p.media_paths || []) || []),
+
+        // Extract prompt text losslessly
+        let originalPrompt = '';
+        if (selectedConversation?.conversation_id === convoId && (editedPromptText?.trim() || activePromptText?.trim())) {
+            originalPrompt = (editedPromptText?.trim() || activePromptText?.trim()) ?? '';
+        }
+        if (!originalPrompt && conv) {
+            if (conv.selected_turn_number != null && conv.prompts && conv.prompts.length > 0) {
+                const matchedTurn = conv.prompts.find((p) => p.turn_number === conv.selected_turn_number);
+                if (matchedTurn?.prompt_text?.trim()) {
+                    originalPrompt = matchedTurn.prompt_text.trim();
+                }
+            }
+            if (!originalPrompt && conv.prompts && conv.prompts.length > 0) {
+                const runningTurn = conv.prompts.find((p) => Boolean(p.is_running) && Boolean(p.prompt_text?.trim()));
+                if (runningTurn?.prompt_text?.trim()) {
+                    originalPrompt = runningTurn.prompt_text.trim();
+                } else {
+                    const lastTurnWithText = [...conv.prompts].reverse().find((p) => Boolean(p.prompt_text?.trim()));
+                    if (lastTurnWithText?.prompt_text?.trim()) {
+                        originalPrompt = lastTurnWithText.prompt_text.trim();
+                    }
+                }
+            }
+            if (!originalPrompt) {
+                originalPrompt = (conv.full_prompt_text || conv.prompt_preview_200w || conv.title || '').trim();
+            }
+        }
+
+        const convMedia: string[] = Array.from(new Set([
+            ...(conv?.media_paths || []),
+            ...(conv?.media_thumbnails || []),
+            ...(conv?.prompts?.flatMap((p) => p.media_paths || []) || []),
+            ...(conv?.sub_runs?.flatMap((s) => s.media_paths || []) || []),
         ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
 
         setActionMsg(`Dispatching rerun nudge (×${count})...`);
@@ -382,7 +408,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             repoPath: targetRepoPath,
             convId: convoId,
             count,
-            messageOption: msgOption,
+            messageOption: (nudgeType as any) || 'randomized',
             originalPrompt,
             source: 'PromptTreeViewModal.onRerunConversation',
             mediaPaths: convMedia.length > 0 ? convMedia : undefined,

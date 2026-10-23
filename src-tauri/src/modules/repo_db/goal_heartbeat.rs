@@ -371,34 +371,51 @@ pub fn stop_prompt_goal_workers_for_instance(instance_id: &str, data_dir: &str) 
         }
     }
 
-    // Retire active prompts for this instance to 'completed' in repo_prompts.db
+    // Preserve stopped/interrupted active prompts for this instance as 'backed_up' in repo_prompts.db
+    // Justification: stopped or interrupted prompts must be preserved as 'backed_up'
+    // for subsequent restore instead of claiming fake completion.
     let now = Utc::now().timestamp();
     if let Ok(conn) = super::schema::connect_db() {
         let is_default = instance_id == "default" || instance_id == "__default__";
         let update_res = if is_default {
             conn.execute(
-                "UPDATE active_prompts SET status = 'completed', updated_at = ?1 \
+                "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 \
                  WHERE (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '') \
                    AND status IN ('running', 'in_flight')",
                 rusqlite::params![now],
             )
         } else if instance_id == "all" {
             conn.execute(
-                "UPDATE active_prompts SET status = 'completed', updated_at = ?1 \
+                "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 \
                  WHERE status IN ('running', 'in_flight')",
                 rusqlite::params![now],
             )
         } else {
             conn.execute(
-                "UPDATE active_prompts SET status = 'completed', updated_at = ?1 \
+                "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 \
                  WHERE instance_id = ?2 AND status IN ('running', 'in_flight')",
                 rusqlite::params![now, instance_id],
             )
         };
-        // Justification: retiring active prompts is auxiliary to worker process termination
+        match &update_res {
+            Ok(count) if *count > 0 => {
+                crate::modules::logger::log_info(&format!(
+                    "[RepoDB] Preserved {} running/in_flight prompt(s) as 'backed_up' for instance '{}' upon stopping goal workers (ready for restore)",
+                    count, instance_id
+                ));
+            }
+            Ok(_) => {}
+            Err(e) => {
+                crate::modules::logger::log_warn(&format!(
+                    "[RepoDB] Failed to preserve active_prompts as 'backed_up' for instance '{}': {}",
+                    instance_id, e
+                ));
+            }
+        }
+        // Justification: preserving active prompts as backed_up is auxiliary to worker process termination
         crate::error::record_ignored(
             update_res,
-            "retire active_prompts in stop_prompt_goal_workers_for_instance",
+            "preserve active_prompts as backed_up in stop_prompt_goal_workers_for_instance",
         );
     }
 

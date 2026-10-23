@@ -432,27 +432,24 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
     let is_all_or_default =
         instance_id == "all" || instance_id == "__default__" || instance_id == "default";
 
-    // Transition in-flight and active prompts in active_prompts to 'backed_up' before switch (scoped to target instance).
-    // RC-1: 'dispatched' rows transition at ANY age. A row still in
-    // 'dispatched' was never marked 'completed', so the old 120s recency
-    // window silently dropped long-running prompts from every restore query.
-    // Also include 'pending', 'queued', and 'blocked' prompts so quota exhaustion
-    // or auto-switching never drops prompts that were waiting to be executed.
+    // Transition all uncompleted prompts in active_prompts to 'backed_up' before switch (scoped to target instance).
+    // Incomplete-prompt sweep: transition ALL uncompleted prompts (WHERE status NOT IN ('completed', 'succeeded', 'backed_up'))
+    // so long-running, pending, or interrupted prompts are never dropped when switching or when quota expires.
     let transitioned = if instance_id == "all" {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched', 'pending', 'queued', 'blocked')",
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status NOT IN ('completed', 'succeeded', 'backed_up')",
             params![now],
         )
         .unwrap_or(0)
     } else if is_all_or_default {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched', 'pending', 'queued', 'blocked') AND (instance_id IN ('default', '__default__', '') OR instance_id IS NULL)",
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status NOT IN ('completed', 'succeeded', 'backed_up') AND (instance_id IN ('default', '__default__', '') OR instance_id IS NULL)",
             params![now],
         )
         .unwrap_or(0)
     } else {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status IN ('running', 'in_flight', 'dispatched', 'pending', 'queued', 'blocked') AND instance_id = ?2",
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status NOT IN ('completed', 'succeeded', 'backed_up') AND instance_id = ?2",
             params![now, instance_id],
         )
         .unwrap_or(0)
@@ -467,12 +464,8 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                             || p.instance_id == "default"
                             || p.instance_id == "__default__"))
                     || p.instance_id == instance_id;
-                let is_inflight_status = p.status == "running"
-                    || p.status == "in_flight"
-                    || p.status == "dispatched"
-                    || p.status == "pending"
-                    || p.status == "queued"
-                    || p.status == "blocked";
+                let is_inflight_status =
+                    p.status != "completed" && p.status != "succeeded" && p.status != "backed_up";
                 if is_inflight_status && matches_inst {
                     p.status = "backed_up".to_string();
                     p.updated_at = now;
@@ -887,7 +880,7 @@ pub fn sweep_incomplete_prompts_for_instance(instance_id: &str) -> Result<usize,
         let changed = conn
             .execute(
                 "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1
-                 WHERE id = ?2 AND status NOT IN ('completed', 'succeeded')",
+                 WHERE id = ?2 AND status NOT IN ('completed', 'succeeded', 'backed_up')",
                 params![now, id],
             )
             .map_err(|e| format!("Failed to sweep incomplete prompt '{}': {}", id, e))?;

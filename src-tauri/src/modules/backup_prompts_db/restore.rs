@@ -2,6 +2,7 @@ use crate::modules::repo_db::{self, ActivePrompt};
 use chrono::Utc;
 use rusqlite::{params, Connection};
 use std::fs;
+use std::path::Path;
 
 use super::*;
 
@@ -118,16 +119,6 @@ impl RestoreOutcome {
 }
 
 /// Restore running prompts: re-inserts them into repo_db and updates restoration flags.
-///
-/// Scoping contract:
-/// - `instance_id = Some(id)`: strictly scoped to that instance. The `default`
-///   scope also matches legacy rows with NULL/empty `instance_id`.
-/// - `instance_id = None`: restores ALL unrestored backups across every instance
-///   in FIFO order, re-injecting each prompt under its own recorded instance id.
-///   This is the historical behavior the CLI relied on before per-instance
-///   scoping was introduced; strict scoping broke post-switch restores because
-///   backups are recorded under the instance that was active at backup time,
-///   which differs from the active instance at restore time.
 pub fn restore_running_prompts_for_instance(
     instance_id: Option<&str>,
     keep_backup: bool,
@@ -146,25 +137,63 @@ pub fn restore_running_prompts_for_instance_with_outcome(
     keep_backup: bool,
     custom_file: Option<&str>,
 ) -> Result<(Vec<PromptBackupRecord>, RestoreOutcome), String> {
-    // Regression guard: restore must never run on the resend path.
-    // `resend_queued_prompts_for_instance` runs its own single dispatch pass;
-    // a nested restore would dispatch every prompt a second time.
-    let resend_active = crate::modules::repo_db::backup::RESEND_IN_PROGRESS.with(|f| f.get());
-    if resend_active {
+    let is_resend_active = crate::modules::repo_db::backup::RESEND_IN_PROGRESS.with(|f| f.get());
+    if is_resend_active {
         return Err("restore_running_prompts_for_instance must not run while resend_queued_prompts_for_instance is active (double-dispatch guard)".to_string());
     }
 
     let target_inst = instance_id.unwrap_or("default");
-    // None means "restore everything": no instance predicate at all.
-    let unscoped = instance_id.is_none();
+    let is_unscoped = instance_id.is_none();
     let conn = connect_backup_db(custom_file)?;
     let now = Utc::now().timestamp();
     let mut outcome = RestoreOutcome::default();
 
-    // Query unrestored prompts: unscoped restores every instance (FIFO); otherwise
-    // scoped strictly to the target instance.
     let is_target_default = target_inst == "default" || target_inst == "__default__";
-    let (query, update_query) = if unscoped {
+    let (query, update_query) = build_restore_queries(is_unscoped, is_target_default);
+    let records =
+        fetch_unrestored_records(&conn, query, is_unscoped, is_target_default, target_inst)?;
+
+    repo_db::reset_dispatched_prompts_cache();
+    let live_conn = acquire_live_conn_best_effort();
+    reinject_records_into_active(&records, live_conn.as_ref(), target_inst, now, &mut outcome);
+
+    let has_records = !records.is_empty();
+    if !keep_backup && has_records {
+        mark_backups_restored(
+            &conn,
+            update_query,
+            is_unscoped,
+            is_target_default,
+            target_inst,
+            now,
+        );
+    }
+
+    dispatch_restored_commands(is_unscoped, target_inst, &mut outcome);
+    rearm_restored_goals(&records, target_inst);
+
+    Ok((records, outcome))
+}
+
+fn acquire_live_conn_best_effort() -> Option<Connection> {
+    match repo_db::connect_db() {
+        Ok(c) => Some(c),
+        Err(e) => {
+            // Justification: probing live status is best-effort dedup; proceed without live dedup if repo_db unavailable
+            crate::error::record_ignored(
+                Err::<(), _>(format!("connect repo_db for live probe: {e}")),
+                "connect repo_db for live probe",
+            );
+            None
+        }
+    }
+}
+
+fn build_restore_queries(
+    is_unscoped: bool,
+    is_target_default: bool,
+) -> (&'static str, &'static str) {
+    if is_unscoped {
         (
             "SELECT id, backup_batch_id, prompt_id, project_name, project_path, project_id,
                     conversation_id, conversation_name, sequence_id, prompt_text, has_images,
@@ -196,116 +225,136 @@ pub fn restore_running_prompts_for_instance_with_outcome(
              ORDER BY created_at ASC, id ASC",
             "UPDATE prompt_backups SET is_restored = 1, restored_at = ?1 WHERE is_restored = 0 AND instance_id = ?2",
         )
-    };
+    }
+}
 
+fn fetch_unrestored_records(
+    conn: &Connection,
+    query: &str,
+    is_unscoped: bool,
+    is_target_default: bool,
+    target_inst: &str,
+) -> Result<Vec<PromptBackupRecord>, String> {
     let mut stmt = conn
         .prepare(query)
         .map_err(|e| format!("Failed to prepare restore query: {}", e))?;
 
-    let records: Vec<PromptBackupRecord> = if unscoped || is_target_default {
+    if is_unscoped || is_target_default {
         stmt.query_map([], |row| parse_prompt_record(row))
             .map_err(|e| format!("Failed to query unrestored prompts: {}", e))?
-            .flatten()
-            .collect()
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Failed to collect unrestored prompts: {}", e))
     } else {
         stmt.query_map(params![target_inst], |row| parse_prompt_record(row))
             .map_err(|e| format!("Failed to query unrestored prompts: {}", e))?
-            .flatten()
-            .collect()
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Failed to collect unrestored prompts: {}", e))
+    }
+}
+
+fn reinject_records_into_active(
+    records: &[PromptBackupRecord],
+    live_conn: Option<&Connection>,
+    target_inst: &str,
+    now: i64,
+    outcome: &mut RestoreOutcome,
+) {
+    for rec in records {
+        reinject_single_record(rec, live_conn, target_inst, now, outcome);
+    }
+}
+
+fn reinject_single_record(
+    rec: &PromptBackupRecord,
+    live_conn: Option<&Connection>,
+    target_inst: &str,
+    now: i64,
+    outcome: &mut RestoreOutcome,
+) {
+    let eff_inst = rec.instance_id.as_deref().unwrap_or(target_inst);
+    let restored_status = prompt_status_after_restore(&rec.status);
+    crate::modules::logger::log_info(&format!(
+        "[PROMPT_RESTORE] Restoring prompt {} for instance '{}' (has_images: {}) -> status: {}",
+        rec.prompt_id, eff_inst, rec.has_images, restored_status
+    ));
+
+    let active_p = ActivePrompt {
+        id: rec.prompt_id.clone(),
+        project_id: rec.project_id.clone(),
+        instance_id: eff_inst.to_string(),
+        repo_path: rec.project_path.clone(),
+        prompt_content: rec.prompt_text.clone(),
+        model: Some("gemini-3.8-flash-high".to_string()),
+        session_id: Some(rec.conversation_id.clone()),
+        status: restored_status.to_string(),
+        created_at: if rec.created_at > 0 {
+            rec.created_at
+        } else {
+            now
+        },
+        updated_at: now,
+        image_payload: rec.images_payload.clone(),
     };
 
-    // Reset dispatched prompts cache to allow restored prompts to execute post-switch
-    repo_db::reset_dispatched_prompts_cache();
-
-    // Re-inject into repo_db active_prompts table if records exist in backup DB.
-    // Queued prompts stay queued. Anything that was running is marked backed_up so
-    // dispatch sends that prompt again and leaves the queue untouched.
-    // RC-6: probe live statuses first — a row already `running`/`completed`
-    // must never be overwritten by the INSERT OR REPLACE in save_or_requeue_prompt.
-    let live_conn = repo_db::connect_db().ok();
-    for rec in &records {
-        let eff_inst = rec.instance_id.as_deref().unwrap_or(target_inst);
-        let restored_status = prompt_status_after_restore(&rec.status);
+    let live_status = live_conn
+        .and_then(|c| live_prompt_status(c, &rec.prompt_id, &rec.project_path, &rec.prompt_text));
+    let has_live_final_status = is_live_status_preserved(live_status.as_deref());
+    if has_live_final_status {
+        outcome.record_skipped_live();
         crate::modules::logger::log_info(&format!(
-            "[PROMPT_RESTORE] Restoring prompt {} for instance '{}' (has_images: {}) -> status: {}",
-            rec.prompt_id, eff_inst, rec.has_images, restored_status
+            "[BackupDB] Restore preserving live prompt {} on {} (live status: {})",
+            rec.prompt_id,
+            eff_inst,
+            live_status.as_deref().unwrap_or("unknown")
         ));
-        crate::modules::logger::log_info(&format!(
-            "[BackupDB] Restore prompt {} on {}: saved '{}' -> '{}'",
-            rec.prompt_id, eff_inst, rec.status, restored_status
-        ));
-        let active_p = ActivePrompt {
-            id: rec.prompt_id.clone(),
-            project_id: rec.project_id.clone(),
-            instance_id: eff_inst.to_string(),
-            repo_path: rec.project_path.clone(),
-            prompt_content: rec.prompt_text.clone(),
-            model: Some("gemini-3.8-flash-high".to_string()),
-            session_id: Some(rec.conversation_id.clone()),
-            status: restored_status.to_string(),
-            created_at: if rec.created_at > 0 {
-                rec.created_at
-            } else {
-                now
-            },
-            updated_at: now,
-            image_payload: rec.images_payload.clone(),
-        };
-        let live_status = live_conn.as_ref().and_then(|c| {
-            live_prompt_status(c, &rec.prompt_id, &rec.project_path, &rec.prompt_text)
-        });
-        let has_live_final_status = is_live_status_preserved(live_status.as_deref());
-        if has_live_final_status {
-            outcome.record_skipped_live();
-            crate::modules::logger::log_info(&format!(
-                "[BackupDB] Restore preserving live prompt {} on {} (live status: {})",
-                rec.prompt_id,
-                eff_inst,
-                live_status.as_deref().unwrap_or("unknown")
-            ));
-            continue;
-        }
-        match repo_db::save_or_requeue_prompt(&active_p) {
-            Ok(()) => outcome.record_restored(),
-            Err(e) => {
-                outcome.record_failed(Some(e.clone()));
-                crate::modules::logger::log_error(&format!(
-                    "[BackupDB] Restore failed to re-inject prompt {} on {}: {}",
-                    rec.prompt_id, eff_inst, e
-                ));
-            }
-        }
+        return;
     }
 
-    if !keep_backup && !records.is_empty() {
-        if unscoped || is_target_default {
-            // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
-            crate::error::record_ignored(conn.execute(update_query, params![now]), "db execute");
-        } else {
-            // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
-            crate::error::record_ignored(
-                conn.execute(update_query, params![now, target_inst]),
-                "db execute",
-            );
+    match repo_db::save_or_requeue_prompt(&active_p) {
+        Ok(()) => outcome.record_restored(),
+        Err(e) => {
+            outcome.record_failed(Some(e.clone()));
+            crate::modules::logger::log_error(&format!(
+                "[BackupDB] Restore failed to re-inject prompt {} on {}: {}",
+                rec.prompt_id, eff_inst, e
+            ));
         }
+    }
+}
+
+fn mark_backups_restored(
+    conn: &Connection,
+    update_query: &str,
+    is_unscoped: bool,
+    is_target_default: bool,
+    target_inst: &str,
+    now: i64,
+) {
+    if is_unscoped || is_target_default {
         // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
-        crate::error::record_ignored(conn.execute(
+        crate::error::record_ignored(conn.execute(update_query, params![now]), "db execute");
+    } else {
+        // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+        crate::error::record_ignored(
+            conn.execute(update_query, params![now, target_inst]),
+            "db execute",
+        );
+    }
+    // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
+    crate::error::record_ignored(
+        conn.execute(
             "UPDATE backup_batches SET is_fully_restored = 1 WHERE id IN (
                 SELECT backup_batch_id FROM prompt_backups GROUP BY backup_batch_id HAVING min(is_restored) = 1
              )",
             [],
-        ), "db execute");
-    }
+        ),
+        "db execute",
+    );
+}
 
-    // Automatically trigger resend and execute restored prompts via CLI.
-    // Unscoped restores fan out across every instance the backups belong to;
-    // scoped restores stay on the target instance.
-    // RC-3: the dispatch pass is no longer swallowed — the real sent count and
-    // any failure are returned to the caller as outcome data, not silence.
-    match repo_db::resend_running_commands_for_instance(
-        if unscoped { None } else { Some(target_inst) },
-        20,
-    ) {
+fn dispatch_restored_commands(is_unscoped: bool, target_inst: &str, outcome: &mut RestoreOutcome) {
+    let target_scope = if is_unscoped { None } else { Some(target_inst) };
+    match repo_db::resend_running_commands_for_instance(target_scope, 20) {
         Ok(sent) => outcome.record_dispatched(sent.len()),
         Err(e) => {
             outcome.record_failed(Some(e.clone()));
@@ -315,25 +364,23 @@ pub fn restore_running_prompts_for_instance_with_outcome(
             ));
         }
     }
-    // Re-arm prompt-goal heartbeats for every instance that received restored prompts.
-    {
-        use std::collections::HashSet;
-        let mut goal_instances: HashSet<&str> = HashSet::new();
-        for rec in &records {
-            goal_instances.insert(rec.instance_id.as_deref().unwrap_or(target_inst));
-        }
-        if goal_instances.is_empty() {
+}
+
+fn rearm_restored_goals(records: &[PromptBackupRecord], target_inst: &str) {
+    use std::collections::HashSet;
+    let mut goal_instances: HashSet<&str> = HashSet::new();
+    for rec in records {
+        goal_instances.insert(rec.instance_id.as_deref().unwrap_or(target_inst));
+    }
+    if goal_instances.is_empty() {
+        // Justification: non-Result return value intentionally discarded — no error channel to track
+        let _ = repo_db::ensure_prompt_goals_running_for_instance(target_inst);
+    } else {
+        for inst in goal_instances {
             // Justification: non-Result return value intentionally discarded — no error channel to track
-            let _ = repo_db::ensure_prompt_goals_running_for_instance(target_inst);
-        } else {
-            for inst in goal_instances {
-                // Justification: non-Result return value intentionally discarded — no error channel to track
-                let _ = repo_db::ensure_prompt_goals_running_for_instance(inst);
-            }
+            let _ = repo_db::ensure_prompt_goals_running_for_instance(inst);
         }
     }
-
-    Ok((records, outcome))
 }
 
 /// Queued stays queued. A running, dispatched, or already backed-up prompt is
@@ -354,21 +401,34 @@ fn live_prompt_status(
     repo_path: &str,
     prompt_text: &str,
 ) -> Option<String> {
-    if let Ok(st) = conn.query_row(
+    match conn.query_row(
         "SELECT status FROM active_prompts WHERE id = ?1",
         params![prompt_id],
         |row| row.get::<_, String>(0),
     ) {
-        return Some(st);
+        Ok(st) => return Some(st),
+        Err(rusqlite::Error::QueryReturnedNoRows) => {}
+        Err(e) => {
+            // Justification: probing live status by prompt id is best-effort; non-existence/read errors fall back to signature probe
+            crate::error::record_ignored(Err(e), "query live_prompt_status by id");
+        }
     }
+
     let norm_slash = repo_path.trim().replace('\\', "/");
     let norm_bslash = repo_path.trim().replace('/', "\\");
-    conn.query_row(
+    match conn.query_row(
         "SELECT status FROM active_prompts WHERE (repo_path = ?1 OR repo_path = ?2 OR repo_path = ?3) AND prompt_content = ?4 LIMIT 1",
         params![repo_path, norm_slash, norm_bslash, prompt_text],
         |row| row.get::<_, String>(0),
-    )
-    .ok()
+    ) {
+        Ok(st) => Some(st),
+        Err(rusqlite::Error::QueryReturnedNoRows) => None,
+        Err(e) => {
+            // Justification: probing live status by signature is best-effort; fallback to None when row missing or query fails
+            crate::error::record_ignored(Err(e), "query live_prompt_status by signature");
+            None
+        }
+    }
 }
 
 /// RC-6: a live row that is already `completed` must never be
@@ -388,6 +448,14 @@ pub fn count_unrestored_prompts_for_other_instances(
 ) -> Result<usize, String> {
     let conn = connect_backup_db(custom_file)?;
     let is_target_default = instance_id == "default" || instance_id == "__default__";
+    query_other_unrestored_count(&conn, instance_id, is_target_default)
+}
+
+fn query_other_unrestored_count(
+    conn: &Connection,
+    instance_id: &str,
+    is_target_default: bool,
+) -> Result<usize, String> {
     let count: i64 = if is_target_default {
         conn.query_row(
             "SELECT COUNT(*) FROM prompt_backups
@@ -427,14 +495,23 @@ pub fn restore_running_prompts_scoped_with_fallback_with_outcome(
         keep_backup,
         custom_file,
     )?;
-    let has_restored = !records.is_empty();
-    if has_restored {
+    let has_records = !records.is_empty();
+    if has_records {
         return Ok((records, outcome));
     }
+    fallback_unscoped_if_orphaned(instance_id, keep_backup, custom_file, (records, outcome))
+}
+
+fn fallback_unscoped_if_orphaned(
+    instance_id: &str,
+    keep_backup: bool,
+    custom_file: Option<&str>,
+    empty_result: (Vec<PromptBackupRecord>, RestoreOutcome),
+) -> Result<(Vec<PromptBackupRecord>, RestoreOutcome), String> {
     let other_count = count_unrestored_prompts_for_other_instances(instance_id, custom_file)?;
     let has_orphaned = other_count > 0;
     if !has_orphaned {
-        return Ok((records, outcome));
+        return Ok(empty_result);
     }
     crate::modules::logger::log_info(&format!(
         "[BackupDB] Scoped restore for instance '{}' found nothing; {} unrestored record(s) exist under other instances — falling back to unscoped restore",
@@ -463,23 +540,11 @@ pub fn restore_running_prompts_scoped_with_fallback(
 /// Query storage information of the split database
 pub fn get_storage_info(custom_file: Option<&str>) -> Result<serde_json::Value, String> {
     let db_path = get_backup_prompts_db_path(custom_file)?;
-    let size_bytes = fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
+    let size_bytes = get_db_file_size(&db_path);
     let size_kb = (size_bytes as f64) / 1024.0;
 
     let conn = connect_backup_db(custom_file)?;
-    let total_records: usize = conn
-        .query_row("SELECT COUNT(*) FROM prompt_backups", [], |r| r.get(0))
-        .unwrap_or(0);
-    let restored_records: usize = conn
-        .query_row(
-            "SELECT COUNT(*) FROM prompt_backups WHERE is_restored = 1",
-            [],
-            |r| r.get(0),
-        )
-        .unwrap_or(0);
-    let batches_count: usize = conn
-        .query_row("SELECT COUNT(*) FROM backup_batches", [], |r| r.get(0))
-        .unwrap_or(0);
+    let (total_records, restored_records, batches_count) = query_storage_counts(&conn)?;
 
     Ok(serde_json::json!({
         "database_path": db_path.to_string_lossy(),
@@ -491,4 +556,33 @@ pub fn get_storage_info(custom_file: Option<&str>) -> Result<serde_json::Value, 
         "total_batches": batches_count,
         "retention_days": 1,
     }))
+}
+
+fn get_db_file_size(db_path: &Path) -> u64 {
+    match fs::metadata(db_path) {
+        Ok(m) => m.len(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => 0,
+        Err(e) => {
+            // Justification: metadata lookup for db path is non-fatal for storage stats; defaults to 0
+            crate::error::record_ignored(Err(e), "fs::metadata backup db");
+            0
+        }
+    }
+}
+
+fn query_storage_counts(conn: &Connection) -> Result<(usize, usize, usize), String> {
+    let total_records: usize = conn
+        .query_row("SELECT COUNT(*) FROM prompt_backups", [], |r| r.get(0))
+        .map_err(|e| format!("Failed to count prompt_backups: {}", e))?;
+    let restored_records: usize = conn
+        .query_row(
+            "SELECT COUNT(*) FROM prompt_backups WHERE is_restored = 1",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|e| format!("Failed to count restored prompt_backups: {}", e))?;
+    let batches_count: usize = conn
+        .query_row("SELECT COUNT(*) FROM backup_batches", [], |r| r.get(0))
+        .map_err(|e| format!("Failed to count backup_batches: {}", e))?;
+    Ok((total_records, restored_records, batches_count))
 }

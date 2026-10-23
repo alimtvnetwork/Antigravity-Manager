@@ -7,54 +7,47 @@
 //! 4. Scoped-restore fallback: automatically falls back to unscoped restore when scoped restore returns 0 records.
 //! 5. Re-attribution of unrestored prompt_backups across instance switches.
 
+use super::connect_backup_db;
 use super::restore::{
     count_unrestored_prompts_for_other_instances, is_live_status_preserved,
-    restore_running_prompts_for_instance_with_outcome,
-    restore_running_prompts_scoped_with_fallback,
     restore_running_prompts_scoped_with_fallback_with_outcome, RestoreOutcome,
 };
-use super::{connect_backup_db, PromptBackupRecord};
 use chrono::Utc;
-use rusqlite::params;
+use rusqlite::{params, Connection};
 use std::fs;
+use std::path::Path;
 use uuid::Uuid;
 
 #[test]
 fn test_restore_outcome_honesty_struct_and_accessors() {
     let mut outcome = RestoreOutcome::new(5, 4, 1);
     assert_eq!(outcome.restored_count(), 5);
-    assert_eq!(outcome.restored, 5);
     assert_eq!(outcome.dispatched_count(), 4);
-    assert_eq!(outcome.dispatched, 4);
     assert_eq!(outcome.failed_count(), 1);
-    assert_eq!(outcome.failed, 1);
     assert!(
         !outcome.is_success(),
         "Outcome with failures must not be reported as success"
     );
 
     outcome.record_restored();
-    assert_eq!(outcome.restored_count(), 6);
-    assert_eq!(outcome.restored, 6);
-
     outcome.record_dispatched(6);
-    assert_eq!(outcome.dispatched_count(), 6);
-    assert_eq!(outcome.dispatched, 6);
-
     outcome.record_skipped_live();
-    assert_eq!(outcome.skipped_live, 1);
+    assert_eq!(outcome.restored_count(), 6);
+    assert_eq!(outcome.dispatched_count(), 6);
     assert_eq!(outcome.skipped_live_count(), 1);
 
     outcome.record_failed(Some("Dispatch failure: connection dropped".to_string()));
     assert_eq!(outcome.failed_count(), 2);
-    assert_eq!(outcome.failed, 2);
     assert_eq!(
         outcome.last_error.as_deref(),
         Some("Dispatch failure: connection dropped")
     );
     assert!(!outcome.is_success());
 
-    // Clean outcome
+    assert_clean_and_detailed_outcomes();
+}
+
+fn assert_clean_and_detailed_outcomes() {
     let clean = RestoreOutcome::new(3, 3, 0);
     assert!(clean.is_success());
     assert_eq!(clean.restored_count(), 3);
@@ -62,7 +55,6 @@ fn test_restore_outcome_honesty_struct_and_accessors() {
     assert_eq!(clean.failed_count(), 0);
     assert_eq!(clean.skipped_live_count(), 0);
 
-    // Detailed outcome constructor
     let detailed = RestoreOutcome::with_details(10, 8, 2, 3, Some("connection reset".to_string()));
     assert_eq!(detailed.restored_count(), 10);
     assert_eq!(detailed.dispatched_count(), 8);
@@ -107,30 +99,12 @@ fn test_scoped_restore_fallback_when_scoped_returns_zero_and_other_exists() {
         Uuid::new_v4().simple()
     ));
     let db_path = temp_dir.join("test-fallback.db");
-    let custom_file = db_path.to_str().unwrap();
+    let custom_file = db_path.to_str().expect("valid path");
 
     let conn = connect_backup_db(Some(custom_file)).expect("Must connect to backup DB");
     let now = Utc::now().timestamp();
+    seed_fallback_test_records(&conn, custom_file, now);
 
-    // Create a backup batch
-    conn.execute(
-        "INSERT INTO backup_batches (id, created_at, prompts_count, file_path, retention_days, is_fully_restored)
-         VALUES ('b-fallback', ?1, 2, ?2, 1, 0)",
-        params![now, custom_file],
-    )
-    .expect("Must insert batch");
-
-    // Insert 2 unrestored prompt backups recorded under "inst-source"
-    for (pid, idx) in [("prompt-fb-1", 1), ("prompt-fb-2", 2)] {
-        conn.execute(
-            "INSERT INTO prompt_backups (id, backup_batch_id, prompt_id, project_name, project_path, project_id, conversation_id, sequence_id, prompt_text, created_at, is_restored, instance_id)
-             VALUES (?1, 'b-fallback', ?2, 'proj-fallback', '/work/proj-fb', 'proj-1', 'conv-1', ?3, 'Test fallback restore', ?4, 0, 'inst-source')",
-            params![format!("rec-{}", idx), pid, idx, now + idx],
-        )
-        .expect("Must insert prompt backup");
-    }
-
-    // Verify other count probe
     let other_count =
         count_unrestored_prompts_for_other_instances("inst-target", Some(custom_file))
             .expect("Must count other instance unrestored prompts");
@@ -139,10 +113,9 @@ fn test_scoped_restore_fallback_when_scoped_returns_zero_and_other_exists() {
         "inst-target must see 2 records under other instances"
     );
 
-    // Scoped restore with fallback for "inst-target" should fall back to unscoped restore
     let (records, outcome) = restore_running_prompts_scoped_with_fallback_with_outcome(
         "inst-target",
-        true, // keep_backup = true to preserve DB rows for verification
+        true,
         Some(custom_file),
     )
     .expect("Fallback restore should succeed");
@@ -160,16 +133,50 @@ fn test_scoped_restore_fallback_when_scoped_returns_zero_and_other_exists() {
     crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove temp dir");
 }
 
+fn seed_fallback_test_records(conn: &Connection, custom_file: &str, now: i64) {
+    conn.execute(
+        "INSERT INTO backup_batches (id, created_at, prompts_count, file_path, retention_days, is_fully_restored)
+         VALUES ('b-fallback', ?1, 2, ?2, 1, 0)",
+        params![now, custom_file],
+    )
+    .expect("Must insert batch");
+
+    for (pid, idx) in [("prompt-fb-1", 1), ("prompt-fb-2", 2)] {
+        conn.execute(
+            "INSERT INTO prompt_backups (id, backup_batch_id, prompt_id, project_name, project_path, project_id, conversation_id, sequence_id, prompt_text, created_at, is_restored, instance_id)
+             VALUES (?1, 'b-fallback', ?2, 'proj-fallback', '/work/proj-fb', 'proj-1', 'conv-1', ?3, 'Test fallback restore', ?4, 0, 'inst-source')",
+            params![format!("rec-{}", idx), pid, idx, now + idx],
+        )
+        .expect("Must insert prompt backup");
+    }
+}
+
 #[test]
 fn test_reattribution_of_unrestored_prompt_backups_during_switch() {
     let temp_dir =
         std::env::temp_dir().join(format!("agm_test_reattribute_{}", Uuid::new_v4().simple()));
     let db_path = temp_dir.join("test-reattribute.db");
-    let custom_file = db_path.to_str().unwrap();
+    let custom_file = db_path.to_str().expect("valid path");
 
     let conn = connect_backup_db(Some(custom_file)).expect("Must connect to backup DB");
     let now = Utc::now().timestamp();
+    seed_reattribution_test_records(&conn, custom_file, now);
 
+    let changed = conn
+        .execute(
+            "UPDATE prompt_backups SET instance_id = ?1 WHERE instance_id = ?2 AND is_restored = 0",
+            params!["inst-new", "inst-old"],
+        )
+        .expect("Must update instance_id");
+    assert_eq!(changed, 1, "Only unrestored row should be re-attributed");
+
+    assert_reattribution_outcomes(&conn);
+
+    // Justification: test cleanup of temporary directory
+    crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove temp dir");
+}
+
+fn seed_reattribution_test_records(conn: &Connection, custom_file: &str, now: i64) {
     conn.execute(
         "INSERT INTO backup_batches (id, created_at, prompts_count, file_path, retention_days, is_fully_restored)
          VALUES ('b-reattr', ?1, 2, ?2, 1, 0)",
@@ -190,17 +197,9 @@ fn test_reattribution_of_unrestored_prompt_backups_during_switch() {
         params![now],
     )
     .expect("Must insert prompt backup");
+}
 
-    // Execute re-attribution query: only unrestored records (is_restored = 0) are re-attributed
-    let changed = conn
-        .execute(
-            "UPDATE prompt_backups SET instance_id = ?1 WHERE instance_id = ?2 AND is_restored = 0",
-            params!["inst-new", "inst-old"],
-        )
-        .expect("Must update instance_id");
-
-    assert_eq!(changed, 1, "Only unrestored row should be re-attributed");
-
+fn assert_reattribution_outcomes(conn: &Connection) {
     let new_inst: String = conn
         .query_row(
             "SELECT instance_id FROM prompt_backups WHERE id = 'r-old-1'",
@@ -221,9 +220,6 @@ fn test_reattribution_of_unrestored_prompt_backups_during_switch() {
         old_inst, "inst-old",
         "Already restored row remains on inst-old"
     );
-
-    // Justification: test cleanup of temporary directory
-    crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove temp dir");
 }
 
 #[test]
@@ -232,8 +228,28 @@ fn test_incomplete_prompt_sweep_selection_and_status_transition() {
     // Justification: test cleanup of temporary directory
     crate::error::record_ignored(fs::create_dir_all(&temp_dir), "create test temp dir");
     let db_path = temp_dir.join("test-sweep.db");
-    let conn = rusqlite::Connection::open(&db_path).expect("Must open temp test DB");
+    let conn = setup_test_active_prompts_db(&db_path);
 
+    let now = Utc::now().timestamp();
+    seed_test_sweep_rows(&conn, now);
+
+    let ids = fetch_sweep_candidate_ids(&conn, "inst-test");
+    assert_eq!(
+        ids.len(),
+        6,
+        "All 6 uncompleted prompts must be selected regardless of age"
+    );
+    assert!(!ids.contains(&"p-completed".to_string()));
+
+    execute_sweep_transition(&conn, &ids, now);
+    assert_sweep_results(&conn);
+
+    // Justification: test cleanup of temporary directory
+    crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove temp dir");
+}
+
+fn setup_test_active_prompts_db(db_path: &Path) -> Connection {
+    let conn = Connection::open(db_path).expect("Must open temp test DB");
     conn.execute_batch(
         "CREATE TABLE active_prompts (
             id TEXT PRIMARY KEY,
@@ -250,11 +266,11 @@ fn test_incomplete_prompt_sweep_selection_and_status_transition() {
         );",
     )
     .expect("Must create active_prompts table");
+    conn
+}
 
-    let now = Utc::now().timestamp();
+fn seed_test_sweep_rows(conn: &Connection, now: i64) {
     let ten_hours_ago = now - 36000;
-
-    // Insert prompts across various uncompleted statuses with older timestamps
     let test_rows = [
         ("p-running", "running", ten_hours_ago),
         ("p-inflight", "in_flight", ten_hours_ago),
@@ -273,8 +289,9 @@ fn test_incomplete_prompt_sweep_selection_and_status_transition() {
         )
         .expect("Must insert test prompt");
     }
+}
 
-    // Run sweep query selecting incomplete prompts (ignoring age)
+fn fetch_sweep_candidate_ids(conn: &Connection, instance_id: &str) -> Vec<String> {
     let mut stmt = conn
         .prepare(
             "SELECT id FROM active_prompts
@@ -283,21 +300,14 @@ fn test_incomplete_prompt_sweep_selection_and_status_transition() {
         )
         .expect("Must prepare sweep select");
 
-    let ids: Vec<String> = stmt
-        .query_map(params!["inst-test"], |r| r.get(0))
+    stmt.query_map(params![instance_id], |r| r.get(0))
         .expect("Must query ids")
         .flatten()
-        .collect();
+        .collect()
+}
 
-    assert_eq!(
-        ids.len(),
-        6,
-        "All 6 uncompleted prompts must be selected regardless of age"
-    );
-    assert!(!ids.contains(&"p-completed".to_string()));
-
-    // Perform the status transition to backed_up
-    for id in &ids {
+fn execute_sweep_transition(conn: &Connection, ids: &[String], now: i64) {
+    for id in ids {
         conn.execute(
             "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1
              WHERE id = ?2 AND status NOT IN ('completed', 'succeeded')",
@@ -305,8 +315,9 @@ fn test_incomplete_prompt_sweep_selection_and_status_transition() {
         )
         .expect("Must sweep prompt");
     }
+}
 
-    // Verify all 6 are now backed_up
+fn assert_sweep_results(conn: &Connection) {
     let backed_up_count: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM active_prompts WHERE status = 'backed_up'",
@@ -316,7 +327,6 @@ fn test_incomplete_prompt_sweep_selection_and_status_transition() {
         .expect("Must count backed up");
     assert_eq!(backed_up_count, 6);
 
-    // Verify completed prompt remained untouched
     let completed_status: String = conn
         .query_row(
             "SELECT status FROM active_prompts WHERE id = 'p-completed'",
@@ -325,7 +335,4 @@ fn test_incomplete_prompt_sweep_selection_and_status_transition() {
         )
         .expect("Must query completed status");
     assert_eq!(completed_status, "completed");
-
-    // Justification: test cleanup of temporary directory
-    crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove temp dir");
 }

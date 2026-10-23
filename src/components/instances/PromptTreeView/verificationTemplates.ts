@@ -836,6 +836,9 @@ export function buildRerunPrompt(
 
         const isNudgeText = (text: string): boolean => {
             const clean = text.toLowerCase().trim();
+            if (clean.includes('# 🔄 rerun execution nudge')) {
+                return false;
+            }
             return (
                 clean === 'is it done?' ||
                 clean === 'is it published?' ||
@@ -870,7 +873,6 @@ export function buildRerunPrompt(
                 clean.startsWith('please review and finalize') ||
                 clean.startsWith('checking in') ||
                 clean.startsWith('status update') ||
-                clean.startsWith('# 🔄 rerun execution nudge') ||
                 clean.includes('status check') ||
                 clean.includes('progress update') ||
                 clean.includes('ping me when') ||
@@ -912,8 +914,30 @@ export function buildRerunPrompt(
             if (startIdx !== -1 && endIdx > startIdx) {
                 originalPrompt = originalPrompt.substring(startIdx + startMarker.length, endIdx).trim();
             }
-        } else if (originalPrompt.trim().startsWith('# 🔄 RERUN EXECUTION NUDGE')) {
-            originalPrompt = '';
+        } else if (originalPrompt.includes('# 🔄 RERUN EXECUTION NUDGE')) {
+            // Strip the nudge header and delimiters instead of erasing the prompt to empty string
+            let stripped = originalPrompt;
+            // 1. If there is an extracted custom nudge within the header, extract it if customNudge is not set
+            const specificNudgeMatch = stripped.match(/>\s*\*\*Specific Nudge:\*\*\s*([^\r\n]+)/i);
+            if (specificNudgeMatch && !customNudge) {
+                customNudge = specificNudgeMatch[1].trim();
+            }
+            // 2. Strip the rerun header line
+            stripped = stripped.replace(/# 🔄 RERUN EXECUTION NUDGE[^\r\n]*/gi, '');
+            // 3. Strip blockquote lines (> ...)
+            stripped = stripped.replace(/^>.*$/gm, '');
+            // 4. Strip original task prompt label and horizontal rules
+            stripped = stripped.replace(/###\s*Original Task Prompt:?/gi, '');
+            stripped = stripped.replace(/^---+$/gm, '');
+            // 5. Strip trailing status request line
+            stripped = stripped.replace(/Please provide an updated status of your progress in this round and complete any remaining work\.?/gi, '');
+            stripped = stripped.trim();
+
+            if (stripped) {
+                originalPrompt = stripped;
+            } else {
+                originalPrompt = '';
+            }
         }
 
         // If customNudge is still empty and originalPrompt looks like a nudge message, shift it

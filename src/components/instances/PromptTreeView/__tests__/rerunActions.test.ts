@@ -46,6 +46,7 @@ import {
     loadPersistedRerunCount,
     savePersistedRerunCount,
 } from '../usePromptTreePromptActions';
+import { buildRerunPrompt } from '../verificationTemplates';
 
 let passed = 0;
 let failed = 0;
@@ -86,13 +87,15 @@ test('verifies default rerun options and count constants', () => {
     assertEqual(RERUN_COUNT_STORAGE_KEY, 'agm:prompt-tree:rerun-count');
 });
 
-test('verifies randomized message set contains at least 16 distinct actionable variations', () => {
-    assertTrue(RERUN_RANDOM_MESSAGE_SET.length >= 16);
+test('verifies randomized message set contains at least 25 distinct actionable variations', () => {
+    assertTrue(RERUN_RANDOM_MESSAGE_SET.length >= 25);
 
     const requiredPhrases = [
         'Is it completed?',
         'Is it finished?',
         'Is it released?',
+        'Is it done?',
+        'Is it published?',
         'Has this been fully implemented and verified?',
         'Can you check the pending tasks and continue?',
         'Is the implementation done and pushed?',
@@ -106,6 +109,13 @@ test('verifies randomized message set contains at least 16 distinct actionable v
         'Check pending tasks and proceed with the next one.',
         'Verify build cleanliness and finalize.',
         'Confirm all changes are committed and pushed.',
+        'Quick status check — is it done yet?',
+        'Please continue where you left off and confirm when finished.',
+        'Checking in: how is it going? Any blockers or pending items?',
+        'Status update please: what is done and what is left to complete?',
+        'Are all pending plans completed and verified?',
+        'Please confirm when the task is fully finished and ready.',
+        'What is the current status of the implementation?',
     ];
 
     for (const phrase of requiredPhrases) {
@@ -114,6 +124,31 @@ test('verifies randomized message set contains at least 16 distinct actionable v
             `Missing required phrase: "${phrase}"`
         );
     }
+});
+
+test('verifies buildRerunPrompt strips rerun header and retains underlying prompt when markers missing', () => {
+    const priorRerunPrompt = [
+        '# 🔄 RERUN EXECUTION NUDGE — ROUND 1 OF 4',
+        '',
+        '> [!NOTE]',
+        '> This is automated execution nudge **Round 1 of 4** for the task below.',
+        '>',
+        '> - **State Preservation:** Review files already modified and steps already completed.',
+        '> **Specific Nudge:** Is it completed?',
+        '',
+        '### Original Task Prompt:',
+        '---',
+        'Implement authentication tokens and verify API endpoints',
+        '---',
+        '',
+        'Please provide an updated status of your progress in this round and complete any remaining work.',
+    ].join('\n');
+
+    const result = buildRerunPrompt(priorRerunPrompt, 2, 4);
+    assertTrue(result.includes('Implement authentication tokens and verify API endpoints'));
+    assertTrue(result.includes('ROUND 2 OF 4'));
+    assertTrue(result.includes('<<<ORIGINAL_TASK_PROMPT_START>>>'));
+    assertTrue(result.includes('<<<ORIGINAL_TASK_PROMPT_END>>>'));
 });
 
 test('verifies resolveRerunMessage picks from RERUN_RANDOM_MESSAGE_SET when randomized', () => {

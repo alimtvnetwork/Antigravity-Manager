@@ -1097,7 +1097,7 @@ export const RERUN_MESSAGE_OPTIONS: ReadonlyArray<{ value: RerunMessageOption; l
     {
         value: 'randomized',
         label: 'Randomized nudge (auto-picked random variation)',
-        hint: 'Every dispatch picks ONE message at random from the 20+ built-in variations',
+        hint: 'Every dispatch picks ONE message at random from the 25+ built-in variations',
     },
     { value: 'is-it-completed', label: 'Is it completed?', hint: 'Send a completion-check nudge' },
     { value: 'is-it-finished', label: 'Is it finished?', hint: 'Send a finish-check nudge' },
@@ -1117,11 +1117,13 @@ export const RERUN_MESSAGE_OPTIONS: ReadonlyArray<{ value: RerunMessageOption; l
     { value: 'verify-build-cleanliness', label: 'Verify build cleanliness and finalize', hint: 'Send a build cleanliness verification nudge' },
 ];
 
-/** Built-in set of follow-up nudges used by the "randomized" option (20+ distinct actionable variations). */
+/** Built-in set of follow-up nudges used by the "randomized" option (25+ distinct actionable variations). */
 export const RERUN_RANDOM_MESSAGE_SET: ReadonlyArray<string> = [
     'Is it completed?',
     'Is it finished?',
     'Is it released?',
+    'Is it done?',
+    'Is it published?',
     'Has this been fully implemented and verified?',
     'Can you check the pending tasks and continue?',
     'Is the implementation done and pushed?',
@@ -1145,6 +1147,9 @@ export const RERUN_RANDOM_MESSAGE_SET: ReadonlyArray<string> = [
     'Please continue where you left off and confirm when finished.',
     'Checking in: how is it going? Any blockers or pending items?',
     'Status update please: what is done and what is left to complete?',
+    'Are all pending plans completed and verified?',
+    'Please confirm when the task is fully finished and ready.',
+    'What is the current status of the implementation?',
 ];
 
 export const RERUN_FIXED_MESSAGES: Record<Exclude<RerunMessageOption, 'randomized'>, string> = {

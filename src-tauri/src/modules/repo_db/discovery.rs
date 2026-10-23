@@ -214,23 +214,28 @@ pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<Activ
                 continue;
             }
 
-            let is_genuinely_running = not_fully_idle != 0 && status.contains("RUNNING");
-            if !is_genuinely_running {
-                continue;
-            }
-
             let last_time_epoch = item
                 .last_modified_time
                 .as_deref()
                 .map(parse_flexible_timestamp)
                 .unwrap_or(0);
-            let is_recent = last_time_epoch > 0 && (now - last_time_epoch <= 60);
+            // 30-minute freshness window (1800s) ensures prompts whose quota ran out earlier are not dropped
+            let is_recent = last_time_epoch > 0 && (now - last_time_epoch <= 1800);
             if !is_recent {
                 continue;
             }
 
             let inspection = inspect_conversation_transcript(&base_dir, &cid);
             if inspection.is_terminal_done || inspection.is_subagent {
+                continue;
+            }
+
+            let is_genuinely_running = not_fully_idle != 0 && status.contains("RUNNING");
+            let is_quota_or_error_interrupted = inspection.is_error_or_quota
+                || status.contains("ERROR")
+                || status.contains("FAILED");
+
+            if !is_genuinely_running && !is_quota_or_error_interrupted {
                 continue;
             }
 
@@ -280,6 +285,14 @@ pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<Activ
                 }
             }
 
+            // Fallback to conversation preview if transcript extraction found no user prompt
+            if user_prompt.is_none()
+                && !preview.trim().is_empty()
+                && !is_subagent_or_system_content(&preview)
+            {
+                user_prompt = Some(preview.clone());
+            }
+
             if let Some(prompt_text) = user_prompt {
                 let p_id = format!("prompt-{}", cid);
                 prompts.push(ActivePrompt {
@@ -297,6 +310,14 @@ pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<Activ
                 });
             }
         }
+    }
+
+    if !prompts.is_empty() {
+        crate::modules::logger::log_info(&format!(
+            "[RepoDB] Discovered {} prompt(s) from Antigravity storage for instance '{}' (freshness window 1800s, including quota/error-interrupted)",
+            prompts.len(),
+            instance_id
+        ));
     }
 
     prompts
