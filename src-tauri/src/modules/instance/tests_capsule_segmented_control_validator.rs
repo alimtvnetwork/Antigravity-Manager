@@ -1,8 +1,10 @@
 //! Unit tests for Capsule Segmented Control Validator (`Imp-262`).
 
+use super::capsule_segmented_control_validator::*;
+
 #[cfg(test)]
 mod tests {
-    use super::capsule_segmented_control_validator::*;
+    use super::*;
 
     #[test]
     fn test_compliant_capsule_with_rounded_full_and_transparent_select() {

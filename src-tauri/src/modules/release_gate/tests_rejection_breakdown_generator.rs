@@ -69,7 +69,7 @@ fn test_validation_rejects_absolute_path() {
         "Clean logic",
         None,
     );
-    let report = RejectionBreakdownReport::new("Review", "author").with_file(item);
+    let report = RejectionBreakdownReport::new("Review", "author").with_file_breakdown(item);
     let res = validate_rejection_has_actionable_path(&report);
     assert!(res.is_err());
     assert!(res
@@ -129,11 +129,11 @@ fn test_generate_markdown_rejection_breakdown() {
     );
 
     let report = RejectionBreakdownReport::new("Refactor pipeline", "contributor_jane")
-        .with_pr_number(Some(42))
-        .with_file(item1)
-        .with_file(item2)
+        .with_pr_number(42)
+        .with_file_breakdown(item1)
+        .with_file_breakdown(item2)
         .with_actionable_step("Move adapter logic into common pipeline")
-        .with_coauthor("Jane Contributor", "jane@example.com");
+        .with_co_author("Jane Contributor", "jane@example.com");
 
     let md = generate_markdown_rejection_breakdown(&report);
     assert!(md.contains("Review Feedback for PR #42 (`Refactor pipeline`)"));

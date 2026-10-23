@@ -1,8 +1,10 @@
 //! Unit tests for release notes & changelog relative paths linter (Imp-657).
 
+use super::release_notes_relative_paths_linter::*;
+
 #[cfg(test)]
 mod tests {
-    use super::release_notes_relative_paths_linter::*;
+    use super::*;
 
     #[test]
     fn test_clean_markdown_with_valid_relative_paths() {

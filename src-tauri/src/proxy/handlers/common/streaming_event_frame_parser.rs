@@ -222,6 +222,11 @@ impl StreamingFrameParser {
         self.buffer.is_empty()
     }
 
+    /// True if unparsed bytes remain in the internal buffer.
+    pub fn has_unprocessed_bytes(&self) -> bool {
+        !self.buffer.is_empty()
+    }
+
     /// Current incomplete line byte length held in the buffer.
     pub fn incomplete_line_bytes(&self) -> usize {
         self.buffer.len()

@@ -62,7 +62,7 @@ fn test_exponential_ceiling_clamping() {
 #[test]
 fn test_full_jitter_behavior() {
     let config = BackoffConfig::new(1000, 10000, 3, JitterMode::FullJitter);
-    let mut stepper = TransportBackoffStepper::new(config);
+    let mut stepper = TransportBackoffStepper::new(config.clone());
     let failure = NetworkFailureType::GatewayStatus(503);
 
     // With rand = 0.5 and ceiling = 1000 -> delay = 500

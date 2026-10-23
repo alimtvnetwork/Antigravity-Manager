@@ -1,8 +1,10 @@
 //! Unit tests for branch release channel gate (Imp-656).
 
+use super::branch_release_channel_gate::*;
+
 #[cfg(test)]
 mod tests {
-    use super::branch_release_channel_gate::*;
+    use super::*;
 
     const SAMPLE_CHANGELOG: &str = r#"# Changelog
 

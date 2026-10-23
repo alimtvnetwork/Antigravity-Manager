@@ -15,6 +15,7 @@ fn test_inactive_account_disqualified() {
     assert_eq!(res.final_score, 0.0);
     assert!(res
         .exclusion_reason
+        .as_deref()
         .unwrap()
         .contains("inactive or disabled"));
     assert!(res
@@ -34,6 +35,7 @@ fn test_in_use_by_other_instance_disqualified() {
     assert_eq!(res.final_score, 0.0);
     assert!(res
         .exclusion_reason
+        .as_deref()
         .unwrap()
         .contains("in use by sibling instance"));
     assert!(res
@@ -52,6 +54,7 @@ fn test_cooldown_active_disqualified() {
     assert_eq!(res.final_score, 0.0);
     assert!(res
         .exclusion_reason
+        .as_deref()
         .unwrap()
         .contains("in cooldown (45s remaining)"));
     assert!(res.violations.contains(&ScoringViolation::ActiveCooldown));
@@ -68,6 +71,7 @@ fn test_exhausted_quota_disqualified() {
     assert_eq!(res.final_score, 0.0);
     assert!(res
         .exclusion_reason
+        .as_deref()
         .unwrap()
         .contains("Quota completely exhausted"));
     assert!(res.violations.contains(&ScoringViolation::QuotaExhausted));

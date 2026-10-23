@@ -1,8 +1,10 @@
 //! Unit Tests for Prompt Tree Branch Hierarchy Formatter (`Imp-257`).
 
+use super::prompt_tree_branch_hierarchy_formatter::*;
+
 #[cfg(test)]
 mod tests {
-    use super::prompt_tree_branch_hierarchy_formatter::*;
+    use super::*;
 
     #[test]
     fn test_root_node_formatting() {

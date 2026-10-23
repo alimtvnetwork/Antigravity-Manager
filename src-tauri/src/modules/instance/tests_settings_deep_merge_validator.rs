@@ -1,8 +1,10 @@
 //! Unit Tests for Settings Deep Merge Validator (`Imp-251`).
 
+use super::settings_deep_merge_validator::*;
+
 #[cfg(test)]
 mod tests {
-    use super::settings_deep_merge_validator::*;
+    use super::*;
     use serde_json::json;
 
     #[test]

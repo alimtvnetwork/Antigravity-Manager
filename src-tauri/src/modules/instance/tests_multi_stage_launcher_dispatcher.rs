@@ -142,7 +142,7 @@ mod tests {
         let err = plan_multi_stage_launch(&spec, false)
             .expect_err("Direct .bat execution must be rejected");
 
-        match err {
+        match &err {
             LauncherSecurityViolation::DirectBatchFileExecutionDisallowed { path, extension } => {
                 assert_eq!(path, "scripts/launch.bat");
                 assert_eq!(extension, ".bat");
