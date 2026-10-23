@@ -1,24 +1,19 @@
-# Parent Plan — 200 Implementing Next Five Tasks (Steps 216–220)
-
+# Plan 200: Implementing Next Five Tasks (Steps 211–215)
 Status: IN PROGRESS (TAKEN)
-Phase: 1 (claimed & reserved)
-Owner: Agent-200-Lead
-Specs: `02-spec/21-app/200-implementing-next-five-tasks/spec.md`
-Subtasks: `.ai-memory/plans/subtasks/200-implementing-next-five-tasks/`
-Backlog Delta: 40 steps -> 35 steps remaining (-5 steps claimed)
+Sequence: 200
+Total Steps in Batch: 5
+Remaining Backlog after Batch: 35
 
-## 1. Selected Five Tasks (Claimed & In-Progress)
+## Subtasks
+1. `01-prefix-stability-sanitizer.md`: Pipeline Prefix Stability & Header Sanitizer (`Imp-625`)
+2. `02-unified-context-structural-aligner.md`: Unified Context Structural Aligner (`Imp-626`)
+3. `03-thinking-cache-target-version-guard.md`: Thinking Cache Invalidation Target Version Guard (`Imp-627`)
+4. `04-job-breakaway-process-spawner.md`: Multi-Stage Launcher Job Breakaway Spawner (`Imp-628`)
+5. `05-lock-timeout-escalator.md`: Split-DB Lock Contention Timeout Escalator (`Imp-629`)
 
-| Task # | Slug | Module Target | Status | Implementation Details |
-|---|---|---|---|---|
-| 01 | `thinking-cache-invalidation-controller` | `src-tauri/src/modules/release_gate/thinking_cache_invalidation_controller.rs` | `IN_PROGRESS` | Manages upgrade prompt evaluation and persistent state for thinking cache cleanup. |
-| 02 | `readme-changelog-synchronizer` | `src-tauri/src/modules/release_gate/readme_changelog_synchronizer.rs` | `IN_PROGRESS` | Verifies full synchronization of release summaries across `README.md` and `README_EN.md` for stable releases. |
-| 03 | `sole-contributor-attribution-guard` | `src-tauri/src/modules/release_gate/sole_contributor_attribution_guard.rs` | `IN_PROGRESS` | Audits changelogs and release notes to enforce strictly attribution to `@aukgit` and intercept extraneous `@...` handles. |
-| 04 | `tag-changelog-heading-matcher` | `src-tauri/src/modules/release_gate/tag_changelog_heading_matcher.rs` | `IN_PROGRESS` | Enforces exact character-for-character matching between Git tag names and changelog headings, with branch gating. |
-| 05 | `prefix-stability-pipeline-guard` | `src-tauri/src/proxy/handlers/common/prefix_stability_pipeline_guard.rs` | `IN_PROGRESS` | Enforces immutable prefix stability across multi-turn LLM dialogs to preserve upstream KV prompt caching. |
-
-## 2. Invariants & Rules
-- Zero-Build & Zero-Test Invariant (R1).
+## Execution Invariants
+- Zero builds and zero tests during implementation.
 - Strictly relative Git paths.
-- Search exclusively via GitMap. Total ban on `rg`, `ripgrep`, `grep`, `git grep`, `Select-String`.
-- Anti-collision commit before worker dispatch.
+- Search exclusively via GitMap (`gitmap aum search`, `gitmap find`, `gitmap cat`). Total ban on rg, ripgrep, grep, git grep, Select-String.
+- No silent errors rule across Rust and TypeScript.
+- Strict FIFO query ordering (`ORDER BY created_at ASC, id ASC`).
