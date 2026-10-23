@@ -410,6 +410,11 @@ pub mod caller_process_ancestry_tree_scanner;
 #[cfg(test)]
 #[path = "instance/tests_caller_process_ancestry_tree_scanner.rs"]
 pub mod tests_caller_process_ancestry_tree_scanner;
+#[path = "instance/inline_select_dropdown_styler.rs"]
+pub mod inline_select_dropdown_styler;
+#[cfg(test)]
+#[path = "instance/tests_inline_select_dropdown_styler.rs"]
+pub mod tests_inline_select_dropdown_styler;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use arg_normalizer::*;
@@ -614,3 +619,4 @@ pub use windows_shell_dispatch_argument_escaper::*;
 pub use truncation_omission_banner_formatter::*;
 pub use window_control_capsule_formatter::*;
 pub use caller_process_ancestry_tree_scanner::*;
+pub use inline_select_dropdown_styler::*;

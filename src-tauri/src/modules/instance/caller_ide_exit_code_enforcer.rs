@@ -1,4 +1,4 @@
-//! Caller IDE Exit Code 2 Enforcer (`Imp-641`).
+//! Caller IDE Exit Code 2 Enforcer (`Imp-693`, Step 279).
 //!
 //! Enforces caller IDE self-preservation per AGENTS.md:
 //! "Caller IDE Self-Preservation & Transient Test Sandboxing: Automated tests,
@@ -10,10 +10,250 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// Non-negotiable process exit code when an instance command targets the caller IDE session.
+/// Non-negotiable process exit code when a destructive command targets the caller IDE session without `--force`.
 pub const CALLER_PROTECTION_EXIT_CODE: i32 = 2;
 
-/// Lifecycle and management commands subject to caller IDE self-preservation protection.
+/// Instance command types subject to caller IDE interception and protection checks.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum InstanceCommandType {
+    Stop,
+    Remove,
+    Switch,
+    Restart,
+    NonDestructive(String),
+}
+
+impl InstanceCommandType {
+    /// Returns true if this command performs a destructive action (stop, kill, removal, switch, restart).
+    pub fn is_destructive(&self) -> bool {
+        match self {
+            Self::Stop | Self::Remove | Self::Switch | Self::Restart => true,
+            Self::NonDestructive(_) => false,
+        }
+    }
+
+    /// Returns the canonical CLI subcommand token.
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Stop => "stop",
+            Self::Remove => "rm",
+            Self::Switch => "switch",
+            Self::Restart => "restart",
+            Self::NonDestructive(ref name) => name.as_str(),
+        }
+    }
+}
+
+impl fmt::Display for InstanceCommandType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+/// Contextual details of the caller instance initiating an instance operation.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct CallerInstanceContext {
+    pub caller_instance_id: Option<String>,
+    pub caller_pid: Option<u32>,
+    pub caller_ide_name: Option<String>,
+}
+
+impl CallerInstanceContext {
+    pub fn new(
+        caller_instance_id: Option<String>,
+        caller_pid: Option<u32>,
+        caller_ide_name: Option<String>,
+    ) -> Self {
+        Self {
+            caller_instance_id,
+            caller_pid,
+            caller_ide_name,
+        }
+    }
+
+    pub fn from_caller_id(id: impl Into<String>) -> Self {
+        Self {
+            caller_instance_id: Some(id.into()),
+            caller_pid: None,
+            caller_ide_name: None,
+        }
+    }
+
+    /// Checks if a given target instance matches this caller's session.
+    pub fn is_caller(&self, target_id: &str) -> bool {
+        let clean_target = target_id.trim();
+        if clean_target.is_empty() {
+            return false;
+        }
+
+        match &self.caller_instance_id {
+            Some(caller_id) => {
+                let clean_caller = caller_id.trim();
+                !clean_caller.is_empty() && clean_target == clean_caller
+            }
+            None => false,
+        }
+    }
+}
+
+/// Structured interception result evaluating caller preservation gates.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CommandInterceptionResult {
+    pub is_intercepted: bool,
+    pub exit_code: i32,
+    pub target_instance_id: String,
+    pub is_caller_match: bool,
+    pub was_force_provided: bool,
+    pub reason: String,
+    pub remediation_hint: String,
+}
+
+impl CommandInterceptionResult {
+    /// Creates a permitted (non-intercepted) execution verdict with exit code 0.
+    pub fn permitted(
+        target_id: &str,
+        is_caller_match: bool,
+        was_force_provided: bool,
+        reason: impl Into<String>,
+    ) -> Self {
+        Self {
+            is_intercepted: false,
+            exit_code: 0,
+            target_instance_id: target_id.trim().to_string(),
+            is_caller_match,
+            was_force_provided,
+            reason: reason.into(),
+            remediation_hint: String::new(),
+        }
+    }
+
+    /// Creates an intercepted failure verdict with exit code 2 and explicit remediation hint.
+    pub fn blocked(
+        target_id: &str,
+        command: &InstanceCommandType,
+        context: &CallerInstanceContext,
+    ) -> Self {
+        let clean_target = target_id.trim();
+        let pid_info = context
+            .caller_pid
+            .map(|p| format!(" (PID {})", p))
+            .unwrap_or_default();
+        let ide_info = context
+            .caller_ide_name
+            .as_deref()
+            .map(|ide| format!(" [{}]", ide))
+            .unwrap_or_default();
+
+        let reason = format!(
+            "Commands targeting the caller instance ('{}'{}{}) must fail-fast with exit code 2 to prevent terminating your working IDE session.",
+            clean_target, pid_info, ide_info
+        );
+        let remediation_hint = format!(
+            "Re-run the command with '--force' to proceed: agm instances {} {} --force",
+            command.as_str(),
+            clean_target
+        );
+
+        Self {
+            is_intercepted: true,
+            exit_code: CALLER_PROTECTION_EXIT_CODE,
+            target_instance_id: clean_target.to_string(),
+            is_caller_match: true,
+            was_force_provided: false,
+            reason,
+            remediation_hint,
+        }
+    }
+
+    /// Formats user-facing diagnostic text for terminal display.
+    pub fn format_terminal_error(&self) -> String {
+        if self.is_intercepted {
+            format!(
+                "Error [Exit Code {}]: {}\nRemediation: {}",
+                self.exit_code, self.reason, self.remediation_hint
+            )
+        } else {
+            self.reason.clone()
+        }
+    }
+}
+
+impl fmt::Display for CommandInterceptionResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.is_intercepted {
+            write!(
+                f,
+                "[BLOCKED - exit code {}] {}. Hint: {}",
+                self.exit_code, self.reason, self.remediation_hint
+            )
+        } else {
+            write!(f, "[PERMITTED] {}", self.reason)
+        }
+    }
+}
+
+/// Evaluates an instance command against caller self-preservation policies.
+///
+/// Returns:
+/// - When `target_id` matches caller and `command` is destructive and `!force`:
+///   `is_intercepted = true`, `exit_code = 2`, actionable remediation instructions.
+/// - When `force == true` or `target_id != caller`:
+///   `is_intercepted = false`, `exit_code = 0`.
+/// - When `command` is non-destructive (e.g. status, logs):
+///   `is_intercepted = false`, `exit_code = 0`.
+pub fn evaluate_instance_command(
+    target_id: &str,
+    command: InstanceCommandType,
+    force: bool,
+    context: &CallerInstanceContext,
+) -> CommandInterceptionResult {
+    let clean_target = target_id.trim();
+    let is_match = context.is_caller(clean_target);
+
+    if !is_match {
+        return CommandInterceptionResult::permitted(
+            clean_target,
+            false,
+            force,
+            format!(
+                "Target instance '{}' is safe: does not match caller IDE session.",
+                clean_target
+            ),
+        );
+    }
+
+    if !command.is_destructive() {
+        return CommandInterceptionResult::permitted(
+            clean_target,
+            true,
+            force,
+            format!(
+                "Command '{}' is non-destructive and permitted on caller instance '{}'.",
+                command, clean_target
+            ),
+        );
+    }
+
+    if force {
+        return CommandInterceptionResult::permitted(
+            clean_target,
+            true,
+            true,
+            format!(
+                "Bypassing caller self-preservation for instance '{}' via explicit --force flag.",
+                clean_target
+            ),
+        );
+    }
+
+    CommandInterceptionResult::blocked(clean_target, &command, context)
+}
+
+// =========================================================================
+// Legacy compatibility layer for TargetInstanceCommand & CallerProtectionPolicy
+// =========================================================================
+
+/// Legacy enum for instance lifecycle actions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TargetInstanceCommand {
     Stop,
@@ -24,7 +264,6 @@ pub enum TargetInstanceCommand {
 }
 
 impl TargetInstanceCommand {
-    /// Returns the command name string representation.
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Stop => "stop",
@@ -42,7 +281,19 @@ impl fmt::Display for TargetInstanceCommand {
     }
 }
 
-/// Policy governing caller IDE protection thresholds and overrides.
+impl From<TargetInstanceCommand> for InstanceCommandType {
+    fn from(cmd: TargetInstanceCommand) -> Self {
+        match cmd {
+            TargetInstanceCommand::Stop => InstanceCommandType::Stop,
+            TargetInstanceCommand::Remove => InstanceCommandType::Remove,
+            TargetInstanceCommand::Switch => InstanceCommandType::Switch,
+            TargetInstanceCommand::Restart => InstanceCommandType::Restart,
+            TargetInstanceCommand::Kill => InstanceCommandType::Stop,
+        }
+    }
+}
+
+/// Legacy policy governing caller protection.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CallerProtectionPolicy {
     pub fail_fast_exit_code: i32,
@@ -83,7 +334,7 @@ impl CallerProtectionPolicy {
     }
 }
 
-/// Final verdict on whether an instance operation is permitted or blocked.
+/// Legacy verdict for caller protection.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CallerProtectionVerdict {
     AllowedSafeTarget,
@@ -98,7 +349,6 @@ pub enum CallerProtectionVerdict {
 }
 
 impl CallerProtectionVerdict {
-    /// Returns true if the command is permitted to execute.
     pub fn is_allowed(&self) -> bool {
         matches!(
             self,
@@ -106,12 +356,10 @@ impl CallerProtectionVerdict {
         )
     }
 
-    /// Returns true if the command is blocked by caller self-preservation.
     pub fn is_blocked(&self) -> bool {
         matches!(self, Self::BlockedCallerProtectionFailFast { .. })
     }
 
-    /// Returns the non-zero exit code if blocked, or None if allowed.
     pub fn exit_code(&self) -> Option<i32> {
         match self {
             Self::BlockedCallerProtectionFailFast { exit_code, .. } => Some(*exit_code),
@@ -119,7 +367,6 @@ impl CallerProtectionVerdict {
         }
     }
 
-    /// Human-readable explanation of why the action was blocked or bypassed.
     pub fn guidance_message(&self) -> Option<String> {
         match self {
             Self::BlockedCallerProtectionFailFast {
@@ -139,13 +386,11 @@ impl CallerProtectionVerdict {
     }
 }
 
-/// Checks whether the target instance corresponds to the caller's active instance ID.
 pub fn is_caller_target(target_instance: &str, caller_instance: Option<&str>) -> bool {
     let clean_target = target_instance.trim();
     if clean_target.is_empty() {
         return false;
     }
-
     match caller_instance {
         Some(caller) => {
             let clean_caller = caller.trim();
@@ -155,7 +400,6 @@ pub fn is_caller_target(target_instance: &str, caller_instance: Option<&str>) ->
     }
 }
 
-/// Evaluates whether an instance lifecycle action is allowed under the standard caller protection policy.
 pub fn evaluate_instance_action(
     target_instance: &str,
     caller_instance: Option<&str>,
@@ -172,7 +416,6 @@ pub fn evaluate_instance_action(
     )
 }
 
-/// Evaluates whether an instance lifecycle action is allowed under a custom caller protection policy.
 pub fn evaluate_instance_action_with_policy(
     target_instance: &str,
     caller_instance: Option<&str>,

@@ -4,7 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
-| [213-implementing-next-five-tasks.md](./pending/213-implementing-next-five-tasks.md) | `IN_PROGRESS` | Execution of 5 tasks: author & test streaming event frame parser, inline select dropdown styler, FIFO queue compaction guard, caller IDE exit code 2 enforcer, and transient test sandbox lifecycle guard (Steps 276–280). |
+| [213-implementing-next-five-tasks.md](./completed/213-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test streaming event frame parser, inline select dropdown styler, FIFO queue compaction guard, caller IDE exit code 2 enforcer, and transient test sandbox lifecycle guard (Steps 276–280). |
 | [212-implementing-next-five-tasks.md](./completed/212-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test pipeline response header sanitizer, window control capsule formatter, FIFO dead letter queue spillover guard, caller process ancestry tree scanner, and GitHub release notes parity guard (Steps 271–275). |
 | [211-implementing-next-five-tasks.md](./completed/211-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test windows shell dispatch argument escaper, FIFO queue drain monotonicity verifier, streaming chunk boundary guard, truncation omission banner formatter, and individually revertable commit guard (Steps 266–270). |
 | [210-implementing-next-five-tasks.md](./completed/210-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test unified context alignment guard, capsule segmented control styling validator, PR problem classification linter, FIFO prompt restore concurrency limiter, and verified fallback path linter (Steps 261–265). |

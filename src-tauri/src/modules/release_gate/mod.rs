@@ -79,6 +79,7 @@ pub mod truncation_callout_parser_guard;
 pub mod unverified_paths_disclosure_guard;
 pub mod verified_fallback_path_linter;
 pub mod wildcard_model_routing_guard;
+pub mod transient_test_sandbox_lifecycle_guard;
 
 #[cfg(test)]
 pub mod tests_agent_prompt_sanitizer;
@@ -212,6 +213,8 @@ pub mod tests_verified_fallback_path_linter;
 pub mod tests_version_manifest_sync;
 #[cfg(test)]
 pub mod tests_wildcard_model_routing;
+#[cfg(test)]
+pub mod tests_transient_test_sandbox_lifecycle_guard;
 
 pub use agent_prompt_sanitizer_guard::*;
 pub use attribution_verifier::*;
@@ -279,3 +282,4 @@ pub use truncation_callout_parser_guard::*;
 pub use unverified_paths_disclosure_guard::*;
 pub use verified_fallback_path_linter::*;
 pub use wildcard_model_routing_guard::*;
+pub use transient_test_sandbox_lifecycle_guard::*;
