@@ -1,9 +1,21 @@
 # 02 - Should `is_instance_running` trust a matching saved PID without a process scan?
 
 Slug: is-instance-running-saved-pid-fast-path
-Status: open
-Raised: 2026-10-06
+Status: resolved 2026-10-23
 Blocking: any further change to `src-tauri/src/modules/instance.rs` `is_instance_running` or the PID cache cadence
+
+## Resolution (user decision, 2026-10-23)
+
+> Trust but always verify before execution. If mismatch full rescan
+
+Audit of the current implementation (`src-tauri/src/modules/instance/pid_util.rs`, `is_instance_running`) against that rule — the code already conforms, no change needed:
+
+- Trust: the saved PID (config or stored) is the first candidate.
+- Always verify before the verdict: the saved PID must pass `saved_pid_matches` (that one process is alive and is Antigravity) AND `live_pid_is_instance_window` (that one process is this instance's window — clone-executable marker, `/instances/{id}` argument, or data-dir match; for the default instance, a plain stock main window that is not a copy). The Windows fallback for processes whose arguments cannot be read still verifies identity and refuses PIDs protected by another instance (`should_spare_pid`).
+- Mismatch → full rescan: any verification failure falls through to `first_live_window_pid` (full data-dir scan plus the cached process list), and the PID found by the scan is recorded as the new saved PID.
+- No blind-trust path exists elsewhere: every other `saved_pid_matches` caller pairs it with a liveness check or the same window verification.
+
+Note: this file's premise (a full scan on every call at the old `instance.rs:2584`) predates the `pid_util.rs` refactor; the scan-on-every-call behavior it describes no longer exists.
 
 ## Original request (verbatim intent, 2026-10-02 session)
 
