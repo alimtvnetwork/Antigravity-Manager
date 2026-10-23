@@ -54,6 +54,7 @@ pub mod sse_stream_splitter;
 pub mod status_mapper;
 pub mod stream_abort;
 pub mod stream_boundary_guard;
+pub mod streaming_chunk_boundary_guard;
 pub mod stream_drain_guard;
 pub mod stream_early_abort_sentinel;
 pub mod stream_flusher;
@@ -123,6 +124,8 @@ pub mod tests_thinking_budget_filter_pipeline;
 #[cfg(test)]
 pub mod tests_thinking_budget_headroom_evaluator;
 #[cfg(test)]
+pub mod tests_streaming_chunk_boundary_guard;
+#[cfg(test)]
 pub mod tests_thinking_budget_proportional_allocator;
 #[cfg(test)]
 pub mod tests_prefix_stability_pipeline_guard;
@@ -177,6 +180,7 @@ pub use sse_stream_splitter::*;
 pub use status_mapper::{map_upstream_status_to_canonical, CanonicalErrorPayload};
 pub use stream_abort::{StreamAbortHandle, StreamAbortReceiver};
 pub use stream_boundary_guard::*;
+pub use streaming_chunk_boundary_guard::*;
 pub use stream_drain_guard::*;
 pub use stream_early_abort_sentinel::*;
 pub use stream_flusher::{StreamFlusher, SSE_KEEPALIVE_BYTES};

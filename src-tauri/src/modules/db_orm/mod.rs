@@ -28,6 +28,7 @@ pub mod fifo_prompt_restore_transaction_guard;
 pub mod fifo_prompt_restore_validator;
 pub mod fifo_prompt_restore_concurrency_limiter;
 pub mod fifo_queue_batch_drain_guard;
+pub mod fifo_queue_drain_monotonicity_verifier;
 pub mod fifo_queue_index_analyzer;
 pub mod fifo_restore_transaction_coordinator;
 pub mod fk_resolver;
@@ -173,6 +174,8 @@ pub mod tests_fifo_prompt_restore_transaction_guard;
 #[cfg(test)]
 pub mod tests_fifo_queue_batch_drain_guard;
 #[cfg(test)]
+pub mod tests_fifo_queue_drain_monotonicity_verifier;
+#[cfg(test)]
 pub mod tests_fifo_queue_index_analyzer;
 #[cfg(test)]
 pub mod tests_fifo_restore_transaction_coordinator;
@@ -187,6 +190,7 @@ pub use fifo_prompt_restore_transaction_guard::*;
 pub use fifo_prompt_restore_validator::*;
 pub use fifo_prompt_restore_concurrency_limiter::*;
 pub use fifo_queue_batch_drain_guard::*;
+pub use fifo_queue_drain_monotonicity_verifier::*;
 pub use fifo_queue_index_analyzer::*;
 pub use fifo_restore_transaction_coordinator::*;
 pub use builder::{Order, QueryBuilder, ViewQueryBuilder};

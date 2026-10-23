@@ -390,6 +390,16 @@ pub mod capsule_segmented_control_validator;
 #[cfg(test)]
 #[path = "instance/tests_capsule_segmented_control_validator.rs"]
 pub mod tests_capsule_segmented_control_validator;
+#[path = "instance/windows_shell_dispatch_argument_escaper.rs"]
+pub mod windows_shell_dispatch_argument_escaper;
+#[cfg(test)]
+#[path = "instance/tests_windows_shell_dispatch_argument_escaper.rs"]
+pub mod tests_windows_shell_dispatch_argument_escaper;
+#[path = "instance/truncation_omission_banner_formatter.rs"]
+pub mod truncation_omission_banner_formatter;
+#[cfg(test)]
+#[path = "instance/tests_truncation_omission_banner_formatter.rs"]
+pub mod tests_truncation_omission_banner_formatter;
 
 pub use crate::models::instance::{InstanceConfig, InstanceRegistry, InstanceStatus};
 pub use arg_normalizer::*;
@@ -590,3 +600,5 @@ pub use caller_ide_heartbeat_watchdog::*;
 pub use settings_deep_merge_validator::*;
 pub use prompt_tree_branch_hierarchy_formatter::*;
 pub use capsule_segmented_control_validator::*;
+pub use windows_shell_dispatch_argument_escaper::*;
+pub use truncation_omission_banner_formatter::*;
