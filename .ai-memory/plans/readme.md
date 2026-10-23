@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [218-gitmap-and-antigravity-tools-manager-updates-and-testing.md](./pending/218-gitmap-and-antigravity-tools-manager-updates-and-testing.md) | `IN_PROGRESS` | Execution of 5 tasks: GitMap PA updates, prompt restore & quota drop recovery, rerun randomizer auto-pick, GitMap CG execute, and master E2E verification (Steps 301–305). |
 | [217-implementing-next-five-tasks.md](./completed/217-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test streaming thought signature validator, segmented capsule toggle styler, FIFO queue partition allocator, transient sandbox cleanup sentinel, and sole contributor attribution guard (Steps 296–300). |
 | [216-gitmap-and-antigravity-tools-manager-updates-and-testing.md](./completed/216-gitmap-and-antigravity-tools-manager-updates-and-testing.md) | `COMPLETED` | Execution of 5 tasks: GitMap PA updates, prompt restore & quota drop recovery, rerun randomizer auto-pick, GitMap CG execute, and master E2E verification (Steps 291–295). |
 | [215-gitmap-and-antigravity-tools-manager-updates-and-testing.md](./completed/215-gitmap-and-antigravity-tools-manager-updates-and-testing.md) | `COMPLETED` | Execution of 5 tasks: GitMap PA updates, prompt restore & quota drop recovery, rerun randomizer auto-pick, GitMap CG execute, and master E2E verification (Steps 286–290). |
