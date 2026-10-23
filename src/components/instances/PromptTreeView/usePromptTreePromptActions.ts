@@ -1269,9 +1269,27 @@ export function savePersistedRerunCount(count: number): void {
 }
 
 /** Resolve the actual message text for one rerun dispatch. */
-export function resolveRerunMessage(option: RerunMessageOption): { message: string; pickedIndex: number | null } {
+export function resolveRerunMessage(
+    option: RerunMessageOption,
+    excludeIndices?: Set<number> | number[]
+): { message: string; pickedIndex: number | null } {
     if (option === 'randomized') {
-        const pickedIndex = Math.floor(Math.random() * RERUN_RANDOM_MESSAGE_SET.length);
+        const excluded = excludeIndices instanceof Set
+            ? excludeIndices
+            : new Set(excludeIndices || []);
+
+        const availableIndices: number[] = [];
+        for (let idx = 0; idx < RERUN_RANDOM_MESSAGE_SET.length; idx++) {
+            if (!excluded.has(idx)) {
+                availableIndices.push(idx);
+            }
+        }
+        const pool = availableIndices.length > 0
+            ? availableIndices
+            : Array.from({ length: RERUN_RANDOM_MESSAGE_SET.length }, (_, i) => i);
+
+        const randomPoolIdx = Math.floor(Math.random() * pool.length);
+        const pickedIndex = pool[randomPoolIdx];
         return { message: RERUN_RANDOM_MESSAGE_SET[pickedIndex], pickedIndex };
     }
     const fixed = RERUN_FIXED_MESSAGES[option as Exclude<RerunMessageOption, 'randomized'>];
@@ -1300,6 +1318,7 @@ export interface RerunDispatchResult {
     requested: number;
     dispatched: number;
     failed: number;
+    messages?: string[];
 }
 
 /**
@@ -1314,7 +1333,7 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
         Math.max(RERUN_MIN_COUNT, Math.floor(ctx.count) || RERUN_DEFAULT_COUNT)
     );
     const source = ctx.source ?? 'DetailHeader.rerunSection';
-    const result: RerunDispatchResult = { requested, dispatched: 0, failed: 0 };
+    const result: RerunDispatchResult = { requested, dispatched: 0, failed: 0, messages: [] };
     const auditBase = {
         actor: 'user' as const,
         methodName: 'prompt_tree_rerun_dispatch',
@@ -1322,8 +1341,12 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
         uiTarget: 'PromptTreeView | DetailHeader | RerunSection',
         trigger: 'click' as const,
     };
+    const usedIndices = new Set<number>();
     for (let i = 0; i < requested; i += 1) {
-        const { message: rawMessage, pickedIndex } = resolveRerunMessage(ctx.messageOption);
+        const { message: rawMessage, pickedIndex } = resolveRerunMessage(ctx.messageOption, usedIndices);
+        if (pickedIndex !== null) {
+            usedIndices.add(pickedIndex);
+        }
         const richPrompt = buildRerunPrompt({
             prompt: ctx.originalPrompt,
             originalPrompt: ctx.originalPrompt,
@@ -1364,6 +1387,7 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
                 );
             }
             result.dispatched += 1;
+            result.messages?.push(rawMessage);
             try {
                 await copyPromptWithRichImages(message, undefined, undefined, rerunMedia.length > 0 ? rerunMedia : undefined);
             } catch (clipErr) {
@@ -1392,6 +1416,10 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
             // sendPromptNow already routed this into the error store (captureError);
             // persist the crash record as well so the failure stays visible.
             persistClientCrash(errorObj, 'usePromptTreePromptActions.dispatchRerunMessages');
+            useErrorStore.getState().captureException(errorObj, {
+                source: 'usePromptTreePromptActions.dispatchRerunMessages',
+                triggerAction: 'rerun_dispatch_round',
+            });
             await auditRecord({
                 ...auditBase,
                 params: {

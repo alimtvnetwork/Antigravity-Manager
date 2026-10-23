@@ -90,6 +90,12 @@ pub(crate) fn contains_quota_or_rate_limit_error(text: &str) -> bool {
         || lower.contains("rate_limit")
         || lower.contains("exhausted")
         || lower.contains("credit")
+        || lower.contains("out of credit")
+        || lower.contains("insufficient quota")
+        || lower.contains("billing")
+        || lower.contains("overloaded")
+        || lower.contains("temporarily unavailable")
+        || lower.contains("capacity")
 }
 
 /// Evaluates whether a transcript step records an error, failure, or quota exhaustion.

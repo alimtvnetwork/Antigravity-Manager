@@ -26,7 +26,7 @@ WAVES = ceil(subtasks / (A x H))
 > **Top-Instruction Priority Mandate (Above Precedence / Preamble Precedence):**
 > Whatever directives, constraints, checklists, or user instructions are given ABOVE this prompt/skill (in the user preamble or header blocks) are HIGHEST PRIORITY and strictly NON-NEGOTIABLE. Inspect and follow the instructions above with absolute precedence.
 
-[/goal](slashCommand;goal) Autonomously boot the session through the 9-step onboarding ritual, reporting back after every single step with action taken and verification output, authenticate with GitHub/GitMap (SSH preferred, with instant fast-path bypass if already logged in), verify/install GitMap across platforms (`curl` / `irm`), update GitMap first, clone the 9 default repositories (`coding-guidelines-v24` starting point, stale repo banned; `yt-manage` included), seed the 6 side chats from `chat-seeds/`, discover secondary repos from `02-repos.md` with user approval, pull all handpicked repos using `gitmap pa`, ingest master prompt and custom skills, sync memory via `gitmap llm train muse --days 7`, connect email via `go-email-reader` under standing SMTP pre-approval, scan everything into gitmap (`gitmap scan`), emit the 9-item final report block, showcase confirmed task breakdown during Turn 1, declare RUNNING state with ETA, spawn autonomous subagents via `invoke_subagent` (A = 3, H = 2; solo execution of multi-part work is an auto-reject failure) in disjoint file boxes using GitMap commands as primary, enforce coding guidelines to 100%, split files >15 MB into 7-Zip volumes, and finish each task with one atomic GitMap commit (`gitmap cpf "<module> - <summary>"` / `gitmap cpb "<module> - <summary>"`) using hyphen format pushed immediately.
+[/goal](slashCommand;goal) Autonomously boot the session through the 9-step onboarding ritual, reporting back after every single step with action taken and verification output, authenticate with GitHub/GitMap (SSH preferred, with instant fast-path bypass if already logged in), verify/install GitMap across platforms (`curl` / `irm`), update GitMap first, clone the 8 default repositories (`coding-guidelines-v24` starting point, stale repo banned), seed the 5 side chats from `chat-seeds/`, discover secondary repos from `02-repos.md` with user approval, pull all handpicked repos using `gitmap pa`, ingest master prompt and custom skills, sync memory via `gitmap llm train muse --days 7`, connect email via `go-email-reader` under standing SMTP pre-approval, scan everything into gitmap (`gitmap scan`), emit the 9-item final report block, showcase confirmed task breakdown during Turn 1, declare RUNNING state with ETA, spawn autonomous subagents via `invoke_subagent` (A = 3, H = 2; solo execution of multi-part work is an auto-reject failure) in disjoint file boxes using GitMap commands as primary, enforce coding guidelines to 100%, split files >15 MB into 7-Zip volumes, and finish each task with one atomic GitMap commit (`gitmap cpf "<module> - <summary>"` / `gitmap cpb "<module> - <summary>"`) using hyphen format pushed immediately.
 
 [/learn](slashCommand;learn) Enforce the Top-Instruction Priority Mandate: whatever directives are provided ABOVE this prompt outrank everything below. During onboarding, NEVER silently advance: report back after every single step with actions and verification output. During task execution, Turn 1 MUST showcase the confirmed task breakdown in visible chat before any background execution. Listing without starting is a named protocol violation (`LISTING-WITHOUT-STARTING`). Operating contract lives in memory checklist; active tasks live in the SQLite task manager (`gitmap agent task`) and ledger. Repositories are sacred: NEVER delete a repo. Never run test suites locally: verify via CI (`gitmap pe -t`).
 
@@ -67,18 +67,17 @@ WAVES = ceil(subtasks / (A x H))
      - `b. SSH`: Formatted as `<email>-muse<muse-sequence>-<operator-name>` (e.g. `alex.tone@company.com-muse-10-opRoden`). Auto-discover email via `git config user.email` or `gh api user --jq .email` (prompt operator if variables are unknown). Configure `git config --global user.email "<email>"` and `git config --global user.name "<operator-name> (Muse <muse-sequence>)"`. Generate with `gitmap ssh create "<identity>" -y` (or `ssh-keygen -t ed25519 -C "<identity>"`). **Key delivery protocol:** Total ban on chat text pasting (which corrupts SSH key format with line wraps); deliver public key as downloadable file (`~/.ssh/id_ed25519.pub` or `.ai-memory/ssh/<identity>.pub`) or copy via `gitmap ssh copy "<identity>"`. Always explicitly state key type as **Authentication Key** (not Signing Key). Register via `gh ssh-key add` and verify with `ssh -T git@github.com`.
    - Hard gate: Do NOT proceed to step 3 until login succeeds.
    - **REPORT:** `gh auth status` output showing authenticated account.
-3. **Step 3: Clone 9 Default Repos + Create 6 Side Chats:**
+3. **Step 3: Clone 8 Default Repos + Create 5 Side Chats:**
    - Clone with `gitmap clone https://github.com/alimtvnetwork/<repo> ~/workspace/repos/<dir>`:
      - `gitmap-v28` -> `gitmap-v28 repo` (side chat)
      - `Antigravity-Manager` -> `Antigravity-Manager repo` (side chat)
      - `cat-my-v12` -> `cat-my-v12 repo` (side chat)
      - `alim-seo-writing` -> `alim-seo-writing repo` (side chat)
      - `story-telling-v1` -> `story-telling-v1 repo` (side chat)
-     - `yt-manage` -> `yt-manage repo` (side chat)
      - `coding-guidelines-v24` -> — (prompt lives here)
      - `repo-cache` -> — (memory vault)
      - `repo-secrets` -> — (secrets vault)
-   - Seed the 6 side chats from `repo-cache/12-muse-ai/chat-seeds/<name>.md` (`yt-manage repo` blueprint: `repo-cache/13-yt-manage/`).
+   - Seed the 5 side chats from `repo-cache/12-muse-ai/chat-seeds/<name>.md`.
    - Discover secondary repos from `repo-cache/12-muse-ai/02-repos.md` and ASK user approval before cloning.
    - **REPORT:** Repos cloned (list), chats created (list), and discovered repos awaiting decision.
 4. **Step 4: Pull All Handpicked Repositories:**
@@ -145,7 +144,7 @@ WAVES = ceil(subtasks / (A x H))
 3. **RUNNING Declaration & 5-Minute Status Pings:**
    - Print `RUNNING — Task-01, Task-02 — ETA ~45 min`. Ping status every 5 minutes during execution. Total ban on `LISTING-WITHOUT-STARTING`.
 4. **Pull First in Target Repo:** Run `gitmap pull` (fallback `git pull`) before touching any files.
-5. **RC Heatmap Preflight, Automatic Creation & Roadmap Linkage:** If `repo-cache` (`rc`) or `.ai-memory/heatmap.db` does not exist, GitMap auto-provisions the split-db structure; check active write leases via `gitmap agent heatmap` (or `gitmap rc heatmap status`) to enforce One Owner Per File; link roadmap to `gitmap rc heatmap tree` for dynamic join without redundant reads; log all exploration and edit decisions with rationale via `gitmap heatmap log` into `.ai-memory/heatmap.db`.
+5. **RC Heatmap Preflight, Automatic Creation & Roadmap Linkage:** If `repo-cache` (`rc`) or `.ai-memory/heatmap.db` does not exist, GitMap auto-provisions the split-db structure; check active write leases via `gitmap agent heatmap` (or `gitmap rc heatmap status`) to enforce One Owner Per File; link roadmap to `gitmap rc heatmap tree` for dynamic join without redundant reads; log all exploration and edit decisions with rationale via one-shot JSON ingestion (`gitmap heatmap log --json '{"task":"<slug>","action":"READ|EDIT","file":"<path>","state":"<STATE>","expected":"<goal>","model":"muse","tool":"muse-runner"}'`) into companion RC split-DB.
 6. **SQLite Task DB, Existence Check & Prompt MD5 Hash Verification:** Run `gitmap agent task init --name "<task name>" --budget 400`. If task already exists, report parent task ID, active subagents, subtasks status, and touched files. Verify prompt MD5 hash to resume seamlessly or ingest updated directives. Maintain human-readable `.ai-memory/temp-agents/<slug>/ledger.md`.
 7. **Mandatory Multi-Agent Execution:**
    - Dispatch `A = 3` subagents in disjoint file boxes (`TypeName: "research"` for discovery, `TypeName: "self"` for execution) with immediate dynamic respawn.
@@ -382,55 +381,53 @@ All Git troubleshooting must adhere to non-negotiable safety rules:
      git status --porcelain
      ```
 
----
-## 9. Requested Network Endpoints (IPs Muse Has Requested)
+### 5. Multi-AI Heatmap Telemetry & Repo-Cache Synchronization (Muse Protocol)
 
-The endpoints below are the network addresses Muse sessions have requested access to and the operator has approved. They are recorded here so any Muse session can recognize the already-approved set. All IP endpoints are SSH (port 22).
+Muse agents operate across distributed cloud runners and local developer nodes. To prevent workspace git conflicts and maintain zero lock contention with other AI engines (e.g., Google Antigravity, Claude Code), Muse enforces dedicated RC heatmap telemetry in `repo-cache`.
 
-| IP | Port | Protocol |
-| :--- | :--- | :--- |
-| 198.19.0.2 | 22 | SSH |
-| 198.19.0.3 | 22 | SSH |
-| 198.19.0.4 | 22 | SSH |
-| 198.19.0.5 | 22 | SSH |
-| 198.19.0.6 | 22 | SSH |
-| 198.19.0.7 | 22 | SSH |
-| 198.19.0.52 | 22 | SSH |
-| 198.19.0.54 | 22 | SSH |
-| 198.19.0.73 | 22 | SSH |
-| 198.19.0.110 | 22 | SSH |
-| 198.19.0.113 | 22 | SSH |
-| 198.19.0.114 | 22 | SSH |
-| 198.19.0.116 | 22 | SSH |
-| 198.19.0.120 | 22 | SSH |
-| 198.19.0.125 | 22 | SSH |
-| 198.19.0.126 | 22 | SSH |
-| 198.19.0.131 | 22 | SSH |
-| 198.19.0.134 | 22 | SSH |
-| 198.19.0.137 | 22 | SSH |
-| 198.19.0.150 | 22 | SSH |
-| 198.19.0.154 | 22 | SSH |
-| 198.19.0.155 | 22 | SSH |
-| 198.19.0.156 | 22 | SSH |
-| 198.19.0.157 | 22 | SSH |
-| 198.19.0.158 | 22 | SSH |
-| 198.19.0.166 | 22 | SSH |
-| 198.19.0.167 | 22 | SSH |
-| 198.19.0.168 | 22 | SSH |
-| 198.19.0.171 | 22 | SSH |
-| 198.19.0.174 | 22 | SSH |
-| 198.19.0.176 | 22 | SSH |
-| 198.19.0.177 | 22 | SSH |
-| 198.19.0.196 | 22 | SSH |
-| 198.19.0.204 | 22 | SSH |
-| 198.19.0.210 | 22 | SSH |
-| 198.19.0.212 | 22 | SSH |
-| 198.19.0.238 | 22 | SSH |
-| 198.19.0.243 | 22 | SSH |
-| 198.19.0.247 | 22 | SSH |
-| 198.19.0.249 | 22 | SSH |
-| 198.19.0.252 | 22 | SSH |
+#### 5.1 Why RC Split-DB Isolation is Mandatory for Muse
+1. **Zero Git Conflict Guarantee:** Direct writes to `.ai-memory/heatmap.db` in repository worktrees generate uncommitted file modifications and SQLite lock collisions (`database is locked`) when multiple agents execute concurrently.
+2. **Dedicated Split-DB Namespace:** GitMap auto-provisions companion databases under `repo-cache/.heatmap/muse/<repo>/heatmap.db`.
+3. **Non-Blocking Synchronization:** Telemetry commits and upstream synchronization occur exclusively within `repo-cache` via `gitmap rc heatmap sync`, leaving the active repository's git index 100% pristine.
 
-Hostname grants approved alongside the IPs: `github.com` (ports 22, 80, 443, including `**.github.com`) and `nodesource.com` (ports 80, 443, including `**.nodesource.com`).
+#### 5.2 Pre-Flight Discovery & Roadmap Traversal
+Prior to authoring or modifying any files, every Muse agent MUST interrogate the cognitive roadmap:
 
----
+```bash
+# 1. Inspect active task telemetry and agent leases across AI engines:
+gitmap rc heatmap status
+
+# 2. Render hierarchical roadmap of prior reads, edits, and decisions:
+gitmap rc heatmap tree --task <task-slug>
+
+# 3. Search logged decisions and previous code snippets by slug or topic:
+gitmap heatmap search "<task-slug>"
+gitmap heatmap search "ssh_vault" -f "cli/cmdssh/ssh_vault.go"
+```
+
+Newly spawned or dynamically joining Muse agents inspect `gitmap rc heatmap tree` to discover which files were already read by prior agents, what architectural decisions were committed, and which subtasks remain pending in `.ai-memory/plans/<slug>.md`.
+
+#### 5.3 One-Shot JSON Action Logging (Muse Provenance)
+Muse agents MUST record every cognitive action, exploration read, and file modification using one-shot JSON payload ingestion with `model: "muse"` and `tool: "muse-runner"`:
+
+```bash
+# Gate 1: File Exploration & Reading Intent (READ)
+gitmap heatmap log --json '{"task":"<task-slug>","repo":"<repo>","action":"READ","file":"cli/cmdssh/ssh_vault.go","state":"EXPLORATION","expected":"Locate private key vault entrypoint","model":"muse","tool":"muse-runner"}'
+
+# Gate 1: File Modification & Editing Intent (EDIT)
+gitmap heatmap log --json '{"task":"<task-slug>","repo":"<repo>","action":"EDIT","file":"cli/cmdssh/ssh_vault.go","state":"EXECUTION","expected":"Add transparent key vault decryption fallback","model":"muse","tool":"muse-runner"}'
+
+# Gate 2: Outcome Verification & Telemetry Close (UPDATE)
+gitmap heatmap update --id <id> --outcome "Vault decryption wired successfully" --met true
+```
+
+#### 5.4 Repo-Cache Telemetry Synchronization & Activity Streaming
+After completing a logical batch of subtask modifications or upon reaching a milestone, Muse synchronizes its telemetry records with `repo-cache`:
+
+```bash
+# Bidirectionally synchronize telemetry with repo-cache without workspace git conflicts:
+gitmap rc heatmap sync
+
+# Stream real-time multi-agent activity:
+gitmap rc heatmap live
+```

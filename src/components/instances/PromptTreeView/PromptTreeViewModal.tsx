@@ -402,26 +402,39 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             ...(conv?.sub_runs?.flatMap((s) => s.media_paths || []) || []),
         ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
 
+        const effectiveNudgeType: RerunMessageOption = (nudgeType as RerunMessageOption) || loadPersistedRerunMessageOption();
         setActionMsg(`Dispatching rerun nudge (×${count})...`);
         void dispatchRerunMessages({
             targetInstId,
             repoPath: targetRepoPath,
             convId: convoId,
             count,
-            messageOption: (nudgeType as any) || 'randomized',
+            messageOption: effectiveNudgeType,
             originalPrompt,
             source: 'PromptTreeViewModal.onRerunConversation',
             mediaPaths: convMedia.length > 0 ? convMedia : undefined,
         }).then((res) => {
             if (res.dispatched > 0) {
-                setActionMsg(`Rerun ×${res.dispatched} dispatched successfully!`);
-                setTimeout(() => setActionMsg(null), 3000);
+                const previewMsg = res.messages?.[0] ? ` ("${res.messages[0]}")` : '';
+                setActionMsg(`Rerun ×${res.dispatched} dispatched successfully!${previewMsg}`);
+                setTimeout(() => setActionMsg(null), 3500);
             } else if (res.failed > 0) {
-                setActionMsg(`Rerun failed (${res.failed} error(s))`);
+                setActionMsg(`Rerun failed: ${res.failed} of ${res.requested} dispatch(es) failed`);
+                useErrorStore.getState().captureError(
+                    new Error(`Rerun failed: ${res.failed} of ${res.requested} dispatch(es) failed`),
+                    {
+                        source: 'PromptTreeViewModal.handleRerunConversation',
+                        triggerAction: 'rerun_dispatch',
+                    }
+                );
             }
         }).catch((err: unknown) => {
-            const msg = err instanceof Error ? err.message : String(err) || 'rerun failed';
-            setActionMsg(`Rerun failed: ${msg}`);
+            const errorObj = err instanceof Error ? err : new Error(String(err) || 'rerun failed');
+            useErrorStore.getState().captureException(errorObj, {
+                source: 'PromptTreeViewModal.handleRerunConversation',
+                triggerAction: 'rerun_conversation',
+            });
+            setActionMsg(`Rerun failed: ${errorObj.message}`);
         });
     };
 

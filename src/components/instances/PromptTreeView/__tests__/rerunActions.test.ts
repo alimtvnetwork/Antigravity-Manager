@@ -1,19 +1,31 @@
 /**
- * Unit Tests for Rerun Randomizer & Storage Persistence (Step 288 / Imp-702)
+ * Unit Tests for Rerun Randomizer & Storage Persistence (Step 288 / Imp-702, Imp-727)
  *
  * Verifies:
  * 1. Default rerun option is 'randomized' and count defaults to 4.
- * 2. RERUN_RANDOM_MESSAGE_SET contains at least 16 distinct actionable variations.
+ * 2. RERUN_RANDOM_MESSAGE_SET contains at least 25 distinct actionable variations.
  * 3. resolveRerunMessage correctly picks random items or fixed phrases.
- * 4. loadPersistedRerunMessageOption and savePersistedRerunMessageOption work with both
+ * 4. resolveRerunMessage avoids previous picks when excludeIndices is provided.
+ * 5. loadPersistedRerunMessageOption and savePersistedRerunMessageOption work with both
  *    primary and legacy localStorage keys.
- * 5. loadPersistedRerunCount and savePersistedRerunCount clamp to valid range [1, 8].
+ * 6. loadPersistedRerunCount and savePersistedRerunCount clamp to valid range [1, 8].
+ * 7. dispatchRerunMessages auto-picks randomized messages, sends Round 1 immediately
+ *    via sendPromptNow, and enqueues Rounds 2..N via enqueuePrompt.
+ * 8. dispatchRerunMessages handles errors gracefully without unhandled crashes.
  *
  * Run: node scripts/run-frontend-tests.mjs rerunActions
  *      npm test -- rerunActions
  */
 
-// Mock window and localStorage if running in Node.js
+interface MockInvokeCall {
+    cmd: string;
+    args: any;
+}
+
+const mockInvokeCalls: MockInvokeCall[] = [];
+let mockInvokeFailCmd: string | null = null;
+
+// Mock window, localStorage and Tauri IPC internals if running in Node.js
 if (typeof (globalThis as any).window === 'undefined') {
     const store = new Map<string, string>();
     const mockStorage = {
@@ -28,8 +40,29 @@ if (typeof (globalThis as any).window === 'undefined') {
             store.clear();
         },
     };
-    (globalThis as any).window = { localStorage: mockStorage };
+    (globalThis as any).window = {
+        localStorage: mockStorage,
+        __TAURI_INTERNALS__: {
+            invoke: async (cmd: string, args: any) => {
+                mockInvokeCalls.push({ cmd, args });
+                if (mockInvokeFailCmd && cmd === mockInvokeFailCmd) {
+                    throw new Error(`Mock invoke failure for ${cmd}`);
+                }
+                return 'ok';
+            },
+        },
+    };
     (globalThis as any).localStorage = mockStorage;
+} else if (!(globalThis as any).window.__TAURI_INTERNALS__) {
+    (globalThis as any).window.__TAURI_INTERNALS__ = {
+        invoke: async (cmd: string, args: any) => {
+            mockInvokeCalls.push({ cmd, args });
+            if (mockInvokeFailCmd && cmd === mockInvokeFailCmd) {
+                throw new Error(`Mock invoke failure for ${cmd}`);
+            }
+            return 'ok';
+        },
+    };
 }
 
 import {
@@ -45,15 +78,16 @@ import {
     savePersistedRerunMessageOption,
     loadPersistedRerunCount,
     savePersistedRerunCount,
+    dispatchRerunMessages,
 } from '../usePromptTreePromptActions';
 import { buildRerunPrompt } from '../verificationTemplates';
 
 let passed = 0;
 let failed = 0;
 
-function test(description: string, fn: () => void): void {
+async function test(description: string, fn: () => void | Promise<void>): Promise<void> {
     try {
-        fn();
+        await fn();
         passed++;
     } catch (e: unknown) {
         failed++;
@@ -74,11 +108,17 @@ function assertTrue(actual: boolean, msg?: string): void {
     }
 }
 
+function assertFalse(actual: boolean, msg?: string): void {
+    if (actual !== false) {
+        throw new Error(msg || `expected false, got ${actual}`);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-test('verifies default rerun options and count constants', () => {
+await test('verifies default rerun options and count constants', () => {
     assertEqual(RERUN_DEFAULT_MESSAGE_OPTION, 'randomized');
     assertEqual(RERUN_DEFAULT_COUNT, 4);
     assertEqual(RERUN_MIN_COUNT, 1);
@@ -87,7 +127,7 @@ test('verifies default rerun options and count constants', () => {
     assertEqual(RERUN_COUNT_STORAGE_KEY, 'agm:prompt-tree:rerun-count');
 });
 
-test('verifies randomized message set contains at least 25 distinct actionable variations', () => {
+await test('verifies randomized message set contains at least 25 distinct actionable variations', () => {
     assertTrue(RERUN_RANDOM_MESSAGE_SET.length >= 25);
 
     const requiredPhrases = [
@@ -126,7 +166,7 @@ test('verifies randomized message set contains at least 25 distinct actionable v
     }
 });
 
-test('verifies buildRerunPrompt strips rerun header and retains underlying prompt when markers missing', () => {
+await test('verifies buildRerunPrompt strips rerun header and retains underlying prompt when markers missing', () => {
     const priorRerunPrompt = [
         '# 🔄 RERUN EXECUTION NUDGE — ROUND 1 OF 4',
         '',
@@ -151,7 +191,7 @@ test('verifies buildRerunPrompt strips rerun header and retains underlying promp
     assertTrue(result.includes('<<<ORIGINAL_TASK_PROMPT_END>>>'));
 });
 
-test('verifies resolveRerunMessage picks from RERUN_RANDOM_MESSAGE_SET when randomized', () => {
+await test('verifies resolveRerunMessage picks from RERUN_RANDOM_MESSAGE_SET when randomized', () => {
     const pickedMessages = new Set<string>();
     for (let i = 0; i < 50; i++) {
         const { message, pickedIndex } = resolveRerunMessage('randomized');
@@ -163,7 +203,22 @@ test('verifies resolveRerunMessage picks from RERUN_RANDOM_MESSAGE_SET when rand
     assertTrue(pickedMessages.size > 1, 'Random picker did not vary over 50 iterations');
 });
 
-test('verifies resolveRerunMessage returns expected fixed messages for non-randomized options', () => {
+await test('verifies resolveRerunMessage avoids previous picks when excludeIndices is provided', () => {
+    const used = new Set<number>();
+    const pickedPhrases = new Set<string>();
+    // Pick 5 consecutive variations
+    for (let round = 0; round < 5; round++) {
+        const { message, pickedIndex } = resolveRerunMessage('randomized', used);
+        assertTrue(pickedIndex !== null);
+        assertFalse(used.has(pickedIndex!), `picked index ${pickedIndex} was already in excluded set`);
+        used.add(pickedIndex!);
+        pickedPhrases.add(message);
+    }
+    assertEqual(used.size, 5);
+    assertEqual(pickedPhrases.size, 5);
+});
+
+await test('verifies resolveRerunMessage returns expected fixed messages for non-randomized options', () => {
     assertEqual(resolveRerunMessage('is-it-completed').message, 'Is it completed?');
     assertEqual(resolveRerunMessage('is-it-finished').message, 'Is it finished?');
     assertEqual(resolveRerunMessage('is-it-released').message, 'Is it released?');
@@ -187,7 +242,7 @@ test('verifies resolveRerunMessage returns expected fixed messages for non-rando
     );
 });
 
-test('verifies loadPersistedRerunMessageOption defaults to randomized and reads from localStorage', () => {
+await test('verifies loadPersistedRerunMessageOption defaults to randomized and reads from localStorage', () => {
     window.localStorage.clear();
     assertEqual(loadPersistedRerunMessageOption(), 'randomized');
 
@@ -200,7 +255,7 @@ test('verifies loadPersistedRerunMessageOption defaults to randomized and reads 
     assertEqual(loadPersistedRerunMessageOption(), 'is-it-released');
 });
 
-test('verifies loadPersistedRerunCount clamps values within bounds [1, RERUN_MAX_COUNT]', () => {
+await test('verifies loadPersistedRerunCount clamps values within bounds [1, RERUN_MAX_COUNT]', () => {
     window.localStorage.clear();
     assertEqual(loadPersistedRerunCount(), 4);
 
@@ -214,6 +269,71 @@ test('verifies loadPersistedRerunCount clamps values within bounds [1, RERUN_MAX
     // Above max clamps to RERUN_MAX_COUNT
     savePersistedRerunCount(999);
     assertEqual(loadPersistedRerunCount(), RERUN_MAX_COUNT);
+});
+
+await test('verifies dispatchRerunMessages sends round 1 immediately and enqueues rounds 2..N with varied randomized messages', async () => {
+    mockInvokeCalls.length = 0;
+    mockInvokeFailCmd = null;
+
+    const result = await dispatchRerunMessages({
+        targetInstId: 'inst-test-1',
+        repoPath: '/work/test-repo',
+        convId: 'conv-test-1',
+        count: 3,
+        messageOption: 'randomized',
+        originalPrompt: 'Complete task and push changes',
+        source: 'testRunner',
+    });
+
+    assertEqual(result.requested, 3);
+    assertEqual(result.dispatched, 3);
+    assertEqual(result.failed, 0);
+    assertTrue(Array.isArray(result.messages));
+    assertEqual(result.messages!.length, 3);
+
+    // Verify messages are varied
+    const uniqueMessages = new Set(result.messages!);
+    assertEqual(uniqueMessages.size, 3, 'All 3 randomized messages should be distinct');
+
+    // Filter invoke calls for prompt dispatches
+    const promptCalls = mockInvokeCalls.filter((c) => c.cmd === 'send_prompt_now' || c.cmd === 'enqueue_prompt');
+    assertEqual(promptCalls.length, 3);
+
+    // Round 1 must be send_prompt_now (immediate preempt)
+    assertEqual(promptCalls[0].cmd, 'send_prompt_now');
+    assertEqual(promptCalls[0].args.instanceId, 'inst-test-1');
+    assertEqual(promptCalls[0].args.conversationId, 'conv-test-1');
+
+    // Rounds 2 and 3 must be enqueue_prompt (FIFO enqueued)
+    assertEqual(promptCalls[1].cmd, 'enqueue_prompt');
+    assertEqual(promptCalls[1].args.instanceId, 'inst-test-1');
+    assertEqual(promptCalls[1].args.conversationId, 'conv-test-1');
+
+    assertEqual(promptCalls[2].cmd, 'enqueue_prompt');
+    assertEqual(promptCalls[2].args.instanceId, 'inst-test-1');
+    assertEqual(promptCalls[2].args.conversationId, 'conv-test-1');
+});
+
+await test('verifies dispatchRerunMessages handles errors gracefully without crashing', async () => {
+    mockInvokeCalls.length = 0;
+    mockInvokeFailCmd = 'enqueue_prompt'; // Round 2..N will fail
+
+    const result = await dispatchRerunMessages({
+        targetInstId: 'inst-err-1',
+        repoPath: '/work/test-repo',
+        convId: 'conv-err-1',
+        count: 2,
+        messageOption: 'is-it-completed',
+        originalPrompt: 'Check test status',
+        source: 'testRunner',
+    });
+
+    assertEqual(result.requested, 2);
+    assertEqual(result.dispatched, 1); // Round 1 succeeded
+    assertEqual(result.failed, 1);     // Round 2 failed
+    assertEqual(result.messages!.length, 1);
+
+    mockInvokeFailCmd = null;
 });
 
 // ===========================================================================

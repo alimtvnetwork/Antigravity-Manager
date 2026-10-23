@@ -456,15 +456,21 @@ export function ConversationContextMenu({
 
     // Rerun uses the same persisted option + count as the DetailHeader rerun
     // picker (default: randomized nudge) instead of a hardcoded nudge.
-    const persistedRerunOption = loadPersistedRerunMessageOption();
-    const persistedRerunCount = loadPersistedRerunCount();
+    const [persistedRerunOption, setPersistedRerunOption] = useState<RerunMessageOption>(() => loadPersistedRerunMessageOption());
+    const [persistedRerunCount, setPersistedRerunCount] = useState<number>(() => loadPersistedRerunCount());
     const persistedRerunOptionLabel =
         RERUN_MESSAGE_OPTIONS.find((opt) => opt.value === persistedRerunOption)?.label ?? persistedRerunOption;
+
+    const handleSetCount = (cnt: number) => {
+        savePersistedRerunCount(cnt);
+        setPersistedRerunCount(cnt);
+    };
 
     const handleDoRerun = async (e?: React.MouseEvent) => {
         e?.stopPropagation();
         if (isRerunning) return;
-        const currentOption = loadPersistedRerunMessageOption();
+        const currentOption = persistedRerunOption || loadPersistedRerunMessageOption();
+        const currentCount = persistedRerunCount || loadPersistedRerunCount();
         if (onRerun) {
             onRerun();
             onClose();
@@ -492,7 +498,7 @@ export function ConversationContextMenu({
                 targetInstId,
                 repoPath: targetRepoPath,
                 convId: conversationId,
-                count: loadPersistedRerunCount(),
+                count: currentCount,
                 messageOption: currentOption,
                 originalPrompt,
                 source: 'ConversationContextMenu.handleDoRerun',
@@ -514,6 +520,7 @@ export function ConversationContextMenu({
 
     const handleRerunWithOption = async (option: RerunMessageOption) => {
         savePersistedRerunMessageOption(option);
+        setPersistedRerunOption(option);
         if (isRerunning) return;
         if (onRerunConversation) {
             onRerunConversation(conversationId, option);
@@ -537,7 +544,7 @@ export function ConversationContextMenu({
                 targetInstId,
                 repoPath: targetRepoPath,
                 convId: conversationId,
-                count: loadPersistedRerunCount(),
+                count: persistedRerunCount,
                 messageOption: option,
                 originalPrompt,
                 source: 'ConversationContextMenu.handleRerunWithOption',
@@ -923,7 +930,7 @@ export function ConversationContextMenu({
                                     type="button"
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        savePersistedRerunCount(cnt);
+                                        handleSetCount(cnt);
                                     }}
                                     className={cn(
                                         "px-1.5 py-0.5 rounded text-[10px] font-bold font-mono cursor-pointer transition-colors",

@@ -286,49 +286,45 @@ pub async fn execute_profile_rotation_with_context(
             ),
             "copy_instance_projects",
         );
-        // Re-attribute backed-up prompts from depleted instance to target instance so post-switch restore finds them
-        if let Ok(conn) = crate::modules::repo_db::connect_db() {
-            let is_source_default =
-                current_instance_id == "default" || current_instance_id == "__default__";
-            let reattributed = if is_source_default {
-                conn.execute(
-                    "UPDATE active_prompts SET instance_id = ?1 WHERE (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL) AND status = 'backed_up'",
-                    rusqlite::params![&target.instance_id],
-                )
-            } else {
-                conn.execute(
-                    "UPDATE active_prompts SET instance_id = ?1 WHERE instance_id = ?2 AND status = 'backed_up'",
-                    rusqlite::params![&target.instance_id, &current_instance_id],
-                )
-            }
-            .unwrap_or(0);
-            logger::log_info(&format!(
-                "[AutoSwitcher] Re-attributed {} backed-up prompts from '{}' to target '{}'",
-                reattributed, current_instance_id, target.instance_id
-            ));
-        }
-        if let Ok(conn) = crate::modules::backup_prompts_db::connect_db() {
-            let is_source_default =
-                current_instance_id == "default" || current_instance_id == "__default__";
-            // Justification: prompt re-attribution to target instance during switch
-            if is_source_default {
-                crate::error::record_ignored(
+        // Re-attribute incomplete prompts from depleted instance to target instance so post-switch restore finds them
+        match crate::modules::repo_db::connect_db() {
+            Ok(conn) => {
+                let is_source_default =
+                    current_instance_id == "default" || current_instance_id == "__default__";
+                let reattributed = if is_source_default {
                     conn.execute(
-                        "UPDATE prompt_backups SET instance_id = ?1 WHERE (instance_id = 'default' OR instance_id = '__default__' OR instance_id IS NULL OR instance_id = '') AND is_restored = 0",
+                        "UPDATE active_prompts SET instance_id = ?1, status = 'backed_up' WHERE (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL) AND status NOT IN ('completed', 'succeeded')",
                         rusqlite::params![&target.instance_id],
-                    ),
-                    "re-attribute prompt backups to target instance in auto-switcher",
-                );
-            } else {
-                crate::error::record_ignored(
+                    )
+                } else {
                     conn.execute(
-                        "UPDATE prompt_backups SET instance_id = ?1 WHERE instance_id = ?2 AND is_restored = 0",
+                        "UPDATE active_prompts SET instance_id = ?1, status = 'backed_up' WHERE instance_id = ?2 AND status NOT IN ('completed', 'succeeded')",
                         rusqlite::params![&target.instance_id, &current_instance_id],
-                    ),
-                    "re-attribute prompt backups to target instance in auto-switcher",
+                    )
+                }
+                .unwrap_or(0);
+                logger::log_info(&format!(
+                    "[AutoSwitcher] Re-attributed {} incomplete prompts from '{}' to target '{}'",
+                    reattributed, current_instance_id, target.instance_id
+                ));
+            }
+            Err(e) => {
+                // Justification: best-effort DB statement during switch; failure logged
+                crate::error::record_ignored(
+                    Err::<(), _>(e),
+                    "connect repo_db to re-attribute active prompts",
                 );
             }
         }
+        // Justification: prompt re-attribution to target instance during switch; failure logged
+        crate::error::record_ignored(
+            crate::modules::backup_prompts_db::reattribute_unrestored_prompt_backups(
+                Some(&current_instance_id),
+                &target.instance_id,
+                None,
+            ),
+            "reattribute_unrestored_prompt_backups in auto-switcher",
+        );
         for ws in &active_workspaces {
             // Justification: best-effort call; failure logged without changing control flow
             crate::error::record_ignored(
@@ -489,7 +485,11 @@ pub async fn execute_profile_rotation_with_context(
     // Schedule post-switch prompt restore on target instance if auto_reopen_on_switch is enabled
     // or if backed-up prompts exist for the target instance
     let app_config = config::load_app_config().unwrap_or_default();
-    if app_config.auto_profile_switcher.auto_reopen_on_switch || backed_up_count_val > 0 {
+    let has_pending_backups = backed_up_count_val > 0
+        || crate::modules::repo_db::count_backed_up_prompts(&target_inst_id_clone) > 0
+        || crate::modules::backup_prompts_db::count_unrestored_prompts_for_instance(Some(&target_inst_id_clone)).unwrap_or(0) > 0
+        || crate::modules::backup_prompts_db::count_unrestored_prompts_for_other_instances(&target_inst_id_clone, None).unwrap_or(0) > 0;
+    if app_config.auto_profile_switcher.auto_reopen_on_switch || has_pending_backups {
         crate::modules::instance::schedule_prompt_restore_after_launch(
             target_inst_id_clone.clone(),
         );

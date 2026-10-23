@@ -1,5 +1,5 @@
 # Subtask 02: Account Auto-Switch Prompt Restore Engine & Quota Exhaustion Remediation
-Status: PENDING
+Status: COMPLETED
 Sequence: 220
 Step: 312
 Improvement: `Imp-726`

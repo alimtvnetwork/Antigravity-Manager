@@ -219,8 +219,18 @@ pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<Activ
                 .as_deref()
                 .map(parse_flexible_timestamp)
                 .unwrap_or(0);
-            // 30-minute freshness window (1800s) ensures prompts whose quota ran out earlier are not dropped
-            let is_recent = last_time_epoch > 0 && (now - last_time_epoch <= 1800);
+            // 2-hour freshness window (7200s); if last_time_epoch is missing or 0, fallback to transcript file mtime
+            let effective_mtime = if last_time_epoch > 0 {
+                last_time_epoch
+            } else {
+                resolve_transcript_path(&base_dir, &cid)
+                    .and_then(|p| fs::metadata(p).ok())
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0)
+            };
+            let is_recent = effective_mtime == 0 || (now - effective_mtime <= 7200);
             if !is_recent {
                 continue;
             }
@@ -314,7 +324,7 @@ pub fn discover_running_prompts_from_antigravity(instance_id: &str) -> Vec<Activ
 
     if !prompts.is_empty() {
         crate::modules::logger::log_info(&format!(
-            "[RepoDB] Discovered {} prompt(s) from Antigravity storage for instance '{}' (freshness window 1800s, including quota/error-interrupted)",
+            "[RepoDB] Discovered {} prompt(s) from Antigravity storage for instance '{}' (freshness window 7200s, including quota/error-interrupted)",
             prompts.len(),
             instance_id
         ));

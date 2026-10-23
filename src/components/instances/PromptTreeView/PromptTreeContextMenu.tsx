@@ -15,9 +15,11 @@ import {
     FileJson,
     Database,
     FileText,
+    ChevronRight,
 } from 'lucide-react';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
+import { cn } from '../../../utils/cn';
 import type { AgmConversationNode, AgmProjectTreeNode } from './types';
 import {
     exportConversationAsJson,
@@ -25,6 +27,10 @@ import {
     exportConversationAsSqlite,
     loadPersistedRerunMessageOption,
     loadPersistedRerunCount,
+    savePersistedRerunMessageOption,
+    savePersistedRerunCount,
+    RERUN_MESSAGE_OPTIONS,
+    type RerunMessageOption,
 } from './usePromptTreePromptActions';
 import { copyPromptWithRichImages } from './clipboard';
 import { stripImagesFromPrompt } from './formatters';
@@ -112,10 +118,13 @@ export function PromptTreeContextMenu(props: PromptTreeContextMenuProps) {
     const [isIdCopied, setIsIdCopied] = useState(false);
     const [isPromptCopied, setIsPromptCopied] = useState(false);
     const [isTextOnlyCopied, setIsTextOnlyCopied] = useState(false);
+    const [isRerunSubmenuOpen, setIsRerunSubmenuOpen] = useState(false);
+    const [persistedCount, setPersistedCount] = useState<number>(() => loadPersistedRerunCount());
+    const [persistedOption, setPersistedOption] = useState<RerunMessageOption>(() => loadPersistedRerunMessageOption());
 
     // Context menu width/height clamping
     const MENU_WIDTH = 250;
-    const MENU_HEIGHT = type === 'project' ? 320 : 420;
+    const MENU_HEIGHT = type === 'project' ? 320 : (isRerunSubmenuOpen ? 540 : 420);
     const left = Math.max(8, Math.min(x, window.innerWidth - MENU_WIDTH));
     const top = Math.max(8, Math.min(y, window.innerHeight - MENU_HEIGHT));
 
@@ -432,17 +441,79 @@ export function PromptTreeContextMenu(props: PromptTreeContextMenuProps) {
                     )}
 
                     {onRerunConversation && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                onRerunConversation(conversationId, loadPersistedRerunMessageOption());
-                                onClose();
-                            }}
-                            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left hover:bg-slate-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer text-xs"
-                        >
-                            <Repeat className="w-3.5 h-3.5 text-sky-500" />
-                            <span>Rerun Nudge (×{loadPersistedRerunCount()})</span>
-                        </button>
+                        <div>
+                            <button
+                                type="button"
+                                onClick={() => setIsRerunSubmenuOpen((prev) => !prev)}
+                                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left hover:bg-slate-100 dark:hover:bg-[#40285e] transition-colors cursor-pointer text-xs"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <Repeat className="w-3.5 h-3.5 text-sky-500" />
+                                    <span>Rerun Nudge (×{persistedCount})</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-[10px] font-mono text-sky-600 dark:text-sky-400 capitalize">
+                                        {persistedOption === 'randomized' ? 'Random' : persistedOption.replace(/-/g, ' ')}
+                                    </span>
+                                    <ChevronRight className={cn("w-3 h-3 text-slate-400 transition-transform", isRerunSubmenuOpen && "rotate-90")} />
+                                </div>
+                            </button>
+
+                            {isRerunSubmenuOpen && (
+                                <div className="mx-2 my-1 pl-2.5 border-l-2 border-sky-500/40 space-y-1 max-h-52 overflow-y-auto">
+                                    <div className="flex items-center justify-between px-1 text-[10px] text-slate-400 font-mono">
+                                        <span>COUNT:</span>
+                                        <div className="flex items-center gap-1">
+                                            {[1, 2, 4, 8].map((cnt) => (
+                                                <button
+                                                    key={cnt}
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        savePersistedRerunCount(cnt);
+                                                        setPersistedCount(cnt);
+                                                    }}
+                                                    className={cn(
+                                                        "px-1.5 py-0.5 rounded text-[10px] font-bold font-mono cursor-pointer transition-colors",
+                                                        persistedCount === cnt
+                                                            ? "bg-sky-500 text-white"
+                                                            : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                                                    )}
+                                                >
+                                                    ×{cnt}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    {RERUN_MESSAGE_OPTIONS.map((opt) => (
+                                        <button
+                                            key={opt.value}
+                                            type="button"
+                                            className={cn(
+                                                "flex w-full items-center justify-between px-2 py-1 text-left rounded text-[11px] cursor-pointer transition-colors",
+                                                opt.value === persistedOption
+                                                    ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 font-semibold hover:bg-sky-500/25"
+                                                    : "hover:bg-sky-500/10 text-slate-700 dark:text-slate-200"
+                                            )}
+                                            onClick={() => {
+                                                savePersistedRerunMessageOption(opt.value);
+                                                setPersistedOption(opt.value);
+                                                onRerunConversation(conversationId, opt.value);
+                                                onClose();
+                                            }}
+                                            title={opt.hint}
+                                        >
+                                            <span className="truncate pr-1">{opt.label}</span>
+                                            {opt.value === 'randomized' && (
+                                                <span className="text-[9px] font-mono font-bold uppercase px-1 py-0.2 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+                                                    Random
+                                                </span>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     )}
 
                     {type === 'conversation' && (

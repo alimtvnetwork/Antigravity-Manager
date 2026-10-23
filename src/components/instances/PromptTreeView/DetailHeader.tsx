@@ -154,7 +154,7 @@ export function DetailHeader(props: DetailHeaderProps) {
         setPrimaryDispatchAction(mode);
         propSetDispatchMode?.(mode);
         if (mode === 'rerun') {
-            setRerunMessageOption('randomized');
+            setRerunMessageOption((prev) => prev || 'randomized');
         }
     };
 
@@ -367,7 +367,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                 ...(attachedImage ? [attachedImage.dataUri, attachedImage.path] : []),
             ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
 
-            const effectiveOption: RerunMessageOption = 'randomized';
+            const effectiveOption: RerunMessageOption = rerunMessageOption || 'randomized';
             const result = await dispatchRerunMessages({
                 targetInstId,
                 repoPath: effectiveRepoPath,
@@ -386,8 +386,9 @@ export function DetailHeader(props: DetailHeaderProps) {
                     'DetailHeader.rerunSection'
                 );
             } else if (result.dispatched > 0) {
+                const previewMsg = result.messages?.[0] ? ` ("${result.messages[0]}")` : '';
                 setRerunFlash(`Sent ×${result.dispatched}`);
-                setActionMsg?.(`Rerun ×${result.dispatched} dispatched successfully!`);
+                setActionMsg?.(`Rerun ×${result.dispatched} dispatched successfully!${previewMsg}`);
                 setTimeout(() => setRerunFlash(null), 2500);
                 setAttachedImage(null);
             }

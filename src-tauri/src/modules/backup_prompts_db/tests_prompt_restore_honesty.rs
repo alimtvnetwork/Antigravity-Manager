@@ -9,7 +9,9 @@
 
 use super::connect_backup_db;
 use super::restore::{
+    count_unrestored_prompts_for_instance_with_file,
     count_unrestored_prompts_for_other_instances, is_live_status_preserved,
+    reattribute_unrestored_prompt_backups,
     restore_running_prompts_scoped_with_fallback_with_outcome, RestoreOutcome,
 };
 use chrono::Utc;
@@ -128,6 +130,8 @@ fn test_scoped_restore_fallback_when_scoped_returns_zero_and_other_exists() {
     assert_eq!(records[0].prompt_id, "prompt-fb-1");
     assert_eq!(records[1].prompt_id, "prompt-fb-2");
     assert_eq!(outcome.restored_count(), 2);
+    assert_eq!(records[0].instance_id.as_deref(), Some("inst-target"));
+    assert_eq!(records[1].instance_id.as_deref(), Some("inst-target"));
 
     // Justification: test cleanup of temporary directory
     crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove temp dir");
@@ -162,15 +166,183 @@ fn test_reattribution_of_unrestored_prompt_backups_during_switch() {
     let now = Utc::now().timestamp();
     seed_reattribution_test_records(&conn, custom_file, now);
 
-    let changed = conn
-        .execute(
-            "UPDATE prompt_backups SET instance_id = ?1 WHERE instance_id = ?2 AND is_restored = 0",
-            params!["inst-new", "inst-old"],
-        )
-        .expect("Must update instance_id");
+    let changed = reattribute_unrestored_prompt_backups(
+        Some("inst-old"),
+        "inst-new",
+        Some(custom_file),
+    )
+    .expect("Must re-attribute prompt backups");
     assert_eq!(changed, 1, "Only unrestored row should be re-attributed");
 
     assert_reattribution_outcomes(&conn);
+
+    // Justification: test cleanup of temporary directory
+    crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove temp dir");
+}
+
+#[test]
+fn test_reattribute_unrestored_prompt_backups_unscoped_and_scoped() {
+    let temp_dir = std::env::temp_dir().join(format!(
+        "agm_test_reattr_all_{}",
+        Uuid::new_v4().simple()
+    ));
+    let db_path = temp_dir.join("test-reattr-all.db");
+    let custom_file = db_path.to_str().expect("valid path");
+
+    let conn = connect_backup_db(Some(custom_file)).expect("Must connect to backup DB");
+    let now = Utc::now().timestamp();
+
+    conn.execute(
+        "INSERT INTO backup_batches (id, created_at, prompts_count, file_path, retention_days, is_fully_restored)
+         VALUES ('b-all', ?1, 3, ?2, 1, 0)",
+        params![now, custom_file],
+    )
+    .expect("Must insert batch");
+
+    conn.execute(
+        "INSERT INTO prompt_backups (id, backup_batch_id, prompt_id, project_name, project_path, project_id, conversation_id, sequence_id, prompt_text, created_at, is_restored, instance_id)
+         VALUES ('r-1', 'b-all', 'p-1', 'proj', '/work/p', 'proj-1', 'conv-1', 1, 'text 1', ?1, 0, 'inst-a')",
+        params![now],
+    )
+    .expect("Must insert r-1");
+
+    conn.execute(
+        "INSERT INTO prompt_backups (id, backup_batch_id, prompt_id, project_name, project_path, project_id, conversation_id, sequence_id, prompt_text, created_at, is_restored, instance_id)
+         VALUES ('r-2', 'b-all', 'p-2', 'proj', '/work/p', 'proj-1', 'conv-1', 2, 'text 2', ?1, 0, 'inst-b')",
+        params![now + 1],
+    )
+    .expect("Must insert r-2");
+
+    conn.execute(
+        "INSERT INTO prompt_backups (id, backup_batch_id, prompt_id, project_name, project_path, project_id, conversation_id, sequence_id, prompt_text, created_at, is_restored, instance_id)
+         VALUES ('r-3', 'b-all', 'p-3', 'proj', '/work/p', 'proj-1', 'conv-1', 3, 'text 3', ?1, 1, 'inst-a')",
+        params![now + 2],
+    )
+    .expect("Must insert r-3");
+
+    // Scoped re-attribution: from inst-a to inst-target
+    let changed_scoped = reattribute_unrestored_prompt_backups(
+        Some("inst-a"),
+        "inst-target",
+        Some(custom_file),
+    )
+    .expect("Must re-attribute inst-a");
+    assert_eq!(changed_scoped, 1, "Only r-1 was from inst-a and unrestored");
+
+    // Unscoped re-attribution: from None to inst-target (should reattribute remaining r-2 from inst-b)
+    let changed_unscoped = reattribute_unrestored_prompt_backups(
+        None,
+        "inst-target",
+        Some(custom_file),
+    )
+    .expect("Must re-attribute all unrestored");
+    assert_eq!(changed_unscoped, 2);
+
+    let count_target = count_unrestored_prompts_for_instance_with_file(
+        Some("inst-target"),
+        Some(custom_file),
+    )
+    .expect("Must count unrestored prompts for inst-target");
+    assert_eq!(count_target, 2);
+
+    let count_other = count_unrestored_prompts_for_other_instances("inst-target", Some(custom_file))
+        .expect("Must count other unrestored");
+    assert_eq!(count_other, 0);
+
+    // r-3 was already restored and remains inst-a
+    let r3_inst: String = conn
+        .query_row(
+            "SELECT instance_id FROM prompt_backups WHERE id = 'r-3'",
+            [],
+            |r| r.get(0),
+        )
+        .expect("query r-3");
+    assert_eq!(r3_inst, "inst-a");
+
+    // Justification: test cleanup of temporary directory
+    crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove temp dir");
+}
+
+#[test]
+fn test_fallback_unscoped_if_orphaned_reattributes_and_restores() {
+    let temp_dir = std::env::temp_dir().join(format!(
+        "agm_test_fallback_reattr_{}",
+        Uuid::new_v4().simple()
+    ));
+    let db_path = temp_dir.join("test-fallback-reattr.db");
+    let custom_file = db_path.to_str().expect("valid path");
+
+    let conn = connect_backup_db(Some(custom_file)).expect("Must connect to backup DB");
+    let now = Utc::now().timestamp();
+
+    conn.execute(
+        "INSERT INTO backup_batches (id, created_at, prompts_count, file_path, retention_days, is_fully_restored)
+         VALUES ('b-orphaned', ?1, 2, ?2, 1, 0)",
+        params![now, custom_file],
+    )
+    .expect("Must insert batch");
+
+    conn.execute(
+        "INSERT INTO prompt_backups (id, backup_batch_id, prompt_id, project_name, project_path, project_id, conversation_id, sequence_id, prompt_text, created_at, is_restored, instance_id)
+         VALUES ('rec-orph-1', 'b-orphaned', 'p-orph-1', 'proj-fb', '/work/proj-fb', 'proj-1', 'conv-1', 1, 'Orphaned prompt 1', ?1, 0, 'inst-dead-1')",
+        params![now],
+    )
+    .expect("Must insert rec-orph-1");
+
+    conn.execute(
+        "INSERT INTO prompt_backups (id, backup_batch_id, prompt_id, project_name, project_path, project_id, conversation_id, sequence_id, prompt_text, created_at, is_restored, instance_id)
+         VALUES ('rec-orph-2', 'b-orphaned', 'p-orph-2', 'proj-fb', '/work/proj-fb', 'proj-1', 'conv-1', 2, 'Orphaned prompt 2', ?1, 0, 'inst-dead-2')",
+        params![now + 1],
+    )
+    .expect("Must insert rec-orph-2");
+
+    let target_initial = count_unrestored_prompts_for_instance_with_file(
+        Some("inst-active-running"),
+        Some(custom_file),
+    )
+    .expect("Count initial");
+    assert_eq!(target_initial, 0);
+
+    let (records, outcome) = restore_running_prompts_scoped_with_fallback_with_outcome(
+        "inst-active-running",
+        false,
+        Some(custom_file),
+    )
+    .expect("Restore with fallback must succeed");
+
+    assert_eq!(records.len(), 2, "Must restore both orphaned prompts");
+    assert_eq!(outcome.restored_count(), 2);
+
+    assert_eq!(
+        records[0].instance_id.as_deref(),
+        Some("inst-active-running"),
+        "Prompt 1 must be re-attributed to target instance"
+    );
+    assert_eq!(
+        records[1].instance_id.as_deref(),
+        Some("inst-active-running"),
+        "Prompt 2 must be re-attributed to target instance"
+    );
+
+    let (inst_1, restored_1): (String, i64) = conn
+        .query_row(
+            "SELECT instance_id, is_restored FROM prompt_backups WHERE id = 'rec-orph-1'",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .expect("Query rec-orph-1");
+    assert_eq!(inst_1, "inst-active-running");
+    assert_eq!(restored_1, 1);
+
+    let (inst_2, restored_2): (String, i64) = conn
+        .query_row(
+            "SELECT instance_id, is_restored FROM prompt_backups WHERE id = 'rec-orph-2'",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .expect("Query rec-orph-2");
+    assert_eq!(inst_2, "inst-active-running");
+    assert_eq!(restored_2, 1);
 
     // Justification: test cleanup of temporary directory
     crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove temp dir");
