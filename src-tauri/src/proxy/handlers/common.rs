@@ -81,6 +81,14 @@ pub mod tests_sse_comment_filter;
 pub mod tests_role_normalization_validator;
 #[cfg(test)]
 pub mod tests_request_content_encoding_negotiator;
+#[cfg(test)]
+pub mod tests_decompressor;
+#[cfg(test)]
+pub mod tests_boundary_normalizer;
+#[cfg(test)]
+pub mod tests_chunk_boundary_validator;
+#[cfg(test)]
+pub mod tests_json_payload_sanitizer;
 
 pub use abort_sentinel::*;
 pub use boundary_normalizer::StreamBoundaryNormalizer;
