@@ -19,19 +19,21 @@ pub struct UpstreamCallResult {
     pub fallback_attempts: Vec<FallbackAttemptLog>,
 }
 
-/// 邮箱脱敏：只显示前3位 + *** + @域名前2位 + ***
-/// 例: "userexample@gmail.com" → "use***@gm***"
+/// 邮箱脱敏：显示前4位 + ***，对 @gmail / @googlemail 域名完全隐藏
+/// 例: "userexample@gmail.com" → "user***"
 pub fn mask_email(email: &str) -> String {
-    if let Some(at_pos) = email.find('@') {
-        let local = &email[..at_pos];
-        let domain = &email[at_pos + 1..];
-        let local_prefix: String = local.chars().take(3).collect();
-        let domain_prefix: String = domain.chars().take(2).collect();
-        format!("{}***@{}***", local_prefix, domain_prefix)
+    if let Some((local, domain)) = email.split_once('@') {
+        let prefix: String = local.chars().take(4).collect();
+        let lower_domain = domain.to_ascii_lowercase();
+        if lower_domain.contains("gmail") || lower_domain.contains("googlemail") {
+            format!("{prefix}***")
+        } else {
+            format!("{prefix}***@{domain}")
+        }
     } else {
-        // 不是合法邮箱格式，直接截取前5位
-        let prefix: String = email.chars().take(5).collect();
-        format!("{}***", prefix)
+        // 不是合法邮箱格式，截取前4位
+        let prefix: String = email.chars().take(4).collect();
+        format!("{prefix}***")
     }
 }
 

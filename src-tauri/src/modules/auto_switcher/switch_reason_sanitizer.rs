@@ -20,12 +20,17 @@ impl SwitchReasonSanitizer {
         // 1. Redact OAuth tokens
         let no_tokens = TOKEN_REGEX.replace_all(reason, "[REDACTED_TOKEN]");
 
-        // 2. Mask email addresses: keep first char, mask user part with ***
+        // 2. Mask email addresses: keep 4 chars, mask user part with ***, hide @gmail
         let masked = EMAIL_REGEX.replace_all(&no_tokens, |caps: &regex::Captures| {
             let user = &caps[1];
             let domain = &caps[2];
-            let first_char = user.chars().next().unwrap_or('*');
-            format!("{}***@{}", first_char, domain)
+            let prefix: String = user.chars().take(4).collect();
+            let lower_domain = domain.to_ascii_lowercase();
+            if lower_domain.contains("gmail") || lower_domain.contains("googlemail") {
+                format!("{prefix}***")
+            } else {
+                format!("{prefix}***@{domain}")
+            }
         });
 
         masked.to_string()

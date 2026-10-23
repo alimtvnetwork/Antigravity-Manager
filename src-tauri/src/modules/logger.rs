@@ -345,23 +345,26 @@ pub fn log_error(message: &str) {
 }
 
 /// Mask sensitive email addresses for logs, telemetry, and external notifications.
-/// Example: `riseup.asia.team@gmail.com` -> `rise***@***`
+/// Displays 4 characters from local part first and hides `@gmail` domains.
+/// Example: `riseup.asia.team@gmail.com` -> `rise***`
 pub fn mask_email(email: &str) -> String {
     let trimmed = email.trim();
     if trimmed.is_empty() {
         return "***".to_string();
     }
-    if let Some((local, _domain)) = trimmed.split_once('@') {
-        if local.len() <= 2 {
-            format!("{}***@***", &local[..1.min(local.len())])
+    if let Some((local, domain)) = trimmed.split_once('@') {
+        let shown = 4.min(local.len()).max(1);
+        let prefix = &local[..shown];
+        let lower_domain = domain.to_ascii_lowercase();
+        if lower_domain.contains("gmail") || lower_domain.contains("googlemail") {
+            format!("{prefix}***")
         } else {
-            let shown = 4.min(local.len().saturating_sub(2)).max(1);
-            format!("{}***@***", &local[..shown])
+            format!("{prefix}***@{domain}")
         }
-    } else if trimmed.len() <= 3 {
-        "***".to_string()
+    } else if trimmed.len() <= 4 {
+        format!("{trimmed}***")
     } else {
-        format!("{}***", &trimmed[..3])
+        format!("{}***", &trimmed[..4])
     }
 }
 
