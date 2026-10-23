@@ -40,6 +40,7 @@ pub mod profile_duplication_parity_guard;
 pub mod pr_scope_cohesion_verifier;
 pub mod pr_template_compliance_linter;
 pub mod published_tip_rewrite_guard;
+pub mod readme_changelog_sync_gate;
 pub mod readme_changelog_synchronizer;
 pub mod rejection_breakdown_generator;
 pub mod remote_branch_base_verifier;
@@ -48,9 +49,11 @@ pub mod rollback_ref_guard;
 pub mod semver_monotonic_validator;
 pub mod settings_deep_merge_synchronizer;
 pub mod side_effect_ordering_guard;
+pub mod sole_contributor_attribution_enforcer;
 pub mod sole_contributor_attribution_guard;
 pub mod staging_protocol_guard;
 pub mod tag_changelog_heading_matcher;
+pub mod tag_changelog_heading_matcher_gate;
 pub mod test_sandbox_lifecycle_verifier;
 pub mod thinking_cache_invalidation_controller;
 pub mod thinking_cache_invalidation_guard;
@@ -108,6 +111,8 @@ pub mod tests_pr_template_linter;
 #[cfg(test)]
 pub mod tests_published_tip_rewrite;
 #[cfg(test)]
+pub mod tests_readme_changelog_sync_gate;
+#[cfg(test)]
 pub mod tests_readme_changelog_synchronizer;
 #[cfg(test)]
 pub mod tests_rejection_breakdown_generator;
@@ -130,11 +135,15 @@ pub mod tests_settings_deep_merge;
 #[cfg(test)]
 pub mod tests_side_effect_ordering;
 #[cfg(test)]
+pub mod tests_sole_contributor_attribution_enforcer;
+#[cfg(test)]
 pub mod tests_sole_contributor_attribution_guard;
 #[cfg(test)]
 pub mod tests_staging_protocol;
 #[cfg(test)]
 pub mod tests_tag_changelog_heading_matcher;
+#[cfg(test)]
+pub mod tests_tag_changelog_heading_matcher_gate;
 #[cfg(test)]
 pub mod tests_thinking_cache_guard;
 #[cfg(test)]
@@ -177,6 +186,7 @@ pub use profile_duplication_parity_guard::*;
 pub use pr_scope_cohesion_verifier::*;
 pub use pr_template_compliance_linter::*;
 pub use published_tip_rewrite_guard::*;
+pub use readme_changelog_sync_gate::*;
 pub use readme_changelog_synchronizer::*;
 pub use rejection_breakdown_generator::*;
 pub use remote_branch_base_verifier::*;
@@ -185,9 +195,11 @@ pub use rollback_ref_guard::*;
 pub use semver_monotonic_validator::*;
 pub use settings_deep_merge_synchronizer::*;
 pub use side_effect_ordering_guard::*;
+pub use sole_contributor_attribution_enforcer::*;
 pub use sole_contributor_attribution_guard::*;
 pub use staging_protocol_guard::*;
 pub use tag_changelog_heading_matcher::*;
+pub use tag_changelog_heading_matcher_gate::*;
 pub use test_sandbox_lifecycle_verifier::*;
 pub use thinking_cache_invalidation_controller::*;
 pub use thinking_cache_invalidation_guard::*;

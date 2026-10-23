@@ -316,6 +316,11 @@ pub mod workspace_hash_sentinel;
 pub mod workspace_storage_migrator;
 #[path = "instance/workspace_storage_sanitizer.rs"]
 pub mod workspace_storage_sanitizer;
+#[path = "instance/workspace_storage_continuity_verifier.rs"]
+pub mod workspace_storage_continuity_verifier;
+#[cfg(test)]
+#[path = "instance/tests_workspace_storage_continuity_verifier.rs"]
+pub mod tests_workspace_storage_continuity_verifier;
 #[path = "instance/env_token_scrubber.rs"]
 pub mod env_token_scrubber;
 #[path = "instance/socket_lock_recovery.rs"]
@@ -530,3 +535,4 @@ pub use remote_port_guard::*;
 pub use directory_permission_guard::*;
 pub use transient_sandbox_manager::*;
 pub use job_breakaway_process_spawner::*;
+pub use workspace_storage_continuity_verifier::*;

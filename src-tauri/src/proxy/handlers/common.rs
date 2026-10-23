@@ -35,6 +35,7 @@ pub mod request_header_sanitizer;
 pub mod request_payload_length_negotiator;
 pub mod request_size_guard;
 pub mod response_content_type_matcher;
+pub mod response_stream_delimiter_normalizer;
 pub(crate) mod retrystrategy;
 pub mod role_normalization_validator;
 pub mod sse_boundary_normalizer;
@@ -73,6 +74,8 @@ pub mod tests_request_header_sanitizer;
 pub mod tests_request_content_length_validator;
 #[cfg(test)]
 pub mod tests_response_content_type_matcher;
+#[cfg(test)]
+pub mod tests_response_stream_delimiter_normalizer;
 #[cfg(test)]
 pub mod tests_compression_negotiator;
 #[cfg(test)]
@@ -132,6 +135,7 @@ pub use request_header_sanitizer::*;
 pub use request_payload_length_negotiator::*;
 pub use request_size_guard::*;
 pub use response_content_type_matcher::*;
+pub use response_stream_delimiter_normalizer::*;
 pub use role_normalization_validator::*;
 pub use sse_boundary_normalizer::*;
 pub use sse_chunk_coalescer::*;

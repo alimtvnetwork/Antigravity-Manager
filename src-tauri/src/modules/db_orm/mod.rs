@@ -17,6 +17,7 @@ pub mod connection;
 pub mod connection_busy_timeout_scaler;
 pub mod connection_checkout_limiter;
 pub mod connection_pool_metrics;
+pub mod connection_starvation_watchdog;
 pub mod database_snapshot_manifest;
 pub mod db_size_watchdog;
 pub mod deadlock_detector;
@@ -154,6 +155,8 @@ pub mod tests_schema_integrity_gate;
 pub mod tests_page_cache_manager;
 #[cfg(test)]
 pub mod tests_fifo_prompt_queue_coordinator;
+#[cfg(test)]
+pub mod tests_connection_starvation_watchdog;
 
 pub use audit_table_archiver::*;
 pub use backup_snapshot_verifier::*;
@@ -176,6 +179,7 @@ pub use connection::{
 pub use connection_busy_timeout_scaler::*;
 pub use connection_checkout_limiter::*;
 pub use connection_pool_metrics::*;
+pub use connection_starvation_watchdog::*;
 pub use database_snapshot_manifest::*;
 pub use db_size_watchdog::*;
 pub use deadlock_detector::*;
