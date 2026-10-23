@@ -344,7 +344,10 @@ mod tests {
                 ..
             } => {
                 assert_eq!(account_id, "acc-1");
-                assert_eq!(selection_tier, FfSelectionTier::FallbackHighestCombinedQuota);
+                assert_eq!(
+                    selection_tier,
+                    FfSelectionTier::FallbackHighestCombinedQuota
+                );
             }
             _ => panic!("Expected FallbackHighestCombinedQuota"),
         }
@@ -374,7 +377,10 @@ mod tests {
                 ..
             } => {
                 assert_eq!(account_id, "acc-clean");
-                assert_eq!(selection_tier, FfSelectionTier::PrimaryFullHeadroomClosestExpiry);
+                assert_eq!(
+                    selection_tier,
+                    FfSelectionTier::PrimaryFullHeadroomClosestExpiry
+                );
             }
             _ => panic!("Expected FoundCandidate with acc-clean"),
         }
@@ -421,7 +427,10 @@ mod tests {
                 ..
             } => {
                 assert_eq!(account_id, "acc-sooner");
-                assert_eq!(selection_tier, FfSelectionTier::PrimaryFullHeadroomClosestExpiry);
+                assert_eq!(
+                    selection_tier,
+                    FfSelectionTier::PrimaryFullHeadroomClosestExpiry
+                );
             }
             _ => panic!("Expected acc-sooner"),
         }
@@ -452,7 +461,10 @@ mod tests {
                 ..
             } => {
                 assert_eq!(account_id, "acc-ultra");
-                assert_eq!(selection_tier, FfSelectionTier::FallbackHighestCombinedQuota);
+                assert_eq!(
+                    selection_tier,
+                    FfSelectionTier::FallbackHighestCombinedQuota
+                );
                 assert!((score - 280.0).abs() < 1e-6);
             }
             _ => panic!("Expected acc-ultra"),

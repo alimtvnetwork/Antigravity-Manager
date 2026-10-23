@@ -120,6 +120,8 @@ pub mod tests_dynamic_quota_floor;
 #[cfg(test)]
 pub mod tests_epoch_drift_compensator;
 #[cfg(test)]
+pub mod tests_fast_forward_target_resolver;
+#[cfg(test)]
 pub mod tests_headroom_multiplier;
 #[cfg(test)]
 pub mod tests_hourly_entropy_guard;
@@ -141,8 +143,6 @@ pub mod tests_score_variance_guard;
 pub mod tests_switch_settling_timer;
 #[cfg(test)]
 pub mod tests_weekly_headroom_ratio;
-#[cfg(test)]
-pub mod tests_fast_forward_target_resolver;
 #[cfg(test)]
 pub(crate) use crate::models::account::Account;
 #[cfg(test)]

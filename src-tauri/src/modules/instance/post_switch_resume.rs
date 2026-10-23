@@ -601,7 +601,9 @@ fn audit_resume_lifecycle(stage: &str, instance_id: &str, detail: &str) {
         "force_dispatched" => format!(
             "AutoSwitcher force-dispatched immediate prompt restore on instance '{instance_id}': {detail}"
         ),
-        _ => format!("AutoSwitcher post-switch lifecycle stage '{stage}' on '{instance_id}': {detail}"),
+        _ => format!(
+            "AutoSwitcher post-switch lifecycle stage '{stage}' on '{instance_id}': {detail}"
+        ),
     };
     let element_hierarchy = vec![
         format!("Instance: {instance_id}"),
@@ -633,7 +635,9 @@ fn audit_resume_lifecycle(stage: &str, instance_id: &str, detail: &str) {
         "force_dispatched" => format!(
             "Antigravity Manager bypassed the remaining settling delay and immediately dispatched backed-up prompts to instance '{instance_id}' ({detail})."
         ),
-        _ => format!("AutoSwitcher lifecycle event '{stage}' on instance '{instance_id}': {detail}"),
+        _ => format!(
+            "AutoSwitcher lifecycle event '{stage}' on instance '{instance_id}': {detail}"
+        ),
     };
 
     let input = RecordInteractionInput {

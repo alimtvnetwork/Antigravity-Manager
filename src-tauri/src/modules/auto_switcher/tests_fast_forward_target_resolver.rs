@@ -102,7 +102,10 @@ fn test_sub_100_percent_4h_quota_skips_primary_tier() {
                 FfSelectionTier::PrimaryFullHeadroomClosestExpiry
             );
         }
-        _ => panic!("Expected acc-full-100 in Primary tier, got {:?}", mixed_result),
+        _ => panic!(
+            "Expected acc-full-100 in Primary tier, got {:?}",
+            mixed_result
+        ),
     }
 }
 
@@ -169,10 +172,12 @@ fn test_recent_fleet_usage_in_last_4h_skips_primary_tier() {
     }
 
     // If only recent-usage account is available, it degrades to Fallback tier
-    let only_recent = vec![FfCandidateAccount::new("acc-used-recent", "recent@test.com")
-        .with_weekly_quota(95.0)
-        .with_rolling_4h_quota(100.0)
-        .with_last_used_epoch(now - 3_600)];
+    let only_recent = vec![
+        FfCandidateAccount::new("acc-used-recent", "recent@test.com")
+            .with_weekly_quota(95.0)
+            .with_rolling_4h_quota(100.0)
+            .with_last_used_epoch(now - 3_600),
+    ];
     let outcome_recent = resolve_fast_forward_target(&only_recent, None, &config);
     match outcome_recent {
         FfResolutionOutcome::FoundCandidate {
@@ -186,7 +191,10 @@ fn test_recent_fleet_usage_in_last_4h_skips_primary_tier() {
                 FfSelectionTier::FallbackHighestCombinedQuota
             );
         }
-        _ => panic!("Expected fallback tier for recent account, got {:?}", outcome_recent),
+        _ => panic!(
+            "Expected fallback tier for recent account, got {:?}",
+            outcome_recent
+        ),
     }
 }
 
@@ -403,11 +411,7 @@ fn test_current_instance_account_excluded() {
             .with_tier_multiplier(1.0),
     ];
 
-    let result = resolve_fast_forward_target(
-        &candidates,
-        Some("acc-current-active"),
-        &config,
-    );
+    let result = resolve_fast_forward_target(&candidates, Some("acc-current-active"), &config);
     match result {
         FfResolutionOutcome::FoundCandidate { account_id, .. } => {
             assert_eq!(account_id, "acc-alternate");
@@ -417,11 +421,7 @@ fn test_current_instance_account_excluded() {
 
     // If only current instance account is in the candidate pool, result is NoEligibleCandidates
     let only_current = vec![FfCandidateAccount::new("acc-current-active", "active@test.com")];
-    let outcome = resolve_fast_forward_target(
-        &only_current,
-        Some("acc-current-active"),
-        &config,
-    );
+    let outcome = resolve_fast_forward_target(&only_current, Some("acc-current-active"), &config);
     assert!(!outcome.is_found());
 }
 
@@ -463,7 +463,10 @@ fn test_rolling_4h_floating_tolerance_boundary() {
     let res_sub = resolve_fast_forward_target(&sub_tol, None, &config);
     match res_sub {
         FfResolutionOutcome::FoundCandidate { selection_tier, .. } => {
-            assert_eq!(selection_tier, FfSelectionTier::FallbackHighestCombinedQuota);
+            assert_eq!(
+                selection_tier,
+                FfSelectionTier::FallbackHighestCombinedQuota
+            );
         }
         _ => panic!("Expected fallback tier for 99.4% quota"),
     }
@@ -475,7 +478,10 @@ fn test_rolling_4h_floating_tolerance_boundary() {
     let res_at = resolve_fast_forward_target(&at_tol, None, &config);
     match res_at {
         FfResolutionOutcome::FoundCandidate { selection_tier, .. } => {
-            assert_eq!(selection_tier, FfSelectionTier::PrimaryFullHeadroomClosestExpiry);
+            assert_eq!(
+                selection_tier,
+                FfSelectionTier::PrimaryFullHeadroomClosestExpiry
+            );
         }
         _ => panic!("Expected Primary tier for 99.5% quota"),
     }
