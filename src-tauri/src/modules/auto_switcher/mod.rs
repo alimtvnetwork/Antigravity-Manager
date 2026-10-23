@@ -9,6 +9,7 @@ pub mod bounce_dampener;
 pub mod breakdown;
 pub mod candidate_cooldown_sweeper;
 pub mod candidate_dedup;
+pub mod candidate_dynamic_scorer;
 pub mod candidate_exclusion_registry;
 pub mod candidate_score_decay;
 pub mod conflict_checker;
@@ -54,6 +55,7 @@ pub mod priority_tier_ladder;
 pub mod quota;
 pub mod quota_acceleration_detector;
 pub mod quota_boundary_synchronizer;
+pub mod quota_exhaustion_predictor;
 pub mod quota_forecaster;
 pub mod quota_gap;
 pub mod quota_recovery_forecaster;
@@ -133,6 +135,10 @@ pub mod tests_rotation_brake;
 #[cfg(test)]
 pub mod tests_switch_settling_timer;
 #[cfg(test)]
+pub mod tests_quota_exhaustion_predictor;
+#[cfg(test)]
+pub mod tests_candidate_dynamic_scorer;
+#[cfg(test)]
 pub(crate) use crate::models::account::Account;
 #[cfg(test)]
 pub(crate) use tests_a::make_test_account;
@@ -157,6 +163,7 @@ pub use bounce_dampener::*;
 pub use breakdown::*;
 pub use candidate_cooldown_sweeper::*;
 pub use candidate_dedup::*;
+pub use candidate_dynamic_scorer::*;
 pub use candidate_exclusion_registry::*;
 pub use candidate_score_decay::*;
 pub use conflict_checker::*;
@@ -202,6 +209,7 @@ pub use priority_tier_ladder::*;
 pub use quota::*;
 pub use quota_acceleration_detector::*;
 pub use quota_boundary_synchronizer::*;
+pub use quota_exhaustion_predictor::*;
 pub use quota_forecaster::*;
 pub use quota_gap::*;
 pub use quota_recovery_forecaster::*;

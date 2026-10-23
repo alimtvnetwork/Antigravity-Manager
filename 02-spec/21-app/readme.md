@@ -2,6 +2,7 @@
 
 | # | Specification File | Summary |
 | :--- | :--- | :--- |
+| `197-implementing-next-five-tasks` | [spec.md](./197-implementing-next-five-tasks/spec.md), [e2e_master_plan.md](./197-implementing-next-five-tasks/e2e_master_plan.md) | Enforces request payload length negotiation, sse heartbeat keepalive generation, token budget allocation with thinking backfill/filtering, quota exhaustion velocity prediction, and dynamic candidate scoring. |
 | `196-implementing-next-five-tasks` | [spec.md](./196-implementing-next-five-tasks/spec.md), [e2e_master_plan.md](./196-implementing-next-five-tasks/e2e_master_plan.md) | Enforces wildcard model routing (`gemini-*-flash-*`), regex-based prompt sanitization, pipeline protocol decoupling, single problem scope PR cohesion, and contributor cost disclosure with Co-authored-by trailers. |
 | `195-implementing-next-five-tasks` | [spec.md](./195-implementing-next-five-tasks/spec.md), [e2e_master_plan.md](./195-implementing-next-five-tasks/e2e_master_plan.md) | Enforces risky path replacement explicit fallback, side effect ordering around point of no return, bounded matcher and timeout guards, git remote branch base precedence, and local commit convergence. |
 | `194-implementing-next-five-tasks` | [spec.md](./194-implementing-next-five-tasks/spec.md), [e2e_master_plan.md](./194-implementing-next-five-tasks/e2e_master_plan.md) | Enforces FIFO queue ordering queries, segmented capsule styling with borderless selects, 4-tier prompt origin classification, interactive truncation callout parsing, and no-silent-errors rules. |
