@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [206-implementing-next-five-tasks.md](./pending/206-implementing-next-five-tasks.md) | `IN_PROGRESS` | Execution of 5 tasks: author & test side effect order enforcer, branch release channel gate, release notes relative paths linter, thinking budget proportional allocator, and FIFO prompt restore transaction guard (5 steps remaining). |
 | [205-implementing-next-five-tasks.md](./completed/205-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test multi-stage launcher engine, preflight clippy gate, PR unverified paths linter, thinking budget headroom evaluator, and FIFO prompt order enforcer (10 steps remaining). |
 | [204-implementing-next-five-tasks.md](./completed/204-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test pipeline request header sanitizer, strictly relative Git paths guard, transient sandbox lifecycle verifier, rollback reference drift verifier, and multi-stage launcher dispatcher (15 steps remaining). |
 | [203-implementing-next-five-tasks.md](./completed/203-implementing-next-five-tasks.md) | `COMPLETED` | Execution of 5 tasks: author & test preflight checks gate, caller IDE exit code 2 enforcer, PR template compliance guard, thinking budget filter pipeline, and FIFO prompt restore query validator (20 steps remaining). |

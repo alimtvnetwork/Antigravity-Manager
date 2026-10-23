@@ -2,6 +2,7 @@
 
 | # | Specification File | Summary |
 | :--- | :--- | :--- |
+| `206-implementing-next-five-tasks` | [spec.md](./206-implementing-next-five-tasks/spec.md), [e2e_master_plan.md](./206-implementing-next-five-tasks/e2e_master_plan.md) | Enforces side effect order enforcer, branch release channel gate, release notes relative paths linter, thinking budget proportional allocator, and FIFO prompt restore transaction guard (5 steps remaining). |
 | `205-implementing-next-five-tasks` | [spec.md](./205-implementing-next-five-tasks/spec.md), [e2e_master_plan.md](./205-implementing-next-five-tasks/e2e_master_plan.md) | Enforces multi-stage launcher engine, preflight clippy gate, PR unverified paths linter, thinking budget headroom evaluator, and FIFO prompt order enforcer (10 steps remaining). |
 | `204-implementing-next-five-tasks` | [spec.md](./204-implementing-next-five-tasks/spec.md), [e2e_master_plan.md](./204-implementing-next-five-tasks/e2e_master_plan.md) | Enforces pipeline request header sanitizer, strictly relative Git paths guard, transient sandbox lifecycle verifier, rollback reference drift verifier, and multi-stage launcher dispatcher (15 steps remaining). |
 | `203-implementing-next-five-tasks` | [spec.md](./203-implementing-next-five-tasks/spec.md), [e2e_master_plan.md](./203-implementing-next-five-tasks/e2e_master_plan.md) | Enforces preflight checks gate, caller IDE exit code 2 enforcer, PR template compliance guard, thinking budget filter pipeline, and FIFO prompt restore query validator. |
