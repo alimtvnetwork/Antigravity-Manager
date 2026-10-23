@@ -393,7 +393,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
     };
 
     const handleStripRerun = (promptId: string) => {
-        handleRerunConversation(promptId, 'is-it-done');
+        handleRerunConversation(promptId, loadPersistedRerunMessageOption());
     };
 
     const handleStripResendWithImage = (promptId: string) => {

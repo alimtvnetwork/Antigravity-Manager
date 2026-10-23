@@ -198,7 +198,7 @@ pub fn switch_prompt_snapshot(instance_id: &str) -> SwitchPromptSnap {
     conn.query_row(
         "SELECT id, prompt_content, IFNULL(session_id, '')
          FROM active_prompts
-         WHERE status IN ('running', 'backed_up', 'dispatched')
+         WHERE status IN ('running', 'backed_up', 'dispatched', 'pending', 'queued', 'blocked')
            AND (
                 instance_id = ?1
                 OR (?1 = 'default' AND instance_id IN ('default', '__default__', ''))

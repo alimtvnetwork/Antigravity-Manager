@@ -35,6 +35,7 @@ pub fn resend_running_commands_for_instance(
     instance_id: Option<&str>,
     limit: usize,
 ) -> Result<Vec<ActivePrompt>, String> {
+    reset_dispatched_prompts_cache();
     let mut resent_all = Vec::new();
     for pass_index in 0..MAX_RESEND_PASSES {
         let remaining = limit.saturating_sub(resent_all.len());
@@ -175,19 +176,20 @@ fn resend_single_pass(
         dispatched_repos.insert(clean_path);
 
         let sig = format!("{}:{}", prompt.repo_path, prompt.prompt_content.trim());
-        let already_dispatched = if prompt.status == "backed_up" {
-            false
-        } else {
-            let mut cache = match get_dispatched_prompts_cache().lock() {
-                Ok(guard) => guard,
-                Err(poisoned) => poisoned.into_inner(),
-            };
-            let seen = cache.contains(&prompt.id) || cache.contains(&sig);
-            if !seen {
-                cache.insert(prompt.id.clone());
-                cache.insert(sig);
+        let already_dispatched = match prompt.status.as_str() {
+            "backed_up" | "running" | "pending" | "queued" => false,
+            _ => {
+                let mut cache = match get_dispatched_prompts_cache().lock() {
+                    Ok(guard) => guard,
+                    Err(poisoned) => poisoned.into_inner(),
+                };
+                let seen = cache.contains(&prompt.id) || cache.contains(&sig);
+                if !seen {
+                    cache.insert(prompt.id.clone());
+                    cache.insert(sig);
+                }
+                seen
             }
-            seen
         };
 
         if already_dispatched {

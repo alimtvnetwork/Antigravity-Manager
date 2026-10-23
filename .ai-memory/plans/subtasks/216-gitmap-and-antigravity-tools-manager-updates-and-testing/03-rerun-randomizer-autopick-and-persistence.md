@@ -1,7 +1,7 @@
 # Subtask 03: Rerun Randomizer Auto-Pick & Persistence
 Sequence: 216
 Step: 293
-Status: IN_PROGRESS
+Status: COMPLETED
 Module: `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx`, `usePromptTreePromptActions.ts`, `DetailHeader.tsx`
 
 ## Description
