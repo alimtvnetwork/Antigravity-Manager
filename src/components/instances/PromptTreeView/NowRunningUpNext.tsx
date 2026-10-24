@@ -189,7 +189,7 @@ function RowActions({
             </button>
             <button
                 type="button"
-                onClick={() => onRerun(item.id)}
+                onClick={() => onRerun(item.session_id || item.id)}
                 className={btn}
                 title="Rerun this prompt"
                 aria-label={`Rerun prompt ${item.id}`}
@@ -198,7 +198,7 @@ function RowActions({
             </button>
             <button
                 type="button"
-                onClick={() => onResendWithImage(item.id)}
+                onClick={() => onResendWithImage(item.session_id || item.id)}
                 className={cn(btn, 'rounded-r-full pr-2')}
                 title="Resend with image"
                 aria-label={`Resend prompt ${item.id} with image`}

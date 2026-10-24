@@ -355,15 +355,20 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
     const findStripConversation = (promptId: string): { conv: AgmConversationNode; proj: AgmProjectTreeNode } | null => {
         const bareId = promptId.startsWith('prompt-') ? promptId.slice('prompt-'.length) : promptId;
         const keys = new Set([promptId, bareId].filter((value) => value.length > 0));
+        const running: { conv: AgmConversationNode; proj: AgmProjectTreeNode }[] = [];
         for (const proj of treeData) {
-            const conv = (proj.conversations || []).find((c) => {
-                const convBare = c.conversation_id.startsWith('prompt-')
-                    ? c.conversation_id.slice('prompt-'.length)
-                    : c.conversation_id;
-                return keys.has(c.conversation_id) || keys.has(convBare);
-            });
-            if (conv) return { conv, proj };
+            for (const conv of proj.conversations || []) {
+                const convBare = conv.conversation_id.startsWith('prompt-')
+                    ? conv.conversation_id.slice('prompt-'.length)
+                    : conv.conversation_id;
+                const idMatch = keys.has(conv.conversation_id)
+                    || keys.has(convBare)
+                    || keys.has(conv.short_id);
+                if (idMatch) return { conv, proj };
+                if (conv.is_running) running.push({ conv, proj });
+            }
         }
+        if (running.length === 1) return running[0];
         return null;
     };
 
@@ -415,7 +420,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         void dispatchRerunMessages({
             targetInstId,
             repoPath: targetRepoPath,
-            convId: convoId,
+            convId: conv?.conversation_id || convoId,
             count,
             messageOption: effectiveNudgeType,
             originalPrompt,
