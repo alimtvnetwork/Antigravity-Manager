@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.257.2] - 2026-10-24
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.257.1] - 2026-10-24
 
 ### Fixed
@@ -1225,11 +1232,9 @@
         -   **[Prompt Tree Titles and File Image URIs] Placeholder conversation titles use the prompt's first line, and out-of-workspace images are `file:///` URIs (Thanks to @aukgit)**:
             -   **Description**: `conversation_display_title` in `src-tauri/src/modules/repo_db/tree_node_conv.rs` replaces empty, `untitled`, and `new conversation` titles with `extract_smart_prompt_summary`. `workspace_relative_media` keeps in-repo images relative and writes out-of-repo images as `file:///` URIs. `agm prompts tree --json` on the live instance reported 146 conversations, 0 untitled titles, 0 empty prompts, and 10 `file:///` image paths with 0 raw drive paths. (Thanks to @aukgit)
 
-
     *   **v4.257.0 (2026-10-24)**:
         -   **[Prompt Tree Current Conversation, Silent Sync, and Image Files] Current Conv passes real `conv-` ids to `agy --conversation`, background sync no longer paints a layout-shifting bar, and image clicks open the file (Thanks to @aukgit)**:
             -   **Description**: `agy_conversation_id` in `src-tauri/src/modules/repo_db/agy.rs` now keeps `conv-` conversation ids and still rejects `new`, `p-`, `proj-`, `queued-`, and path-like values. `agm prompt send --new` and a send with no session pass the `new` sentinel in `src-tauri/src/bin/agm/prompt_cmds.rs`. The prompt tree hides the top progress bar during background sync in `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx`. Thumbnail clicks open the disk file through the opener in `src/components/instances/PromptTreeView/PromptInstructionView.tsx`. Verified with `cargo build --bin agm`, the conversation-id unit test, `npm run build`, and `agm errors list`. (Thanks to @aukgit)
-
 
     *   **v4.256.0 (2026-10-24)**:
         -   **[Single-Prompt Resume After Switch & Fast-Forward] After an account switch or fast-forward, re-dispatch exactly one prompt — the most recently active backed-up prompt strictly belonging to the target instance — while every other backed-up prompt stays backed up, replacing the previous whole-queue re-injection (Thanks to @aukgit)**:
