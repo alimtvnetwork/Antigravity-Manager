@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.262.0 (2026-10-24)**:
+        -   **[Account Switch E2E and Fast-Forward Previous Profile] Isolated switch/FF cases were run on a new test instance, and Previous Profile now names the target account (Thanks to @aukgit)**:
+            -   **Description**: Last-night spec `02-spec/21-app/222-fast-forward-algorithm-issues-and-confirmation/spec.md` plus catalog `02-spec/21-app/fixing-auto-switching-and-progress-bar-issues/02-e2e-test-cases-spec.md` TC-01..TC-11 were executed on `agm instances test-create` sandboxes. Default and v2 were never stopped. `agm ff` now reports the target instance previous email. `agm auto-switch status --json` includes `is_enabled` and `low_quota_threshold_percent`. Threshold was restored to `15.0`. (Thanks to @aukgit)
+
     *   **v4.261.0 (2026-10-24)**:
         -   **[Inspector Image Open and Isolated Current Conv E2E] Markdown inspector clicks open IDE files, and Current Conv was re-proven on a new test instance without stopping the caller (Thanks to @aukgit)**:
             -   **Description**: `handleImageClick` in `src/components/instances/PromptTreeView/PromptMarkdownPreview.tsx` now calls `openFileInIde` for `file:`, drive-letter, and POSIX `/` paths. `PromptInstructionView.tsx` treats POSIX absolute paths as disk files. `agy.rs` dropped unused `mut` on `stderr_reader`. `gitmap cargo build --bin agm` and `npm run build` passed. `agm prompts tree --json --local` reported 144 conversations, 0 untitled titles, 68 `file:///` paths. `agm prompts send --conversation conv-e2e-probe2` on a new `test-create` instance stored `session_id=conv-e2e-probe2`. Caller `default` and `v2-3127` stayed running. (Thanks to @aukgit)

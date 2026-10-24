@@ -75,6 +75,8 @@ pub(crate) fn cmd_fast_forward(args: &[String]) {
     };
 
     crate::instance_cmds::guard_caller_instance(args, &target_instance);
+    let prev_email_raw = bound_email_for_instance(&target_instance);
+    let credit_before = quota_for_instance(&status_before, &target_instance);
 
     // Snapshot & backup running prompts before rotation
     antigravity_tools_lib::error::record_ignored(
@@ -115,28 +117,23 @@ pub(crate) fn cmd_fast_forward(args: &[String]) {
                 &format!("instance:{target_instance}"),
                 serde_json::json!({
                     "instanceId": target_instance,
-                    "selectedEmail": status_after.active_account_email,
-                    "previousEmail": status_before.active_account_email,
+                    "selectedEmail": bound_email_for_instance(&target_instance)
+                        .or_else(|| status_after.active_account_email.clone()),
+                    "previousEmail": prev_email_raw,
                 }),
                 "ok",
                 &res_msg,
             );
             let prompts_resent = running_prompts_count > 0;
-            let mut prev_email = status_before.active_account_email.clone();
-            let selected_email = status_after.active_account_email.clone();
-            if let (Some(ref p), Some(ref s)) = (&prev_email, &selected_email) {
-                if p.trim().eq_ignore_ascii_case(s.trim()) {
-                    prev_email = None;
-                }
-            }
-            let mut pred_exclusions = Vec::new();
-            if let Some(ref p) = prev_email {
-                pred_exclusions.push(p.clone());
-            }
-            if let Some(ref s) = selected_email {
-                pred_exclusions.push(s.clone());
-            }
-            let inst_ref = target_opt.unwrap_or("default");
+            let selected_email = bound_email_for_instance(&target_instance)
+                .or_else(|| status_after.active_account_email.clone());
+            let prev_email = distinct_previous_email(prev_email_raw, &selected_email);
+            let pred_exclusions: Vec<String> = [prev_email.as_ref(), selected_email.as_ref()]
+                .into_iter()
+                .flatten()
+                .cloned()
+                .collect();
+            let inst_ref = target_instance.as_str();
             let predicted_candidate = auto_switcher::select_candidate_profiles(
                 inst_ref,
                 "gemini-2.5-pro",
@@ -172,7 +169,7 @@ pub(crate) fn cmd_fast_forward(args: &[String]) {
                     "selected_account": selected_email,
                     "selected_email": selected_email,
                     "active_account": status_after.active_account_email,
-                    "credit_before_switch": status_before.current_quota_percent,
+                    "credit_before_switch": credit_before,
                     "current_quota_percent": status_after.current_quota_percent,
                     "prompts_running": running_prompts_count,
                     "prompts_resent": prompts_resent,
@@ -211,5 +208,32 @@ pub(crate) fn cmd_fast_forward(args: &[String]) {
             }
             std::process::exit(1);
         }
+    }
+}
+
+fn bound_email_for_instance(instance_id: &str) -> Option<String> {
+    instance::list_instances()
+        .ok()?
+        .into_iter()
+        .find(|row| row.config.id == instance_id)
+        .and_then(|row| row.config.bound_email)
+}
+
+fn quota_for_instance(
+    status: &auto_switcher::AutoSwitcherStatus,
+    instance_id: &str,
+) -> Option<f64> {
+    status
+        .monitored_instances
+        .iter()
+        .find(|row| row.instance_id == instance_id)
+        .and_then(|row| row.quota_percent)
+        .or(status.current_quota_percent)
+}
+
+fn distinct_previous_email(previous: Option<String>, selected: &Option<String>) -> Option<String> {
+    match (previous, selected.as_deref()) {
+        (Some(p), Some(s)) if p.trim().eq_ignore_ascii_case(s.trim()) => None,
+        (previous, _) => previous,
     }
 }

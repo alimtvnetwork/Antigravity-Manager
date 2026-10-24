@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.261.0)
+> Professional AI Account Management & Protocol Proxy System (v4.262.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.261.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.262.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.262.0**: Isolated account-switch E2E and Fast-Forward Previous Profile — TC-01..TC-11 ran on a new `test-create` instance; `agm ff` now prints the target instance previous email; `agm auto-switch status --json` includes `is_enabled` and `low_quota_threshold_percent`; threshold restored to `15.0`; Default and v2 were not stopped. (Thanks to @aukgit)
 
 > Latest version **v4.261.0**: Inspector image open and isolated Current Conv E2E — markdown inspector clicks open disk files through `openFileInIde`; POSIX absolute paths are treated as files; `agm prompts tree --json --local` reported 144 conversations, 0 untitled titles, 68 `file:///` paths; `agm prompts send --conversation conv-e2e-probe2` on a new test instance kept `session_id=conv-e2e-probe2` without stopping the caller IDE. (Thanks to @aukgit)
 

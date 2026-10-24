@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.261.0-3B82F6?style=flat-square" alt="Version v4.261.0">
+    <img src="https://img.shields.io/badge/Version-v4.262.0-3B82F6?style=flat-square" alt="Version v4.262.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,7 +116,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.261.0)**
+**Bar 2: Version-Based Installation (v4.262.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.258.0/install.ps1))) -Version "v4.258.0"
 ```
@@ -645,6 +645,8 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
 ## 📝 Changelog
+
+> Latest version **v4.262.0**: Isolated account-switch E2E and Fast-Forward Previous Profile — TC-01..TC-11 ran on a new `test-create` instance; `agm ff` now prints the target instance previous email; `agm auto-switch status --json` includes `is_enabled` and `low_quota_threshold_percent`; threshold restored to `15.0`; Default and v2 were not stopped. (Thanks to @aukgit)
 
 > Latest version **v4.261.0**: Inspector image open and isolated Current Conv E2E — markdown inspector clicks open disk files through `openFileInIde`; POSIX absolute paths are treated as files; `agm prompts tree --json --local` reported 144 conversations, 0 untitled titles, 68 `file:///` paths; `agm prompts send --conversation conv-e2e-probe2` on a new test instance kept `session_id=conv-e2e-probe2` without stopping the caller IDE. (Thanks to @aukgit)
 

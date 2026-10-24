@@ -1,5 +1,14 @@
 # Changelog
 
+## [v4.262.0] - 2026-10-24
+
+### Fixed
+- Fast-forward Previous Profile now reads the **target** instance bound email in `src-tauri/src/bin/agm/instance_fastforward.rs` instead of the active-instance status. Isolated E2E printed `Previous Profile: zihadxshohag2@gmail.com` after `agm ff test-ff-prev-*` while Default stayed on `riseup.team.now@gmail.com` (Thanks to @aukgit)
+- `agm auto-switch status --json` now includes `is_enabled` and `low_quota_threshold_percent` from `src-tauri/src/modules/auto_switcher/status.rs` (Thanks to @aukgit)
+- Removed unused `mut` on the completions request body in `src-tauri/src/proxy/handlers/openai/completions.rs` (Thanks to @aukgit)
+
+---
+
 ## [v4.261.0] - 2026-10-24
 
 ### Fixed
@@ -1274,6 +1283,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.262.0 (2026-10-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.261.0 (2026-10-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

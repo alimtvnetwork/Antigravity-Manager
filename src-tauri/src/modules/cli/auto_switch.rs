@@ -147,10 +147,20 @@ pub(crate) fn handle_auto_switch_command(args: &[String]) {
             // Show status
             let status = auto_switcher::get_status();
             if is_json {
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&status).unwrap_or_default()
-                );
+                let out = serde_json::json!({
+                    "is_running": status.is_running,
+                    "is_enabled": app_cfg.auto_profile_switcher.is_enabled,
+                    "low_quota_threshold_percent": app_cfg.auto_profile_switcher.low_quota_threshold_percent,
+                    "active_instance_id": status.active_instance_id,
+                    "active_account_email": status.active_account_email,
+                    "current_quota_percent": status.current_quota_percent,
+                    "last_check_timestamp": status.last_check_timestamp,
+                    "last_switch_timestamp": status.last_switch_timestamp,
+                    "last_switch_reason": status.last_switch_reason,
+                    "monitored_instance_count": status.monitored_instance_count,
+                    "monitored_instances": status.monitored_instances,
+                });
+                println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
             } else {
                 println!("================================================================================");
                 println!("                   AGM Auto-Profile Switcher Status                             ");
