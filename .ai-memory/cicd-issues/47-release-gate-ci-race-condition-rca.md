@@ -43,17 +43,16 @@ fi
 ## Part 3: Surgical Fix
 
 1. **Polling Wait Loop in Release Gate**: In `.github/workflows/release.yml`:
-   - Replaced the single-shot query with a bounded polling loop (`MAX_WAIT_SECONDS=1500`, polling every `POLL_INTERVAL=20`s).
+   - Replaced the single-shot query with a bounded polling loop (`MAX_WAIT_SECONDS=3600`, polling every `POLL_INTERVAL=20`s).
    - Queries `actions/workflows/ci.yml/runs?head_sha=${{ github.sha }}&per_page=1` without filtering by `status=completed`.
    - If no run has registered yet, waits up to 90s for GitHub's event registration.
    - If status is `in_progress` or `queued`, logs progress and waits for completion.
    - Once `status=completed`, evaluates `conclusion`: if `success`, allows the release to proceed; if failure or cancelled, fails fast.
-   - Times out safely after 25 minutes if CI never completes.
+   - Times out safely after 60 minutes if CI never completes (sized generously to absorb runner queue delays).
 2. **Main Branch Concurrency Isolation**: In `.github/workflows/ci.yml`:
    - Scoped concurrency group on `main` to the specific commit SHA (`group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}`), ensuring runs on `main` are never cancelled by subsequent commits while preserving auto-cancellation for PR branches.
    - If `success`: allows the release to proceed.
    - If `failure`, `cancelled`, or anything else: fails fast.
-6. Times out safely after 25 minutes if CI never completes.
 
 ---
 

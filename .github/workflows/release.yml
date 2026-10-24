@@ -106,7 +106,7 @@ jobs:
         run: |
           set -e
           echo "Verifying CI status for commit ${{ github.sha }}..."
-          MAX_WAIT_SECONDS=1500
+          MAX_WAIT_SECONDS=3600
           POLL_INTERVAL=20
           ELAPSED=0
 
