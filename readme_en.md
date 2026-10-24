@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.255.0)
+> Professional AI Account Management & Protocol Proxy System (v4.256.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.255.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.256.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -505,6 +505,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.256.0**: Single-Prompt Resume After Switch & Fast-Forward — After an account switch or fast-forward, exactly one prompt is resumed: the most recently active backed-up prompt strictly belonging to the target instance, selected by the new `dispatch_single_latest_prompt` in `src-tauri/src/modules/repo_db/dispatch.rs` (greatest `updated_at`, ties broken by `created_at` then `id`) and sent through the same resume-file + agy/CDP path as full dispatch; every other backed-up prompt stays `backed_up` instead of the whole queue being re-injected, the flexible cross-instance fallback was removed from the resume path so another instance's prompt is never dispatched, `has_auto_resume = false` now fully suppresses the re-dispatch while restore bookkeeping still runs, and the duplicate inline auto-resume was removed from the switch path so resume happens exactly once in the scheduled STAGE_5_RESTORE stage after the prompt channel is up; FIFO ordering of the remaining backlog is unchanged. (Thanks to @aukgit)
 
 > Latest version **v4.255.0**: American English Modernization, Global React Error Boundaries & Root Route Recovery — Converted all legacy Chinese code comments, JSDoc documentation, and internal log/diagnostic messages across 352 Rust backend files, 76 TypeScript/React frontend files, and all architecture documentation to pure American English; resolved minified React error #310 ("Rendered more hooks than during the previous render") on the Instances page "Switch Profile" modal and prompt export modal by strictly lifting hooks above conditional early returns; mounted universal RouteErrorBoundary on root browser routing in `src/App.tsx` to intercept unhandled render exceptions and provide user-friendly dark-glass error recovery cards with reload, navigation, and telemetry actions; wrapped fleet tables and modal dialogs with defensive error boundaries; and refreshed root documentation and changelogs. (Thanks to @aukgit)
 
