@@ -318,7 +318,12 @@ export function assembleConversationHierarchy(
     }
 
     // Reverse rootNodes so newest user prompt appears at top,
-    // and sort running and queued roots to the top
+    // and sort running and queued roots to the top (with recent subagents on top)
+    for (const root of rootNodes) {
+        if (root.subagents.length > 1) {
+            root.subagents.sort(compareHierarchicalNodes);
+        }
+    }
     return rootNodes.reverse().sort(compareHierarchicalNodes);
 }
 

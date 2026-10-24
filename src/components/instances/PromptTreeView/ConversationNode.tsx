@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Bot, User, Terminal, Wrench, Clock, ChevronRight, ChevronDown } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../../utils/cn';
 import { PromptOriginTier } from './types';
-import type { AgmConversationNode, AgmProjectTreeNode, TierClassificationResult } from './types';
+import type { AgmConversationNode, AgmProjectTreeNode, AgmPromptTurnNode, TierClassificationResult } from './types';
 import { isConversationOrTurnQueued, getConversationStatus } from './conversationGuards';
 import { classifyPromptTier } from './tierClassification';
 import { formatSeqBadge, formatRelativeRecency } from './formatters';
@@ -34,6 +34,51 @@ export function getTierIcon(tier: TierClassificationResult['tier']) {
           : tier === PromptOriginTier.ToolOutput
             ? Wrench
             : User;
+}
+
+function getTurnTimeMs(turn: AgmPromptTurnNode): number {
+    if (typeof turn.created_at === 'number' && turn.created_at > 0) {
+        return turn.created_at < 100_000_000_000 ? turn.created_at * 1000 : turn.created_at;
+    }
+    if (turn.timestamp) {
+        const parsed = new Date(turn.timestamp).getTime();
+        if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+    return 0;
+}
+
+/**
+ * Sorts prompt turns with recent items on top:
+ * Tier 1: Running turns on top
+ * Tier 2: Queued turns
+ * Tier 3: Completed turns in descending chronological order (newest first)
+ */
+export function sortPromptTurns(turns: AgmPromptTurnNode[]): AgmPromptTurnNode[] {
+    return [...turns].sort((a, b) => {
+        const aRunning = Boolean(
+            a.is_running ||
+            (a.status && (a.status.toLowerCase().includes('run') || a.status.toLowerCase().includes('exec')))
+        );
+        const bRunning = Boolean(
+            b.is_running ||
+            (b.status && (b.status.toLowerCase().includes('run') || b.status.toLowerCase().includes('exec')))
+        );
+        if (aRunning !== bRunning) return aRunning ? -1 : 1;
+
+        const aQueued = Boolean(
+            a.is_queued || (a.status && a.status.toLowerCase().includes('queue'))
+        );
+        const bQueued = Boolean(
+            b.is_queued || (b.status && b.status.toLowerCase().includes('queue'))
+        );
+        if (aQueued !== bQueued) return aQueued ? -1 : 1;
+
+        const aTime = getTurnTimeMs(a);
+        const bTime = getTurnTimeMs(b);
+        if (bTime !== aTime) return bTime - aTime;
+
+        return b.turn_number - a.turn_number;
+    });
 }
 
 export function ConversationNode({
@@ -76,6 +121,9 @@ export function ConversationNode({
     const promptCategory = classifyPromptTier(conv.prompt_preview_200w, conv.title, conv);
     const IconComponent = getTierIcon(promptCategory.tier);
     const hasPrompts = Boolean(conv.prompts && conv.prompts.length > 0);
+    const sortedPrompts = useMemo(() => {
+        return conv.prompts && conv.prompts.length > 0 ? sortPromptTurns(conv.prompts) : [];
+    }, [conv.prompts]);
     const enqueuedTurnsCount = conv.prompts
         ? conv.prompts.filter((p) => Boolean(p.is_queued) || (p.status && p.status.toLowerCase().includes('queue'))).length
         : 0;
@@ -129,14 +177,14 @@ export function ConversationNode({
                 key={conv.conversation_id}
                 tabIndex={0}
                 onClick={() => {
-                    const runningTurn = conv.prompts?.find((p) => p.is_running) || conv.prompts?.[conv.prompts.length - 1];
-                    const defaultTurnNum = runningTurn ? runningTurn.turn_number : null;
+                    const topTurn = sortedPrompts.find((p) => p.is_running) || sortedPrompts[0];
+                    const defaultTurnNum = topTurn ? topTurn.turn_number : null;
                     setSelectedTurnNumber(defaultTurnNum);
                     onSelect({ ...conv, selected_turn_number: defaultTurnNum }, project);
                 }}
                 onDoubleClick={() => {
-                    const runningTurn = conv.prompts?.find((p) => p.is_running) || conv.prompts?.[conv.prompts.length - 1];
-                    const defaultTurnNum = runningTurn ? runningTurn.turn_number : null;
+                    const topTurn = sortedPrompts.find((p) => p.is_running) || sortedPrompts[0];
+                    const defaultTurnNum = topTurn ? topTurn.turn_number : null;
                     setSelectedTurnNumber(defaultTurnNum);
                     const effectiveConv = { ...conv, selected_turn_number: defaultTurnNum };
                     onSelect(effectiveConv, project);
@@ -343,10 +391,10 @@ export function ConversationNode({
             </div>
 
             {/* Tier 3: Indented Prompt Subtree */}
-            {hasPrompts && isExpanded && conv.prompts && (
+            {hasPrompts && isExpanded && sortedPrompts.length > 0 && (
                 <div className="border-l border-slate-300/60 dark:border-purple-900/50 ml-2.5 pl-1.5 space-y-0.5 mt-0.5">
-                    {conv.prompts.map((turn, tIdx) => {
-                        const isLastTurn = tIdx === conv.prompts!.length - 1;
+                    {sortedPrompts.map((turn, tIdx) => {
+                        const isLastTurn = tIdx === sortedPrompts.length - 1;
                         const hasImages = turn.media_paths && turn.media_paths.length > 0;
                         const isTurnActive = isSelected && selectedTurnNumber === turn.turn_number;
                         const isTurnRunning = Boolean(turn.is_running);

@@ -17,6 +17,7 @@
  */
 
 import { sortConversations } from '../ProjectNode';
+import { sortPromptTurns } from '../ConversationNode';
 import {
     getConversationStatus,
     isConversationOrTurnQueued,
@@ -479,6 +480,53 @@ test('sortConversations: handles empty list and single item gracefully', () => {
     const singleResult = sortConversations([singleConv], 'all');
     assertEqual(singleResult.length, 1);
     assertEqual(singleResult[0].conversation_id, 'single');
+});
+
+// ===========================================================================
+// Test Group 5: sortPromptTurns Recent-on-Top & 3-Tier Priority
+// ===========================================================================
+
+test('sortPromptTurns: running prompt turn sorts to Tier 1 on top', () => {
+    const t1 = makePromptTurn({ turn_number: 1, created_at: 1000, status: 'COMPLETED' });
+    const t2 = makePromptTurn({ turn_number: 2, created_at: 2000, status: 'COMPLETED' });
+    const t3 = makePromptTurn({ turn_number: 3, created_at: 3000, is_running: true, status: 'RUNNING' });
+
+    const sorted = sortPromptTurns([t1, t2, t3]);
+    assertEqual(sorted[0].turn_number, 3, 'Running turn 3 must be on top');
+    assertEqual(sorted[1].turn_number, 2, 'Newer completed turn 2 must be second');
+    assertEqual(sorted[2].turn_number, 1, 'Oldest completed turn 1 must be at the bottom');
+});
+
+test('sortPromptTurns: queued turn sorts below running but above completed', () => {
+    const t1 = makePromptTurn({ turn_number: 1, created_at: 1000, status: 'COMPLETED' });
+    const t2 = makePromptTurn({ turn_number: 2, created_at: 2000, is_queued: true, status: 'QUEUED' });
+    const t3 = makePromptTurn({ turn_number: 3, created_at: 3000, is_running: true, status: 'RUNNING' });
+
+    const sorted = sortPromptTurns([t1, t2, t3]);
+    assertEqual(sorted[0].turn_number, 3, 'Tier 1 Running turn must be first');
+    assertEqual(sorted[1].turn_number, 2, 'Tier 2 Queued turn must be second');
+    assertEqual(sorted[2].turn_number, 1, 'Tier 3 Completed turn must be third');
+});
+
+test('sortPromptTurns: completed turns sort in descending order (recent on top)', () => {
+    const t1 = makePromptTurn({ turn_number: 1, created_at: 1729200000, status: 'COMPLETED' });
+    const t2 = makePromptTurn({ turn_number: 2, created_at: 1729203600, status: 'COMPLETED' });
+    const t3 = makePromptTurn({ turn_number: 3, created_at: 1729207200, status: 'COMPLETED' });
+    const t4 = makePromptTurn({ turn_number: 4, created_at: 1729210800, status: 'COMPLETED' });
+
+    const sorted = sortPromptTurns([t1, t2, t3, t4]);
+    const numbers = sorted.map((t) => t.turn_number);
+    assertDeepEqual(numbers, [4, 3, 2, 1], 'Completed prompt turns must display recent on top');
+});
+
+test('sortPromptTurns: handles empty and single turn gracefully', () => {
+    const emptyResult = sortPromptTurns([]);
+    assertEqual(emptyResult.length, 0);
+
+    const singleTurn = makePromptTurn({ turn_number: 1 });
+    const singleResult = sortPromptTurns([singleTurn]);
+    assertEqual(singleResult.length, 1);
+    assertEqual(singleResult[0].turn_number, 1);
 });
 
 // ===========================================================================
