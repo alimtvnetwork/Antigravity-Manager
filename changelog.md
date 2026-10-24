@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.256.1] - 2026-10-24
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.256.0] - 2026-10-24
 
 ### Fixed
@@ -1194,21 +1201,17 @@
         -   **[Single-Prompt Resume After Switch & Fast-Forward] After an account switch or fast-forward, re-dispatch exactly one prompt — the most recently active backed-up prompt strictly belonging to the target instance — while every other backed-up prompt stays backed up, replacing the previous whole-queue re-injection (Thanks to @aukgit)**:
             -   **Description**: Added `dispatch_single_latest_prompt` in `src-tauri/src/modules/repo_db/dispatch.rs`, which selects the single most recently active backed-up prompt for the target instance (greatest `updated_at`, ties broken by `created_at` then `id`) under a strict instance match with no cross-instance fallback, and sends it through the same resume-file + agy/CDP path as full dispatch; the STAGE_5_RESTORE stage in `src-tauri/src/modules/instance/post_switch_resume.rs` now uses this single-prompt dispatch, `has_auto_resume = false` fully suppresses the re-dispatch while restore bookkeeping still runs, and the duplicate inline auto-resume of recent prompts was removed from the switch path in `src-tauri/src/modules/instance/workspace.rs` so resume happens exactly once after the prompt channel is up (the manual auto-resume command path is unchanged); FIFO ordering of the remaining backlog is unchanged, and unit tests cover the latest-prompt selection. (Thanks to @aukgit)
 
-
     *   **v4.255.0 (2026-10-24)**:
         -   **[American English Modernization, Global React Error Boundaries & Root Route Recovery] Full American English language modernization across 352 backend Rust files, 76 frontend TypeScript/React files, and all architecture docs, fix minified React hook error #310, mount universal RouteErrorBoundary on root route, wrap fleet tables and modals with defensive error boundaries, and update root README (Thanks to @aukgit)**:
             -   **Description**: Converted all legacy Chinese code comments, JSDoc documentation, and internal log/diagnostic messages across 352 Rust backend files, 76 TypeScript/React frontend files, and all architecture documentation to pure American English; resolved minified React error #310 ("Rendered more hooks than during the previous render") on the Instances page "Switch Profile" modal and prompt export modal by strictly lifting hooks above conditional early returns; mounted universal RouteErrorBoundary on root browser routing in `src/App.tsx` to intercept unhandled render exceptions and provide user-friendly dark-glass error recovery cards with reload, navigation, and telemetry actions; wrapped fleet tables and modal dialogs with defensive error boundaries; and refreshed root `README.md` and `README_EN.md` with latest version badges and release highlights. (Thanks to @aukgit)
-
 
     *   **v4.254.0 (2026-10-24)**:
         -   **[Fast Forward 4-Tier Selection Ladder, Weekly Floor Exclusion & Headroom Invariants] Implement 4-tier Fast-Forward account target resolver, configurable weekly quota floor slider (default 15%), 100% 4-hour clean headroom invariant, cross-instance fleet exclusion (SSH/Email/Telegram/GitMap), earliest expiry ranking, and degraded fallback scoring (Thanks to @aukgit)**:
             -   **Description**: Refactored `fast_forward_target_resolver.rs` to enforce the full 4-tier decision ladder: accounts with weekly quota < 15% (configurable via slider) are treated as 0 credits and skipped; candidate accounts in the Primary tier must possess 100% 4-hour credit and zero activity across local or fleet instances (SSH, Email, Telegram, GitMap) in the last 4 hours; primary accounts are sorted by closest reset/expiry time to maximize window efficiency before reset; when no 100% 4-hour candidate exists, the algorithm safely falls back to highest combined weekly and 4-hour credits weighted by subscription tier multipliers (Ultra ×4.0, Pro ×2.0, Free ×1.0); added UI slider in `ScoringAlgorithm.tsx` for `min_weekly_quota_percent` (0–50%, default 15%); synchronized backend config models in `src-tauri/src/models/config.rs`; and added comprehensive unit test suite in `tests_fast_forward_target_resolver.rs`. (Thanks to @aukgit)
 
-
     *   **v4.253.3 (2026-10-23)**:
         -   **[Release Pipeline & CI Dynamic Polling Gate, Atomic Version Sync, Prompt Restore & CLI Rerun Hardening] Fix release asset publication pipeline, synchronize all project manifests, harden prompt restore sweep on quota completion, and enable instant rerun randomizer (Thanks to @aukgit)**:
             -   **Description**: Resolved GitHub Actions release pipeline failure where concurrent tag pushes caused premature release gate exits due to in-progress CI runs; implemented an asynchronous polling wait loop up to 45 minutes in `.github/workflows/release.yml` with post-release asset count verification; synchronized all 14 repository version manifests (`package.json`, `package-lock.json`, `version.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.lock`, `releases-manifest.json`, etc.) to eliminate version drift; and integrated prompt restore sweep engine with diverse rerun anti-repeat buffer and top-level CLI command routing. (Thanks to @aukgit)
-
 
     *   **v4.253.0 (2026-10-23)**:
         -   **[Streaming Thought Signature Validator, Segmented Capsule Styler, FIFO Queue Partition Allocator, Transient Sandbox Sentinel, Sole Contributor Attribution & Windows FFI Remediation] Complete implementation of final architectural components (Steps 296–300), stream delimiter validation, capsule styling rules, FIFO partition allocation, caller IDE preservation, and pure kernel32 vitality probes (Thanks to @aukgit)**:
