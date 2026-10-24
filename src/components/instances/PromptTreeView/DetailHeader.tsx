@@ -6,7 +6,7 @@ import { formatRelativeRecency } from './formatters';
 import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat, Send } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { CopyFormat, type AgmConversationNode } from './types';
-import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, dispatchConversationId, workspaceImageMarkdown, rewritePromptImageTargets, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
+import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, dispatchConversationId, workspaceImageMarkdown, rewritePromptImageTargets, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, extractUsedNudgesFromConversation, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
 import { isGhostConversation } from './conversationGuards';
 import { persistClientCrash } from '../../../lib/error-listener';
 import { useErrorStore } from '../../../stores/error-store';
@@ -254,6 +254,7 @@ export function DetailHeader(props: DetailHeaderProps) {
     // resetting on every mount.
     const [rerunCount, setRerunCount] = useState<number>(() => loadPersistedRerunCount());
     const [rerunMessageOption, setRerunMessageOption] = useState<RerunMessageOption>(() => loadPersistedRerunMessageOption());
+    const [showVariations, setShowVariations] = useState(false);
     const [localRerunHistory, setLocalRerunHistory] = useState<string[]>([]);
     const rerunHistory = propRerunHistory ?? localRerunHistory;
     const setRerunHistory = onRerunHistoryChange ?? setLocalRerunHistory;
@@ -380,6 +381,7 @@ export function DetailHeader(props: DetailHeaderProps) {
 
             const effectiveOption: RerunMessageOption = rerunMessageOption || 'randomized';
             promptWithImage = rewritePromptImageTargets(promptWithImage, effectiveRepoPath);
+            const combinedHistory = extractUsedNudgesFromConversation(selectedConversation, rerunHistory);
             const result = await dispatchRerunMessages({
                 targetInstId,
                 repoPath: effectiveRepoPath,
@@ -389,7 +391,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                 originalPrompt: promptWithImage,
                 source: 'DetailHeader.rerunSection',
                 mediaPaths: rerunMediaList,
-                history: rerunHistory,
+                history: combinedHistory,
             });
             if (result.failed > 0) {
                 // Each failed rerun already landed in the error module via
@@ -1280,50 +1282,52 @@ export function DetailHeader(props: DetailHeaderProps) {
                                             </div>
                                         </div>
 
-                                        {/* Message options */}
-                                        <div className="px-2 pt-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                                            Message:
-                                        </div>
-                                        <div className="space-y-1 max-h-52 overflow-y-auto pr-0.5">
-                                            {RERUN_MESSAGE_OPTIONS.map((opt) => {
-                                                const active = rerunMessageOption === opt.value;
-                                                const isRandom = opt.value === 'randomized';
-                                                return (
-                                                    <button
-                                                        key={opt.value}
-                                                        type="button"
-                                                        onClick={() => setRerunMessageOption(opt.value)}
-                                                        className={cn(
-                                                            "w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-lg text-left cursor-pointer transition-colors border",
-                                                            active
-                                                                ? "bg-sky-500/10 border-sky-500/40 text-slate-800 dark:text-slate-100"
-                                                                : "border-transparent text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80"
-                                                        )}
-                                                        title={opt.hint}
-                                                    >
-                                                        <span className="flex items-center gap-2">
-                                                            <span className={cn("w-3 h-3 rounded-full border-2 flex items-center justify-center", active ? "border-sky-500" : "border-slate-300 dark:border-slate-600")}>
-                                                                {active && <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />}
-                                                            </span>
-                                                            <span className="font-medium">{opt.label}</span>
-                                                        </span>
-                                                        {isRandom && (
-                                                            <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                                                                Randomized
-                                                            </span>
-                                                        )}
-                                                    </button>
-                                                );
-                                            })}
+                                        {/* Message selector: compact dropdown */}
+                                        <div className="flex items-center justify-between px-2 py-1 text-xs gap-2">
+                                            <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
+                                                Message:
+                                            </span>
+                                            <select
+                                                value={rerunMessageOption}
+                                                onChange={(e) => setRerunMessageOption(e.target.value as RerunMessageOption)}
+                                                className="flex-1 min-w-0 px-2 py-1 rounded-lg text-xs bg-slate-100 dark:bg-purple-950/40 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-purple-500/20 focus:outline-none cursor-pointer truncate"
+                                            >
+                                                {RERUN_MESSAGE_OPTIONS.map((opt) => (
+                                                    <option key={opt.value} value={opt.value}>
+                                                        {opt.value === 'randomized' ? '🎲 Random from set (skips used)' : opt.label}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </div>
 
-                                        {/* Built-in randomized set preview */}
-                                        {rerunMessageOption === 'randomized' && (
-                                            <div className="mx-2 px-2 py-1.5 rounded-lg bg-slate-50/80 dark:bg-purple-950/20 border border-slate-200/60 dark:border-purple-500/20 max-h-36 overflow-y-auto">
-                                                <div className="text-[9.5px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1 sticky top-0 bg-slate-50 dark:bg-[#1a0e2e]">
-                                                    Built-in set ({RERUN_RANDOM_MESSAGE_SET.length} variations — picked per dispatch)
+                                        {/* Compact status pill for randomized mode */}
+                                        {rerunMessageOption === 'randomized' && (() => {
+                                            const usedNudges = extractUsedNudgesFromConversation(selectedConversation, rerunHistory);
+                                            const unusedCount = Math.max(0, RERUN_RANDOM_MESSAGE_SET.length - usedNudges.length);
+                                            return (
+                                                <div className="mx-2 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-[10px] text-amber-700 dark:text-amber-300">
+                                                    <span className="flex items-center gap-1.5 truncate">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                                                        <span>Auto-picks random unused ({unusedCount} of {RERUN_RANDOM_MESSAGE_SET.length} left)</span>
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowVariations((prev) => !prev)}
+                                                        className="text-[9.5px] font-mono underline hover:text-amber-900 dark:hover:text-amber-100 shrink-0 ml-1 cursor-pointer"
+                                                    >
+                                                        {showVariations ? 'Hide' : 'List'}
+                                                    </button>
                                                 </div>
-                                                <ul className="space-y-0.5 text-[10.5px] text-slate-500 dark:text-slate-400 list-disc list-inside">
+                                            );
+                                        })()}
+
+                                        {/* Collapsible variations preview (only rendered if user clicks 'List') */}
+                                        {rerunMessageOption === 'randomized' && showVariations && (
+                                            <div className="mx-2 px-2 py-1.5 rounded-lg bg-slate-50/80 dark:bg-purple-950/20 border border-slate-200/60 dark:border-purple-500/20 max-h-28 overflow-y-auto">
+                                                <div className="text-[9px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5 sticky top-0 bg-slate-50 dark:bg-[#1a0e2e]">
+                                                    {RERUN_RANDOM_MESSAGE_SET.length} variations
+                                                </div>
+                                                <ul className="space-y-0.5 text-[10px] text-slate-500 dark:text-slate-400 list-disc list-inside">
                                                     {RERUN_RANDOM_MESSAGE_SET.map((m) => (
                                                         <li key={m}>{m}</li>
                                                     ))}

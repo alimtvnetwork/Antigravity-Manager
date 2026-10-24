@@ -1354,23 +1354,92 @@ export function savePersistedRerunCount(count: number): void {
 /** Maximum recent turns tracked for anti-repeat filtering. */
 export const RERUN_HISTORY_WINDOW = 5;
 
+/** Finds index of a message in RERUN_RANDOM_MESSAGE_SET using exact or case-insensitive/substring matching. */
+export function findMatchingVariationIndex(msg: string): number {
+    if (!msg || typeof msg !== 'string') return -1;
+    const clean = msg.trim().toLowerCase();
+    if (!clean) return -1;
+
+    // 1. Exact case-insensitive match
+    const exactIdx = RERUN_RANDOM_MESSAGE_SET.findIndex(
+        (v) => v.toLowerCase() === clean
+    );
+    if (exactIdx >= 0) return exactIdx;
+
+    // 2. Substring match (e.g. prompt contains the variation or variation contains the prompt)
+    return RERUN_RANDOM_MESSAGE_SET.findIndex((v) => {
+        const vClean = v.toLowerCase();
+        return clean.includes(vClean) || vClean.includes(clean);
+    });
+}
+
+/**
+ * Extracts all rerun nudge variations that have already been used in this conversation
+ * or recent dispatch history, ensuring they are excluded from future random picks.
+ */
+export function extractUsedNudgesFromConversation(
+    conv?: AgmConversationNode | null,
+    sessionHistory?: string[] | null
+): string[] {
+    const used = new Set<string>();
+
+    if (sessionHistory && Array.isArray(sessionHistory)) {
+        for (const item of sessionHistory) {
+            if (item && typeof item === 'string' && item.trim()) {
+                const idx = findMatchingVariationIndex(item);
+                if (idx >= 0) {
+                    used.add(RERUN_RANDOM_MESSAGE_SET[idx]);
+                } else {
+                    used.add(item.trim());
+                }
+            }
+        }
+    }
+
+    if (conv?.prompts && Array.isArray(conv.prompts) && conv.prompts.length > 0) {
+        for (const turn of conv.prompts) {
+            const text = (turn.prompt_text || turn.preview_200w || '').trim();
+            if (!text) continue;
+            for (const variation of RERUN_RANDOM_MESSAGE_SET) {
+                if (text.toLowerCase().includes(variation.toLowerCase())) {
+                    used.add(variation);
+                }
+            }
+        }
+    }
+
+    const convText = (conv?.full_prompt_text || conv?.prompt_preview_200w || '').trim();
+    if (convText) {
+        for (const variation of RERUN_RANDOM_MESSAGE_SET) {
+            if (convText.toLowerCase().includes(variation.toLowerCase())) {
+                used.add(variation);
+            }
+        }
+    }
+
+    return Array.from(used);
+}
+
 /**
  * Picks a diverse, actionable rerun nudge from the random message set while
- * excluding recently used questions in history (up to 5 turns).
+ * strictly excluding all previously used questions in history and conversation turns.
  *
- * If the history covers every option or candidates are exhausted, it falls back
- * to sampling from the remaining options excluding the single most recent nudge (or full set).
+ * If all options in the set have been used, it resets the exclusion pool (or excludes only
+ * the most recent question) to maintain continuous execution.
  */
 export function pickDiverseRerunNudge(history?: string[] | null): string {
     const historyList = history || [];
-    const recent = historyList.slice(-RERUN_HISTORY_WINDOW);
-    const recentSet = new Set(recent);
+    const usedIndices = new Set<number>();
+    for (const msg of historyList) {
+        const idx = findMatchingVariationIndex(msg);
+        if (idx >= 0) usedIndices.add(idx);
+    }
 
-    let candidates = RERUN_RANDOM_MESSAGE_SET.filter((msg) => !recentSet.has(msg));
+    let candidates = RERUN_RANDOM_MESSAGE_SET.filter((_, idx) => !usedIndices.has(idx));
 
     if (candidates.length === 0) {
         // Fallback: exclude only the most recent question if possible
-        const lastUsed = recent[recent.length - 1];
+        const lastUsed = historyList[historyList.length - 1];
         candidates = RERUN_RANDOM_MESSAGE_SET.filter((msg) => msg !== lastUsed);
         if (candidates.length === 0) {
             candidates = [...RERUN_RANDOM_MESSAGE_SET];
@@ -1402,11 +1471,11 @@ export function resolveRerunMessage(
                 if (typeof item === 'number') {
                     excludedIndices.add(item);
                     if (RERUN_RANDOM_MESSAGE_SET[item]) {
-                        excludedMessages.add(RERUN_RANDOM_MESSAGE_SET[item]);
+                        excludedMessages.add(RERUN_RANDOM_MESSAGE_SET[item].toLowerCase());
                     }
                 } else if (typeof item === 'string') {
-                    excludedMessages.add(item);
-                    const idx = RERUN_RANDOM_MESSAGE_SET.indexOf(item);
+                    excludedMessages.add(item.trim().toLowerCase());
+                    const idx = findMatchingVariationIndex(item);
                     if (idx >= 0) {
                         excludedIndices.add(idx);
                     }
@@ -1416,7 +1485,8 @@ export function resolveRerunMessage(
 
         const availableIndices: number[] = [];
         for (let idx = 0; idx < RERUN_RANDOM_MESSAGE_SET.length; idx++) {
-            if (!excludedIndices.has(idx) && !excludedMessages.has(RERUN_RANDOM_MESSAGE_SET[idx])) {
+            const text = RERUN_RANDOM_MESSAGE_SET[idx].toLowerCase();
+            if (!excludedIndices.has(idx) && !excludedMessages.has(text)) {
                 availableIndices.push(idx);
             }
         }
@@ -1483,10 +1553,9 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
     const usedIndices = new Set<number>();
     const recentHistory: string[] = [...(ctx.history || [])];
 
-    // Pre-populate used indices from recent history (up to RERUN_HISTORY_WINDOW turns)
-    // so consecutive rerun calls never pick the same question.
-    for (const priorMsg of recentHistory.slice(-RERUN_HISTORY_WINDOW)) {
-        const priorIdx = RERUN_RANDOM_MESSAGE_SET.indexOf(priorMsg);
+    // Pre-populate used indices from recent history so questions already used are strictly excluded
+    for (const priorMsg of recentHistory) {
+        const priorIdx = findMatchingVariationIndex(priorMsg);
         if (priorIdx >= 0) {
             usedIndices.add(priorIdx);
         }

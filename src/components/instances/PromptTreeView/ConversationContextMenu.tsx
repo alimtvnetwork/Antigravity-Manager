@@ -34,6 +34,7 @@ import {
     exportConversationAsSqlite,
     extractConversationPromptsList,
     dispatchRerunMessages,
+    extractUsedNudgesFromConversation,
     loadPersistedRerunCount,
     loadPersistedRerunMessageOption,
     savePersistedRerunMessageOption,
@@ -503,6 +504,7 @@ export function ConversationContextMenu({
                 originalPrompt,
                 source: 'ConversationContextMenu.handleDoRerun',
                 mediaPaths: convMedia.length > 0 ? convMedia : undefined,
+                history: extractUsedNudgesFromConversation(conversationNode),
             });
             onClose();
         } catch (err) {
@@ -549,6 +551,7 @@ export function ConversationContextMenu({
                 originalPrompt,
                 source: 'ConversationContextMenu.handleRerunWithOption',
                 mediaPaths: convMedia.length > 0 ? convMedia : undefined,
+                history: extractUsedNudgesFromConversation(conversationNode),
             });
             onClose();
         } catch (err) {

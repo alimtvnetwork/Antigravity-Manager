@@ -82,6 +82,7 @@ import {
     loadPersistedRerunCount,
     savePersistedRerunCount,
     dispatchRerunMessages,
+    extractUsedNudgesFromConversation,
     dispatchConversationId,
     rewritePromptImageTargets,
 } from '../usePromptTreePromptActions';
@@ -468,6 +469,23 @@ test('dispatched image markdown is a workspace-relative file the IDE can open', 
     const rewritten = rewritePromptImageTargets(prompt, 'D:/work/gitmap');
     assertEqual(rewritten, 'Look ![Shot](assets/screenshots/shot.png)');
     assertFalse(rewritten.includes('file:///'), 'absolute file URI must not be sent to the IDE');
+});
+
+test('extractUsedNudgesFromConversation extracts used variations from conversation turns and history', () => {
+    const mockConv = {
+        conversation_id: 'conv-test-1',
+        prompts: [
+            { turn_number: 1, prompt_text: 'Initial implementation task' },
+            { turn_number: 2, prompt_text: 'Did all tests pass and is everything green?' },
+            { turn_number: 3, prompt_text: 'Is it completed?' },
+        ],
+    } as any;
+
+    const used = extractUsedNudgesFromConversation(mockConv, ['Is it finished?']);
+    assertTrue(used.includes('Did all tests pass and is everything green?'));
+    assertTrue(used.includes('Is it completed?'));
+    assertTrue(used.includes('Is it finished?'));
+    assertEqual(used.length, 3);
 });
 
 // ===========================================================================

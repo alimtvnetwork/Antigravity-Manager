@@ -12,7 +12,7 @@ import type { PromptTreeViewModalProps } from './types';
 import { usePromptTreeState } from './usePromptTreeState';
 import { usePromptTreeData, invalidatePromptTreeCache } from './usePromptTreeData';
 import { usePromptTreeCoreActions } from './usePromptTreeCoreActions';
-import { usePromptTreePromptActions, dispatchRerunMessages, loadPersistedRerunCount, loadPersistedRerunMessageOption, type RerunMessageOption } from './usePromptTreePromptActions';
+import { usePromptTreePromptActions, dispatchRerunMessages, extractUsedNudgesFromConversation, loadPersistedRerunCount, loadPersistedRerunMessageOption, type RerunMessageOption } from './usePromptTreePromptActions';
 import { isGhostConversation, isStaleOrEmptyConversation, getConversationStatus } from './conversationGuards';
 import { classifyPromptTier } from './tierClassification';
 import { ModalHeader } from './ModalHeader';
@@ -426,7 +426,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             originalPrompt,
             source: 'PromptTreeViewModal.onRerunConversation',
             mediaPaths: convMedia.length > 0 ? convMedia : undefined,
-            history: rerunHistory,
+            history: extractUsedNudgesFromConversation(conv, rerunHistory),
         }).then((res) => {
             if (res.dispatched > 0) {
                 setRerunHistory((prev) => [...prev, ...(res.messages || [])].slice(-10));
