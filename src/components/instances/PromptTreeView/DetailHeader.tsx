@@ -6,7 +6,7 @@ import { formatRelativeRecency } from './formatters';
 import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { CopyFormat, type AgmConversationNode } from './types';
-import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, dispatchConversationId, workspaceImageMarkdown, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
+import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, dispatchConversationId, workspaceImageMarkdown, rewritePromptImageTargets, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
 import { isGhostConversation } from './conversationGuards';
 import { persistClientCrash } from '../../../lib/error-listener';
 import { useErrorStore } from '../../../stores/error-store';
@@ -379,6 +379,7 @@ export function DetailHeader(props: DetailHeaderProps) {
             ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
 
             const effectiveOption: RerunMessageOption = rerunMessageOption || 'randomized';
+            promptWithImage = rewritePromptImageTargets(promptWithImage, effectiveRepoPath);
             const result = await dispatchRerunMessages({
                 targetInstId,
                 repoPath: effectiveRepoPath,

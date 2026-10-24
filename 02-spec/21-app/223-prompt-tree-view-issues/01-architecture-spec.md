@@ -4,7 +4,7 @@ Status: active
 
 ## Root cause
 
-Send and Enqueue injected text through DevTools into whichever composer was focused. The selected conversation id was stored on the prompt row and then ignored, so Current Conv still opened a new chat. Image markdown wrapped absolute paths in angle brackets, which the IDE cannot open as a workspace file and which Windows rejects as a path (os error 123). The tree timer dropped to 2 seconds whenever any project was running, and conversation hover added a border that shifted the row.
+Send and Enqueue dropped the selected conversation id whenever that conversation was already running, so Current Conv fell through to the focused-composer injector and opened a new chat. Image markdown wrapped absolute paths in angle brackets, which the IDE cannot open as a workspace file and which Windows rejects as a path (os error 123). The tree timer dropped to 2 seconds whenever any project was running, and conversation hover added a border that shifted the row.
 
 ## Rules
 

@@ -30,22 +30,27 @@ export { copyPromptWithRichImages } from './clipboard';
 export function dispatchConversationId(
     mode: 'current' | 'new',
     conversationId: string | undefined,
-    isRunning: boolean
+    _isRunning: boolean
 ): string | undefined {
     if (mode === 'new') {
         return 'new';
     }
-    if (isRunning) {
+
+    const trimmed = conversationId?.trim();
+    if (!trimmed) {
         return undefined;
     }
-    return conversationId;
+
+    return trimmed;
 }
 
-export function workspaceImageMarkdown(absPath: string, repoPath: string, index: number): string {
-    const normalized = absPath.replace(/\\/g, '/');
+export function workspaceRelativeImageTarget(absPath: string, repoPath: string): string {
+    const stripped = absPath.trim().replace(/^<|>$/g, '').replace(/^file:\/\//i, '');
+    const normalized = stripped.replace(/^\/+/, '').replace(/\\/g, '/');
     const repo = repoPath.replace(/\\/g, '/').replace(/\/+$/, '');
     const hasRepoPrefix = repo.length > 0 && normalized.toLowerCase().startsWith(repo.toLowerCase());
     let relative = hasRepoPrefix ? normalized.slice(repo.length).replace(/^\/+/, '') : '';
+
     if (!relative) {
         const repoName = repo.split('/').filter((part) => part.length > 0).pop() ?? '';
         const marker = repoName.length > 0 ? `/${repoName.toLowerCase()}/` : '';
@@ -54,11 +59,33 @@ export function workspaceImageMarkdown(absPath: string, repoPath: string, index:
             relative = normalized.slice(markerAt + marker.length);
         }
     }
+
     const isAbsolute = /^[a-zA-Z]:\//.test(relative) || relative.startsWith('/');
     if (!relative || isAbsolute) {
         relative = normalized.split('/').pop() || 'image';
     }
+
+    return relative;
+}
+
+export function workspaceImageMarkdown(absPath: string, repoPath: string, index: number): string {
+    const relative = workspaceRelativeImageTarget(absPath, repoPath);
+
     return `![Attached Image ${index}](${relative})`;
+}
+
+export function rewritePromptImageTargets(prompt: string, repoPath: string): string {
+    return prompt.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (full, alt: string, src: string) => {
+        const cleaned = src.trim();
+        if (cleaned.startsWith('data:') || cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
+            return full;
+        }
+
+        const relative = workspaceRelativeImageTarget(cleaned, repoPath);
+        const label = alt.trim() || 'Attached Image';
+
+        return `![${label}](${relative})`;
+    });
 }
 
 export type PromptAiCopyKind = 'json' | 'text' | 'md';
@@ -504,6 +531,8 @@ export function usePromptTreePromptActions({
                 }
             }
 
+            promptContent = rewritePromptImageTargets(promptContent, repoPath);
+
             // Dispatch real prompt content directly to running instance via sendPromptNow without stripping Base64 images to non-existent relative attachments
             // Track real dispatch outcome: the backend returns Err when the agy
             // CLI spawn fails, and the success message must not show in that case.
@@ -749,6 +778,7 @@ ${activePromptText}
             }
 
             // Enqueue prompt into FIFO queue (preserving real Base64 image data URIs and file paths)
+            promptContent = rewritePromptImageTargets(promptContent, repoPath);
             await enqueuePrompt(targetInstId, repoPath, promptContent, targetConvId, undefined, mediaList);
 
             // Invalidate prompt tree cache first so tree reload fetches fresh state including enqueued turn

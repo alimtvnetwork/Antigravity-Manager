@@ -61,7 +61,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
     return (
         <div className="pt-2.5 border-t border-gray-100 dark:border-[#40285e]/80 mt-2 space-y-1.5">
                                                 {/* Row 1: Primary Actions Capsule (Launch/Stop, Switch Account, Fast-Forward, Sync PID) */}
-                                                <div className="flex items-center rounded-full overflow-hidden bg-slate-100 dark:bg-[#090611] border border-slate-200/80 dark:border-[#40285e] divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs w-full">
+                                                <div className="flex w-full items-stretch overflow-hidden rounded-full border border-slate-200/80 bg-slate-100 shadow-2xs divide-x divide-slate-200 dark:border-[#40285e] dark:bg-[#090611] dark:divide-[#40285e]">
                                                     {inst.is_running ? (
                                                         <div className="flex-1 flex items-center divide-x divide-slate-200 dark:divide-[#40285e]">
                                                             <button
@@ -114,7 +114,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                         className={cn(
                                                             "flex-1 flex items-center justify-center py-1 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
                                                             "bg-transparent text-slate-600 dark:text-slate-400",
-                                                            "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:!text-black hover:font-bold hover:shadow-[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.25)]",
+                                                            "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:!text-black hover:[&_svg]:!text-black hover:font-bold hover:shadow-[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.25)]",
                                                             "active:translate-y-0.5 active:shadow-[0_0_0_0_#A16207]"
                                                         )}
                                                         title="Switch Account"
@@ -133,7 +133,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                         className={cn(
                                                             "flex-1 flex items-center justify-center py-1 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
                                                             "bg-transparent text-slate-600 dark:text-slate-400",
-                                                            "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:!text-black hover:font-bold hover:shadow-[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.25)]",
+                                                            "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:!text-black hover:[&_svg]:!text-black hover:font-bold hover:shadow-[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.25)]",
                                                             "active:translate-y-0.5 active:shadow-[0_0_0_0_#A16207]"
                                                         )}
                                                         title="Fast Forward to Next Best"
@@ -157,7 +157,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                 </div>
 
                                                 {/* Row 2: Secondary Actions Capsule (Prompts Tree, Settings, Clone Profile, Audit, More Popover) */}
-                                                <div className="flex items-center rounded-full overflow-hidden bg-slate-100 dark:bg-[#090611] border border-slate-200/80 dark:border-[#40285e] divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs w-full relative">
+                                                <div className="relative flex w-full items-stretch overflow-hidden rounded-full border border-slate-200/80 bg-slate-100 shadow-2xs divide-x divide-slate-200 dark:border-[#40285e] dark:bg-[#090611] dark:divide-[#40285e]">
                                                     {/* Slot 1: Prompts Tree */}
                                                     <button
                                                         id={`prompt-tree-btn-${inst.config.id}`}

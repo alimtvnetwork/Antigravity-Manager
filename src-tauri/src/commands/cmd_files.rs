@@ -1,15 +1,22 @@
 use super::*;
 
-fn resolve_existing_or_parent(path: &Path) -> Result<PathBuf, String> {
-    let rendered = path.to_string_lossy();
-    if rendered
+fn path_has_illegal_syntax(rendered: &str) -> bool {
+    rendered
         .chars()
         .any(|ch| matches!(ch, '<' | '>' | '|' | '"' | '*' | '?'))
-    {
+        || rendered.contains("://")
+}
+
+fn resolve_existing_or_parent(path: &Path) -> Result<PathBuf, String> {
+    let rendered = path.to_string_lossy();
+    if path_has_illegal_syntax(&rendered) {
         return Err(
             "invalid_path: path contains characters Windows rejects, so it cannot be opened as a file"
                 .to_string(),
         );
+    }
+    if !path.is_absolute() {
+        return Err("invalid_path: absolute path is required".to_string());
     }
 
     if path.exists() {
@@ -23,7 +30,7 @@ fn resolve_existing_or_parent(path: &Path) -> Result<PathBuf, String> {
         .ok_or_else(|| "invalid_path: missing parent directory".to_string())?;
     let canonical_parent = parent
         .canonicalize()
-        .map_err(|e| format!("failed_to_resolve_parent: {}", e))?;
+        .map_err(|e| format!("invalid_path: parent directory cannot be opened ({e})"))?;
     let file_name = path
         .file_name()
         .ok_or_else(|| "invalid_path: missing file name".to_string())?;

@@ -165,7 +165,7 @@ export function ConversationNode({
                     });
                 }}
                 className={cn(
-                    'group flex items-center justify-between rounded-md px-1.5 py-0.5 text-xs cursor-pointer transition-colors duration-150 relative outline-none focus-visible:!outline-none border border-transparent',
+                    'group flex items-center justify-between rounded-md px-1.5 py-0.5 text-xs cursor-pointer transition-colors duration-150 relative outline-none focus:outline-none focus-visible:!outline-none border-0',
                     isSelected && selectedTurnNumber === null
                         ? 'bg-gradient-to-r from-violet-600/30 to-purple-600/20 text-white font-medium'
                         : isSelected

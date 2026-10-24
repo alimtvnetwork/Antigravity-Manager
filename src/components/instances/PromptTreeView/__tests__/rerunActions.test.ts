@@ -82,6 +82,8 @@ import {
     loadPersistedRerunCount,
     savePersistedRerunCount,
     dispatchRerunMessages,
+    dispatchConversationId,
+    rewritePromptImageTargets,
 } from '../usePromptTreePromptActions';
 import { buildRerunPrompt } from '../verificationTemplates';
 
@@ -451,6 +453,21 @@ await test('verifies dispatchRerunMessages carries history and enforces anti-rep
     const run2Calls = promptCalls.slice(3, 5);
     assertEqual(run2Calls[0].cmd, 'send_prompt_now');
     assertEqual(run2Calls[1].cmd, 'enqueue_prompt');
+});
+
+test('current conversation keeps its id while the conversation is running', () => {
+    const runningId = 'bc221407-c445-415a-9034-b1179a550a79';
+    assertEqual(dispatchConversationId('current', runningId, true), runningId);
+    assertEqual(dispatchConversationId('current', `prompt-${runningId}`, true), `prompt-${runningId}`);
+    assertEqual(dispatchConversationId('new', runningId, true), 'new');
+    assertEqual(dispatchConversationId('current', '   ', false), undefined);
+});
+
+test('dispatched image markdown is a workspace-relative file the IDE can open', () => {
+    const prompt = 'Look ![Shot](file:///D:/work/gitmap/assets/screenshots/shot.png)';
+    const rewritten = rewritePromptImageTargets(prompt, 'D:/work/gitmap');
+    assertEqual(rewritten, 'Look ![Shot](assets/screenshots/shot.png)');
+    assertFalse(rewritten.includes('file:///'), 'absolute file URI must not be sent to the IDE');
 });
 
 // ===========================================================================
