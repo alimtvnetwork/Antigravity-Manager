@@ -332,6 +332,43 @@ pub fn schedule_post_switch_resume(instance_id: String) {
     arm_resume_timer(entry);
 }
 
+/// CLI/headless Stage-5: persist, wait the settle delay, restore inline.
+/// The GUI timer is in-process and dies when `agm` exits, so a CLI switch
+/// must block here or the running prompt never comes back on the next account.
+pub async fn run_post_switch_resume_after_delay(instance_id: &str) -> usize {
+    let delay = post_switch_resume_delay_seconds();
+    let previews = collect_pending_prompt_previews(instance_id);
+    let prompt_count = previews.len();
+    let now_ms = Utc::now().timestamp_millis() as u64;
+    let entry = ScheduledResumeEntry {
+        instance_id: instance_id.to_string(),
+        scheduled_at_ms: now_ms,
+        fire_at_ms: now_ms + delay * 1000,
+        remaining_seconds: delay as i64,
+        total_delay_seconds: delay,
+        prompt_count,
+        prompts: previews,
+    };
+    persist_resume_task(&entry);
+    audit_resume_lifecycle(
+        "scheduled",
+        instance_id,
+        &format!("CLI/headless resume scheduled in {delay}s ({prompt_count} prompt(s))"),
+    );
+    crate::modules::logger::log_info(&format!(
+        "[PostSwitchResume] CLI/headless: waiting {delay}s then restoring on '{instance_id}' ({prompt_count} prompt(s))"
+    ));
+    tokio::time::sleep(Duration::from_secs(delay)).await;
+    let restored = run_resume_with_retry(instance_id).await;
+    clear_persisted_resume_task(instance_id);
+    audit_resume_lifecycle(
+        "fired",
+        instance_id,
+        &format!("CLI/headless resume fired; {restored} prompt(s) restored"),
+    );
+    restored
+}
+
 /// Spawn the resume timer for `entry` and register it, aborting any displaced
 /// task for the same instance. Lock scope is sync-only: no .await while the
 /// guard is held. Aborting a displaced handle covers the tiny race between

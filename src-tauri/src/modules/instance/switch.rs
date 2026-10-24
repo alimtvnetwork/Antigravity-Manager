@@ -152,12 +152,11 @@ pub async fn switch_account_to_instance(
         None
     };
 
-    // 1.5. [Step 1/5] Snapshot and re-enqueue running prompts scoped to the currently active instance BEFORE closing IDE
-    let source_instance_id = if !registry.active_instance_id.is_empty() {
-        registry.active_instance_id.clone()
-    } else {
-        instance.id.clone()
-    };
+    // 1.5. [Step 1/5] Snapshot the instance whose account is changing.
+    // Never use the globally-selected active instance: CLI `switch`/`ff` on a
+    // sandbox would otherwise steal Default's running prompts and skip the
+    // target instance's own running prompt.
+    let source_instance_id = prompt_backup_source_instance_id(&instance.id);
 
     // Incomplete-prompt sweep: transition ALL uncompleted prompts (running, in_flight, dispatched, any age)
     // to backed_up so long-running prompts are never dropped when switching or when quota expires.
@@ -680,12 +679,28 @@ pub async fn switch_account_to_instance(
             .unwrap_or(false);
     let channel_wait = crate::modules::repo_db::needs_prompt_channel_wait(total_pending_restore)
         || has_unrestored_backups;
+    let mut restored_count = 0usize;
     if channel_wait {
         crate::modules::logger::log_info(&format!(
             "[INSTANCE_SWITCH:STAGE_5_RESTORE] Scheduling prompt restore for instance '{}' after the IDE is up ({} backed up, unrestored available: {})",
             target_inst_id, total_pending_restore, has_unrestored_backups
         ));
-        crate::modules::instance::schedule_prompt_restore_after_launch(target_inst_id.clone());
+        if crate::modules::log_bridge::get_app_handle().is_some() {
+            crate::modules::instance::schedule_prompt_restore_after_launch(target_inst_id.clone());
+        } else {
+            // CLI/headless: the 10s in-process timer dies when this process
+            // exits. Wait the settle delay and run STAGE_5 inline so a
+            // running prompt is actually restored after the next account.
+            crate::modules::logger::log_info(&format!(
+                "[INSTANCE_SWITCH:STAGE_5_RESTORE] CLI/headless path: waiting for post-switch resume on '{}'",
+                target_inst_id
+            ));
+            restored_count =
+                crate::modules::instance::post_switch_resume::run_post_switch_resume_after_delay(
+                    &target_inst_id,
+                )
+                .await;
+        }
     } else {
         crate::modules::logger::log_info(&format!(
             "[INSTANCE_SWITCH:STAGE_5_RESTORE] No backed-up prompt for instance '{}'",
@@ -693,15 +708,13 @@ pub async fn switch_account_to_instance(
         ));
     }
 
-    // RC-3: the Stage-5 restore runs on the deferred post-switch timer, so at
-    // audit time its result does not exist yet. Report the real count at this
-    // point (nothing restored synchronously) instead of claiming every
-    // backed-up prompt was restored; the deferred restore unit reports its
-    // actual restored count via the prompts://restored event and its log line.
+    // RC-3: GUI restore is deferred to the post-switch timer, so audit
+    // reports 0 here. CLI/headless already ran STAGE_5 and reports the
+    // real dispatched count.
     let restore_step = crate::modules::task_history_db::SwitchRestoreStep {
         method: "resume_task_json + sync_agy_prompt_restore".to_string(),
-        restored_count: 0,
-        dispatched_count: 0,
+        restored_count,
+        dispatched_count: restored_count,
         prompt_channel_waited: channel_wait,
         success: true,
     };
@@ -889,4 +902,28 @@ pub async fn switch_account_to_instance(
         );
     }
     Ok(())
+}
+
+/// Stage 1 snapshot source is the instance whose credentials are changing.
+fn prompt_backup_source_instance_id(target_instance_id: &str) -> String {
+    if target_instance_id.is_empty() {
+        "default".to_string()
+    } else {
+        target_instance_id.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::prompt_backup_source_instance_id;
+
+    #[test]
+    fn prompt_backup_source_is_the_switched_instance_not_global_active() {
+        assert_eq!(
+            prompt_backup_source_instance_id("test-restore-1"),
+            "test-restore-1"
+        );
+        assert_eq!(prompt_backup_source_instance_id("default"), "default");
+        assert_eq!(prompt_backup_source_instance_id(""), "default");
+    }
 }

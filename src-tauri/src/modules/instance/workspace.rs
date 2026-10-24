@@ -165,7 +165,7 @@ pub(crate) fn push_backed_up_prompts_after_channel(instance_id: &str) -> usize {
     // finds 0 records, it falls back to unrestored records under other instances.
     // The outcome counts are real (RC-3): a failed restore or dispatch is
     // logged with its counts here, never presented as success.
-    match crate::modules::backup_prompts_db::restore_running_prompts_scoped_with_fallback_with_outcome(
+    let backup_dispatched = match crate::modules::backup_prompts_db::restore_running_prompts_scoped_with_fallback_with_outcome(
         instance_id,
         false,
         None,
@@ -183,13 +183,15 @@ pub(crate) fn push_backed_up_prompts_after_channel(instance_id: &str) -> usize {
                     .map(|e| format!(" (last error: {e})"))
                     .unwrap_or_default()
             ));
+            outcome.dispatched_count
         }
         Err(err) => {
             crate::modules::logger::log_error(&format!(
                 "[INSTANCE_SWITCH:STAGE_5_RESTORE] Backup restore failed for '{instance_id}': {err}"
             ));
+            0
         }
-    }
+    };
     // Single-prompt resume (user decision, 2026-10-24): after a switch or
     // fast-forward, only the most recently active backed-up prompt is
     // re-dispatched; every other backed-up prompt stays backed up.
@@ -221,7 +223,7 @@ pub(crate) fn push_backed_up_prompts_after_channel(instance_id: &str) -> usize {
         0
     };
     let after = crate::modules::repo_db::count_backed_up_prompts(instance_id);
-    let pushed = dispatched;
+    let pushed = dispatched.max(backup_dispatched);
     crate::modules::logger::log_info(&format!(
         "[INSTANCE_SWITCH:STAGE_5_RESTORE] Re-pushed {pushed} prompt(s) for instance '{instance_id}' ({before} backed up before, {after} still backed up)"
     ));

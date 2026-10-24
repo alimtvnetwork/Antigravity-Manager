@@ -95,15 +95,19 @@ pub(crate) fn cmd_fast_forward(args: &[String]) {
     )));
 
     if result.is_ok() {
-        // Immediately restore and dispatch running prompts for target instance
-        antigravity_tools_lib::error::record_ignored(
-            repo_db::resend_running_commands_for_instance(Some(&target_instance), 20),
-            "resend_running_commands_for_instance",
-        ); // Justification: best-effort prompt re-injection (crate::error::record_ignored)
-        antigravity_tools_lib::error::record_ignored(
-            repo_db::dispatch_running_prompts(&target_instance),
-            "dispatch_running_prompts",
-        ); // Justification: best-effort prompt re-injection (crate::error::record_ignored)
+        // Stage 5 already ran inside switch_account_to_instance on the CLI
+        // path. Only re-dispatch leftovers that are still backed_up.
+        let still_backed = repo_db::count_backed_up_prompts(&target_instance);
+        if still_backed > 0 {
+            antigravity_tools_lib::error::record_ignored(
+                repo_db::resend_running_commands_for_instance(Some(&target_instance), 20),
+                "resend_running_commands_for_instance",
+            ); // Justification: leftover backed-up prompts after Stage 5
+            antigravity_tools_lib::error::record_ignored(
+                repo_db::dispatch_running_prompts(&target_instance),
+                "dispatch_running_prompts",
+            ); // Justification: leftover backed-up prompts after Stage 5
+        }
     }
 
     let status_after = auto_switcher::get_status();

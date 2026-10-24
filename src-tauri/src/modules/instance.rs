@@ -551,7 +551,8 @@ pub use port_lease_tracker::*;
 pub use port_reclaim_sentinel::*;
 pub use port_reclaim_watchdog::*;
 pub use post_switch_resume::{
-    cancel_post_switch_resume, rearm_persisted_resumes, schedule_post_switch_resume,
+    cancel_post_switch_resume, rearm_persisted_resumes, run_post_switch_resume_after_delay,
+    schedule_post_switch_resume,
 };
 pub use process_cache::is_instance_process_running_smart;
 pub(crate) use process_cache::{check_cached_pid_alive, focus_running_instance};
