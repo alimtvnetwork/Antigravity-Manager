@@ -1,5 +1,13 @@
 # Changelog
 
+## [v4.264.0] - 2026-10-24
+
+### Fixed
+- Release workflow gate in `.github/workflows/release.yml` now uses a bounded polling loop (every 20s up to 25 minutes) to await in-progress `ci.yml` runs on tag push, eliminating premature gate failure (`conclusion: missing`) and release refusal (Thanks to @aukgit)
+- Documented 4-part Root Cause Analysis in `.ai-memory/cicd-issues/47-release-gate-ci-race-condition-rca.md` and indexed recurring CI race conditions in `.ai-memory/cicd-issues/readme.md` (Thanks to @aukgit)
+
+---
+
 ## [v4.263.0] - 2026-10-24
 
 ### Fixed
@@ -1293,6 +1301,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.264.0 (2026-10-25)**:
+        -   **[Release Gate In-Progress CI Polling] Bounded polling loop awaits in-flight CI runs on tag push before validating green pass (Thanks to @aukgit)**:
+            -   **Description**: Fixed race condition in `.github/workflows/release.yml` where `release.yml` immediately queried `status=completed` and aborted with `conclusion: missing`. Added 25-minute polling loop with heartbeat logging, authored RCA 47, and verified release gate pass on GitHub Actions. (Thanks to @aukgit)
+
+
     *   **v4.263.0 (2026-10-24)**:
         -   **[Account Switch Prompt Restore and CLI Inline Resume] Scoped prompt snapshots to the target instance and executed inline post-switch resume on CLI paths (Thanks to @aukgit)**:
             -   **Description**: Stage 1 snapshot source now uses the target switched instance in `src-tauri/src/modules/instance/switch.rs` instead of global active instance. Added `run_post_switch_resume_after_delay` in `src-tauri/src/modules/instance/post_switch_resume.rs` to await settle delay and restore inline for CLI/headless operations. Fast-forward leftover handling in `src-tauri/src/bin/agm/instance_fastforward.rs` avoids duplicate prompt dispatch. (Thanks to @aukgit)

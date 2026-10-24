@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.263.0)
+> Professional AI Account Management & Protocol Proxy System (v4.264.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.263.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.264.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.264.0**: Release gate in-progress CI polling — `.github/workflows/release.yml` now uses a bounded polling loop awaiting in-flight CI runs before evaluating the green gate, preventing premature release failure and `conclusion: missing` race condition. (Thanks to @aukgit)
 
 > Latest version **v4.263.0**: Account switch prompt restore and CLI inline resume — Stage 1 prompt snapshot now scopes strictly to the target switched instance; CLI and headless account switching executes Stage 5 restore inline via `run_post_switch_resume_after_delay` so running prompts resume reliably; fast-forward skips duplicate dispatches if already restored. (Thanks to @aukgit)
 
