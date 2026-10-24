@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.263.0 (2026-10-24)**:
+        -   **[Account Switch Prompt Restore and CLI Inline Resume] Scoped prompt snapshots to the target instance and executed inline post-switch resume on CLI paths (Thanks to @aukgit)**:
+            -   **Description**: Stage 1 snapshot source now uses the target switched instance in `src-tauri/src/modules/instance/switch.rs` instead of global active instance. Added `run_post_switch_resume_after_delay` in `src-tauri/src/modules/instance/post_switch_resume.rs` to await settle delay and restore inline for CLI/headless operations. Fast-forward leftover handling in `src-tauri/src/bin/agm/instance_fastforward.rs` avoids duplicate prompt dispatch. (Thanks to @aukgit)
+
     *   **v4.262.0 (2026-10-24)**:
         -   **[Account Switch E2E and Fast-Forward Previous Profile] Isolated switch/FF cases were run on a new test instance, and Previous Profile now names the target account (Thanks to @aukgit)**:
             -   **Description**: Last-night spec `02-spec/21-app/222-fast-forward-algorithm-issues-and-confirmation/spec.md` plus catalog `02-spec/21-app/fixing-auto-switching-and-progress-bar-issues/02-e2e-test-cases-spec.md` TC-01..TC-11 were executed on `agm instances test-create` sandboxes. Default and v2 were never stopped. `agm ff` now reports the target instance previous email. `agm auto-switch status --json` includes `is_enabled` and `low_quota_threshold_percent`. Threshold was restored to `15.0`. (Thanks to @aukgit)

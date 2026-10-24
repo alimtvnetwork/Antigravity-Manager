@@ -1,5 +1,15 @@
 # Changelog
 
+## [v4.263.0] - 2026-10-24
+
+### Fixed
+- Stage 1 prompt snapshot during account rotation now scopes strictly to the target switched instance via `prompt_backup_source_instance_id` in `src-tauri/src/modules/instance/switch.rs` instead of defaulting to global active instance (Thanks to @aukgit)
+- CLI and headless account switching now executes Stage 5 restore inline via `run_post_switch_resume_after_delay` in `src-tauri/src/modules/instance/post_switch_resume.rs`, preventing prompt loss when short-lived CLI processes exit before GUI timers fire (Thanks to @aukgit)
+- Fast-forward leftover handling in `src-tauri/src/bin/agm/instance_fastforward.rs` only re-dispatches prompts if backed-up records remain, eliminating duplicate prompt dispatches after Stage 5 execution (Thanks to @aukgit)
+- Real dispatched prompt counts correctly propagate across `src-tauri/src/modules/instance/workspace.rs` and audit logs during switch restoration (Thanks to @aukgit)
+
+---
+
 ## [v4.262.0] - 2026-10-24
 
 ### Fixed
@@ -1283,6 +1293,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.263.0 (2026-10-24)**:
+        -   **[Account Switch Prompt Restore and CLI Inline Resume] Scoped prompt snapshots to the target instance and executed inline post-switch resume on CLI paths (Thanks to @aukgit)**:
+            -   **Description**: Stage 1 snapshot source now uses the target switched instance in `src-tauri/src/modules/instance/switch.rs` instead of global active instance. Added `run_post_switch_resume_after_delay` in `src-tauri/src/modules/instance/post_switch_resume.rs` to await settle delay and restore inline for CLI/headless operations. Fast-forward leftover handling in `src-tauri/src/bin/agm/instance_fastforward.rs` avoids duplicate prompt dispatch. (Thanks to @aukgit)
+
+
     *   **v4.262.0 (2026-10-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
