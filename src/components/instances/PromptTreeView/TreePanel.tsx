@@ -594,7 +594,7 @@ export function TreePanel(props: TreePanelProps) {
             </div>
 
             {/* Tree Items List */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-3.5">
+            <div className="flex-1 overflow-y-auto p-1.5 space-y-1">
                 {activeFilter === 'archived' ? (
                     effectiveArchivedProjects.length === 0 ? (
                         <div className="py-12 text-center text-xs text-slate-400">

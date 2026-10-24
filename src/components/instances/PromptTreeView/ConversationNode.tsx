@@ -165,12 +165,12 @@ export function ConversationNode({
                     });
                 }}
                 className={cn(
-                    'group flex items-center justify-between rounded-md px-2 py-1.5 text-xs cursor-pointer transition-all duration-150 relative outline-none focus-visible:ring-1 focus-visible:ring-purple-500/50',
+                    'group flex items-center justify-between rounded-md px-1.5 py-0.5 text-xs cursor-pointer transition-colors duration-150 relative outline-none focus-visible:ring-1 focus-visible:ring-purple-500/50 border border-transparent',
                     isSelected && selectedTurnNumber === null
-                        ? 'bg-gradient-to-r from-violet-600/30 to-purple-600/20 border border-violet-500/50 text-white font-medium shadow-[0_0_12px_rgba(139,92,246,0.15)] backdrop-blur-md'
+                        ? 'bg-gradient-to-r from-violet-600/30 to-purple-600/20 text-white font-medium'
                         : isSelected
-                          ? 'bg-purple-500/15 border-l-2 border-purple-500 text-purple-300 font-medium'
-                          : 'text-slate-600 dark:text-zinc-300 hover:bg-slate-100/80 dark:hover:bg-[#181126]/70 border border-transparent hover:border-purple-900/30'
+                          ? 'bg-purple-500/15 text-purple-300 font-medium'
+                          : 'text-slate-600 dark:text-zinc-300 hover:bg-slate-100/80 dark:hover:bg-[#181126]/70'
                 )}
                 title={`${conv.title || 'Conversation'} · ${conv.step_count || 1} steps · Click to view (F2 to rename)`}
             >

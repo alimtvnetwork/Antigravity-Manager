@@ -27,6 +27,14 @@ import {
 
 export { copyPromptWithRichImages } from './clipboard';
 
+function workspaceImageMarkdown(absPath: string, repoPath: string, index: number): string {
+    const normalized = absPath.replace(/\\/g, '/');
+    const repo = repoPath.replace(/\\/g, '/').replace(/\/+$/, '');
+    const hasRepoPrefix = repo.length > 0 && normalized.toLowerCase().startsWith(repo.toLowerCase());
+    const relative = hasRepoPrefix ? normalized.slice(repo.length).replace(/^\/+/, '') : normalized;
+    return `![Attached Image ${index}](${relative})`;
+}
+
 export type PromptAiCopyKind = 'json' | 'text' | 'md';
 
 export function resolvePromptBody(conv: AgmConversationNode, preferred?: string): string {
@@ -426,8 +434,11 @@ export function usePromptTreePromptActions({
             const repoPath = proj?.repo_path || selectedProject?.repo_path || (conv as { repo_path?: string })?.repo_path || '';
             const targetInstId = selectedConversation?.instance_id || conv?.instance_id || proj?.instance_id || instanceId || 'default';
             const targetConvId = conversationTargetMode === 'new'
-                ? (newConversationTitle?.trim() || undefined)
+                ? undefined
                 : conv?.conversation_id;
+            if (conversationTargetMode === 'new' && newConversationTitle?.trim()) {
+                promptContent = `# ${newConversationTitle.trim()}\n\n${promptContent}`;
+            }
 
             if (confirmationSuffix && confirmationSuffix !== 'None (Send as is)' && confirmationSuffix !== 'none') {
                 const templateType = parseVerificationTypeFromSuffix(confirmationSuffix);
@@ -456,7 +467,7 @@ export function usePromptTreePromptActions({
             if (mediaList.length > 0) {
                 const missing = mediaList.filter((p) => p && !promptContent.includes(p));
                 if (missing.length > 0) {
-                    const imagesBlock = '\n\n' + missing.map((p, idx) => `![Attached Image ${idx + 1}](<${p}>)`).join('\n\n');
+                    const imagesBlock = '\n\n' + missing.map((p, idx) => workspaceImageMarkdown(p, repoPath, idx + 1)).join('\n\n');
                     if (promptContent.includes('</USER_REQUEST>')) {
                         promptContent = promptContent.replace('</USER_REQUEST>', imagesBlock + '\n</USER_REQUEST>');
                     } else {
@@ -665,8 +676,11 @@ ${activePromptText}
             const repoPath = proj?.repo_path || selectedProject?.repo_path || (conv as { repo_path?: string })?.repo_path || '';
             const targetInstId = selectedConversation?.instance_id || conv.instance_id || proj?.instance_id || instanceId || 'default';
             const targetConvId = conversationTargetMode === 'new'
-                ? (newConversationTitle?.trim() || undefined)
+                ? undefined
                 : conv.conversation_id;
+            if (conversationTargetMode === 'new' && newConversationTitle?.trim()) {
+                promptContent = `# ${newConversationTitle.trim()}\n\n${promptContent}`;
+            }
 
             if (confirmationSuffix && confirmationSuffix !== 'None (Send as is)' && confirmationSuffix !== 'none') {
                 const templateType = parseVerificationTypeFromSuffix(confirmationSuffix);
@@ -695,7 +709,7 @@ ${activePromptText}
             if (mediaList.length > 0) {
                 const missing = mediaList.filter((p) => p && !promptContent.includes(p));
                 if (missing.length > 0) {
-                    const imagesBlock = '\n\n' + missing.map((p, idx) => `![Attached Image ${idx + 1}](<${p}>)`).join('\n\n');
+                    const imagesBlock = '\n\n' + missing.map((p, idx) => workspaceImageMarkdown(p, repoPath, idx + 1)).join('\n\n');
                     if (promptContent.includes('</USER_REQUEST>')) {
                         promptContent = promptContent.replace('</USER_REQUEST>', imagesBlock + '\n</USER_REQUEST>');
                     } else {

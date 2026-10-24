@@ -964,64 +964,42 @@ export function DetailHeader(props: DetailHeaderProps) {
                         )}
                     </div>
 
-                    {/* Capsule B: Unified Dispatch Capsule [ Send (Preempt) | Enqueue (FIFO) | v (Options) ] */}
-                    <div className="relative flex items-center rounded-lg bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
-                        {/* 1. Send (Preempt): Cancels any running task and executes immediately */}
+                    {/* Capsule B: one dispatch control. Send, Enqueue, and Rerun live in the dropdown. */}
+                    <div className="relative flex items-center rounded-full overflow-hidden bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 shadow-2xs shrink-0">
                         <button
                             type="button"
                             onClick={() => {
+                                if (primaryDispatchAction === 'enqueue') {
+                                    void Promise.resolve(onEnqueue()).catch((err) => {
+                                        reportPromptActionError(err, 'DetailHeader.onEnqueue');
+                                    });
+                                    return;
+                                }
+                                if (primaryDispatchAction === 'rerun') {
+                                    void handleRerun().catch((err) => {
+                                        reportPromptActionError(err, 'DetailHeader.rerunSection');
+                                    });
+                                    return;
+                                }
                                 void Promise.resolve(onResend()).catch((err) => {
                                     reportPromptActionError(err, 'DetailHeader.onResend');
                                 });
                             }}
-                            disabled={isResending}
-                            data-ui-name="prompt-send-preempt-btn"
-                            data-ui-id={`prompt-send-preempt-${selectedConversation.conversation_id}`}
-                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-md text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/20 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                            title="Send (Preempt): Cancels any running task to execute immediately (Hotkey: N)"
-                            aria-label="Send (Preempt): Cancels any running task to execute immediately (Hotkey: N)"
+                            disabled={isResending || isEnqueueing || isRerunning}
+                            data-ui-name="prompt-dispatch-primary-btn"
+                            data-ui-id={`prompt-dispatch-primary-${selectedConversation.conversation_id}`}
+                            className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 transition-all duration-150 ease-out active:translate-y-px cursor-pointer disabled:opacity-50"
+                            title="Run the selected dispatch mode. Open the menu for Send, Enqueue, or Rerun."
+                            aria-label="Run selected dispatch mode"
                         >
-                            <RotateCw className={cn('w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0', isResending && 'animate-spin')} />
-                            <span>{isResending ? 'Sending…' : 'Send'}</span>
-                            <kbd className="ml-0.5 px-1 py-0.2 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 rounded text-[8.5px] font-mono font-bold">N</kbd>
-                        </button>
-
-                        {/* 2. Enqueue (FIFO): Stages prompt into background FIFO queue without cancelling active task */}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                void Promise.resolve(onEnqueue()).catch((err) => {
-                                    reportPromptActionError(err, 'DetailHeader.onEnqueue');
-                                });
-                            }}
-                            disabled={isEnqueueing}
-                            data-ui-name="prompt-enqueue-fifo-btn"
-                            data-ui-id={`prompt-enqueue-fifo-${selectedConversation.conversation_id}`}
-                            className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 dark:hover:bg-amber-500/20 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                            title="Enqueue (FIFO): Queues prompt behind active task in IDE without interrupting"
-                            aria-label="Enqueue (FIFO): Queues prompt behind active task in IDE without interrupting"
-                        >
-                            <ListPlus className={cn('w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0', isEnqueueing && 'animate-pulse')} />
-                            <span>{isEnqueueing ? 'Queueing…' : 'Enqueue'}</span>
-                        </button>
-
-                        {/* 3. Rerun (Randomized): Directly dispatches auto-picked randomized completion/release check */}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                void handleRerun().catch((err) => {
-                                    reportPromptActionError(err, 'DetailHeader.rerunSection');
-                                });
-                            }}
-                            disabled={isRerunning}
-                            data-ui-name="prompt-rerun-btn"
-                            data-ui-id={`prompt-rerun-${selectedConversation.conversation_id}`}
-                            className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold text-sky-700 dark:text-sky-400 hover:bg-sky-500/10 dark:hover:bg-sky-500/20 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50"
-                            title={`Rerun (${rerunMessageOption}): Dispatches auto-picked completion/release nudge (Hotkey: R)`}
-                            aria-label={`Rerun (${rerunMessageOption}): Dispatches auto-picked completion or release nudge${rerunCount > 1 ? ` ${rerunCount} times` : ''}`}
-                        >
-                            <Repeat className={cn('w-3 h-3 text-sky-600 dark:text-sky-400 shrink-0', isRerunning && 'animate-spin')} />
-                            <span>{isRerunning ? 'Rerunning…' : (rerunFlash ?? `Rerun ×${rerunCount}`)}</span>
+                            <RotateCw className={cn('w-3 h-3 shrink-0', (isResending || isRerunning) && 'animate-spin')} />
+                            <span>
+                                {primaryDispatchAction === 'enqueue'
+                                    ? (isEnqueueing ? 'Queueing…' : 'Enqueue')
+                                    : primaryDispatchAction === 'rerun'
+                                      ? (isRerunning ? 'Rerunning…' : (rerunFlash ?? `Rerun ×${rerunCount}`))
+                                      : (isResending ? 'Sending…' : 'Send')}
+                            </span>
                         </button>
 
                         {/* 4. Dropdown Chevron for Unified Dispatch Menu (Rerun, Target, Templates) */}

@@ -218,7 +218,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         project: AgmProjectTreeNode;
     } | null>(null);
 
-    const DEFAULT_TREE_WIDTH = 450;
+    const DEFAULT_TREE_WIDTH = 340;
     const MIN_TREE_WIDTH = 280;
     const MAX_TREE_WIDTH = 760;
 
@@ -353,8 +353,11 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
     const runningUpNext = useRunningAndUpNext(instanceId, isOpen);
 
     const findStripConversation = (promptId: string): { conv: AgmConversationNode; proj: AgmProjectTreeNode } | null => {
+        const bareId = promptId.startsWith('prompt-') ? promptId.slice('prompt-'.length) : promptId;
         for (const proj of treeData) {
-            const conv = (proj.conversations || []).find((c) => c.conversation_id === promptId);
+            const conv = (proj.conversations || []).find((c) => {
+                return c.conversation_id === promptId || c.conversation_id === bareId;
+            });
             if (conv) return { conv, proj };
         }
         return null;

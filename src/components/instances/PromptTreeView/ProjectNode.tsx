@@ -439,7 +439,7 @@ export function ProjectNode(props: ProjectNodeProps) {
     };
 
     return (
-        <div key={project.project_id} className={cn("space-y-1 transition-all", !isScopedSingleProject && "my-2.5 rounded-xl bg-slate-900/20 dark:bg-[#120a1f]/30 border border-slate-700/20 dark:border-purple-900/30 p-1.5 shadow-2xs")}>
+        <div key={project.project_id} className={cn("space-y-0.5", !isScopedSingleProject && "my-1 rounded-lg bg-slate-900/20 dark:bg-[#120a1f]/30 border border-slate-700/20 dark:border-purple-900/30 p-1")}>
             {/* Layer 1: Project Row (Hidden when a specific project is selected in the scope dropdown) */}
             {!isScopedSingleProject && (
                 <div

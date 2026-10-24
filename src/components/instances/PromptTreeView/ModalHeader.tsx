@@ -98,14 +98,14 @@ export function ModalHeader(props: ModalHeaderProps) {
     };
 
     return (
-        <div className="relative z-40 flex items-center justify-between border-b border-slate-200/80 dark:border-purple-900/40 px-4 py-2.5 bg-slate-50/80 dark:bg-[#0c0817]/95 backdrop-blur-xl shrink-0">
-            <div className="flex items-center gap-2.5 min-w-0">
-                <div className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shrink-0">
+        <div className="relative z-40 flex items-center justify-between border-b border-slate-200/80 dark:border-purple-900/40 px-3 py-1 bg-slate-50/80 dark:bg-[#0c0817]/95 backdrop-blur-xl shrink-0">
+            <div className="flex items-center gap-2 min-w-0">
+                <div className="flex h-6 w-6 items-center justify-center rounded-[5px] bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shrink-0">
                     <Layers className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap min-w-0">
-                        <h2 className="text-sm font-bold text-slate-900 dark:text-white shrink-0">
+                        <h2 className="text-xs font-bold text-slate-900 dark:text-white shrink-0">
                             Project & Prompt Tree View
                         </h2>
                         {appVersion && (
@@ -155,11 +155,12 @@ export function ModalHeader(props: ModalHeaderProps) {
                         type="button"
                         onClick={onResetTree}
                         disabled={isLoading || isResetting}
-                        className="flex items-center justify-center w-7 h-7 text-slate-500 dark:text-slate-400 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Reset & Regenerate Tree (Wipe SQLite DB and rebuild prompt tree and sequences fresh from disk transcripts)"
-                        aria-label="Reset & Regenerate Tree"
+                        className="flex items-center justify-center gap-1 h-7 px-2 text-[11px] font-semibold text-black bg-amber-400 hover:bg-amber-300 shadow-[0_2px_0_0_#92400e] active:translate-y-px active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Reset tree from disk transcripts"
+                        aria-label="Reset"
                     >
-                        <RotateCcw className={cn("w-3.5 h-3.5 text-amber-500", isResetting && "animate-spin")} />
+                        <RotateCcw className={cn("w-3.5 h-3.5 text-black", isResetting && "animate-spin")} />
+                        <span>Reset</span>
                     </button>
 
                     {/* Segment 3: Refresh Icon Button */}
@@ -167,11 +168,12 @@ export function ModalHeader(props: ModalHeaderProps) {
                         type="button"
                         onClick={onRefreshAll}
                         disabled={isLoading}
-                        className="flex items-center justify-center w-7 h-7 text-slate-500 dark:text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Refresh All Projects & Prompts (Scan disk transcripts and update active prompts)"
-                        aria-label="Refresh All Projects"
+                        className="flex items-center justify-center gap-1 h-7 px-2 text-[11px] font-semibold text-white bg-sky-600 hover:bg-sky-500 shadow-[0_2px_0_0_#0369a1] active:translate-y-px active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Refresh the tree now. Automatic refresh follows the Sync interval only."
+                        aria-label="Refresh"
                     >
-                        <RefreshCw className={cn("w-3.5 h-3.5 text-blue-500", (isLoading || isAutoSyncing || isRefreshing) && "animate-spin")} />
+                        <RefreshCw className={cn("w-3.5 h-3.5 text-white", (isLoading || isAutoSyncing || isRefreshing) && "animate-spin")} />
+                        <span>Refresh</span>
                     </button>
 
                     {/* Segment 4: Image Filter Toggle Button */}
@@ -245,15 +247,15 @@ export function ModalHeader(props: ModalHeaderProps) {
                         <button
                             type="button"
                             onClick={onToggleTree}
-                            className="flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer"
-                            title={isTreeCollapsed ? "Show Prompt Tree Panel" : "Hide Prompt Tree Panel"}
+                            className="flex items-center justify-center w-7 h-7 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer"
+                            title={isTreeCollapsed ? "Show tree" : "Hide tree"}
+                            aria-label={isTreeCollapsed ? "Show tree" : "Hide tree"}
                         >
                             {isTreeCollapsed ? (
                                 <PanelLeftOpen className="w-3.5 h-3.5 text-blue-500" />
                             ) : (
                                 <PanelLeftClose className="w-3.5 h-3.5 text-slate-400" />
                             )}
-                            <span className="hidden sm:inline">{isTreeCollapsed ? 'Show Tree' : 'Hide Tree'}</span>
                         </button>
                     )}
 

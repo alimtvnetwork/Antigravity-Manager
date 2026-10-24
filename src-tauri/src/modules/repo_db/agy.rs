@@ -47,6 +47,13 @@ fn agy_conversation_id(session: &str) -> Option<&str> {
     Some(trimmed)
 }
 
+fn resumes_existing_conversation(session_id: Option<&str>) -> bool {
+    match session_id {
+        Some(session) => agy_conversation_id(session).is_some(),
+        None => false,
+    }
+}
+
 /// Terminate any active `agy` background worker processes scoped to `instance_id`
 /// before switching or closing an instance so stale workers cannot block post-switch dispatch.
 pub fn terminate_agy_workers_for_instance(instance_id: &str) -> usize {
@@ -888,7 +895,8 @@ pub fn send_prompt_now_for_instance(
     let mut dispatched_via_cdp = false;
     let (is_running, _, pids) =
         crate::modules::instance::is_instance_process_running_smart(&canonical_inst);
-    if is_running {
+    let resume_existing = resumes_existing_conversation(active_prompt.session_id.as_deref());
+    if is_running && !resume_existing {
         crate::modules::instance::focus_running_instance(&pids, Some(repo_path));
         let max_cdp_attempts = if was_cold_started { 3 } else { 1 };
         for attempt in 1..=max_cdp_attempts {
@@ -1041,7 +1049,8 @@ pub fn enqueue_prompt_for_instance(
     // If instance is running, forward directly into Antigravity IDE UI queue via CDP (without cancelling running turn)
     let (is_running, _, pids) =
         crate::modules::instance::is_instance_process_running_smart(&canonical_inst);
-    if is_running {
+    let resume_existing = resumes_existing_conversation(active_prompt.session_id.as_deref());
+    if is_running && !resume_existing {
         crate::modules::instance::focus_running_instance(&pids, Some(repo_path));
         let cdp_prompt = if clean_prompt.trim().is_empty() {
             prompt_content.trim()

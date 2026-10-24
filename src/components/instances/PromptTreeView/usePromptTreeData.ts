@@ -694,15 +694,12 @@ export function usePromptTreeData({
         else if (syncInterval === '1m') intervalMs = 60000;
         else if (syncInterval === '2m') intervalMs = 120000;
 
-        const hasActiveRunningPrompt = treeData.some((p) => isProjectRunning(p));
-        const effectiveIntervalMs = hasActiveRunningPrompt ? 2000 : Math.max(intervalMs, 15000);
-
         const timer = setInterval(() => {
-            loadTree(false, true);
-        }, effectiveIntervalMs);
+            loadTree(false, false);
+        }, intervalMs);
 
         return () => clearInterval(timer);
-    }, [isOpen, syncInterval, instanceId, loadTree, treeData]);
+    }, [isOpen, syncInterval, instanceId, loadTree]);
 
     return { selectConversation, loadTree };
 }

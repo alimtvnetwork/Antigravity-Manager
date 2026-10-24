@@ -61,7 +61,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
     return (
         <div className="pt-2.5 border-t border-gray-100 dark:border-[#40285e]/80 mt-2 space-y-1.5">
                                                 {/* Row 1: Primary Actions Capsule (Launch/Stop, Switch Account, Fast-Forward, Sync PID) */}
-                                                <div className="flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#090611] border border-slate-200/80 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs w-full">
+                                                <div className="flex items-center rounded-full overflow-hidden bg-slate-100 dark:bg-[#090611] border border-slate-200/80 dark:border-[#40285e] divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs w-full">
                                                     {inst.is_running ? (
                                                         <div className="flex-1 flex items-center divide-x divide-slate-200 dark:divide-[#40285e]">
                                                             <button
@@ -81,7 +81,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                                 type="button"
                                                                 disabled={isBusy}
                                                                 onClick={() => handleRestart(inst.config.id)}
-                                                                className="flex-1 flex items-center justify-center py-1 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer disabled:opacity-50"
+                                                                className="flex-1 flex items-center justify-center py-1 text-sky-700 dark:text-sky-300 hover:bg-sky-600 hover:!text-white hover:shadow-[0_2px_0_0_#0369a1] active:translate-y-px transition-all cursor-pointer disabled:opacity-50"
                                                                 title="Restart Instance on Current Account"
                                                             >
                                                                 {currentAction === 'restart' ? (
@@ -114,7 +114,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                         className={cn(
                                                             "flex-1 flex items-center justify-center py-1 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
                                                             "bg-transparent text-slate-600 dark:text-slate-400",
-                                                            "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-slate-950 hover:font-bold hover:shadow-[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.2)]",
+                                                            "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:!text-black hover:font-bold hover:shadow-[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.25)]",
                                                             "active:translate-y-0.5 active:shadow-[0_0_0_0_#A16207]"
                                                         )}
                                                         title="Switch Account"
@@ -133,7 +133,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                         className={cn(
                                                             "flex-1 flex items-center justify-center py-1 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
                                                             "bg-transparent text-slate-600 dark:text-slate-400",
-                                                            "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-slate-950 hover:font-bold hover:shadow-[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.2)]",
+                                                            "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:!text-black hover:font-bold hover:shadow-[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.25)]",
                                                             "active:translate-y-0.5 active:shadow-[0_0_0_0_#A16207]"
                                                         )}
                                                         title="Fast Forward to Next Best"

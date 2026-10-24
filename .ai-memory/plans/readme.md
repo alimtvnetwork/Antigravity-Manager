@@ -201,6 +201,7 @@ Updated 2026-10-21T16:50:00Z from `git log` (HEAD `33ea5d83`). Referenced by `.a
 ## Pending Plans (`pending/`)
 | # | Plan File | Status | Summary |
 | :--- | :--- | :--- | :--- |
+| `223` | [223-prompt-tree-view-issues.md](./pending/223-prompt-tree-view-issues.md) | `IN PROGRESS` | Compact prompt tree, relative image links, current-conversation dispatch, hover border removal, Sync-interval refresh, segmented instance actions. |
 | `ui-enhancements` | [ui-and-functionality-enhancements.md](./ui-and-functionality-enhancements.md) | `COMPLETED` | Header maximize double-click, compact status pill, QuotaProgressBar 10% width shrinkage & 4 equal checkpoints, resizable Email column, PromptTreeView toolbar compaction & New Conversation flow, Prompt Send/Enqueue RCA, and fleet JSON sync. |
 | `75` | [75-multi-instance-switching-prompt-backup-and-hygiene.md](./completed/75-multi-instance-switching-prompt-backup-and-hygiene.md) | `SUPERSEDED by 87` | Multi-Instance credential isolation, account switch/fast-forward progression, running prompt backup & restoration, scripts/dev-tool-clear.ps1 Cargo/Rust hygiene, local E2E test verification, and minor release ceremony with CI/CD monitoring. |
 | `86` | [86-update-integrity-asset-verification-and-release-gates.md](./pending/86-update-integrity-asset-verification-and-release-gates.md) | `PENDING` | Update checker/installers verify a platform asset exists before announcing or installing, tell the user about skipped releases, and the release workflow gates publish on all artifacts. |
