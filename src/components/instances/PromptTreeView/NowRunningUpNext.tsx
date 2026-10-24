@@ -180,7 +180,7 @@ function RowActions({
         >
             <button
                 type="button"
-                onClick={() => onSelectPrompt(item.id)}
+                onClick={() => onSelectPrompt(item.session_id || item.id)}
                 className={cn(btn, 'rounded-l-full pl-2')}
                 title="Select in tree"
                 aria-label={`Select prompt ${item.id} in tree`}
@@ -295,7 +295,7 @@ function PanelRow({
             {/* Title + Id */}
             <button
                 type="button"
-                onClick={() => onSelectPrompt(item.id)}
+                onClick={() => onSelectPrompt(item.session_id || item.id)}
                 className="flex items-center gap-1.5 min-w-0 flex-1 text-left cursor-pointer group"
                 title={`${item.title || '(untitled prompt)'}\nId: ${item.id}`}
             >

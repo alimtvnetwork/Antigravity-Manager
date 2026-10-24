@@ -31,7 +31,19 @@ function workspaceImageMarkdown(absPath: string, repoPath: string, index: number
     const normalized = absPath.replace(/\\/g, '/');
     const repo = repoPath.replace(/\\/g, '/').replace(/\/+$/, '');
     const hasRepoPrefix = repo.length > 0 && normalized.toLowerCase().startsWith(repo.toLowerCase());
-    const relative = hasRepoPrefix ? normalized.slice(repo.length).replace(/^\/+/, '') : normalized;
+    let relative = hasRepoPrefix ? normalized.slice(repo.length).replace(/^\/+/, '') : '';
+    if (!relative) {
+        const repoName = repo.split('/').filter((part) => part.length > 0).pop() ?? '';
+        const marker = repoName.length > 0 ? `/${repoName.toLowerCase()}/` : '';
+        const markerAt = marker.length > 0 ? normalized.toLowerCase().lastIndexOf(marker) : -1;
+        if (markerAt >= 0) {
+            relative = normalized.slice(markerAt + marker.length);
+        }
+    }
+    const isAbsolute = /^[a-zA-Z]:\//.test(relative) || relative.startsWith('/');
+    if (!relative || isAbsolute) {
+        relative = normalized.split('/').pop() || 'image';
+    }
     return `![Attached Image ${index}](${relative})`;
 }
 

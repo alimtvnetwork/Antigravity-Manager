@@ -19,3 +19,7 @@ The dashboard Error Manager History drawer reads the in-memory Zustand store (`s
 ## When to use this
 
 Use `agm errors list --json` before changing dashboard error handling. Do not treat an empty drawer as an empty database. The drawer keeps the latest 50 session errors. The database keeps the persisted rows.
+
+## Known E9001 rows
+
+`NowRunningUpNext: prompt … not found in tree` means the strip passed `active_prompts.id`. Match `session_id` to the tree conversation. `failed_to_resolve_parent` with os error 123 means the path contains characters Windows rejects (`<`, `>`, `|`, `"`, `*`, `?`). Reject that path before `canonicalize`. Dispatch is `src-tauri/src/bin/agm/main.rs` and `src-tauri/src/bin/agm/error_cmds.rs`.

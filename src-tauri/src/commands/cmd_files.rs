@@ -1,6 +1,17 @@
 use super::*;
 
 fn resolve_existing_or_parent(path: &Path) -> Result<PathBuf, String> {
+    let rendered = path.to_string_lossy();
+    if rendered
+        .chars()
+        .any(|ch| matches!(ch, '<' | '>' | '|' | '"' | '*' | '?'))
+    {
+        return Err(
+            "invalid_path: path contains characters Windows rejects, so it cannot be opened as a file"
+                .to_string(),
+        );
+    }
+
     if path.exists() {
         return path
             .canonicalize()

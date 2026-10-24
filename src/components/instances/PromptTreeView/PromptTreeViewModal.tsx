@@ -354,9 +354,13 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
 
     const findStripConversation = (promptId: string): { conv: AgmConversationNode; proj: AgmProjectTreeNode } | null => {
         const bareId = promptId.startsWith('prompt-') ? promptId.slice('prompt-'.length) : promptId;
+        const keys = new Set([promptId, bareId].filter((value) => value.length > 0));
         for (const proj of treeData) {
             const conv = (proj.conversations || []).find((c) => {
-                return c.conversation_id === promptId || c.conversation_id === bareId;
+                const convBare = c.conversation_id.startsWith('prompt-')
+                    ? c.conversation_id.slice('prompt-'.length)
+                    : c.conversation_id;
+                return keys.has(c.conversation_id) || keys.has(convBare);
             });
             if (conv) return { conv, proj };
         }

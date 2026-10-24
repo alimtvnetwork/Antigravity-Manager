@@ -27,6 +27,8 @@ pub struct PromptQueueRow {
     pub origin_tier: String,
     pub created_at: i64,
     pub has_images: bool,
+    /// Live IDE conversation. `id` is the queue row and is not the tree key.
+    pub session_id: Option<String>,
 }
 
 /// Payload for `get_running_and_up_next` (spec §6.1).
@@ -51,6 +53,7 @@ fn map_queue_row(row: &rusqlite::Row) -> rusqlite::Result<PromptQueueRow> {
         origin_tier: "USER_PROMPT".to_string(),
         created_at: row.get(3)?,
         has_images: row.get(4)?,
+        session_id: row.get(5)?,
     })
 }
 
@@ -86,7 +89,7 @@ fn instance_predicate(target: &str) -> (&'static str, Option<String>) {
 fn query_now_running(conn: &Connection, target: &str) -> Result<Option<PromptQueueRow>, String> {
     let (pred, param) = instance_predicate(target);
     let sql = format!(
-        "SELECT id, instance_id, status, created_at, image_payload IS NOT NULL \
+        "SELECT id, instance_id, status, created_at, image_payload IS NOT NULL, session_id \
          FROM active_prompts \
          WHERE status IN ('running', 'dispatched') AND {pred} \
          ORDER BY created_at ASC, id ASC LIMIT 1"
@@ -105,7 +108,7 @@ fn query_now_running(conn: &Connection, target: &str) -> Result<Option<PromptQue
 fn query_up_next(conn: &Connection, target: &str) -> Result<Vec<PromptQueueRow>, String> {
     let (pred, param) = instance_predicate(target);
     let sql = format!(
-        "SELECT id, instance_id, status, created_at, image_payload IS NOT NULL \
+        "SELECT id, instance_id, status, created_at, image_payload IS NOT NULL, session_id \
          FROM active_prompts \
          WHERE status IN ('queued', 'pending', 'backed_up') AND {pred} \
          ORDER BY created_at ASC, id ASC LIMIT 4"
@@ -197,6 +200,7 @@ pub fn get_running_and_up_next(instance_id: Option<String>) -> Result<RunningAnd
                 origin_tier: "USER_PROMPT".to_string(),
                 created_at: Utc::now().timestamp(),
                 has_images: false,
+                session_id: None,
             });
         }
     }

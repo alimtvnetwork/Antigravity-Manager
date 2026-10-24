@@ -32,6 +32,7 @@ fn truncate_utf8(value: &str, max_bytes: usize) -> &str {
 /// "start a new turn", and a project key (`name__instance`) is not a conversation id.
 fn agy_conversation_id(session: &str) -> Option<&str> {
     let trimmed = session.trim();
+    let trimmed = trimmed.strip_prefix("prompt-").unwrap_or(trimmed);
     if trimmed.is_empty()
         || trimmed == "-"
         || trimmed.starts_with("conv-")
@@ -896,7 +897,10 @@ pub fn send_prompt_now_for_instance(
     let (is_running, _, pids) =
         crate::modules::instance::is_instance_process_running_smart(&canonical_inst);
     let resume_existing = resumes_existing_conversation(active_prompt.session_id.as_deref());
-    if is_running && !resume_existing {
+    let caller_named_conversation = conversation_id
+        .map(str::trim)
+        .is_some_and(|value| !value.is_empty());
+    if is_running && !resume_existing && !caller_named_conversation {
         crate::modules::instance::focus_running_instance(&pids, Some(repo_path));
         let max_cdp_attempts = if was_cold_started { 3 } else { 1 };
         for attempt in 1..=max_cdp_attempts {
@@ -1050,7 +1054,10 @@ pub fn enqueue_prompt_for_instance(
     let (is_running, _, pids) =
         crate::modules::instance::is_instance_process_running_smart(&canonical_inst);
     let resume_existing = resumes_existing_conversation(active_prompt.session_id.as_deref());
-    if is_running && !resume_existing {
+    let caller_named_conversation = conversation_id
+        .map(str::trim)
+        .is_some_and(|value| !value.is_empty());
+    if is_running && !resume_existing && !caller_named_conversation {
         crate::modules::instance::focus_running_instance(&pids, Some(repo_path));
         let cdp_prompt = if clean_prompt.trim().is_empty() {
             prompt_content.trim()
@@ -1401,6 +1408,10 @@ mod agy_flag_tests {
         assert_eq!(agy_conversation_id("  abc  "), Some("abc"));
         assert_eq!(agy_conversation_id("conv-11111111"), None);
         assert_eq!(agy_conversation_id("-"), None);
+        assert_eq!(
+            agy_conversation_id("prompt-bc221407-c445-415a-9034-b1179a550a79"),
+            Some("bc221407-c445-415a-9034-b1179a550a79")
+        );
         assert_eq!(agy_conversation_id("p-12345678"), None);
         assert_eq!(agy_conversation_id("queued-12345678"), None);
         assert_eq!(agy_conversation_id("repo__default"), None);

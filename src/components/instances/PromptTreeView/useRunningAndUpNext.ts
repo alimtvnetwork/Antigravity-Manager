@@ -39,6 +39,7 @@ export interface RunningQueueItem {
     has_images?: boolean | null;
     is_subagent?: boolean | null;
     parent_id?: string | null;
+    session_id?: string | null;
 }
 
 export interface UpNextDisplayItem extends RunningQueueItem {
@@ -92,6 +93,7 @@ function toDisplayItem(
         has_images: raw.has_images ?? false,
         is_subagent: raw.is_subagent ?? false,
         parent_id: raw.parent_id ?? null,
+        session_id: raw.session_id ?? null,
         isStale: false,
         lastSeenAtMs: now,
         queuePosition,
