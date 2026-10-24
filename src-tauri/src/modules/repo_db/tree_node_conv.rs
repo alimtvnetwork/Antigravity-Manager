@@ -9,6 +9,55 @@ use super::state::get_active_agy_workers;
 use super::text_utils::{extract_smart_prompt_summary, StrExt};
 use rusqlite::Connection;
 
+fn is_placeholder_title(title: &str) -> bool {
+    let trimmed = title.trim();
+    trimmed.is_empty()
+        || trimmed.eq_ignore_ascii_case("untitled")
+        || trimmed.eq_ignore_ascii_case("untitled conversation")
+        || trimmed.eq_ignore_ascii_case("new conversation")
+}
+
+fn conversation_display_title(title: &str, prompt: &str) -> String {
+    if !is_placeholder_title(title) {
+        return title.trim().to_string();
+    }
+
+    let summary = extract_smart_prompt_summary(prompt, 80);
+    if summary.trim().is_empty() {
+        return "Untitled Conversation".to_string();
+    }
+
+    summary
+}
+
+fn workspace_relative_media(path: &str, repo: &str) -> String {
+    let normalized = path.replace('\\', "/");
+    let repo_norm = repo.replace('\\', "/");
+    let repo_trim = repo_norm.trim_end_matches('/');
+    if repo_trim.is_empty() {
+        return normalized;
+    }
+
+    let lower_path = normalized.to_lowercase();
+    let lower_repo = repo_trim.to_lowercase();
+    if lower_path.starts_with(&lower_repo) {
+        return normalized[repo_trim.len()..]
+            .trim_start_matches('/')
+            .to_string();
+    }
+
+    if normalized.starts_with("file:") {
+        return normalized;
+    }
+
+    let is_drive = normalized.len() >= 2 && normalized.as_bytes().get(1) == Some(&b':');
+    if is_drive {
+        return format!("file:///{normalized}");
+    }
+
+    normalized
+}
+
 /// Returns true if the instance ID represents the default instance or its aliases.
 pub(crate) fn is_default_instance_match(inst_id: &str) -> bool {
     const DEFAULT_IDS: &[&str] = &[
@@ -278,11 +327,7 @@ pub(crate) fn build_transcript_conv_nodes(
                 gitmap_seq_code: format!("GM:{}", short_id),
                 conversation_id: item.cid.clone(),
                 short_id,
-                title: if item.title.trim().is_empty() {
-                    "Untitled Conversation".to_string()
-                } else {
-                    item.title.clone()
-                },
+                title: conversation_display_title(&item.title, &item.prompt),
                 status: conv_status,
                 is_running: effective_is_run,
                 step_count: item.steps,
@@ -305,9 +350,26 @@ pub(crate) fn build_transcript_conv_nodes(
                 execution_results: item.execution_results.clone(),
                 tool_calls_summary: item.tool_calls_summary.clone(),
                 full_prompt_text: Some(item.prompt.clone()),
-                media_paths: conv_media_paths,
-                media_thumbnails: conv_media_thumbnails,
-                prompts: item.prompts.clone(),
+                media_paths: conv_media_paths
+                    .iter()
+                    .map(|path| workspace_relative_media(path, norm_path))
+                    .collect(),
+                media_thumbnails: conv_media_thumbnails
+                    .iter()
+                    .map(|path| workspace_relative_media(path, norm_path))
+                    .collect(),
+                prompts: {
+                    let mut prompts = item.prompts.clone();
+                    for turn in &mut prompts {
+                        for path in &mut turn.media_paths {
+                            *path = workspace_relative_media(path, norm_path);
+                        }
+                        for path in &mut turn.media_thumbnails {
+                            *path = workspace_relative_media(path, norm_path);
+                        }
+                    }
+                    prompts
+                },
             });
         }
     }

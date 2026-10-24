@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.257.0-3B82F6?style=flat-square" alt="Version v4.257.0">
+    <img src="https://img.shields.io/badge/Version-v4.257.1-3B82F6?style=flat-square" alt="Version v4.257.1">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -115,7 +115,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.257.0)**
+**Bar 2: Version-Based Installation (v4.257.1)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
 ```
@@ -603,6 +603,8 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
 ## 📝 Changelog
+
+> Latest version **v4.257.1**: Prompt tree titles and file image URIs — placeholder titles use the prompt's first line, and images outside the workspace are `file:///` URIs the IDE can open. `agm prompts tree --json` reported 146 conversations, 0 untitled titles, and 0 raw drive image paths. (Thanks to @aukgit)
 
 > Latest version **v4.257.0**: Prompt tree Current Conv, silent sync, and image files — Current conversation send keeps `conv-` ids on `agy --conversation` instead of opening a new chat; `agm prompt send --new` uses the `new` sentinel; background sync no longer draws the green top bar; clicking an attached image opens the disk file; dispatched image markdown stays workspace-relative. (Thanks to @aukgit)
 

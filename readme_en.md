@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.257.0)
+> Professional AI Account Management & Protocol Proxy System (v4.257.1)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.257.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.257.1-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -505,6 +505,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.257.1**: Prompt tree titles and file image URIs — placeholder titles use the prompt's first line, and images outside the workspace are `file:///` URIs the IDE can open. `agm prompts tree --json` reported 146 conversations, 0 untitled titles, and 0 raw drive image paths. (Thanks to @aukgit)
 
 > Latest version **v4.257.0**: Prompt tree Current Conv, silent sync, and image files — Current conversation send keeps `conv-` ids on `agy --conversation` instead of opening a new chat; `agm prompt send --new` uses the `new` sentinel; background sync no longer draws the green top bar; clicking an attached image opens the disk file; dispatched image markdown stays workspace-relative. (Thanks to @aukgit)
 

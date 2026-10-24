@@ -62,6 +62,9 @@ export function workspaceRelativeImageTarget(absPath: string, repoPath: string):
 
     const isAbsolute = /^[a-zA-Z]:\//.test(relative) || relative.startsWith('/');
     if (!relative || isAbsolute) {
+        if (/^[a-zA-Z]:\//.test(normalized)) {
+            return `file:///${normalized}`;
+        }
         relative = normalized.split('/').pop() || 'image';
     }
 
