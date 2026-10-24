@@ -97,20 +97,47 @@ jobs:
           echo "release_type=$RELEASE_TYPE" >> "$GITHUB_OUTPUT"
 
       # Plan 91 step 03: a release is impossible on a commit whose CI is not green.
-      # A cancelled or missing CI run for github.sha fails the gate.
+      # A cancelled, failed, or timed-out CI run for github.sha fails the gate.
+      # Bounded polling loop waits for in-progress or queued CI runs to complete.
       - name: Release gate - CI must be green for this commit
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          CONCLUSION=$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?head_sha=${{ github.sha }}&status=completed&per_page=1" --jq '.workflow_runs[0].conclusion // "missing"')
-          echo "Latest completed CI run for ${{ github.sha }} concluded: $CONCLUSION"
-          if [ "$CONCLUSION" != "success" ]; then
-            echo "::error::❌ [Release Gate Intercept] CI for commit ${{ github.sha }} concluded '$CONCLUSION', not 'success'. Release refused."
-            exit 1
-          fi
-          echo "✅ CI gate passed: CI is green for ${{ github.sha }}."
+          echo "Verifying CI status for commit ${{ github.sha }}..."
+          MAX_WAIT_SECONDS=1500
+          POLL_INTERVAL=20
+          ELAPSED=0
+
+          while [ "$ELAPSED" -lt "$MAX_WAIT_SECONDS" ]; do
+            RUN_INFO=$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?head_sha=${{ github.sha }}&per_page=1" --jq '[.workflow_runs[0].status // "none", .workflow_runs[0].conclusion // "none"] | @tsv' 2>/dev/null || echo "none none")
+            read -r STATUS CONCLUSION <<< "$RUN_INFO"
+
+            if [ "$STATUS" = "none" ]; then
+              echo "Waiting for CI run to register for ${{ github.sha }} (elapsed: ${ELAPSED}s)..."
+              sleep 10
+              ELAPSED=$((ELAPSED + 10))
+              continue
+            fi
+
+            if [ "$STATUS" = "completed" ]; then
+              echo "Latest CI run for ${{ github.sha }} completed with conclusion: $CONCLUSION"
+              if [ "$CONCLUSION" != "success" ]; then
+                echo "::error::❌ [Release Gate Intercept] CI for commit ${{ github.sha }} concluded '$CONCLUSION', not 'success'. Release refused."
+                exit 1
+              fi
+              echo "✅ CI gate passed: CI is green for ${{ github.sha }}."
+              exit 0
+            fi
+
+            echo "CI run is currently '$STATUS' (conclusion: '$CONCLUSION'). Waiting ${POLL_INTERVAL}s (elapsed: ${ELAPSED}s / ${MAX_WAIT_SECONDS}s)..."
+            sleep "$POLL_INTERVAL"
+            ELAPSED=$((ELAPSED + POLL_INTERVAL))
+          done
+
+          echo "::error::❌ [Release Gate Intercept] Timed out waiting for CI for commit ${{ github.sha }} after ${MAX_WAIT_SECONDS}s."
+          exit 1
 
       - name: Rust setup (rustfmt only)
         uses: dtolnay/rust-toolchain@stable

@@ -46,6 +46,7 @@ This directory contains CI/CD issue tracking and pipeline RCAs.
 - [44-jsx-syntax-error-and-rustfmt-drift-rca.md](.ai-memory/cicd-issues/44-jsx-syntax-error-and-rustfmt-drift-rca.md)
 - [45-json-envelope-macro-syntax-and-error-tracking-rca.md](.ai-memory/cicd-issues/45-json-envelope-macro-syntax-and-error-tracking-rca.md)
 - [46-macos-hosted-runner-capacity-and-queue-timeout-rca.md](.ai-memory/cicd-issues/46-macos-hosted-runner-capacity-and-queue-timeout-rca.md)
+- [47-release-gate-ci-race-condition-rca.md](.ai-memory/cicd-issues/47-release-gate-ci-race-condition-rca.md)
 
 ## Recurring Failure Classes (read before committing)
 
