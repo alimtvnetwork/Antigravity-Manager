@@ -1,42 +1,49 @@
 ---
 name: create-run-ps1-file
 description: >-
-  Autonomously architect, construct, and verify cross-platform execution runners (run.ps1 and run.sh) driven by run.config.json and standalone installation scripts (local-install.ps1 and local-install.sh) with GitMap integration and automatic rerun.
+  Autonomously architect, construct, and verify cross-platform execution runners (run.ps1, build.ps1, e2e.ps1, install.ps1 / POSIX .sh) with toolchain self-healing, SQLite tracking, and C: drive defaulting.
 ---
 
-# Create Run & Install Scripts Skill (`create-run-ps1-file`)
+# Create Run & Runner Suite Skill (`create-run-ps1-file`)
 
-This skill autonomously architects, constructs, and verifies cross-platform execution runners (`run.ps1` and `run.sh`) driven by a central `run.config.json` manifest, along with accompanying standalone environment installation scripts (`local-install.ps1` and `local-install.sh`). It implements robust dependency pre-flight checks, intelligent fallback to GitMap (`gitmap aum install`) or `local-install.ps1`/`local-install.sh` with automatic rerun, and clean process cleanup on exit.
+This skill autonomously architects, constructs, and verifies cross-platform execution runners (`run.ps1`/`run.sh`, `build.ps1`/`build.sh`, `e2e.ps1`/`e2e.sh`, `install.ps1`/`install.sh`) driven by single-responsibility contracts, fast SQLite verification tracking (`toolchain.db`), toolchain self-healing, and C: drive defaulting.
 
 ## Architecture & Lifecyle
 
 ```mermaid
 flowchart TD
-    A["run.ps1 / run.sh Execution"] --> B["Parse run.config.json"]
-    B --> C{"Toolchains & Dependencies Installed?"}
-    C -- "Yes" --> D["Execute Target Command / Start Services"]
-    C -- "No" --> E{"Is GitMap CLI Available?"}
-    E -- "Yes" --> F["Run gitmap aum install"]
-    E -- "No" --> G["Run .\\local-install.ps1 / ./local-install.sh"]
-    F --> H["Environment Ready"]
-    G --> H
-    H --> I["Self-Rerun: run.ps1 / run.sh with Original Args"]
-    I --> D
-    D --> J["Process Cleanup on Exit (Trap/Finally)"]
+    A["Runner Invocations"] --> B{"Dispatch Target Script"}
+    B -- "Dev Server / CLI Router" --> C["run.ps1 / run.sh"]
+    B -- "Production Compilation" --> D["build.ps1 / build.sh"]
+    B -- "End-to-End Testing" --> E["e2e.ps1 / e2e.sh"]
+    B -- "Toolchain Provisioning" --> F["install.ps1 / install.sh"]
+
+    D --> G{"Check toolchain.db (<5ms)"}
+    G -- "All Verified" --> H["Compile Release Package"]
+    G -- "Incomplete" --> I["Self-Heal: install.ps1 -BuildTools -Drive C:"]
+    I --> J["Dynamic Registry Environment Reload"]
+    J --> H
+
+    E --> K["Caller IDE Process Protection (detect_caller_instance_id)"]
+    K --> L["Transient Sandbox Isolation (.temp/test-sandbox-*)"]
+    L --> M["Run Test Suite & ANSI Formatted Output"]
+    M --> N["Guaranteed Sandbox Cleanup in finally block"]
 ```
 
 ## Implementation Standards
 
-1. **Manifest Driven (`run.config.json`):**
-   - Centralize all ports, paths, and commands.
-   - Support token replacement (e.g. `{fePort}`, `{bePort}`).
-2. **Self-Healing Fallback:**
-   - Detect missing dependencies at runtime.
-   - Check for GitMap environment manager first (`gitmap aum install`).
-   - Fall back to `local-install.ps1` / `local-install.sh`.
-   - Re-verify and automatically re-execute `run.ps1`.
-3. **CI Mode Support (`-CI` / `--ci`):**
-   - Non-interactive execution of build, lint, and test suites.
-   - Immediate exit 1 on any failure.
-4. **Clean Process Management:**
-   - Track spawned PIDs and terminate in `finally` / `trap` blocks.
+1. **Dedicated Single Responsibility:**
+   - `run.ps1` / `run.sh`: Dev server, hot reload, CLI router. Delegates `-Build` / `--build` to `build.ps1` / `build.sh`.
+   - `build.ps1` / `build.sh`: Dedicated production compilation. Never starts UI. Probes prerequisites and auto-installs via `install.ps1 -BuildTools` if missing.
+   - `e2e.ps1` / `e2e.sh`: Unified testing harness with caller IDE preservation and sandboxed isolation.
+   - `install.ps1` / `install.sh`: Universal toolchain provisioner defaulting to C: drive with `-Drive` override.
+2. **System C: Drive Default Invariant:**
+   - All toolchains (Rust, LLVM/Clang, MSVC, NASM) default strictly to `C:` (`C:\Program Files\LLVM`, `%LOCALAPPDATA%\agm-toolchain-cache`).
+   - `D:` drive is NEVER used by default simply because it exists; it requires explicit `-Drive D`.
+3. **SQLite Toolchain Tracking (`toolchain.db`):**
+   - Verified toolchains are recorded in `ToolchainInstallation` table with affirmative boolean `IsVerified` and FIFO view.
+   - Fast pre-flight check `<5ms` avoids repeated network or heavy disk probes.
+4. **Caller IDE Self-Preservation:**
+   - Automated tests detect and protect the developer's active IDE PID.
+5. **Clean Sandbox Teardown:**
+   - Isolated ephemeral sandbox directories (`.temp/test-sandbox-*`) torn down guaranteed in `finally` / `trap`.
