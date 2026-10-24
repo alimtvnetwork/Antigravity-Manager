@@ -112,3 +112,9 @@ scratch/*.dump
 AGM_INSTANCE_STATUS.md
 .ai-memory/temp/recent-file-changes.json
 
+
+
+# GitMap & Task Persistence
+antigravity-resume_task.json
+antigravity_resume_task.json
+.antigravity-resume_task.json
