@@ -92,7 +92,8 @@ export function useInstanceCardData(
               percentage: Math.round((weeklyBucket.remaining_fraction || 0) * 100),
               resetTime: weeklyBucket.reset_time,
           }
-        : ((boundAccount?.quota as { weekly?: { percentage: number; resetTime?: string } | null })?.weekly || null);
+        : ((boundAccount?.quota as { weekly?: { percentage: number; resetTime?: string } | null })?.weekly
+          || (geminiModel ? { percentage: 100, resetTime: undefined } : null));
 
     const isInstanceRunning = Boolean(inst.is_running);
     const hasActiveTask =
