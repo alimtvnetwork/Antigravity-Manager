@@ -23,7 +23,7 @@ use super::gemini_dirs::gemini_dirs_tagged;
 use super::models::{ActivePrompt, AgmPromptTurnNode, CascadeRunStatusType};
 use super::project_queries::list_all_prompts;
 use super::schema::connect_db;
-use super::text_utils::StrExt;
+use super::text_utils::{extract_smart_prompt_summary, StrExt};
 use super::transcript::{extract_conversation_prompt_turns, inspect_conversation_transcript};
 use super::tree_node_conv::*;
 use crate::modules::repo_db::dispatch::parse_flexible_timestamp;
@@ -182,9 +182,37 @@ pub(crate) fn collect_tree_conversation_items(
                 title_lower.starts_with("untitled") || title_lower == "new conversation";
             let has_meaningful_title = !title_clean.is_empty() && !is_placeholder_title;
 
+            // Root human prompt prominence: derive conversation title from root initial turn
+            // rather than collapsing into trailing subagents or short responses ("ok", "thanks")
+            let root_human_prompt = prompt_turns
+                .iter()
+                .find(|t| !t.prompt_text.trim().is_empty())
+                .map(|t| t.prompt_text.as_str())
+                .or_else(|| prompt_turns.first().map(|t| t.prompt_text.as_str()));
+
+            let resolved_title = if has_meaningful_title {
+                title_clean.to_string()
+            } else if let Some(root_p) = root_human_prompt {
+                let summary = extract_smart_prompt_summary(root_p, 80);
+                if !summary.trim().is_empty() {
+                    summary
+                } else {
+                    title.clone()
+                }
+            } else if !preview.trim().is_empty() {
+                let summary = extract_smart_prompt_summary(&preview, 80);
+                if !summary.trim().is_empty() {
+                    summary
+                } else {
+                    title.clone()
+                }
+            } else {
+                title.clone()
+            };
+
             let is_effective_prompt_empty = effective_prompt.trim().is_empty();
             if is_effective_prompt_empty && has_meaningful_title {
-                effective_prompt = title.clone();
+                effective_prompt = resolved_title.clone();
             }
 
             let has_prompt_content =
@@ -214,7 +242,7 @@ pub(crate) fn collect_tree_conversation_items(
                     "<system_message>",
                     "internal subagent",
                 ];
-                let is_sub = title.has_any_word_ignore_case(TITLE_KEYWORDS)
+                let is_sub = resolved_title.has_any_word_ignore_case(TITLE_KEYWORDS)
                     || effective_prompt.has_any_word_ignore_case(PROMPT_KEYWORDS);
                 if is_sub {
                     "subagent".to_string()
@@ -232,8 +260,12 @@ pub(crate) fn collect_tree_conversation_items(
             // Ghost conversation filter: skip untitled / empty title with empty prompt AND zero turns
             let (_, eff_wc) = extract_prompt_words_preview(&effective_prompt, 5);
             let has_zero_turns = prompt_turns.is_empty();
-            let is_ghost =
-                is_vacant_ghost_conversation(&title, &effective_prompt, eff_wc, has_zero_turns);
+            let is_ghost = is_vacant_ghost_conversation(
+                &resolved_title,
+                &effective_prompt,
+                eff_wc,
+                has_zero_turns,
+            );
             if is_ghost {
                 continue;
             }
@@ -268,7 +300,7 @@ pub(crate) fn collect_tree_conversation_items(
                     .or_default()
                     .push(RawConvItem {
                         cid: cid.clone(),
-                        title: title.clone(),
+                        title: resolved_title.clone(),
                         prompt: effective_prompt.clone(),
                         status: if is_conv_running {
                             "RUNNING".to_string()

@@ -151,7 +151,7 @@ function ConversationListWithGrouping({
 
                     {/* Rendering Child Sub-Points (Indented with Branch Glyphs) */}
                     {root.subagents.length > 0 && (
-                        <div className="ml-5 pl-3 space-y-0.5 border-l-2 border-purple-300/40 dark:border-purple-800/40">
+                        <div className="ml-2.5 pl-1.5 space-y-0.5 border-l border-purple-300/40 dark:border-purple-800/40">
                             {root.subagents.map((subNode, subIdx) => {
                                 const isSubSelected = selectedConversationId === subNode.primaryNode.conversation_id;
                                 const { isRunning: isSubRunning } = getConversationStatus(subNode.primaryNode);
@@ -186,10 +186,10 @@ function ConversationListWithGrouping({
                                             });
                                         }}
                                         className={cn(
-                                            "relative flex items-center justify-between rounded-md px-2 py-1 text-xs cursor-pointer transition-colors group outline-none focus-visible:ring-1 focus-visible:ring-purple-400",
+                                            "relative flex items-center justify-between rounded-md px-1.5 py-0.5 text-xs leading-snug cursor-pointer transition-colors group outline-none focus-visible:ring-1 focus-visible:ring-purple-400 border border-transparent",
                                             isSubSelected
-                                                ? "bg-purple-600 text-white font-medium shadow-2xs"
-                                                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#171025]"
+                                                ? "bg-purple-600 text-white font-medium shadow-2xs border-purple-500/40"
+                                                : "text-slate-600 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-zinc-800/60 hover:border-transparent"
                                         )}
                                         title={`AI Subagent Task · ${subNode.primaryNode.title || 'Subagent'} · ${subNode.primaryNode.step_count || 1} steps · Click to view`}
                                     >
@@ -439,7 +439,7 @@ export function ProjectNode(props: ProjectNodeProps) {
     };
 
     return (
-        <div key={project.project_id} className={cn("space-y-0.5", !isScopedSingleProject && "my-1 rounded-lg bg-slate-900/20 dark:bg-[#120a1f]/30 border border-slate-700/20 dark:border-purple-900/30 p-1")}>
+        <div key={project.project_id} className={cn("space-y-0.5", !isScopedSingleProject && "my-0.5 rounded-md bg-slate-900/20 dark:bg-[#120a1f]/30 border border-slate-700/20 dark:border-purple-900/30 p-0.5")}>
             {/* Layer 1: Project Row (Hidden when a specific project is selected in the scope dropdown) */}
             {!isScopedSingleProject && (
                 <div
@@ -457,10 +457,10 @@ export function ProjectNode(props: ProjectNodeProps) {
                         }
                     }}
                     className={cn(
-                        'group flex items-center justify-between rounded-lg px-2.5 py-1.5 text-xs font-semibold cursor-pointer transition-colors',
+                        'group flex items-center justify-between rounded-md px-1.5 py-0.5 text-xs leading-snug font-semibold cursor-pointer transition-colors border border-transparent',
                         isSelected
                             ? 'bg-blue-100/70 text-blue-900 dark:bg-blue-950/60 dark:text-cyan-300'
-                            : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-[#1a112a]'
+                            : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100/80 dark:hover:bg-zinc-800/60 hover:border-transparent'
                     )}
                     title={`Project: ${project.repo_name} · ${totalProjectPrompts} prompts total`}
                 >
@@ -559,7 +559,7 @@ export function ProjectNode(props: ProjectNodeProps) {
             {(isExpanded || isScopedSingleProject) && (
                 <div className={cn(
                     "space-y-0.5 py-0.5",
-                    !isScopedSingleProject && "ml-5 pl-3 border-l-2 border-slate-300/60 dark:border-purple-900/50"
+                    !isScopedSingleProject && "ml-2.5 pl-1.5 border-l border-slate-300/60 dark:border-purple-900/50"
                 )}>
                     {/* Active Conversations */}
                     <ConversationListWithGrouping convList={activeConversations} {...listProps} />
@@ -572,10 +572,10 @@ export function ProjectNode(props: ProjectNodeProps) {
 
                     {/* Collapsible Stale / Empty Prompts Node */}
                     {staleConversations.length > 0 && (
-                        <div className="space-y-1.5 mt-1.5 pt-1.5 border-t border-slate-200/50 dark:border-[#40285e]/40">
+                        <div className="space-y-1 mt-1 pt-1 border-t border-slate-200/50 dark:border-[#40285e]/40">
                             <div
                                 onClick={() => onToggleStaleGroup(project.project_id)}
-                                className="group flex items-center justify-between rounded-md px-2 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#171025] cursor-pointer transition-colors"
+                                className="group flex items-center justify-between rounded-md px-1.5 py-0.5 text-xs leading-snug font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100/80 dark:hover:bg-zinc-800/60 cursor-pointer transition-colors border border-transparent"
                                 title="Toggle Archived / Stale Prompts"
                             >
                                 <div className="flex items-center gap-1.5 min-w-0">
@@ -595,7 +595,7 @@ export function ProjectNode(props: ProjectNodeProps) {
                             </div>
 
                             {isStaleGroupExpanded && (
-                                <div className="ml-4 pl-2 border-l border-dashed border-slate-200 dark:border-[#40285e]/60 space-y-1.5 py-0.5">
+                                <div className="ml-2.5 pl-1.5 border-l border-dashed border-slate-200 dark:border-[#40285e]/60 space-y-1 py-0.5">
                                     <ConversationListWithGrouping convList={staleConversations} {...listProps} />
                                 </div>
                             )}

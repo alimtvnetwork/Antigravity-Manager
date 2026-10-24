@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Check, Copy, RotateCcw, ChevronUp, ChevronDown, Clock, Image as LucideImage } from 'lucide-react';
+import { Check, Copy, RotateCcw, ChevronUp, ChevronDown, Clock, Image as LucideImage, ExternalLink, Send, ListPlus, Repeat } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../../utils/cn';
 import { PromptViewMode, type AgmConversationNode, type AgmProjectTreeNode, type ViewMode } from './types';
@@ -11,6 +11,9 @@ import { resolveImageSrc, extractLocalPathFromUri, writePureImageToClipboard, co
 import { useErrorStore } from '../../../stores/error-store';
 import { useConfigStore } from '../../../stores/useConfigStore';
 import { formatDateTime, formatDateOnly } from '../../../utils/date';
+import { VERIFICATION_OPTIONS, parseVerificationTypeFromSuffix, getCustomSuffixTemplates, type SuffixTemplate } from './verificationTemplates';
+import { dispatchConversationId, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, type RerunMessageOption } from './usePromptTreePromptActions';
+import { sendPromptNow, enqueuePrompt } from '../../../services/instanceService';
 
 export interface ExtractedImage {
     src: string;
@@ -55,6 +58,30 @@ export function normalizeMediaUri(uri: string): string {
     return clean.toLowerCase();
 }
 
+/**
+ * Formats an image path into a clickable IDE markdown link.
+ */
+export function formatIdeClickableFileLink(
+    rawPath: string,
+    repoPath?: string,
+    altText?: string
+): string {
+    const clean = rawPath.trim();
+    let absPath = clean;
+    const isAbs = /^[a-zA-Z]:[\\/]/.test(clean) || clean.startsWith('/') || clean.startsWith('\\\\');
+    if (!isAbs && repoPath && repoPath.trim().length > 0) {
+        const sep = repoPath.includes('/') ? '/' : '\\';
+        absPath = `${repoPath.replace(/[/\\]+$/, '')}${sep}${clean.replace(/^(\.[/\\]|[/\\])+/, '')}`;
+    }
+    const forwardSlashed = absPath.replace(/\\/g, '/');
+    const fileUri = forwardSlashed.startsWith('/')
+        ? `file://${forwardSlashed}`
+        : `file:///${forwardSlashed}`;
+    const filename = forwardSlashed.split('/').pop() || 'image.png';
+    const label = altText || filename;
+    return `[${label}](${fileUri})`;
+}
+
 function extractImagesFromPrompt(
     text: string,
     conv: AgmConversationNode
@@ -62,7 +89,7 @@ function extractImagesFromPrompt(
     const list: ExtractedImage[] = [];
     const seen = new Set<string>();
 
-    // 1. From prompt turns
+    // 1. From prompt turns (strict turn isolation when turn is selected)
     if (conv.prompts && conv.prompts.length > 0) {
         const turns = conv.selected_turn_number != null
             ? conv.prompts.filter((t) => t.turn_number === conv.selected_turn_number)
@@ -82,8 +109,8 @@ function extractImagesFromPrompt(
         }
     }
 
-    // 1.5 From conversation-level media_paths
-    if (conv.media_paths && conv.media_paths.length > 0) {
+    // 1.5 From conversation-level media_paths (only for whole conversation or initial turn)
+    if ((conv.selected_turn_number == null || conv.selected_turn_number === 1) && conv.media_paths && conv.media_paths.length > 0) {
         for (const p of conv.media_paths) {
             if (p) {
                 const key = normalizeMediaUri(p) || p;
@@ -136,8 +163,8 @@ function extractImagesFromPrompt(
         }
     }
 
-    // 5. From sub_runs / sub-prompts (sub-image tracking)
-    if (conv.sub_runs && conv.sub_runs.length > 0) {
+    // 5. From sub_runs / sub-prompts (isolated with explicit subagent tagging)
+    if (conv.selected_turn_number == null && conv.sub_runs && conv.sub_runs.length > 0) {
         for (const sub of conv.sub_runs) {
             if (sub.media_paths) {
                 for (const p of sub.media_paths) {
@@ -145,7 +172,7 @@ function extractImagesFromPrompt(
                         const key = normalizeMediaUri(p) || p;
                         if (!seen.has(key)) {
                             seen.add(key);
-                            list.push({ src: p, alt: `Sub-agent (${sub.title || sub.short_id || 'child'}) Image` });
+                            list.push({ src: p, alt: `[Subagent: ${sub.title || sub.short_id || 'Agent'}] Screenshot` });
                         }
                     }
                 }
@@ -269,6 +296,36 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
                     <span className="text-[9px] font-mono truncate w-full px-0.5">{img.alt || 'Attached Image'}</span>
                 </div>
             )}
+            {/* 1-Click Open in IDE Button */}
+            <button
+                type="button"
+                onClick={async (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const raw = img.src.trim();
+                    let localPath = extractLocalPathFromUri(raw) || raw;
+                    const isAbsolute = /^[a-zA-Z]:[\\/]/.test(localPath) || localPath.startsWith('\\\\');
+                    if (!isAbsolute && repoPath && repoPath.trim().length > 0 && !raw.startsWith('data:') && !raw.startsWith('http')) {
+                        const sep = repoPath.includes('/') ? '/' : '\\';
+                        localPath = `${repoPath.replace(/[/\\]+$/, '')}${sep}${localPath.replace(/^(\.[/\\]|[/\\])+/, '')}`;
+                    }
+                    const clean = localPath.replace(/^file:\/\/\/?/i, '').replace(/^[/\\]+([a-zA-Z]:)/, '$1');
+                    try {
+                        const { openPath } = await import('@tauri-apps/plugin-opener');
+                        await openPath(clean);
+                    } catch (err) {
+                        useErrorStore.getState().trackWarning(err, {
+                            source: 'PromptThumbnailCard.openInIde',
+                            triggerAction: 'open_file_in_ide',
+                        });
+                    }
+                }}
+                className="absolute top-1 left-1 p-1 rounded-sm bg-black/75 hover:bg-cyan-600 text-white transition-all opacity-0 group-hover:opacity-100 cursor-pointer shadow-xs z-10"
+                title="Open in IDE / OS Viewer"
+                aria-label="Open image in IDE or OS viewer"
+            >
+                <ExternalLink className="w-2.5 h-2.5 text-cyan-300" />
+            </button>
             {/* 1-Click Pure PNG Clipboard Button */}
             <button
                 type="button"
@@ -320,6 +377,20 @@ export interface PromptInstructionViewProps {
     setActivePromptText: (v: string) => void;
     setActionMsg: (v: string | null) => void;
     promptPreviewWords?: number;
+    primaryDispatchAction?: 'send' | 'enqueue' | 'rerun';
+    setPrimaryDispatchAction?: (mode: 'send' | 'enqueue' | 'rerun') => void;
+    conversationTargetMode?: 'current' | 'new';
+    setConversationTargetMode?: (mode: 'current' | 'new') => void;
+    newConversationTitle?: string;
+    setNewConversationTitle?: (title: string) => void;
+    confirmationSuffix?: string;
+    setConfirmationSuffix?: (suffix: string) => void;
+    onResend?: () => Promise<void> | void;
+    onEnqueue?: () => Promise<void> | void;
+    onRerun?: () => Promise<void> | void;
+    isResending?: boolean;
+    isEnqueueing?: boolean;
+    isRerunning?: boolean;
 }
 
 export function PromptInstructionView(props: PromptInstructionViewProps) {
@@ -331,7 +402,205 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         openInspector, selectedProject, activeByteCount,
         setActivePromptText, setActionMsg,
         promptPreviewWords,
+        primaryDispatchAction: propPrimaryDispatchAction,
+        setPrimaryDispatchAction: propSetPrimaryDispatchAction,
+        conversationTargetMode: propConversationTargetMode,
+        setConversationTargetMode: propSetConversationTargetMode,
+        newConversationTitle: propNewConversationTitle,
+        setNewConversationTitle: propSetNewConversationTitle,
+        confirmationSuffix: propConfirmationSuffix,
+        setConfirmationSuffix: propSetConfirmationSuffix,
+        onResend: propOnResend,
+        onEnqueue: propOnEnqueue,
+        onRerun: propOnRerun,
+        isResending: propIsResending,
+        isEnqueueing: propIsEnqueueing,
+        isRerunning: propIsRerunning,
     } = props;
+
+    const [localDispatchMode, setLocalDispatchMode] = useState<'send' | 'enqueue' | 'rerun'>(propPrimaryDispatchAction || 'send');
+    const [localTargetMode, setLocalTargetMode] = useState<'current' | 'new'>('current');
+    const [localNewConvTitle, setLocalNewConvTitle] = useState('');
+    const [localSuffix, setLocalSuffix] = useState('None (Send as is)');
+    const [localIsResending, setLocalIsResending] = useState(false);
+    const [localIsEnqueueing, setLocalIsEnqueueing] = useState(false);
+    const [localIsRerunning, setLocalIsRerunning] = useState(false);
+    const [isDispatchMenuOpen, setIsDispatchMenuOpen] = useState(false);
+    const [isSuffixPopoverOpen, setIsSuffixPopoverOpen] = useState(false);
+    const [customTemplates, setCustomTemplates] = useState<SuffixTemplate[]>([]);
+
+    const [rerunCount, setRerunCount] = useState<number>(() => loadPersistedRerunCount());
+    const [rerunMessageOption] = useState<RerunMessageOption>(() => loadPersistedRerunMessageOption());
+
+    useEffect(() => {
+        savePersistedRerunMessageOption(rerunMessageOption);
+        savePersistedRerunCount(rerunCount);
+    }, [rerunMessageOption, rerunCount]);
+
+    useEffect(() => {
+        setCustomTemplates(getCustomSuffixTemplates());
+    }, [isDispatchMenuOpen]);
+
+    const primaryDispatchAction = propPrimaryDispatchAction ?? localDispatchMode;
+    const setPrimaryDispatchAction = propSetPrimaryDispatchAction ?? setLocalDispatchMode;
+    const conversationTargetMode = propConversationTargetMode ?? localTargetMode;
+    const setConversationTargetMode = propSetConversationTargetMode ?? setLocalTargetMode;
+    const newConversationTitle = propNewConversationTitle ?? localNewConvTitle;
+    const setNewConversationTitle = propSetNewConversationTitle ?? setLocalNewConvTitle;
+    const confirmationSuffix = propConfirmationSuffix ?? localSuffix;
+    const setConfirmationSuffix = propSetConfirmationSuffix ?? setLocalSuffix;
+
+    const isResendingActive = propIsResending ?? localIsResending;
+    const isEnqueueingActive = propIsEnqueueing ?? localIsEnqueueing;
+    const isRerunningActive = propIsRerunning ?? localIsRerunning;
+    const isActionInFlight = isResendingActive || isEnqueueingActive || isRerunningActive;
+
+    const executeDirectSend = async () => {
+        setLocalIsResending(true);
+        setActionMsg('Cancelling active task & dispatching prompt now...');
+        try {
+            const targetInstId = selectedConversation.instance_id || 'default';
+            const repoPath = selectedProject?.repo_path || '';
+            let content = editedPromptText.trim() || activePromptText;
+            if (conversationTargetMode === 'new' && newConversationTitle.trim()) {
+                content = `# ${newConversationTitle.trim()}\n\n${content}`;
+            }
+            const targetConvId = dispatchConversationId(
+                conversationTargetMode,
+                selectedConversation.conversation_id,
+                Boolean(selectedConversation.is_running)
+            ) || (conversationTargetMode === 'current' ? 'current' : undefined);
+
+            const mediaList = extractImagesFromPrompt(content, selectedConversation).map((img) => img.src).filter(Boolean);
+            await sendPromptNow(targetInstId, repoPath, content, targetConvId, mediaList.length > 0 ? mediaList : undefined);
+            setActionMsg('Prompt dispatched successfully to active IDE session!');
+            setTimeout(() => setActionMsg(null), 3000);
+        } catch (err) {
+            const errorObj = err instanceof Error ? err : new Error(String(err));
+            useErrorStore.getState().captureException(errorObj, {
+                source: 'PromptInstructionView.executeDirectSend',
+                triggerAction: 'send_prompt_now',
+            });
+            setActionMsg('Failed to dispatch prompt');
+            setTimeout(() => setActionMsg(null), 3500);
+        } finally {
+            setLocalIsResending(false);
+        }
+    };
+
+    const executeDirectEnqueue = async () => {
+        setLocalIsEnqueueing(true);
+        setActionMsg('Enqueuing prompt to IDE FIFO queue...');
+        try {
+            const targetInstId = selectedConversation.instance_id || 'default';
+            const repoPath = selectedProject?.repo_path || '';
+            let content = editedPromptText.trim() || activePromptText;
+            if (conversationTargetMode === 'new' && newConversationTitle.trim()) {
+                content = `# ${newConversationTitle.trim()}\n\n${content}`;
+            }
+            const targetConvId = dispatchConversationId(
+                conversationTargetMode,
+                selectedConversation.conversation_id,
+                Boolean(selectedConversation.is_running)
+            ) || (conversationTargetMode === 'current' ? 'current' : undefined);
+
+            const mediaList = extractImagesFromPrompt(content, selectedConversation).map((img) => img.src).filter(Boolean);
+            await enqueuePrompt(targetInstId, repoPath, content, targetConvId, undefined, mediaList.length > 0 ? mediaList : undefined);
+            setActionMsg('Prompt enqueued successfully into FIFO queue!');
+            setTimeout(() => setActionMsg(null), 3000);
+        } catch (err) {
+            const errorObj = err instanceof Error ? err : new Error(String(err));
+            useErrorStore.getState().captureException(errorObj, {
+                source: 'PromptInstructionView.executeDirectEnqueue',
+                triggerAction: 'enqueue_prompt',
+            });
+            setActionMsg('Failed to enqueue prompt');
+            setTimeout(() => setActionMsg(null), 3500);
+        } finally {
+            setLocalIsEnqueueing(false);
+        }
+    };
+
+    const executeDirectRerun = async () => {
+        setLocalIsRerunning(true);
+        setActionMsg(`Rerunning turn (${rerunCount} round(s))...`);
+        try {
+            const targetInstId = selectedConversation.instance_id || 'default';
+            const repoPath = selectedProject?.repo_path || '';
+            const targetConvId = dispatchConversationId(
+                conversationTargetMode,
+                selectedConversation.conversation_id,
+                Boolean(selectedConversation.is_running)
+            ) || (conversationTargetMode === 'current' ? 'current' : undefined);
+            const content = editedPromptText.trim() || activePromptText;
+            const mediaList = extractImagesFromPrompt(content, selectedConversation).map((img) => img.src).filter(Boolean);
+
+            await sendPromptNow(targetInstId, repoPath, content, targetConvId, mediaList.length > 0 ? mediaList : undefined);
+            setActionMsg('Turn rerun dispatched!');
+            setTimeout(() => setActionMsg(null), 3000);
+        } catch (err) {
+            const errorObj = err instanceof Error ? err : new Error(String(err));
+            useErrorStore.getState().captureException(errorObj, {
+                source: 'PromptInstructionView.executeDirectRerun',
+                triggerAction: 'rerun_prompt',
+            });
+            setActionMsg('Failed to rerun turn');
+            setTimeout(() => setActionMsg(null), 3500);
+        } finally {
+            setLocalIsRerunning(false);
+        }
+    };
+
+    const handlePrimaryAction = async () => {
+        setActivePromptText(editedPromptText);
+        if (primaryDispatchAction === 'enqueue') {
+            if (propOnEnqueue) {
+                await propOnEnqueue();
+            } else {
+                await executeDirectEnqueue();
+            }
+            return;
+        }
+        if (primaryDispatchAction === 'rerun') {
+            if (propOnRerun) {
+                await propOnRerun();
+            } else {
+                await executeDirectRerun();
+            }
+            return;
+        }
+        if (propOnResend) {
+            await propOnResend();
+        } else {
+            await executeDirectSend();
+        }
+    };
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement | null;
+            const isTyping = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+            if (isTyping && !e.altKey) return;
+
+            const key = e.key.toUpperCase();
+            if (e.altKey && key === 'N') {
+                e.preventDefault();
+                setPrimaryDispatchAction('send');
+                void handlePrimaryAction();
+            } else if (e.altKey && key === 'Q') {
+                e.preventDefault();
+                setPrimaryDispatchAction('enqueue');
+                void handlePrimaryAction();
+            } else if (e.altKey && key === 'R') {
+                e.preventDefault();
+                setPrimaryDispatchAction('rerun');
+                void handlePrimaryAction();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handlePrimaryAction, setPrimaryDispatchAction]);
 
     const { config } = useConfigStore();
     const effectiveWordLimit = promptPreviewWords ?? config?.prompt_preview_words ?? 200;
@@ -958,29 +1227,267 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                         className="w-full h-80 rounded-xl border border-slate-200 dark:border-purple-500/25 bg-slate-50 dark:bg-[#19191c] p-4 font-mono text-xs text-slate-900 dark:text-slate-100 leading-relaxed focus:outline-none focus:ring-2 focus:ring-purple-500/40 resize-y"
                         placeholder="Type or modify prompt instruction here..."
                     />
-                    <div className="flex items-center justify-between pt-1">
-                        <button
-                            type="button"
-                            onClick={() => setEditedPromptText(activePromptText)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800/80 text-xs font-semibold transition-colors cursor-pointer"
-                            title="Reset to original text"
-                        >
-                            <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-                            <span>Reset</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setActivePromptText(editedPromptText);
-                                setActionMsg('Prompt changes saved to current session!');
-                                setTimeout(() => setActionMsg(null), 2500);
-                            }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-50 dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-slate-800 hover:bg-emerald-100 dark:hover:bg-slate-800/80 text-xs font-semibold transition-colors cursor-pointer"
-                            title="Save prompt changes"
-                        >
-                            <Check className="w-3.5 h-3.5 text-emerald-500" />
-                            <span>Save Changes</span>
-                        </button>
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setEditedPromptText(activePromptText)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800/80 text-xs font-semibold transition-colors cursor-pointer"
+                                title="Reset to original text"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                                <span>Reset</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setActivePromptText(editedPromptText);
+                                    setActionMsg('Prompt changes saved to current session!');
+                                    setTimeout(() => setActionMsg(null), 2500);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-50 dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-slate-800 hover:bg-emerald-100 dark:hover:bg-slate-800/80 text-xs font-semibold transition-colors cursor-pointer"
+                                title="Save prompt changes"
+                            >
+                                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                <span>Save Changes</span>
+                            </button>
+                        </div>
+
+                        {/* Right: Contiguous Segmented Pill Capsule [ Primary Action | ▼ Chevron ] */}
+                        <div className="relative inline-flex items-center rounded-full bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 shadow-2xs divide-x divide-slate-200/70 dark:divide-purple-500/20 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => void handlePrimaryAction()}
+                                disabled={isActionInFlight}
+                                data-ui-name="prompt-instruction-dispatch-primary-btn"
+                                data-ui-id={`prompt-instruction-dispatch-primary-${selectedConversation.conversation_id}`}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-all duration-150 ease-out active:translate-y-px cursor-pointer disabled:opacity-50 rounded-l-full",
+                                    primaryDispatchAction === 'enqueue'
+                                        ? "text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+                                        : primaryDispatchAction === 'rerun'
+                                          ? "text-sky-700 dark:text-sky-400 hover:bg-sky-500/10"
+                                          : "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+                                )}
+                                title={
+                                    primaryDispatchAction === 'enqueue'
+                                        ? "Enqueue (FIFO): Stages prompt into FIFO queue (Hotkey: Alt+Q)"
+                                        : primaryDispatchAction === 'rerun'
+                                          ? `Rerun Turn (×${rerunCount}): Reruns turn (Hotkey: Alt+R)`
+                                          : "Send (Preempt): Cancels active task and executes immediately (Hotkey: Alt+N)"
+                                }
+                                aria-label="Run selected dispatch mode"
+                            >
+                                {primaryDispatchAction === 'enqueue' ? (
+                                    <ListPlus className={cn('w-3.5 h-3.5 shrink-0', isEnqueueingActive && 'animate-pulse')} />
+                                ) : primaryDispatchAction === 'rerun' ? (
+                                    <Repeat className={cn('w-3.5 h-3.5 shrink-0', isRerunningActive && 'animate-spin')} />
+                                ) : (
+                                    <Send className={cn('w-3.5 h-3.5 shrink-0', isResendingActive && 'animate-pulse')} />
+                                )}
+                                <span>
+                                    {primaryDispatchAction === 'enqueue'
+                                        ? (isEnqueueingActive ? 'Queueing…' : 'Enqueue (FIFO)')
+                                        : primaryDispatchAction === 'rerun'
+                                          ? (isRerunningActive ? 'Rerunning…' : `Rerun Turn (×${rerunCount})`)
+                                          : (isResendingActive ? 'Sending…' : 'Send (Preempt)')}
+                                </span>
+                            </button>
+
+                            {/* Chevron Button */}
+                            <button
+                                type="button"
+                                onClick={() => setIsDispatchMenuOpen((prev) => !prev)}
+                                data-ui-name="prompt-instruction-dispatch-options-btn"
+                                data-ui-id={`prompt-instruction-dispatch-options-${selectedConversation.conversation_id}`}
+                                className="flex items-center justify-center px-2 py-1.5 text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-xs transition-all duration-150 ease-out active:translate-y-px cursor-pointer rounded-r-full"
+                                aria-label="Dispatch options & settings"
+                                title="Dispatch options & destination settings"
+                            >
+                                <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isDispatchMenuOpen && "rotate-180")} />
+                            </button>
+
+                            {/* Flyout: Unified Dispatch Configuration Popover */}
+                            {isDispatchMenuOpen && (
+                                <div
+                                    className="absolute right-0 bottom-full mb-1.5 z-50 w-80 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl p-2.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-2"
+                                    onMouseLeave={() => setIsDispatchMenuOpen(false)}
+                                >
+                                    <div className="px-2 pt-0.5 pb-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                        <span>Dispatch Configuration</span>
+                                        <span className="text-[9px] text-slate-400">{selectedConversation.seq_code || 'AGM:P001'}</span>
+                                    </div>
+
+                                    {/* Mode Switcher Segmented Pill */}
+                                    <div className="flex items-center justify-between px-2 py-1 text-xs">
+                                        <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
+                                            Mode:
+                                        </span>
+                                        <div className="inline-flex rounded-lg bg-slate-100 dark:bg-slate-950/80 p-0.5 border border-slate-200/80 dark:border-purple-500/20 text-[11px]">
+                                            <button
+                                                type="button"
+                                                onClick={() => setPrimaryDispatchAction('send')}
+                                                title="Send (Preempt): Cancels active task and executes immediately"
+                                                className={cn(
+                                                    "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                    primaryDispatchAction === 'send'
+                                                        ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
+                                                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                                )}
+                                            >
+                                                Send
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPrimaryDispatchAction('enqueue')}
+                                                title="Enqueue (FIFO): Queues prompt behind active task in IDE"
+                                                className={cn(
+                                                    "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                    primaryDispatchAction === 'enqueue'
+                                                        ? "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-2xs font-semibold"
+                                                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                                )}
+                                            >
+                                                Enqueue
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPrimaryDispatchAction('rerun')}
+                                                title="Rerun Turn: Reruns previous conversation turn"
+                                                className={cn(
+                                                    "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                    primaryDispatchAction === 'rerun'
+                                                        ? "bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
+                                                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                                )}
+                                            >
+                                                Rerun
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Destination Selector: Current Conv vs New Conv */}
+                                    {(primaryDispatchAction === 'send' || primaryDispatchAction === 'enqueue') && (
+                                        <>
+                                            <div className="flex items-center justify-between px-2 py-1 text-xs">
+                                                <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
+                                                    Destination:
+                                                </span>
+                                                <select
+                                                    value={conversationTargetMode}
+                                                    onChange={(e) => setConversationTargetMode(e.target.value as 'current' | 'new')}
+                                                    className="bg-transparent border-0 text-slate-700 dark:text-slate-200 text-xs font-semibold focus:ring-0 focus:outline-none cursor-pointer py-0.5 text-right"
+                                                >
+                                                    <option value="current" className="bg-white dark:bg-slate-900">Current Conv</option>
+                                                    <option value="new" className="bg-white dark:bg-slate-900">New Conv</option>
+                                                </select>
+                                            </div>
+
+                                            {conversationTargetMode === 'new' && (
+                                                <div className="px-2 py-1.5 space-y-1 bg-slate-50/80 dark:bg-purple-950/20 rounded-lg border border-slate-200/60 dark:border-purple-500/20">
+                                                    <label className="text-[10px] font-mono text-slate-500 dark:text-slate-400 block">
+                                                        New Conversation Title:
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={newConversationTitle}
+                                                        onChange={(e) => setNewConversationTitle(e.target.value)}
+                                                        placeholder="e.g. Bugfix auth refresh, Feature draft..."
+                                                        className="w-full px-2 py-1 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-purple-500/30 rounded-md text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* Suffix presets */}
+                                            {(() => {
+                                                const parsedType = parseVerificationTypeFromSuffix(confirmationSuffix);
+                                                const matchedBuiltin = VERIFICATION_OPTIONS.find((o) => o.value === parsedType);
+                                                const matchedCustom = customTemplates.find((c) => c.id === confirmationSuffix);
+                                                const currentSuffixLabel = matchedCustom ? matchedCustom.name : (matchedBuiltin?.dropdownLabel || matchedBuiltin?.label || 'None');
+
+                                                return (
+                                                    <div className="flex items-center justify-between px-2 py-1 text-xs">
+                                                        <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
+                                                            Suffix:
+                                                        </span>
+                                                        <div className="relative">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setIsSuffixPopoverOpen((prev) => !prev)}
+                                                                className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-purple-950/40 border border-slate-200/80 dark:border-purple-500/20 text-slate-800 dark:text-slate-200 text-xs font-semibold hover:bg-slate-200/80 dark:hover:bg-slate-800/80 transition-colors cursor-pointer max-w-[140px]"
+                                                                title="Select confirmation suffix or verification template"
+                                                            >
+                                                                <span className="truncate">{currentSuffixLabel}</span>
+                                                                <ChevronDown className={cn("w-3 h-3 text-slate-400 shrink-0 transition-transform duration-150", isSuffixPopoverOpen && "rotate-180")} />
+                                                            </button>
+
+                                                            {isSuffixPopoverOpen && (
+                                                                <div
+                                                                    className="absolute right-0 bottom-full mb-1.5 z-50 w-64 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-1.5 space-y-1 backdrop-blur-md max-h-56 overflow-y-auto animate-in fade-in zoom-in-95 duration-100"
+                                                                    onMouseLeave={() => setIsSuffixPopoverOpen(false)}
+                                                                >
+                                                                    <div className="px-2 py-0.5 text-[9.5px] font-mono uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:border-slate-800">
+                                                                        Built-in Presets
+                                                                    </div>
+                                                                    {VERIFICATION_OPTIONS.map((opt) => {
+                                                                        const isSelected = parsedType === opt.value && !matchedCustom;
+                                                                        return (
+                                                                            <button
+                                                                                key={opt.value}
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setConfirmationSuffix(opt.value === 'none' ? 'None (Send as is)' : opt.value);
+                                                                                    setIsSuffixPopoverOpen(false);
+                                                                                }}
+                                                                                className={cn(
+                                                                                    "w-full flex items-center justify-between px-2 py-1 rounded-lg text-left text-xs transition-colors cursor-pointer",
+                                                                                    isSelected
+                                                                                        ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 font-semibold"
+                                                                                        : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/80"
+                                                                                )}
+                                                                            >
+                                                                                <span className="truncate">{opt.dropdownLabel || opt.label}</span>
+                                                                                {isSelected && <Check className="w-3.5 h-3.5 text-purple-500 shrink-0" />}
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </>
+                                    )}
+
+                                    {/* Rerun mode options */}
+                                    {primaryDispatchAction === 'rerun' && (
+                                        <div className="flex items-center justify-between px-2 py-1 text-xs">
+                                            <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
+                                                Times (N):
+                                            </span>
+                                            <div className="inline-flex rounded-lg bg-slate-100 dark:bg-purple-950/40 p-0.5 border border-slate-200/80 dark:border-purple-500/20 text-[11px]">
+                                                {[1, 2, 3, 5].map((cnt) => (
+                                                    <button
+                                                        key={`rerun-times-${cnt}`}
+                                                        type="button"
+                                                        onClick={() => setRerunCount(cnt)}
+                                                        className={cn(
+                                                            "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                            rerunCount === cnt
+                                                                ? "bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
+                                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                                        )}
+                                                    >
+                                                        ×{cnt}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

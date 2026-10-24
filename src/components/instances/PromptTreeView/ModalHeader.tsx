@@ -11,6 +11,8 @@ import {
     ChevronDown,
     Check,
     Image as ImageIcon,
+    Upload,
+    Download,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { SyncInterval } from '../../../services/instanceService';
@@ -47,7 +49,6 @@ export interface ModalHeaderProps {
 
 const SYNC_INTERVALS: { value: SyncInterval; label: string }[] = [
     { value: 'off', label: 'Off' },
-    { value: '15s', label: '15s' },
     { value: '30s', label: '30s' },
     { value: '1m', label: '1m' },
     { value: '2m', label: '2m' },
@@ -98,7 +99,7 @@ export function ModalHeader(props: ModalHeaderProps) {
     };
 
     return (
-        <div className="relative z-40 flex items-center justify-between border-b border-slate-200/80 dark:border-purple-900/40 px-3 py-1 bg-slate-50/80 dark:bg-[#0c0817]/95 backdrop-blur-xl shrink-0">
+        <div className="relative z-40 flex items-center justify-between border-b border-slate-200/80 dark:border-purple-900/40 px-3 py-1.5 bg-slate-50/80 dark:bg-[#0c0817]/95 backdrop-blur-xl shrink-0">
             <div className="flex items-center gap-2 min-w-0">
                 <div className="flex h-6 w-6 items-center justify-center rounded-[5px] bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 shrink-0">
                     <Layers className="h-4 w-4" />
@@ -139,44 +140,70 @@ export function ModalHeader(props: ModalHeaderProps) {
             {/* Top Right Header Controls: Single Contiguous Segmented Dark-Glass Pill Capsule */}
             <div className="flex items-center shrink-0">
                 <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#120d20]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-900/50 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-900/40 shadow-2xs">
-                    {/* Segment 1: Unified Import / Export section */}
-                    <ImportExportMenu
-                        onExportSqlite={onExportSqlite}
-                        onExportJson={onBackup}
-                        onImportSqlite={onImportSqlite}
-                        onImportJson={onRestore}
-                        onRestore={onRestore}
-                        onCopyAllTree={onCopyAllTreePrompts}
-                        isLoading={isLoading}
-                    />
+                    {/* Segment 1: Import Prompts Icon Button */}
+                    <button
+                        type="button"
+                        onClick={onRestore}
+                        disabled={isLoading}
+                        className="flex items-center justify-center w-7 h-7 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer disabled:opacity-50"
+                        title="Import prompts"
+                        aria-label="Import prompts"
+                    >
+                        <Upload className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
+                    </button>
 
-                    {/* Segment 2: Reset Icon Button */}
+                    {/* Segment 2: Export Prompts Icon Button */}
+                    <button
+                        type="button"
+                        onClick={onBackup}
+                        disabled={isLoading}
+                        className="flex items-center justify-center w-7 h-7 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer disabled:opacity-50"
+                        title="Export prompts"
+                        aria-label="Export prompts"
+                    >
+                        <Download className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
+                    </button>
+
+                    {/* Segment 3: Unified Import / Export section */}
+                    <div className="[&>div>button]:rounded-none">
+                        <ImportExportMenu
+                            onExportSqlite={onExportSqlite}
+                            onExportJson={onBackup}
+                            onImportSqlite={onImportSqlite}
+                            onImportJson={onRestore}
+                            onRestore={onRestore}
+                            onCopyAllTree={onCopyAllTreePrompts}
+                            isLoading={isLoading}
+                        />
+                    </div>
+
+                    {/* Segment 4: Reset Button with High-Contrast 3D Tactile Styling */}
                     <button
                         type="button"
                         onClick={onResetTree}
                         disabled={isLoading || isResetting}
-                        className="flex items-center justify-center gap-1 h-7 px-2 text-[11px] font-semibold text-black bg-amber-400 hover:bg-amber-500 hover:text-black shadow-[0_2px_0_0_#92400e] active:translate-y-px active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Reset tree from disk transcripts"
+                        className="flex items-center justify-center gap-1 h-7 px-2.5 text-[11px] font-bold text-zinc-950 bg-amber-400 hover:bg-amber-300 shadow-[0_2px_0_0_#b45309] active:translate-y-0.5 active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Reset tree from disk transcripts (wipes SQLite cache and rescans)"
                         aria-label="Reset"
                     >
-                        <RotateCcw className={cn("w-3.5 h-3.5 text-black", isResetting && "animate-spin")} />
+                        <RotateCcw className={cn("w-3.5 h-3.5 text-zinc-950", isResetting && "animate-spin")} />
                         <span>Reset</span>
                     </button>
 
-                    {/* Segment 3: Refresh Icon Button */}
+                    {/* Segment 5: Refresh Button with 3D Elevation */}
                     <button
                         type="button"
                         onClick={onRefreshAll}
                         disabled={isLoading}
-                        className="flex items-center justify-center gap-1 h-7 px-2 text-[11px] font-semibold text-white bg-sky-600 hover:bg-sky-800 shadow-[0_2px_0_0_#0369a1] active:translate-y-px active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Refresh the tree now. Automatic refresh follows the Sync interval only."
+                        className="flex items-center justify-center gap-1 h-7 px-2.5 text-[11px] font-semibold text-white bg-sky-600 hover:bg-sky-500 shadow-[0_2px_0_0_#0284c7] active:translate-y-0.5 active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Refresh the tree now (respects 30s cache otherwise)"
                         aria-label="Refresh"
                     >
                         <RefreshCw className={cn("w-3.5 h-3.5 text-white", (isLoading || isAutoSyncing || isRefreshing) && "animate-spin")} />
                         <span>Refresh</span>
                     </button>
 
-                    {/* Segment 4: Image Filter Toggle Button */}
+                    {/* Segment 6: Image Filter Toggle Button */}
                     <button
                         type="button"
                         onClick={handleToggleImageFilter}
@@ -192,7 +219,7 @@ export function ModalHeader(props: ModalHeaderProps) {
                         <ImageIcon className="w-3.5 h-3.5" />
                     </button>
 
-                    {/* Segment 4: Sync Interval Selector with Modernized Dark-Glass Popover */}
+                    {/* Segment 7: Sync Interval Selector with Modernized Dark-Glass Popover */}
                     <div className="relative flex items-center h-7 px-2.5">
                         <button
                             type="button"
@@ -242,14 +269,14 @@ export function ModalHeader(props: ModalHeaderProps) {
                         )}
                     </div>
 
-                    {/* Segment 5: Tree View Collapse / Expand Toggle */}
+                    {/* Segment 8: Tree View Collapse / Expand Toggle */}
                     {onToggleTree && (
                         <button
                             type="button"
                             onClick={onToggleTree}
                             className="flex items-center justify-center w-7 h-7 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer"
-                            title={isTreeCollapsed ? "Show tree" : "Hide tree"}
-                            aria-label={isTreeCollapsed ? "Show tree" : "Hide tree"}
+                            title="Toggle Tree View"
+                            aria-label="Toggle Tree View"
                         >
                             {isTreeCollapsed ? (
                                 <PanelLeftOpen className="w-3.5 h-3.5 text-blue-500" />

@@ -156,14 +156,14 @@ export function AccountCardActions({
             )}
 
             {/* 5-Button Segmented Capsule Toolbar */}
-            <div className="flex items-center rounded-[5px] bg-slate-100 dark:bg-[#090611] border border-slate-200/80 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs w-full max-w-xs relative">
+            <div className="flex items-center rounded-full bg-slate-100/90 dark:bg-zinc-900/90 backdrop-blur-md border border-slate-200/80 dark:border-zinc-700/60 p-0.5 divide-x divide-slate-200/70 dark:divide-zinc-700/60 shadow-sm w-full max-w-xs relative">
                 {/* 1. Refresh */}
                 <button
                     type="button"
                     role="button"
                     aria-label={t('common.refresh', 'Refresh')}
                     className={cn(
-                        "flex-1 flex items-center justify-center py-1 rounded-l-[4px] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+                        "flex-1 flex items-center justify-center h-7 py-1 rounded-l-full transition-colors duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
                         isRefreshing
                             ? "text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20"
                             : "text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/20"
@@ -184,10 +184,10 @@ export function AccountCardActions({
                     role="button"
                     aria-label={t('accounts.switch_to_classic', 'Switch to Antigravity (Classic)')}
                     className={cn(
-                        "flex-1 flex items-center justify-center py-1 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+                        "flex-1 flex items-center justify-center h-7 py-1 transition-all duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
                         "bg-transparent text-slate-600 dark:text-slate-400",
-                        "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-slate-950 hover:font-bold hover:shadow-[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.2)]",
-                        "active:translate-y-0.5 active:shadow-[0_0_0_0_#A16207]"
+                        "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-zinc-950 hover:font-bold hover:shadow-[0_2px_0_0_#a16207]",
+                        "active:translate-y-0.5 active:shadow-none"
                     )}
                     onClick={(e) => {
                         e.stopPropagation();
@@ -205,9 +205,9 @@ export function AccountCardActions({
                     role="button"
                     aria-label={t('common.delete', 'Delete Account')}
                     className={cn(
-                        "flex-1 flex items-center justify-center py-1 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+                        "flex-1 flex items-center justify-center h-7 py-1 transition-all duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
                         "bg-transparent text-slate-600 dark:text-slate-400",
-                        "hover:bg-red-600 hover:text-white dark:hover:bg-red-600 dark:hover:text-white active:scale-95"
+                        "hover:bg-red-600 hover:text-white dark:hover:bg-red-600 dark:hover:text-white active:translate-y-0.5"
                     )}
                     onClick={(e) => {
                         e.stopPropagation();
@@ -225,10 +225,10 @@ export function AccountCardActions({
                     role="button"
                     aria-label={t('instances.fast_forward', 'Fast-Forward')}
                     className={cn(
-                        "flex-1 flex items-center justify-center py-1 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+                        "flex-1 flex items-center justify-center h-7 py-1 transition-all duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
                         "bg-transparent text-slate-600 dark:text-slate-400",
-                        "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-slate-950 hover:font-bold hover:shadow-[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.2)]",
-                        "active:translate-y-0.5 active:shadow-[0_0_0_0_#A16207]"
+                        "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-zinc-950 hover:font-bold hover:shadow-[0_2px_0_0_#a16207]",
+                        "active:translate-y-0.5 active:shadow-none"
                     )}
                     onClick={handleFastForward}
                     title={t('instances.fast_forward_tooltip', 'Fast-Forward: Rotate instance to next best profile')}
@@ -245,7 +245,7 @@ export function AccountCardActions({
                         role="button"
                         aria-label={t('common.more', 'More actions')}
                         className={cn(
-                            "w-full flex items-center justify-center py-1 rounded-r-[4px] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+                            "w-full flex items-center justify-center h-7 py-1 rounded-r-full transition-colors duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
                             showMoreMenu
                                 ? "bg-slate-200 dark:bg-[#40285e] text-slate-900 dark:text-white"
                                 : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#40285e]"

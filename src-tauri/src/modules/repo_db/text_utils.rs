@@ -132,17 +132,24 @@ pub fn extract_smart_prompt_summary(raw: &str, max_len: usize) -> String {
             continue;
         }
 
-        // Check if line is a markdown header (# Title), horizontal rule (---, ***), or blockquote (> ...)
-        if trimmed.starts_with('#')
-            || trimmed.starts_with('>')
-            || trimmed.starts_with("---")
-            || trimmed.starts_with("***")
+        // Strip leading markdown header (# Title) glyphs without discarding the title line
+        let unheadered = if trimmed.starts_with('#') {
+            trimmed.trim_start_matches('#').trim()
+        } else {
+            trimmed
+        };
+
+        // Skip horizontal rules (---, ***), blockquotes (> ...), or empty lines after header strip
+        if unheadered.is_empty()
+            || unheadered.starts_with('>')
+            || unheadered.starts_with("---")
+            || unheadered.starts_with("***")
         {
             continue;
         }
 
         // Check for common prompt preamble / telemetry boilerplates
-        let lower = trimmed.to_lowercase();
+        let lower = unheadered.to_lowercase();
         if lower.starts_with("prompt version:")
             || lower.starts_with("synchronization:")
             || lower.starts_with("top-instruction priority mandate")
@@ -158,7 +165,7 @@ pub fn extract_smart_prompt_summary(raw: &str, max_len: usize) -> String {
             continue;
         }
 
-        substantive_lines.push(trimmed);
+        substantive_lines.push(unheadered);
     }
 
     let candidate = if !substantive_lines.is_empty() {

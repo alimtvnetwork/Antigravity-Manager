@@ -16,6 +16,15 @@ export interface PromptTreeData {
     ) => Promise<void>;
 }
 
+export const TREE_CACHE_TTL_MS = 30_000; // 30 seconds strict minimum
+
+export interface TreeCacheOptions {
+    ttlMs: number;
+    lastLoadTimestamp: number;
+    isCooldownActive: boolean;
+    swrCacheSize: number;
+}
+
 interface UsePromptTreeDataProps {
     state: PromptTreeState;
     instanceId: string;
@@ -332,6 +341,38 @@ export function usePromptTreeData({
     archivedProjectIdsRef.current = archivedProjectIds;
     const pinnedProjectIdsRef = useRef(pinnedProjectIds);
     pinnedProjectIdsRef.current = pinnedProjectIds;
+    const lastLoadTimeRef = useRef<number>(0);
+
+    const callbacksRef = useRef({
+        setSelectedProject,
+        setSelectedConversation,
+        setActivePromptText,
+        setEditedPromptText,
+        setShowAllWords,
+        setTreeData,
+        setIsLoading,
+        setIsAutoSyncing,
+        setError,
+        setExpandedProjects,
+        setExpandedStaleGroups,
+        setArchivedProjectIds,
+        setPinnedProjectIds,
+    });
+    callbacksRef.current = {
+        setSelectedProject,
+        setSelectedConversation,
+        setActivePromptText,
+        setEditedPromptText,
+        setShowAllWords,
+        setTreeData,
+        setIsLoading,
+        setIsAutoSyncing,
+        setError,
+        setExpandedProjects,
+        setExpandedStaleGroups,
+        setArchivedProjectIds,
+        setPinnedProjectIds,
+    };
 
     // Select conversation directly (2-tier leaf)
     const selectConversation = useCallback(
@@ -501,6 +542,13 @@ export function usePromptTreeData({
             overrideArchivedIds?: string[],
             overridePinnedIds?: string[]
         ) => {
+            const now = Date.now();
+            // Enforce strict 30-second cooldown for background and auto-sync loads
+            if (!isForce && !isInitialLoad && now - lastLoadTimeRef.current < TREE_CACHE_TTL_MS) {
+                return; // Exit silently; SWR memory cache is fresh
+            }
+            lastLoadTimeRef.current = now;
+
             if (isInitialLoad) {
                 setIsLoading(true);
                 promptTreeLoadingEmitter.set(true);
@@ -681,19 +729,20 @@ export function usePromptTreeData({
         }
     }, [isOpen, instanceId, initialSelectedProjectId, loadTree, performAutoSelection, setArchivedProjectIds, setPinnedProjectIds, setTreeData]);
 
-    // Imp-16: Dynamic 2s Auto-Sync Acceleration when active prompts are running (fallback to configured interval when idle)
+    // Strict 30-Second Minimum Auto-Sync Guard: Never poll faster than 30s as per user specification
     useEffect(() => {
         if (!isOpen || syncInterval === 'off') return;
 
-        let intervalMs = 30000;
-        if (syncInterval === '15s') intervalMs = 15000;
-        else if (syncInterval === '30s') intervalMs = 30000;
-        else if (syncInterval === '1m') intervalMs = 60000;
+        let intervalMs = TREE_CACHE_TTL_MS;
+        if (syncInterval === '1m') intervalMs = 60000;
         else if (syncInterval === '2m') intervalMs = 120000;
+        else intervalMs = TREE_CACHE_TTL_MS; // clamp 15s, 30s, or any other value to minimum 30s
+
+        const effectiveInterval = Math.max(TREE_CACHE_TTL_MS, intervalMs);
 
         const timer = setInterval(() => {
-            loadTree(false, false);
-        }, intervalMs);
+            void loadTree(false, false);
+        }, effectiveInterval);
 
         return () => clearInterval(timer);
     }, [isOpen, syncInterval, instanceId, loadTree]);

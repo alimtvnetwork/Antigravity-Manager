@@ -11,10 +11,8 @@ use rusqlite::Connection;
 
 fn is_placeholder_title(title: &str) -> bool {
     let trimmed = title.trim();
-    trimmed.is_empty()
-        || trimmed.eq_ignore_ascii_case("untitled")
-        || trimmed.eq_ignore_ascii_case("untitled conversation")
-        || trimmed.eq_ignore_ascii_case("new conversation")
+    let lower = trimmed.to_ascii_lowercase();
+    trimmed.is_empty() || lower.starts_with("untitled") || lower.starts_with("new conversation")
 }
 
 fn conversation_display_title(title: &str, prompt: &str) -> String {
@@ -321,13 +319,19 @@ pub(crate) fn build_transcript_conv_nodes(
                 }
             }
 
+            let root_prompt = item
+                .prompts
+                .first()
+                .map(|p| p.prompt_text.as_str())
+                .unwrap_or(&item.prompt);
+
             conv_nodes.push(AgmConversationNode {
                 seq_id: c_seq,
                 seq_code: format!("C{:03}", c_seq),
                 gitmap_seq_code: format!("GM:{}", short_id),
                 conversation_id: item.cid.clone(),
                 short_id,
-                title: conversation_display_title(&item.title, &item.prompt),
+                title: conversation_display_title(&item.title, root_prompt),
                 status: conv_status,
                 is_running: effective_is_run,
                 step_count: item.steps,

@@ -897,18 +897,16 @@ pub fn send_prompt_now_for_instance(
     let mut dispatched_via_cdp = false;
     let (is_running, _, pids) =
         crate::modules::instance::is_instance_process_running_smart(&canonical_inst);
-    let resume_existing = resumes_existing_conversation(active_prompt.session_id.as_deref());
-    let caller_named_conversation = conversation_id
-        .map(str::trim)
-        .is_some_and(|value| !value.is_empty());
-    if is_running && !resume_existing && !caller_named_conversation {
+    let target_is_new = conversation_id.map(str::trim) == Some("new");
+    if is_running {
         crate::modules::instance::focus_running_instance(&pids, Some(repo_path));
         let max_cdp_attempts = if was_cold_started { 3 } else { 1 };
         for attempt in 1..=max_cdp_attempts {
-            if crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
+            if crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance_with_mode(
                 &canonical_inst,
                 fallback_prompt,
                 true,
+                target_is_new,
             )
             .is_ok()
             {
@@ -1054,26 +1052,24 @@ pub fn enqueue_prompt_for_instance(
     // If instance is running, forward directly into Antigravity IDE UI queue via CDP (without cancelling running turn)
     let (is_running, _, pids) =
         crate::modules::instance::is_instance_process_running_smart(&canonical_inst);
-    let resume_existing = resumes_existing_conversation(active_prompt.session_id.as_deref());
-    let caller_named_conversation = conversation_id
-        .map(str::trim)
-        .is_some_and(|value| !value.is_empty());
-    if is_running && !resume_existing && !caller_named_conversation {
+    let target_is_new = conversation_id.map(str::trim) == Some("new");
+    if is_running {
         crate::modules::instance::focus_running_instance(&pids, Some(repo_path));
         let cdp_prompt = if clean_prompt.trim().is_empty() {
             prompt_content.trim()
         } else {
             clean_prompt.as_str()
         };
-        match crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
+        match crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance_with_mode(
             &canonical_inst,
             cdp_prompt,
             false,
+            target_is_new,
         ) {
             Ok(()) => {
                 crate::modules::logger::log_info(&format!(
-                    "[RepoDB] enqueue_prompt_for_instance forwarded prompt directly to Antigravity IDE queue via CDP for instance '{}'",
-                    canonical_inst
+                    "[RepoDB] enqueue_prompt_for_instance forwarded prompt directly to Antigravity IDE queue via CDP for instance '{}' (new_chat: {})",
+                    canonical_inst, target_is_new
                 ));
             }
             Err(e) => {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, type WheelEvent, type MouseEvent } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Copy, Check, Download, X, Image as ImageIcon, FileText, Maximize2 } from 'lucide-react';
-import { writeNativeImageToClipboard, copyImageAsMarkdownText, copySingleImageForOneNoteOrIde } from './clipboard';
+import { ZoomIn, ZoomOut, RotateCcw, Copy, Check, Download, X, Image as ImageIcon, FileText, Maximize2, ExternalLink, Link2 } from 'lucide-react';
+import { writeNativeImageToClipboard, copyImageAsMarkdownText, copySingleImageForOneNoteOrIde, extractLocalPathFromUri } from './clipboard';
+import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 
 export interface PromptImagePreviewModalProps {
@@ -22,6 +23,7 @@ export function PromptImagePreviewModal({
     const [isCopied, setIsCopied] = useState(false);
     const [isTextCopied, setIsTextCopied] = useState(false);
     const [isOneNoteCopied, setIsOneNoteCopied] = useState(false);
+    const [isIdeLinkCopied, setIsIdeLinkCopied] = useState(false);
     const dragStartRef = useRef({ x: 0, y: 0, initialPanX: 0, initialPanY: 0 });
 
     const handleResetZoom = useCallback(() => {
@@ -85,7 +87,7 @@ export function PromptImagePreviewModal({
         setZoomScale((prev) => Math.min(5, Math.max(0.25, Math.round((prev + delta) * 100) / 100)));
     }, []);
 
-    // Pan / Drag handlers
+    // Pan / Drag handlers with window-level coordinate tracking for fluid pan
     const handleMouseDown = useCallback((e: MouseEvent) => {
         if (e.button !== 0) return;
         setIsPanning(true);
@@ -110,6 +112,66 @@ export function PromptImagePreviewModal({
     const handleMouseUp = useCallback(() => {
         setIsPanning(false);
     }, []);
+
+    // Global drag capture guard so pan coordinates do not drop when cursor exits viewport
+    useEffect(() => {
+        if (!isPanning) return;
+        const handleGlobalMouseMove = (e: globalThis.MouseEvent) => {
+            const dx = e.clientX - dragStartRef.current.x;
+            const dy = e.clientY - dragStartRef.current.y;
+            setPanPosition({
+                x: dragStartRef.current.initialPanX + dx,
+                y: dragStartRef.current.initialPanY + dy,
+            });
+        };
+        const handleGlobalMouseUp = () => {
+            setIsPanning(false);
+        };
+        window.addEventListener('mousemove', handleGlobalMouseMove);
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+        return () => {
+            window.removeEventListener('mousemove', handleGlobalMouseMove);
+            window.removeEventListener('mouseup', handleGlobalMouseUp);
+        };
+    }, [isPanning]);
+
+    const handleOpenInIde = useCallback(async () => {
+        if (!imageSrc) return;
+        const local = extractLocalPathFromUri(imageSrc) || imageSrc;
+        const clean = local.replace(/^[/\\]+([a-zA-Z]:)/, '$1');
+        if (/^[a-zA-Z]:[\\/]/.test(clean) || clean.startsWith('/') || clean.startsWith('\\\\')) {
+            try {
+                const { openPath } = await import('@tauri-apps/plugin-opener');
+                await openPath(clean);
+            } catch (err) {
+                useErrorStore.getState().trackWarning(err, {
+                    source: 'PromptImagePreviewModal.handleOpenInIde',
+                    triggerAction: 'open_image_in_ide',
+                });
+            }
+        }
+    }, [imageSrc]);
+
+    const handleCopyIdeLink = useCallback(async () => {
+        if (!imageSrc) return;
+        try {
+            const local = extractLocalPathFromUri(imageSrc) || imageSrc;
+            const cleanPath = local.replace(/^file:\/\/\/?/, '').replace(/\\/g, '/');
+            const filename = cleanPath.split('/').pop() || 'image.png';
+            const fileUri = cleanPath.startsWith('/') ? `file://${cleanPath}` : `file:///${cleanPath}`;
+            const md = `[${altText || filename}](${fileUri})`;
+            const ok = await copyToClipboard(md);
+            if (ok) {
+                setIsIdeLinkCopied(true);
+                setTimeout(() => setIsIdeLinkCopied(false), 2200);
+            }
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'PromptImagePreviewModal.handleCopyIdeLink',
+                triggerAction: 'copy_ide_link',
+            });
+        }
+    }, [altText, imageSrc]);
 
     const handleCopyNative = useCallback(async () => {
         if (!imageSrc) return;
@@ -336,6 +398,24 @@ export function PromptImagePreviewModal({
                     >
                         {isTextCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <FileText className="w-3.5 h-3.5 text-sky-400" />}
                         <span>{isTextCopied ? 'Copied Image as Text!' : 'Copy Image as Text (Markdown)'}</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleCopyIdeLink}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-teal-600/30 hover:bg-teal-600/50 text-teal-200 transition-colors cursor-pointer font-medium"
+                        title="Copy clickable file link for IDE ([filename](file:///...))"
+                    >
+                        {isIdeLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Link2 className="w-3.5 h-3.5 text-teal-400" />}
+                        <span>{isIdeLinkCopied ? 'Copied IDE Link!' : 'Copy IDE Link'}</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleOpenInIde}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 transition-colors cursor-pointer font-medium"
+                        title="Open image file in IDE or default OS viewer"
+                    >
+                        <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Open in IDE</span>
                     </button>
                     <button
                         type="button"

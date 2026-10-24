@@ -3,7 +3,7 @@ import { copyImageAsMarkdownText, writePureImageToClipboard, copyPromptWithRichI
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { formatRelativeRecency } from './formatters';
-import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
+import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat, Send } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { CopyFormat, type AgmConversationNode } from './types';
 import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, dispatchConversationId, workspaceImageMarkdown, rewritePromptImageTargets, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
@@ -330,7 +330,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                 conversationTargetMode,
                 selectedConversation.conversation_id,
                 Boolean(selectedConversation.is_running)
-            );
+            ) || (conversationTargetMode === 'current' ? 'current' : undefined);
 
             // Resolve originalPrompt from active turns / prompt history rather than leaving it undefined
             let originalPrompt = activePromptText?.trim() || '';
@@ -967,8 +967,8 @@ export function DetailHeader(props: DetailHeaderProps) {
                         )}
                     </div>
 
-                    {/* Capsule B: one dispatch control. Send, Enqueue, and Rerun live in the dropdown. */}
-                    <div className="relative flex items-center rounded-full overflow-hidden bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 shadow-2xs shrink-0">
+                    {/* Capsule B: Combined [Send, Enqueue, Rerun] segmented pill capsule and dropdown */}
+                    <div className="relative inline-flex items-center rounded-full bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 shadow-2xs divide-x divide-slate-200/70 dark:divide-purple-500/20 shrink-0">
                         <button
                             type="button"
                             onClick={() => {
@@ -991,11 +991,30 @@ export function DetailHeader(props: DetailHeaderProps) {
                             disabled={isResending || isEnqueueing || isRerunning}
                             data-ui-name="prompt-dispatch-primary-btn"
                             data-ui-id={`prompt-dispatch-primary-${selectedConversation.conversation_id}`}
-                            className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 transition-all duration-150 ease-out active:translate-y-px cursor-pointer disabled:opacity-50"
-                            title="Run the selected dispatch mode. Open the menu for Send, Enqueue, or Rerun."
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold transition-all duration-150 ease-out active:translate-y-px cursor-pointer disabled:opacity-50 rounded-l-full",
+                                primaryDispatchAction === 'enqueue'
+                                    ? "text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+                                    : primaryDispatchAction === 'rerun'
+                                      ? "text-sky-700 dark:text-sky-400 hover:bg-sky-500/10"
+                                      : "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+                            )}
+                            title={
+                                primaryDispatchAction === 'enqueue'
+                                    ? "Enqueue (FIFO): Stages prompt into FIFO queue (Hotkey: Q)"
+                                    : primaryDispatchAction === 'rerun'
+                                      ? `Rerun Turn (×${rerunCount}): Reruns previous turn (Hotkey: R)`
+                                      : "Send (Preempt): Cancels active task and executes immediately (Hotkey: N)"
+                            }
                             aria-label="Run selected dispatch mode"
                         >
-                            <RotateCw className={cn('w-3 h-3 shrink-0', (isResending || isRerunning) && 'animate-spin')} />
+                            {primaryDispatchAction === 'enqueue' ? (
+                                <ListPlus className={cn('w-3 h-3 shrink-0', isEnqueueing && 'animate-pulse')} />
+                            ) : primaryDispatchAction === 'rerun' ? (
+                                <Repeat className={cn('w-3 h-3 shrink-0', isRerunning && 'animate-spin')} />
+                            ) : (
+                                <Send className={cn('w-3 h-3 shrink-0', isResending && 'animate-pulse')} />
+                            )}
                             <span>
                                 {primaryDispatchAction === 'enqueue'
                                     ? (isEnqueueing ? 'Queueing…' : 'Enqueue')
@@ -1003,17 +1022,27 @@ export function DetailHeader(props: DetailHeaderProps) {
                                       ? (isRerunning ? 'Rerunning…' : (rerunFlash ?? `Rerun ×${rerunCount}`))
                                       : (isResending ? 'Sending…' : 'Send')}
                             </span>
+                            <kbd className={cn(
+                                "ml-0.5 px-1 py-0.2 border rounded text-[8.5px] font-mono font-bold",
+                                primaryDispatchAction === 'enqueue'
+                                    ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                                    : primaryDispatchAction === 'rerun'
+                                      ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30"
+                                      : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                            )}>
+                                {primaryDispatchAction === 'enqueue' ? 'Q' : primaryDispatchAction === 'rerun' ? 'R' : 'N'}
+                            </kbd>
                         </button>
 
-                        {/* 4. Dropdown Chevron for Unified Dispatch Menu (Rerun, Target, Templates) */}
+                        {/* Dropdown Chevron for Unified Dispatch Menu (Send, Enqueue, Rerun, Target, Templates) */}
                         <button
                             type="button"
                             onClick={handleToggleDispatchMenu}
                             data-ui-name="prompt-dispatch-options-btn"
                             data-ui-id={`prompt-dispatch-options-${selectedConversation.conversation_id}`}
-                            className="flex items-center justify-center px-1.5 py-1 rounded-r-md text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center justify-center px-2 py-1 rounded-r-full text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             aria-label="Unified dispatch configuration popover"
-                            title="Dispatch options & Rerun settings"
+                            title="Dispatch options: Choose Send, Enqueue, or Rerun and configure target"
                         >
                             <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isMenuOpen && "rotate-180")} />
                         </button>
@@ -1039,40 +1068,44 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         <button
                                              type="button"
                                              onClick={() => handleSwitchDispatchMode('send')}
-                                             title="Cancel & Send / Send (Preempt): Cancels any running task to execute immediately"
+                                             title="Cancel & Send / Send (Preempt): Cancels any running task to execute immediately (Hotkey: N)"
                                              className={cn(
-                                                 "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                 "flex items-center gap-1 px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                  primaryDispatchAction === 'send'
                                                      ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
                                                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 dark:hover:bg-slate-800/80"
                                              )}
                                          >
-                                             Send (Preempt)
+                                             <Send className="w-2.5 h-2.5" />
+                                             <span>Send (Preempt)</span>
                                          </button>
                                          <button
                                              type="button"
                                              onClick={() => handleSwitchDispatchMode('enqueue')}
-                                             title="Enqueue (FIFO): Queues prompt behind active task in IDE"
+                                             title="Enqueue (FIFO): Queues prompt behind active task in IDE (Hotkey: Q)"
                                              className={cn(
-                                                 "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                 "flex items-center gap-1 px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                  primaryDispatchAction === 'enqueue'
                                                      ? "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-2xs font-semibold"
                                                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 dark:hover:bg-slate-800/80"
                                              )}
                                          >
-                                             Enqueue (FIFO)
+                                             <ListPlus className="w-2.5 h-2.5" />
+                                             <span>Enqueue (FIFO)</span>
                                          </button>
                                          <button
                                              type="button"
                                              onClick={() => handleSwitchDispatchMode('rerun')}
+                                             title="Rerun Turn: Reruns turn N times with verification or nudge (Hotkey: R)"
                                              className={cn(
-                                                 "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                 "flex items-center gap-1 px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                  primaryDispatchAction === 'rerun'
                                                      ? "bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
                                                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 dark:hover:bg-slate-800/80"
                                              )}
                                          >
-                                             Rerun Turn
+                                             <Repeat className="w-2.5 h-2.5" />
+                                             <span>Rerun Turn</span>
                                          </button>
                                      </div>
                                  </div>

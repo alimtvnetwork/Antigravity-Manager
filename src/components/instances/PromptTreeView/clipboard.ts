@@ -1452,10 +1452,98 @@ export async function copySingleImageForOneNoteOrIde(
 }
 
 /**
+ * Normalizes an image path or local file URI into an RFC-8089 compliant clickable IDE markdown link: [label](file:///<path>).
+ * Supports both signatures:
+ *   formatIdeClickableFileLink(rawPath: string, repoPath?: string, altText?: string): string
+ *   formatIdeClickableFileLink(rawPath: string, label?: string): string
+ */
+export function formatIdeClickableFileLink(
+    rawPath: string,
+    repoPathOrLabel?: string,
+    altText?: string
+): string {
+    if (!rawPath || !rawPath.trim()) return '';
+    let clean = rawPath.trim();
+
+    // Strip agm-asset:// or file:// or file:/// prefixes
+    if (clean.startsWith('agm-asset://')) {
+        clean = clean.slice('agm-asset://'.length);
+    } else if (clean.startsWith('file:///')) {
+        if (/^file:\/\/\/[a-zA-Z]:[\\/]/.test(clean)) {
+            clean = clean.slice(8);
+        } else {
+            clean = clean.slice(7);
+            if (/^\/[a-zA-Z]:[\\/]/.test(clean)) {
+                clean = clean.slice(1);
+            }
+        }
+    } else if (clean.startsWith('file://')) {
+        clean = clean.slice(7);
+        if (/^\/[a-zA-Z]:[\\/]/.test(clean)) {
+            clean = clean.slice(1);
+        }
+    }
+
+    try {
+        clean = decodeURIComponent(clean);
+    } catch {
+        // Keep raw clean if decoding fails
+    }
+
+    // Strip leading slash before Windows drive letter: /C:/... -> C:/...
+    if (/^\/[a-zA-Z]:[\\/]/.test(clean)) {
+        clean = clean.slice(1);
+    }
+
+    let repoPath: string | undefined;
+    let label: string | undefined;
+
+    if (altText !== undefined) {
+        repoPath = repoPathOrLabel;
+        label = altText;
+    } else if (repoPathOrLabel !== undefined) {
+        const isPath =
+            repoPathOrLabel.includes('/') ||
+            repoPathOrLabel.includes('\\') ||
+            /^[a-zA-Z]:/.test(repoPathOrLabel);
+        if (isPath) {
+            repoPath = repoPathOrLabel;
+        } else {
+            label = repoPathOrLabel;
+        }
+    }
+
+    let absPath = clean;
+    const isAbs =
+        /^[a-zA-Z]:[\\/]/.test(clean) ||
+        clean.startsWith('/') ||
+        clean.startsWith('\\\\');
+    if (!isAbs && repoPath && repoPath.trim().length > 0) {
+        const sep = repoPath.includes('/') ? '/' : '\\';
+        const normRepo = repoPath.replace(/[/\\]+$/, '');
+        const normChild = clean.replace(/^(\.[/\\]|[/\\])+/, '');
+        absPath = `${normRepo}${sep}${normChild}`;
+    }
+
+    const forwardSlashed = absPath.replace(/\\/g, '/');
+    const fileUri = forwardSlashed.startsWith('/')
+        ? `file://${forwardSlashed}`
+        : `file:///${forwardSlashed}`;
+    const filename = forwardSlashed.split('/').pop() || 'image.png';
+    const displayLabel = label || filename;
+
+    return `[${displayLabel}](${fileUri})`;
+}
+
+/**
  * Formats a markdown prompt so all image references point to normalized local file URLs (`file:///...`).
  * Appends any turn mediaPaths not already present in the markdown.
  */
-export function formatMarkdownWithLocalFileLinks(markdownText: string, mediaPaths?: string[]): string {
+export function formatMarkdownWithLocalFileLinks(
+    markdownText: string,
+    mediaPaths?: string[],
+    repoPath?: string
+): string {
     if (!markdownText && (!mediaPaths || mediaPaths.length === 0)) return '';
 
     let text = markdownText || '';
@@ -1464,14 +1552,22 @@ export function formatMarkdownWithLocalFileLinks(markdownText: string, mediaPath
     if (mediaPaths && mediaPaths.length > 0) {
         const missing = mediaPaths.filter((p) => p && !text.includes(p));
         if (missing.length > 0) {
-            text = text.trim() + '\n\n' + missing.map((p, idx) => `![Turn Image ${idx + 1}](${p})`).join('\n\n');
+            text =
+                text.trim() +
+                '\n\n' +
+                missing
+                    .map((p, idx) => {
+                        const link = formatIdeClickableFileLink(p, repoPath, `Turn Image ${idx + 1}`);
+                        return `!${link}`;
+                    })
+                    .join('\n\n');
         }
     }
 
     // Replace all image tags with file:/// paths where possible
     return text.replace(/!\[(.*?)\]\((.*?)\)/g, (fullMatch, alt, src) => {
         const cleanSrc = src.trim();
-        const localPath = extractLocalPathFromUri(cleanSrc);
+        const localPath = resolveToAbsolutePath(cleanSrc, repoPath) || extractLocalPathFromUri(cleanSrc);
         if (localPath) {
             const normalizedPath = localPath.replace(/\\/g, '/');
             const fileUrl = normalizedPath.startsWith('/') ? `file://${normalizedPath}` : `file:///${normalizedPath}`;
@@ -1487,11 +1583,28 @@ export function formatMarkdownWithLocalFileLinks(markdownText: string, mediaPath
 export async function copyPromptWithLocalFileLinks(
     markdownText: string,
     mediaPaths?: string[],
-    onSuccess?: (msg: string) => void,
+    repoPathOrOnSuccess?: string | ((msg: string) => void),
+    onSuccessOrOnError?: ((msg: string) => void) | ((err: unknown) => void),
     onError?: (err: unknown) => void
 ): Promise<boolean> {
+    let repoPath: string | undefined;
+    let onSuccess: ((msg: string) => void) | undefined;
+    let actualOnError: ((err: unknown) => void) | undefined = onError;
+
+    if (typeof repoPathOrOnSuccess === 'string') {
+        repoPath = repoPathOrOnSuccess;
+        if (typeof onSuccessOrOnError === 'function') {
+            onSuccess = onSuccessOrOnError as (msg: string) => void;
+        }
+    } else if (typeof repoPathOrOnSuccess === 'function') {
+        onSuccess = repoPathOrOnSuccess;
+        if (typeof onSuccessOrOnError === 'function') {
+            actualOnError = onSuccessOrOnError as (err: unknown) => void;
+        }
+    }
+
     try {
-        const formatted = formatMarkdownWithLocalFileLinks(markdownText, mediaPaths);
+        const formatted = formatMarkdownWithLocalFileLinks(markdownText, mediaPaths, repoPath);
         const ok = await copyToClipboard(formatted);
         if (ok) {
             const msg = 'Copied prompt with local file links to clipboard!';
@@ -1505,7 +1618,7 @@ export async function copyPromptWithLocalFileLinks(
             source: 'clipboard.copyPromptWithLocalFileLinks',
             triggerAction: 'copy_prompt_local_file_links',
         });
-        onError?.(err);
+        actualOnError?.(err);
         return false;
     }
 }

@@ -49,41 +49,40 @@ export function ActionsCell({
 }: ActionsCellProps) {
     return (
         <td className="px-2 py-1 text-right whitespace-nowrap min-w-[150px]">
-            <div className="inline-flex items-center rounded-full overflow-hidden bg-slate-100 dark:bg-[#090611] border border-slate-200/80 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs backdrop-blur-xs">
+            <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-zinc-900/90 backdrop-blur-md border border-slate-200/80 dark:border-zinc-700/60 p-0.5 divide-x divide-slate-200/70 dark:divide-zinc-700/60 shadow-sm">
                 {inst.is_running ? (
-                    <div className="inline-flex items-center rounded-l-full overflow-hidden">
+                    <>
                         <button
                             type="button"
                             disabled={isBusy}
                             onClick={onStop}
                             data-ui-name="instance-stop-btn"
                             data-ui-id={`instance-stop-${inst.config.id}`}
-                            className="px-2 py-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-l-full transition-colors cursor-pointer disabled:opacity-50"
+                            className="flex items-center justify-center h-7 px-2.5 text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white rounded-l-full transition-all duration-150 ease-out active:translate-y-0.5 cursor-pointer disabled:opacity-50"
                             title="Stop Instance"
                         >
                             {currentAction === 'stop' ? (
-                                <RotateCw className="w-3 h-3 animate-spin text-rose-500" />
+                                <RotateCw className="w-3.5 h-3.5 animate-spin text-rose-500" />
                             ) : (
-                                <Square className="w-3 h-3 fill-current" />
+                                <Square className="w-3.5 h-3.5 fill-current" />
                             )}
                         </button>
-                        <div className="w-px h-3.5 bg-slate-300 dark:bg-slate-700/80 my-auto" />
                         <button
                             type="button"
                             disabled={isBusy}
                             onClick={onRestart}
                             data-ui-name="instance-restart-btn"
                             data-ui-id={`instance-restart-${inst.config.id}`}
-                            className="px-2 py-1 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer disabled:opacity-50"
+                            className="flex items-center justify-center h-7 px-2.5 text-amber-600 dark:text-amber-400 hover:bg-amber-400 hover:text-zinc-950 hover:font-bold hover:shadow-[0_2px_0_0_#b45309] active:translate-y-0.5 active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50"
                             title="Restart Instance on Current Account"
                         >
                             {currentAction === 'restart' ? (
-                                <RotateCw className="w-3 h-3 animate-spin text-amber-500" />
+                                <RotateCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
                             ) : (
-                                <RotateCcw className="w-3 h-3" />
+                                <RotateCcw className="w-3.5 h-3.5" />
                             )}
                         </button>
-                    </div>
+                    </>
                 ) : (
                     <button
                         type="button"
@@ -91,13 +90,13 @@ export function ActionsCell({
                         onClick={onLaunch}
                         data-ui-name="instance-launch-btn"
                         data-ui-id={`instance-launch-${inst.config.id}`}
-                        className="px-2 py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#40285e] rounded-l-full transition-colors cursor-pointer disabled:opacity-50"
+                        className="flex items-center justify-center h-7 px-2.5 text-teal-600 dark:text-teal-400 hover:bg-emerald-600 hover:text-white rounded-l-full transition-all duration-150 ease-out active:translate-y-0.5 cursor-pointer disabled:opacity-50"
                         title="Launch Instance"
                     >
                         {currentAction === 'launch' ? (
-                            <RotateCw className="w-3 h-3 animate-spin text-teal-500" />
+                            <RotateCw className="w-3.5 h-3.5 animate-spin text-teal-500" />
                         ) : (
-                            <Play className="w-3 h-3 fill-current" />
+                            <Play className="w-3.5 h-3.5 fill-current" />
                         )}
                     </button>
                 )}
@@ -108,13 +107,13 @@ export function ActionsCell({
                     onClick={onSwitch}
                     data-ui-name="instance-switch-btn"
                     data-ui-id={`instance-switch-${inst.config.id}`}
-                    className="px-2 py-1 text-sky-600 dark:text-sky-400 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50"
+                    className="flex items-center justify-center h-7 px-2.5 text-sky-600 dark:text-sky-400 hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-zinc-950 hover:font-bold hover:shadow-[0_2px_0_0_#a16207] active:translate-y-0.5 active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50"
                     title="Switch Account"
                 >
                     {currentAction === 'switch' ? (
-                        <RotateCw className="w-3 h-3 animate-spin text-sky-500" />
+                        <RotateCw className="w-3.5 h-3.5 animate-spin text-sky-500" />
                     ) : (
-                        <ArrowLeftRight className="w-3 h-3" />
+                        <ArrowLeftRight className="w-3.5 h-3.5" />
                     )}
                 </button>
 
@@ -124,13 +123,13 @@ export function ActionsCell({
                     onClick={onFastForward}
                     data-ui-name="instance-fastforward-btn"
                     data-ui-id={`instance-fastforward-${inst.config.id}`}
-                    className="px-2 py-1 text-amber-600 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50"
+                    className="flex items-center justify-center h-7 px-2.5 text-amber-600 dark:text-amber-400 hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-zinc-950 hover:font-bold hover:shadow-[0_2px_0_0_#a16207] active:translate-y-0.5 active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50"
                     title="Fast Forward to Best Candidate"
                 >
                     {currentAction === 'fast-forward' ? (
-                        <RotateCw className="w-3 h-3 animate-spin text-amber-500" />
+                        <RotateCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
                     ) : (
-                        <FastForward className="w-3 h-3 fill-current" />
+                        <FastForward className="w-3.5 h-3.5 fill-current" />
                     )}
                 </button>
 
@@ -141,10 +140,10 @@ export function ActionsCell({
                     onClick={onOpenPromptTree}
                     data-ui-name="instance-prompts-btn"
                     data-ui-id={`instance-prompts-${inst.config.id}`}
-                    className="px-2 py-1 text-cyan-600 dark:text-cyan-400 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50"
+                    className="flex items-center justify-center h-7 px-2.5 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-600 hover:text-white active:translate-y-0.5 transition-all duration-150 ease-out cursor-pointer disabled:opacity-50"
                     title="Prompts & History"
                 >
-                    <Layers className="w-3 h-3" />
+                    <Layers className="w-3.5 h-3.5" />
                 </button>
 
                 {/* Explicit Audit Trail Button */}
@@ -155,10 +154,10 @@ export function ActionsCell({
                         onClick={onAudit}
                         data-ui-name="instance-audit-btn"
                         data-ui-id={`instance-audit-${inst.config.id}`}
-                        className="px-2 py-1 text-amber-600 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50"
+                        className="flex items-center justify-center h-7 px-2.5 text-amber-600 dark:text-amber-400 hover:bg-amber-400 hover:text-zinc-950 hover:font-bold hover:shadow-[0_2px_0_0_#b45309] active:translate-y-0.5 active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50"
                         title="Audit Trail & Switch History"
                     >
-                        <History className="w-3 h-3" />
+                        <History className="w-3.5 h-3.5" />
                     </button>
                 )}
 
@@ -172,12 +171,12 @@ export function ActionsCell({
                     data-ui-name="instance-more-btn"
                     data-ui-id={`instance-more-${inst.config.id}`}
                     className={cn(
-                        'px-2 py-1 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#40285e] rounded-r-full transition-colors cursor-pointer',
+                        'flex items-center justify-center h-7 px-2 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#40285e] rounded-r-full active:translate-y-0.5 transition-all duration-150 ease-out cursor-pointer disabled:opacity-50',
                         isMoreOpen && 'bg-slate-200 dark:bg-[#40285e]'
                     )}
                     title="More Actions (Prompts, Audit, Sync, Settings, Clone, Delete)"
                 >
-                    <MoreHorizontal className="w-3 h-3" />
+                    <MoreHorizontal className="w-3.5 h-3.5" />
                 </button>
             </div>
         </td>

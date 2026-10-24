@@ -226,31 +226,38 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
             false
         };
 
-        let mut agy_sent = spawn_or_replace_prompt_via_agy(&prompt, true);
-        if let Err(ref spawn_err) = agy_sent {
-            crate::modules::logger::log_warn(&format!(
-                "[RepoDB] agy dispatch failed for prompt '{}': {spawn_err}; attempting direct DevTools CDP fallback",
-                prompt.id
-            ));
-            let clean_prompt = super::text_utils::extract_clean_user_prompt(&prompt.prompt_content);
-            let fallback_prompt = if clean_prompt.trim().is_empty() {
-                prompt.prompt_content.trim()
-            } else {
-                clean_prompt.as_str()
-            };
-            if crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
+        let clean_prompt = super::text_utils::extract_clean_user_prompt(&prompt.prompt_content);
+        let fallback_prompt = if clean_prompt.trim().is_empty() {
+            prompt.prompt_content.trim()
+        } else {
+            clean_prompt.as_str()
+        };
+        let target_is_new = prompt.session_id.as_deref().map(str::trim) == Some("new");
+
+        let (is_running, _, pids) =
+            crate::modules::instance::is_instance_process_running_smart(&target_inst);
+
+        let mut agy_sent: Result<(), String> = Err("not_attempted".to_string());
+        if is_running {
+            crate::modules::instance::focus_running_instance(&pids, Some(&prompt.repo_path));
+            if crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance_with_mode(
                 &target_inst,
                 fallback_prompt,
                 false,
+                target_is_new,
             )
             .is_ok()
             {
                 crate::modules::logger::log_info(&format!(
-                    "[RepoDB] CDP prompt submission fallback succeeded for prompt '{}' on instance '{}'",
-                    prompt.id, target_inst
+                    "[RepoDB] Direct CDP prompt submission succeeded for prompt '{}' on instance '{}' (new_chat: {})",
+                    prompt.id, target_inst, target_is_new
                 ));
                 agy_sent = Ok(());
             }
+        }
+
+        if agy_sent.is_err() {
+            agy_sent = spawn_or_replace_prompt_via_agy(&prompt, true);
         }
         // The resume file is only a hint. A written file with a session id is not
         // proof the IDE continued the prompt. Leave the row backed_up so the
@@ -461,31 +468,38 @@ fn dispatch_one_prompt(
         false
     };
 
-    let mut agy_sent = spawn_or_replace_prompt_via_agy(prompt, true);
-    if let Err(ref spawn_err) = agy_sent {
-        crate::modules::logger::log_warn(&format!(
-            "[RepoDB] agy dispatch failed for prompt '{}': {spawn_err}; attempting direct DevTools CDP fallback",
-            prompt.id
-        ));
-        let clean_prompt = super::text_utils::extract_clean_user_prompt(&prompt.prompt_content);
-        let fallback_prompt = if clean_prompt.trim().is_empty() {
-            prompt.prompt_content.trim()
-        } else {
-            clean_prompt.as_str()
-        };
-        if crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
+    let clean_prompt = super::text_utils::extract_clean_user_prompt(&prompt.prompt_content);
+    let fallback_prompt = if clean_prompt.trim().is_empty() {
+        prompt.prompt_content.trim()
+    } else {
+        clean_prompt.as_str()
+    };
+    let target_is_new = prompt.session_id.as_deref().map(str::trim) == Some("new");
+
+    let (is_running, _, pids) =
+        crate::modules::instance::is_instance_process_running_smart(target_inst);
+
+    let mut agy_sent: Result<(), String> = Err("not_attempted".to_string());
+    if is_running {
+        crate::modules::instance::focus_running_instance(&pids, Some(&prompt.repo_path));
+        if crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance_with_mode(
             target_inst,
             fallback_prompt,
             false,
+            target_is_new,
         )
         .is_ok()
         {
             crate::modules::logger::log_info(&format!(
-                "[RepoDB] CDP prompt submission fallback succeeded for prompt '{}' on instance '{}'",
-                prompt.id, target_inst
+                "[RepoDB] Direct CDP prompt submission succeeded for prompt '{}' on instance '{}' (new_chat: {})",
+                prompt.id, target_inst, target_is_new
             ));
             agy_sent = Ok(());
         }
+    }
+
+    if agy_sent.is_err() {
+        agy_sent = spawn_or_replace_prompt_via_agy(prompt, true);
     }
     // The resume file is only a hint. A written file with a session id is not
     // proof the IDE continued the prompt. Leave the row backed_up so the

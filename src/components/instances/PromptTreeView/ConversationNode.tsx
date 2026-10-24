@@ -165,12 +165,12 @@ export function ConversationNode({
                     });
                 }}
                 className={cn(
-                    'group flex items-center justify-between rounded-md px-1.5 py-0.5 text-xs cursor-pointer transition-colors duration-150 relative outline-none focus:outline-none focus-visible:!outline-none border-0',
+                    'group flex items-center justify-between rounded-md px-1.5 py-0.5 text-xs leading-snug cursor-pointer transition-colors duration-150 relative outline-none focus:outline-none focus-visible:!outline-none border border-transparent',
                     isSelected && selectedTurnNumber === null
-                        ? 'bg-gradient-to-r from-violet-600/30 to-purple-600/20 text-white font-medium'
+                        ? 'bg-gradient-to-r from-violet-600/30 to-purple-600/20 text-white font-medium border-violet-500/30'
                         : isSelected
-                          ? 'bg-purple-500/15 text-purple-300 font-medium'
-                          : 'text-slate-600 dark:text-zinc-300 hover:bg-slate-100/80 dark:hover:bg-[#181126]/70'
+                          ? 'bg-purple-500/15 text-purple-300 font-medium border-purple-500/30'
+                          : 'text-slate-600 dark:text-zinc-300 hover:bg-slate-100/80 dark:hover:bg-zinc-800/60 hover:border-transparent'
                 )}
                 title={`${conv.title || 'Conversation'} · ${conv.step_count || 1} steps · Click to view (F2 to rename)`}
             >
@@ -287,7 +287,7 @@ export function ConversationNode({
                         if (isRunning) {
                             return (
                                 <span className={cn(
-                                    "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-bold font-mono border animate-pulse",
+                                    "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-bold font-mono border overflow-hidden animate-pulse",
                                     isSelected && selectedTurnNumber === null
                                         ? "bg-emerald-400 text-emerald-950 border-emerald-300"
                                         : "bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border-emerald-500/40"
@@ -344,7 +344,7 @@ export function ConversationNode({
 
             {/* Tier 3: Indented Prompt Subtree */}
             {hasPrompts && isExpanded && conv.prompts && (
-                <div className="border-l-2 border-slate-300/60 dark:border-purple-900/50 ml-5 pl-3 space-y-1 mt-1">
+                <div className="border-l border-slate-300/60 dark:border-purple-900/50 ml-2.5 pl-1.5 space-y-0.5 mt-0.5">
                     {conv.prompts.map((turn, tIdx) => {
                         const isLastTurn = tIdx === conv.prompts!.length - 1;
                         const hasImages = turn.media_paths && turn.media_paths.length > 0;
@@ -405,10 +405,10 @@ export function ConversationNode({
                                     });
                                 }}
                                 className={cn(
-                                    "group/turn flex items-center justify-between rounded-md px-1.5 py-1 text-xs cursor-pointer transition-colors outline-none focus-visible:!outline-none border-l-2",
+                                    "group/turn flex items-center justify-between rounded-md px-1.5 py-0.5 text-xs leading-snug cursor-pointer transition-colors outline-none focus-visible:!outline-none border-l-2",
                                     isTurnActive
                                         ? "bg-sky-500/10 border-sky-500 text-sky-400 font-medium"
-                                        : "border-transparent hover:bg-slate-100 dark:hover:bg-[#1a1228]"
+                                        : "border-transparent hover:bg-slate-100/80 dark:hover:bg-zinc-800/60"
                                 )}
                                 title={`Turn ${turn.turn_number} (${turn.status}) · Click to inspect prompt`}
                             >

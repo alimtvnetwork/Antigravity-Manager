@@ -23,6 +23,9 @@ pub(crate) fn dispatch_errors_domain(args: &[String]) {
         "list" | "ls" => {
             cmd_errors_list(&args[1..]);
         }
+        "inspect" | "show" | "view" | "get" => {
+            cmd_errors_inspect(&args[1..]);
+        }
         "clear" | "clean" | "purge" => {
             cmd_errors_clear(&args[1..]);
         }
@@ -36,9 +39,17 @@ pub(crate) fn dispatch_errors_domain(args: &[String]) {
             // First argument is a flag (e.g. `agm errors --limit 50` or `agm errors --json`)
             cmd_errors_list(args);
         }
+        candidate_id
+            if error_db::get_error_by_id(candidate_id)
+                .ok()
+                .flatten()
+                .is_some() =>
+        {
+            cmd_errors_inspect(args);
+        }
         _ => {
-            eprintln!("[WARN] Unknown errors subcommand: '{first}'");
-            print_errors_help();
+            // Treat as search query in error list
+            cmd_errors_list(args);
         }
     }
 }
@@ -46,8 +57,10 @@ pub(crate) fn dispatch_errors_domain(args: &[String]) {
 fn print_errors_help() {
     println!("AGM Speed Error Database & Self-Healing Diagnostics:");
     println!("  agm errors [list] [--limit <N>] [--severity <S>] [--json]");
+    println!("  agm errors inspect <id> [--json]");
     println!("  agm errors clear");
     println!("  agm errors fix [--dry-run] [--json]");
+    println!("  agm errors count [--json]");
     println!("\nDescription:");
     println!(
         "  Inspect, clear, and heal errors tracked in SQLite speed error database (errors.db)."
@@ -58,6 +71,7 @@ fn print_errors_help() {
     println!("  file permissions, corrupted configurations, and database WAL anomalies.");
     println!("\nCommands:");
     println!("  list, ls            Display recent errors in a formatted table or JSON (default)");
+    println!("  inspect, show       Inspect full error record with stack trace and metadata by ID");
     println!("  clear, clean        Purge error history from errors.db");
     println!("  fix, heal           Automated diagnostic & self-healing engine (stale locks, permissions, configs)");
     println!("  count               Display total error counts by severity");
@@ -73,6 +87,9 @@ fn print_errors_help() {
     println!("  agm errors                          # View recent errors in table format");
     println!("  agm errors list --limit 50          # View up to 50 recent errors");
     println!("  agm errors list --severity error    # View only error-level entries");
+    println!(
+        "  agm errors inspect <id>             # View full stack trace and metadata for an error"
+    );
     println!(
         "  agm errors fix                      # Run automated self-healing & repair common issues"
     );
@@ -191,6 +208,76 @@ pub(crate) fn cmd_errors_list(args: &[String]) {
         }
         Err(e) => {
             eprintln!("[ERROR] Failed to query errors from errors.db: {e}");
+        }
+    }
+}
+
+pub(crate) fn cmd_errors_inspect(args: &[String]) {
+    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+    let id_opt = args.iter().find(|a| !a.starts_with('-')).cloned();
+
+    let id = match id_opt {
+        Some(i) => i,
+        None => {
+            eprintln!("[ERROR] Missing required error record ID for inspect command.");
+            eprintln!("  Usage: agm errors inspect <id> [--json]");
+            return;
+        }
+    };
+
+    match error_db::get_error_by_id(&id) {
+        Ok(Some(record)) => {
+            if is_json {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&record).unwrap_or_else(|_| "{}".to_string())
+                );
+                return;
+            }
+
+            println!(
+                "================================================================================"
+            );
+            println!("  AGM Error Record Inspector");
+            println!(
+                "================================================================================"
+            );
+            println!("  ID:          {}", record.id);
+            println!("  Code:        {}", record.error_code);
+            println!("  Severity:    {}", record.severity.to_uppercase());
+            println!("  Timestamp:   {}", format_timestamp(record.created_at));
+            println!(
+                "  Source:      {}",
+                record.source.as_deref().unwrap_or("N/A")
+            );
+            println!(
+                "  Trigger:     {}",
+                record.trigger_action.as_deref().unwrap_or("N/A")
+            );
+            println!("  Message:     {}", record.message);
+            println!(
+                "--------------------------------------------------------------------------------"
+            );
+            if let Some(ref st) = record.stack_trace {
+                println!("  Stack Trace:\n{}", st);
+            } else {
+                println!("  Stack Trace: None");
+            }
+            if let Some(ref meta) = record.metadata_json {
+                println!("--------------------------------------------------------------------------------");
+                println!("  Metadata:\n{}", meta);
+            }
+            println!("================================================================================\n");
+        }
+        Ok(None) => {
+            if is_json {
+                println!("{}", serde_json::json!({ "error": "not_found", "id": id }));
+            } else {
+                eprintln!("[WARN] No error record found in errors.db matching ID: '{id}'");
+            }
+        }
+        Err(e) => {
+            eprintln!("[ERROR] Failed to query error record from errors.db: {e}");
         }
     }
 }

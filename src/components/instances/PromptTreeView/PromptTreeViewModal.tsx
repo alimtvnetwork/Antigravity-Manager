@@ -973,19 +973,6 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                     </div>
                 )}
 
-                {/* Notification Banner */}
-                {actionMsg && (
-                    <div className="bg-emerald-500/10 border-b border-emerald-500/20 px-6 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-300 flex items-center gap-2 shrink-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        {actionMsg}
-                    </div>
-                )}
-                {error && (
-                    <div className="bg-rose-500/10 border-b border-rose-500/20 px-6 py-2 text-xs font-medium text-rose-700 dark:text-rose-300 shrink-0">
-                        {error}
-                    </div>
-                )}
-
                 {/* Main Split View */}
                 <div className="flex flex-1 overflow-hidden relative">
                     {!isTreeCollapsed ? (
@@ -1369,9 +1356,25 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             />
 
             {isAutoSyncing && (
-                <div className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-xs text-blue-600 dark:text-cyan-400">
+                <div className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs text-blue-600 dark:text-cyan-400 backdrop-blur-md shadow-lg pointer-events-none z-50">
                     <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                     Syncing...
+                </div>
+            )}
+
+            {/* Non-Displacing Absolute Floating Action Toast */}
+            {actionMsg && (
+                <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/95 dark:bg-[#171025]/95 backdrop-blur-md border border-slate-700/60 dark:border-purple-500/40 text-xs font-medium text-slate-200 dark:text-purple-200 shadow-2xl pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-150">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                    <span>{actionMsg}</span>
+                </div>
+            )}
+
+            {/* Non-Displacing Absolute Floating Error Toast */}
+            {error && (
+                <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-950/95 backdrop-blur-md border border-rose-500/50 text-xs font-medium text-rose-200 shadow-2xl pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-150">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+                    <span>{error}</span>
                 </div>
             )}
         </div>

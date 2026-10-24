@@ -493,7 +493,7 @@ export function usePromptTreePromptActions({
                 conversationTargetMode,
                 conv?.conversation_id,
                 Boolean(conv?.is_running)
-            );
+            ) || (conversationTargetMode === 'current' ? 'current' : undefined);
             if (conversationTargetMode === 'new' && newConversationTitle?.trim()) {
                 promptContent = `# ${newConversationTitle.trim()}\n\n${promptContent}`;
             }
@@ -739,7 +739,7 @@ ${activePromptText}
                 conversationTargetMode,
                 conv.conversation_id,
                 Boolean(conv.is_running)
-            );
+            ) || (conversationTargetMode === 'current' ? 'current' : undefined);
             if (conversationTargetMode === 'new' && newConversationTitle?.trim()) {
                 promptContent = `# ${newConversationTitle.trim()}\n\n${promptContent}`;
             }

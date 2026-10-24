@@ -478,13 +478,69 @@ const CANCEL_ACTIVE_TASK_JS: &str = r#"(() => {
     return 'not_running';
 })()"#;
 
-fn submit_prompt_on_ws(ws_url: &str, prompt_text: &str, cancel_running_first: bool) -> bool {
+const NEW_CHAT_JS: &str = r#"(() => {
+    const newChatSelectors = [
+        'button[aria-label="New Chat"]',
+        'button[aria-label="New conversation"]',
+        'button[aria-label="Start new chat"]',
+        'button[title*="New Chat"]',
+        'button[title*="New conversation"]',
+        'button.codicon-plus',
+        'button.codicon-new-chat',
+        'a[aria-label="New Chat"]',
+        'div[aria-label="New Chat"]',
+        '[data-command="workbench.action.chat.newChat"]',
+    ];
+    for (const sel of newChatSelectors) {
+        const btn = document.querySelector(sel);
+        if (btn && !btn.disabled) {
+            btn.click();
+            return 'clicked_new_chat';
+        }
+    }
+    return 'not_found';
+})()"#;
+
+fn submit_prompt_on_ws(
+    ws_url: &str,
+    prompt_text: &str,
+    cancel_running_first: bool,
+    open_new_chat_first: bool,
+) -> bool {
     let mut stream = match connect_ws_stream(ws_url) {
         Some(s) => s,
         None => return false,
     };
 
     let mut msg_id = 1;
+
+    // When open_new_chat_first == true (New Conversation mode):
+    // Trigger "New Chat" in the Antigravity IDE before typing
+    if open_new_chat_first {
+        if let Some(new_chat_res) = cdp_send_and_recv(
+            &mut stream,
+            msg_id,
+            "Runtime.evaluate",
+            serde_json::json!({
+                "expression": NEW_CHAT_JS,
+                "returnByValue": true
+            }),
+        ) {
+            let res_val = new_chat_res
+                .get("result")
+                .and_then(|r| r.get("result"))
+                .and_then(|r| r.get("value"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            if res_val == "clicked_new_chat" {
+                crate::modules::logger::log_info(
+                    "[Instance] Triggered New Chat via CDP before dispatching prompt",
+                );
+                std::thread::sleep(Duration::from_millis(200));
+            }
+        }
+        msg_id += 1;
+    }
 
     // When cancel_running_first == true (Send mode):
     // Execute JavaScript in the Antigravity IDE webview to cancel the active task before typing
@@ -623,10 +679,12 @@ fn submit_prompt_on_ws(ws_url: &str, prompt_text: &str, cancel_running_first: bo
 /// Submit a prompt directly into the running Antigravity IDE's conversation composer
 /// via CDP (`Input.insertText` + clicking `button[aria-label="Send message"]`).
 /// When `cancel_running_first` is true, cancels any active task before typing.
-pub fn submit_prompt_via_cdp_for_instance(
+/// When `open_new_chat_first` is true, triggers New Chat before typing.
+pub fn submit_prompt_via_cdp_for_instance_with_mode(
     instance_id: &str,
     prompt_text: &str,
     cancel_running_first: bool,
+    open_new_chat_first: bool,
 ) -> Result<(), String> {
     let trimmed = prompt_text.trim();
     if trimmed.is_empty() {
@@ -664,11 +722,12 @@ pub fn submit_prompt_via_cdp_for_instance(
 
     for port in ports {
         for ws_url in fetch_page_ws_urls(port) {
-            if submit_prompt_on_ws(&ws_url, trimmed, cancel_running_first) {
+            if submit_prompt_on_ws(&ws_url, trimmed, cancel_running_first, open_new_chat_first) {
                 crate::modules::logger::log_info(&format!(
-                    "[Instance] Submitted prompt ({} chars, cancel_first: {}) into live Antigravity conversation via CDP for instance '{}'",
+                    "[Instance] Submitted prompt ({} chars, cancel_first: {}, new_chat: {}) into live Antigravity conversation via CDP for instance '{}'",
                     trimmed.len(),
                     cancel_running_first,
+                    open_new_chat_first,
                     instance_id
                 ));
                 return Ok(());
@@ -679,6 +738,20 @@ pub fn submit_prompt_via_cdp_for_instance(
         "Failed to submit prompt via CDP for instance '{}': DevTools page targets did not accept input",
         instance_id
     ))
+}
+
+/// Convenience wrapper for submit_prompt_via_cdp_for_instance_with_mode defaulting to current chat.
+pub fn submit_prompt_via_cdp_for_instance(
+    instance_id: &str,
+    prompt_text: &str,
+    cancel_running_first: bool,
+) -> Result<(), String> {
+    submit_prompt_via_cdp_for_instance_with_mode(
+        instance_id,
+        prompt_text,
+        cancel_running_first,
+        false,
+    )
 }
 
 /// Cancel any currently active task/generating turn via CDP by clicking

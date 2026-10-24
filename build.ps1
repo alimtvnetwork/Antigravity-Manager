@@ -313,9 +313,10 @@ if (-not (Test-Path $nodeModulesDir)) {
 }
 
 # 6. Configure compiler parallelization & cache optimizations
-$cores = [System.Environment]::ProcessorCount
+$cores = [math]::Min(6, [System.Environment]::ProcessorCount)
 $env:CARGO_BUILD_JOBS = $cores
-Write-Step "Configured worker threads: $cores"
+$env:RUST_MIN_STACK = "16777216"
+Write-Step "Configured worker threads: $cores (RUST_MIN_STACK: 16MB)"
 
 $hasSccache = [bool](Get-Command sccache -ErrorAction SilentlyContinue)
 if ($hasSccache) {
@@ -323,11 +324,8 @@ if ($hasSccache) {
     Write-Success "Shared compiler cache (sccache) enabled."
 }
 
-$hasLld = [bool](Get-Command lld-link -ErrorAction SilentlyContinue)
-if ($hasLld -and -not $env:RUSTFLAGS) {
-    $env:RUSTFLAGS = "-C link-arg=-fuse-ld=lld"
-    Write-Success "Fast linker (lld-link) enabled."
-}
+# Fast linker (lld-link) is optional and disabled by default on MSVC to prevent ICE
+# if ($hasLld -and -not $env:RUSTFLAGS) { ... }
 
 # 7. Execute Compilation
 Set-Location $ScriptDir

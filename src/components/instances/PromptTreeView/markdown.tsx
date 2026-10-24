@@ -1,12 +1,51 @@
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useState, useMemo, useEffect } from 'react';
 import type React from 'react';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, ExternalLink } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { TruncatedContextCallout } from './TruncatedContextCallout';
 import { formatPromptForMarkdown } from './formatters';
 import { resolveImageSrc, extractLocalPathFromUri } from './clipboard';
 import { useErrorStore } from '../../../stores/error-store';
+
+/**
+ * Opens a local file path or file:// URI directly in the user's IDE or OS default application
+ * using the Tauri opener API.
+ */
+export async function openFileInIde(pathOrUri: string): Promise<void> {
+    const raw = pathOrUri.trim().replace(/^<|>$/g, '');
+    let clean = raw;
+    if (clean.startsWith('file:///')) {
+        if (/^file:\/\/\/[a-zA-Z]:[\\/]/.test(clean)) {
+            clean = clean.slice(8);
+        } else {
+            clean = clean.slice(7);
+            if (/^\/[a-zA-Z]:[\\/]/.test(clean)) {
+                clean = clean.slice(1);
+            }
+        }
+    } else if (clean.startsWith('file://')) {
+        clean = clean.slice(7);
+        if (/^\/[a-zA-Z]:[\\/]/.test(clean)) {
+            clean = clean.slice(1);
+        }
+    }
+    try {
+        clean = decodeURIComponent(clean);
+    } catch {
+        // Keep raw clean
+    }
+
+    try {
+        const { openPath } = await import('@tauri-apps/plugin-opener');
+        await openPath(clean);
+    } catch (err: unknown) {
+        useErrorStore.getState().trackWarning(err, {
+            source: 'markdown.openFileInIde',
+            triggerAction: 'open_path',
+        });
+    }
+}
 
 // Hoisted static regular expression with explicit character exclusions to eliminate catastrophic backtracking
 const TOKEN_REGEX =
@@ -88,10 +127,24 @@ export function MarkdownImage({
     if (hasError) {
         return (
             <span
-                onClick={() => onClick?.(currentSrc, alt)}
+                onClick={() => {
+                    const localPath = extractLocalPathFromUri(src) || src;
+                    const clean = localPath.replace(/^[/\\]+([a-zA-Z]:)/, '$1');
+                    if (/^[a-zA-Z]:[\\/]/.test(clean) || clean.startsWith('/') || clean.startsWith('\\\\')) {
+                        void import('@tauri-apps/plugin-opener')
+                            .then(({ openPath }) => openPath(clean))
+                            .catch((err) => {
+                                useErrorStore.getState().trackWarning(err, {
+                                    source: 'MarkdownImage.hasError.openPath',
+                                    triggerAction: 'open_image_fallback',
+                                });
+                            });
+                    }
+                    onClick?.(currentSrc, alt);
+                }}
                 onContextMenu={(e) => onContextMenu?.(e, currentSrc, alt)}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 my-1 rounded-md text-[11px] font-mono bg-slate-100/90 dark:bg-[#120a1f]/90 text-amber-600 dark:text-amber-400 border border-amber-500/30 backdrop-blur-md shadow-2xs cursor-pointer hover:bg-amber-500/10 transition-colors"
-                title={`Image: ${src} (Preview Unavailable - Click to inspect)`}
+                title={`Image: ${src} (Click to open in IDE or inspect)`}
             >
                 <span>📷</span>
                 <span className="font-semibold">Image (Preview Unavailable)</span>
@@ -101,20 +154,48 @@ export function MarkdownImage({
     }
 
     return (
-        <img
-            src={currentSrc}
-            alt={alt || ''}
-            onClick={() => onClick?.(currentSrc, alt)}
-            onContextMenu={(e) => {
-                if (onContextMenu) {
-                    e.preventDefault();
+        <span className="relative inline-block group my-1">
+            <img
+                src={currentSrc}
+                alt={alt || ''}
+                onClick={() => onClick?.(currentSrc, alt)}
+                onContextMenu={(e) => {
+                    if (onContextMenu) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onContextMenu(e, currentSrc, alt);
+                    }
+                }}
+                className={className}
+                onError={handleImgError}
+            />
+            {/* Quick Open in IDE / OS Viewer floating button */}
+            <button
+                type="button"
+                onClick={(e) => {
                     e.stopPropagation();
-                    onContextMenu(e, currentSrc, alt);
-                }
-            }}
-            className={className}
-            onError={handleImgError}
-        />
+                    const localPath = extractLocalPathFromUri(src) || src;
+                    const clean = localPath.replace(/^[/\\]+([a-zA-Z]:)/, '$1');
+                    if (/^[a-zA-Z]:[\\/]/.test(clean) || clean.startsWith('/') || clean.startsWith('\\\\')) {
+                        void import('@tauri-apps/plugin-opener')
+                            .then(({ openPath }) => openPath(clean))
+                            .catch((err) => {
+                                useErrorStore.getState().trackWarning(err, {
+                                    source: 'MarkdownImage.openInIde',
+                                    triggerAction: 'open_image_file',
+                                });
+                            });
+                    } else if (onClick) {
+                        onClick(currentSrc, alt);
+                    }
+                }}
+                className="absolute top-1 right-1 hidden group-hover:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-sans font-medium bg-black/80 text-white backdrop-blur-md border border-white/20 shadow-xs cursor-pointer hover:bg-black/95 transition-all select-none"
+                title={`Open in IDE / OS Viewer: ${src}`}
+            >
+                <ExternalLink className="w-2.5 h-2.5" />
+                <span>Open</span>
+            </button>
+        </span>
     );
 }
 
@@ -183,17 +264,52 @@ function parseInlineMarkdown(
                 />
             );
         } else if (linkUrl !== undefined) {
-            rawNodes.push(
-                <a
-                    key={`link-${match.index}`}
-                    href={linkUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 dark:text-cyan-400 hover:underline"
-                >
-                    {linkText || linkUrl}
-                </a>
-            );
+            const isFileLink = linkUrl.startsWith('file:') || /^[a-zA-Z]:[\\/]/.test(linkUrl) || (linkUrl.startsWith('/') && !linkUrl.startsWith('//'));
+            if (isFileLink) {
+                const isImage = Boolean(linkUrl.match(/\.(png|jpe?g|webp|gif|svg)(?:\?.*)?$/i));
+                rawNodes.push(
+                    <button
+                        key={`link-${match.index}`}
+                        type="button"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const clean = (extractLocalPathFromUri(linkUrl) || linkUrl)
+                                .replace(/^file:\/\/\/?/i, '')
+                                .replace(/^[/\\]+([a-zA-Z]:)/, '$1');
+                            if (isImage && onImageClick) {
+                                onImageClick(clean, linkText || 'Image');
+                            } else {
+                                void import('@tauri-apps/plugin-opener')
+                                    .then(({ openPath }) => openPath(clean))
+                                    .catch((err) => {
+                                        useErrorStore.getState().trackWarning(err, {
+                                            source: 'markdown.handleFileLinkClick',
+                                            triggerAction: 'open_file_in_ide',
+                                        });
+                                    });
+                            }
+                        }}
+                        className="inline-flex items-center gap-1 my-0.5 px-2 py-0.5 rounded text-[11px] font-mono text-cyan-600 dark:text-cyan-400 bg-cyan-50/70 dark:bg-cyan-950/40 border border-cyan-200/60 dark:border-cyan-800/40 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 transition-colors cursor-pointer select-text"
+                        title={`Click to open in IDE or OS Viewer: ${linkUrl}`}
+                    >
+                        <span>{isImage ? '🖼️' : '📄'}</span>
+                        <span className="underline decoration-cyan-500/40">{linkText || linkUrl}</span>
+                    </button>
+                );
+            } else {
+                rawNodes.push(
+                    <a
+                        key={`link-${match.index}`}
+                        href={linkUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-500 dark:text-cyan-400 hover:underline"
+                    >
+                        {linkText || linkUrl}
+                    </a>
+                );
+            }
         } else if (inlineCode !== undefined) {
             rawNodes.push(
                 <code
@@ -510,8 +626,9 @@ export function RichMarkdownRenderer({
         if (singleImgMatch) {
             const imgSrc = singleImgMatch[2];
             const imgAlt = singleImgMatch[1] || '';
+            const isLocal = imgSrc.startsWith('file:') || /^[a-zA-Z]:[\\/]/.test(imgSrc);
             elements.push(
-                <div key={`imgline-${i}`} className="my-2">
+                <div key={`imgline-${i}`} className="my-2 group relative inline-block max-w-full">
                     <MarkdownImage
                         src={imgSrc}
                         alt={imgAlt}
@@ -519,7 +636,23 @@ export function RichMarkdownRenderer({
                         onContextMenu={onImageContextMenu}
                         className={`max-h-60 max-w-full rounded-md border border-slate-200 dark:border-[#40285e] object-contain bg-slate-100 dark:bg-[#090611] ${onImageClick ? 'cursor-pointer hover:opacity-90 transition-opacity' : ''}`}
                     />
-                    {imgAlt && <div className="text-[10px] text-slate-400 mt-0.5">{imgAlt}</div>}
+                    <div className="flex items-center justify-between gap-2 mt-0.5">
+                        {imgAlt && <div className="text-[10px] text-slate-400">{imgAlt}</div>}
+                        {isLocal && (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    void openFileInIde(imgSrc);
+                                }}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 border border-cyan-300/40 dark:border-cyan-800/40 transition-colors cursor-pointer"
+                                title="Open in IDE / OS Viewer"
+                            >
+                                <ExternalLink className="w-3 h-3" />
+                                <span>Open in IDE</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
             );
             continue;
