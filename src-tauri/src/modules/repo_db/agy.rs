@@ -1414,7 +1414,7 @@ mod agy_flag_tests {
             Some("bc221407-c445-415a-9034-b1179a550a79")
         );
         assert_eq!(agy_conversation_id("new"), None);
-    assert_eq!(agy_conversation_id("p-12345678"), None);
+        assert_eq!(agy_conversation_id("p-12345678"), None);
         assert_eq!(agy_conversation_id("queued-12345678"), None);
         assert_eq!(agy_conversation_id("repo__default"), None);
         assert_eq!(agy_conversation_id("C:/repo"), None);
