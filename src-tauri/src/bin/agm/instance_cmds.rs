@@ -51,6 +51,52 @@ pub(crate) fn dispatch_instance_domain(subcommand: &str, args: &[String]) {
         "delete" | "rm" => cmd_instances_delete(args),
         "logs" | "log" => cmd_instances_logs(args),
         "prompt" => crate::prompt_dispatch::cmd_prompt_dispatch(args),
+        "count" => {
+            let mut forward_args = vec!["count".to_string()];
+            forward_args.extend(args.to_vec());
+            crate::instance_dispatch::cmd_instances(&forward_args);
+        }
+        "copy-projects" | "copy_projects" => {
+            let mut forward_args = vec!["copy-projects".to_string()];
+            forward_args.extend(args.to_vec());
+            crate::instance_dispatch::cmd_instances(&forward_args);
+        }
+        "copy-settings" | "copy_settings" | "sync-settings" | "sync_settings" => {
+            let mut forward_args = vec!["sync-settings".to_string()];
+            forward_args.extend(args.to_vec());
+            crate::instance_dispatch::cmd_instances(&forward_args);
+        }
+        "settings" | "setting" => {
+            let mut forward_args = vec!["settings".to_string()];
+            forward_args.extend(args.to_vec());
+            crate::instance_dispatch::cmd_instances(&forward_args);
+        }
+        "theme" | "profile-theme" => {
+            crate::instance_settings::cmd_theme(args);
+        }
+        "ff" | "fast-forward" | "rotate" => {
+            let mut forward_args = vec!["ff".to_string()];
+            forward_args.extend(args.to_vec());
+            crate::instance_dispatch::cmd_instances(&forward_args);
+        }
+        "auto-switch" | "autoswitch" | "auto" => {
+            crate::scheduler_cmds::cmd_auto_switch(args);
+        }
+        "export" => {
+            let mut forward_args = vec!["export".to_string()];
+            forward_args.extend(args.to_vec());
+            crate::instance_dispatch::cmd_instances(&forward_args);
+        }
+        "import" | "load-json" => {
+            let mut forward_args = vec!["import".to_string()];
+            forward_args.extend(args.to_vec());
+            crate::instance_dispatch::cmd_instances(&forward_args);
+        }
+        "assign" | "bind" => {
+            let mut forward_args = vec!["assign".to_string()];
+            forward_args.extend(args.to_vec());
+            crate::instance_dispatch::cmd_instances(&forward_args);
+        }
         _ => crate::common::handle_unknown_domain_command("instances", subcommand, args),
     }
 }

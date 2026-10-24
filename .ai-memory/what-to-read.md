@@ -180,3 +180,4 @@
 - .ai-memory/plans/completed/104-instance-settings-sync-duplication-and-navbar-combine.md
 - .ai-memory/plans/pending/101-instance-clone-audit-theme-and-ui-enhancements.md
 - .ai-memory/plans/pending/105-audit-pagination-supabase-tab-account-switch-details-and-instance-view-modes.md
+- .ai-memory/plans/completed/225-prompt-tree-view-issues.md
