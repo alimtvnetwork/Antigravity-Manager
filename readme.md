@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.264.0-3B82F6?style=flat-square" alt="Version v4.264.0">
+    <img src="https://img.shields.io/badge/Version-v4.265.0-3B82F6?style=flat-square" alt="Version v4.265.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,7 +116,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.264.0)**
+**Bar 2: Version-Based Installation (v4.265.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.258.0/install.ps1))) -Version "v4.258.0"
 ```
@@ -645,6 +645,8 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
 ## 📝 Changelog
+
+> Latest version **v4.265.0**: CI concurrency SHA scoping & release resilience — Scoped CI concurrency group on `main` in `.github/workflows/ci.yml` to the commit SHA (`group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}`), ensuring sequential commits on `main` never cancel in-flight CI workflows; expanded 4-part RCA in `.ai-memory/cicd-issues/47-release-gate-ci-race-condition-rca.md`; and verified release gate polling and execution. (Thanks to @aukgit)
 
 > Latest version **v4.264.0**: Release gate in-progress CI polling — `.github/workflows/release.yml` now uses a bounded polling loop awaiting in-flight CI runs before evaluating the green gate, preventing premature release failure and `conclusion: missing` race condition. (Thanks to @aukgit)
 

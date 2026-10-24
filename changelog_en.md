@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.265.0 (2026-10-25)**:
+        -   **[CI Concurrency SHA Scoping & Release Resilience] Isolated main branch CI concurrency to commit SHA to prevent rapid sequential push cancellations (Thanks to @aukgit)**:
+            -   **Description**: Scoped CI concurrency group on `main` in `.github/workflows/ci.yml` to the specific commit SHA (`group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}`), ensuring subsequent commits on `main` never cancel in-flight CI workflows. Expanded 4-part Root Cause Analysis in `.ai-memory/cicd-issues/47-release-gate-ci-race-condition-rca.md` and verified clean release gate polling and execution. (Thanks to @aukgit)
+
     *   **v4.264.0 (2026-10-25)**:
         -   **[Release Gate In-Progress CI Polling] Bounded polling loop awaits in-flight CI runs on tag push before validating green pass (Thanks to @aukgit)**:
             -   **Description**: Fixed race condition in `.github/workflows/release.yml` where `release.yml` immediately queried `status=completed` and aborted with `conclusion: missing`. Added 25-minute polling loop with heartbeat logging, authored RCA 47, and verified release gate pass on GitHub Actions. (Thanks to @aukgit)
