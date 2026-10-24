@@ -11,7 +11,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   # Runs on main always finish (plan 91): a cancelled CI run must never be the reason a release gate cannot verify green CI.
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 

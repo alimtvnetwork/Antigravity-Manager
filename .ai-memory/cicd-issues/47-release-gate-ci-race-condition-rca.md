@@ -36,17 +36,21 @@ fi
 1. **Premature Evaluation Race Condition**: `release.yml` triggers immediately on tag push (`v*`), starting within 10–15 seconds. At that exact time, `ci.yml` (triggered by the commit push on `main`) is either in status `queued` or `in_progress`.
 2. Because the API query filtered by `status=completed` without any polling or wait loop, it found zero completed runs and defaulted to `missing`.
 3. The check immediately exited with code 1 without waiting for the in-flight CI run to finish.
+4. **Main Concurrency Group Collision**: In `ci.yml`, concurrency was grouped by `CI-${{ github.ref }}` (`CI-refs/heads/main`), causing subsequent commits on `main` to cancel previous in-flight runs on `main`.
 
 ---
 
 ## Part 3: Surgical Fix
 
-In `.github/workflows/release.yml`:
-1. Replaced the single-shot query with a bounded polling loop (`MAX_WAIT_SECONDS=1500`, polling every `POLL_INTERVAL=20`s).
-2. The loop queries `actions/workflows/ci.yml/runs?head_sha=${{ github.sha }}&per_page=1` without filtering by `status=completed`.
-3. If no run has registered yet, waits up to 90s for GitHub's event registration.
-4. If status is `in_progress` or `queued`, logs progress and waits for completion.
-5. Once `status=completed`, evaluates `conclusion`:
+1. **Polling Wait Loop in Release Gate**: In `.github/workflows/release.yml`:
+   - Replaced the single-shot query with a bounded polling loop (`MAX_WAIT_SECONDS=1500`, polling every `POLL_INTERVAL=20`s).
+   - Queries `actions/workflows/ci.yml/runs?head_sha=${{ github.sha }}&per_page=1` without filtering by `status=completed`.
+   - If no run has registered yet, waits up to 90s for GitHub's event registration.
+   - If status is `in_progress` or `queued`, logs progress and waits for completion.
+   - Once `status=completed`, evaluates `conclusion`: if `success`, allows the release to proceed; if failure or cancelled, fails fast.
+   - Times out safely after 25 minutes if CI never completes.
+2. **Main Branch Concurrency Isolation**: In `.github/workflows/ci.yml`:
+   - Scoped concurrency group on `main` to the specific commit SHA (`group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}`), ensuring runs on `main` are never cancelled by subsequent commits while preserving auto-cancellation for PR branches.
    - If `success`: allows the release to proceed.
    - If `failure`, `cancelled`, or anything else: fails fast.
 6. Times out safely after 25 minutes if CI never completes.
