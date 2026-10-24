@@ -74,6 +74,7 @@ obj/
 tmp/
 *.tmp
 *.cache
+.temp/
 .gitmap/
 .ai-memory/cicd/
 .ai-memory/temp-agents/

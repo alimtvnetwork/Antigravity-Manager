@@ -62,6 +62,7 @@
 <p align="center">
   <a href="#-screenshot--gui-overview">📸 GUI Overview</a> •
   <a href="#%EF%B8%8F-install-scripts">🛠️ Install Scripts</a> •
+  <a href="#-root-runner-suite--developer-automation">🚀 Root Runners</a> •
   <a href="#-brand-identity-logos--icons">🎨 Logos &amp; Icons</a> •
   <a href="#-about-this-repo">📖 About</a> •
   <a href="#-for-ai-agents">🤖 For AI Agents</a> •
@@ -117,7 +118,7 @@ irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/ins
 
 **Bar 2: Version-Based Installation (v4.257.2)**
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
+& ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.257.2/install.ps1))) -Version "4.257.2"
 ```
 
 ---
@@ -129,9 +130,9 @@ irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/ins
 curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash
 ```
 
-**Bar 2: Version-Based Installation (v4.72.0)**
+**Bar 2: Version-Based Installation (v4.257.2)**
 ```bash
-curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.sh | bash -s -- --version "4.72.0"
+curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.257.2/install.sh | bash -s -- --version "4.257.2"
 ```
 
 > [!TIP]
@@ -148,7 +149,11 @@ This version pinning matrix allows developers, enterprise deployments, and users
 <!-- STAMP:VERSION_PIN_TABLE_START -->
 | Target Release | Release Date | Quality Gate | Windows PowerShell (One-Liner) | Linux / macOS (Bash) | Git Tag Checkout |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| **v4.235.0** (Latest) | 2026-10-19 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.235.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.235.0/install.sh \| bash` | `git checkout v4.235.0` |
+| **v4.257.2** (Latest) | 2026-10-24 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.257.2/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.257.2/install.sh \| bash` | `git checkout v4.257.2` |
+| **v4.257.1** | 2026-10-24 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.257.1/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.257.1/install.sh \| bash` | `git checkout v4.257.1` |
+| **v4.257.0** | 2026-10-24 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.257.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.257.0/install.sh \| bash` | `git checkout v4.257.0` |
+| **v4.256.4** | 2026-10-24 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.256.4/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.256.4/install.sh \| bash` | `git checkout v4.256.4` |
+| **v4.235.0** | 2026-10-19 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.235.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.235.0/install.sh \| bash` | `git checkout v4.235.0` |
 | **v4.234.0** | 2026-10-19 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.234.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.234.0/install.sh \| bash` | `git checkout v4.234.0` |
 | **v4.233.1** | 2026-10-19 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.233.1/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.233.1/install.sh \| bash` | `git checkout v4.233.1` |
 | **v4.233.0** | 2026-10-19 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.233.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.233.0/install.sh \| bash` | `git checkout v4.233.0` |
@@ -230,6 +235,43 @@ docker compose up -d
 - **Web Dashboard**: `http://localhost:8045`
 - **API Endpoint**: `http://localhost:8045/v1`
 - **Data Persistence**: Mount `/root/.antigravity_tools` to preserve accounts, preferences, and logs.
+
+---
+
+## 🚀 Root Runner Suite & Developer Automation
+
+Antigravity Tools provides dedicated single-responsibility root runners for development, production compilation, end-to-end testing, and toolchain provisioning across Windows, Linux, and macOS:
+
+| Script (Windows) | Script (POSIX / Bash) | Primary Responsibility | Auto Self-Healing? |
+| :--- | :--- | :--- | :---: |
+| **`run.ps1`** | **`run.sh`** | Hot-reload development server (`npm run tauri dev`), Vite frontend server, or CLI passthrough router (`agm ...`). | ✅ Yes |
+| **`build.ps1`** | **`build.sh`** | Dedicated production compiler (`npm run tauri build` / `cargo build --release`). Never launches UI. | ✅ Yes (via `install.ps1 -BuildTools`) |
+| **`e2e.ps1`** | **`e2e.sh`** | Dedicated end-to-end testing harness with caller IDE self-preservation and sandboxed test isolation. | N/A (Runs on prebuilt binary) |
+| **`install.ps1`** | **`install.sh`** | Universal toolchain and application provisioner. Defaults LLVM and compilers to **C: drive**. | ✅ Native Provisioner |
+
+#### Quick Runner Commands
+
+```powershell
+# 1. Launch development server with hot-reloading
+.\run.ps1
+
+# 2. Compile release package (auto-installs missing toolchains to C: drive)
+.\build.ps1 -Release
+
+# 3. Fast compile CLI binary only (agm.exe)
+.\build.ps1 -CliOnly
+
+# 4. Run end-to-end test suite with sandbox isolation
+.\e2e.ps1 -Suite all
+
+# 5. Full toolchain provisioning (MSVC, Rust, LLVM, NASM, Node.js)
+.\install.ps1 -BuildTools -Drive "C:"
+```
+
+> [!NOTE]
+> **Toolchain Defaults & Verification Caching**:
+> - **C: Drive Invariant**: Native compilers (specifically LLVM/Clang) default to `C:\Program Files\LLVM` (or `%LOCALAPPDATA%\Programs\LLVM` without administrative privileges) unless `-Drive <Letter>` is explicitly provided, eliminating hardcoded `D:\` drive assumptions.
+> - **SQLite Tracking (`.ai-memory/toolchain.db`)**: Toolchain paths, versions, and validation timestamps are cached in SQLite, reducing pre-flight verification from ~1.5s to <50ms on repeated builds.
 
 ---
 

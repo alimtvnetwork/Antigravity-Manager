@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.257.1)
+> Professional AI Account Management & Protocol Proxy System (v4.257.2)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.257.1-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.257.2-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -23,6 +23,7 @@
     <a href="#-gui-overview">GUI Overview</a> •
     <a href="#-architecture">Architecture</a> •
     <a href="#-installation">Installation</a> •
+    <a href="#-root-runner-suite--developer-automation">Runners</a> •
     <a href="#-quick-integration">Integration</a>
   </p>
 
@@ -135,9 +136,9 @@ Automatically detects your OS, architecture, and package manager — one command
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.72.0)**
+**Bar 2: Version-Based Installation (v4.257.2)**
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.ps1))) -Version "4.72.0"
+& ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.257.2/install.ps1))) -Version "4.257.2"
 ```
 
 ---
@@ -149,9 +150,9 @@ irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/ins
 curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash
 ```
 
-**Bar 2: Version-Based Installation (v4.72.0)**
+**Bar 2: Version-Based Installation (v4.257.2)**
 ```bash
-curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.72.0/install.sh | bash -s -- --version "4.72.0"
+curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.257.2/install.sh | bash -s -- --version "4.257.2"
 ```
 
 > **Supported formats**: Linux (`.deb` / `.rpm` / `.AppImage`) | macOS (`.dmg`) | Windows (NSIS `.exe`)
@@ -285,6 +286,45 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
 - `WEBKIT_DISABLE_DMABUF_RENDERER=1`: disable the WebKit DMA-BUF renderer
 
 </details>
+
+---
+
+## 🚀 Root Runner Suite & Developer Automation
+
+Antigravity Tools provides dedicated single-responsibility root runners for development, production compilation, end-to-end testing, and toolchain provisioning across Windows, Linux, and macOS:
+
+| Script (Windows) | Script (POSIX / Bash) | Primary Responsibility | Auto Self-Healing? |
+| :--- | :--- | :--- | :---: |
+| **`run.ps1`** | **`run.sh`** | Hot-reload development server (`npm run tauri dev`), Vite frontend server, or CLI passthrough router (`agm ...`). | ✅ Yes |
+| **`build.ps1`** | **`build.sh`** | Dedicated production compiler (`npm run tauri build` / `cargo build --release`). Never launches UI. | ✅ Yes (via `install.ps1 -BuildTools`) |
+| **`e2e.ps1`** | **`e2e.sh`** | Dedicated end-to-end testing harness with caller IDE self-preservation and sandboxed test isolation. | N/A (Runs on prebuilt binary) |
+| **`install.ps1`** | **`install.sh`** | Universal toolchain and application provisioner. Defaults LLVM and compilers to **C: drive**. | ✅ Native Provisioner |
+
+#### Quick Runner Commands
+
+```powershell
+# 1. Launch development server with hot-reloading
+.\run.ps1
+
+# 2. Compile release package (auto-installs missing toolchains to C: drive)
+.\build.ps1 -Release
+
+# 3. Fast compile CLI binary only (agm.exe)
+.\build.ps1 -CliOnly
+
+# 4. Run end-to-end test suite with sandbox isolation
+.\e2e.ps1 -Suite all
+
+# 5. Full toolchain provisioning (MSVC, Rust, LLVM, NASM, Node.js)
+.\install.ps1 -BuildTools -Drive "C:"
+```
+
+> [!NOTE]
+> **Toolchain Defaults & Verification Caching**:
+> - **C: Drive Invariant**: Native compilers (specifically LLVM/Clang) default to `C:\Program Files\LLVM` (or `%LOCALAPPDATA%\Programs\LLVM` without administrative privileges) unless `-Drive <Letter>` is explicitly provided, eliminating hardcoded `D:\` drive assumptions.
+> - **SQLite Tracking (`.ai-memory/toolchain.db`)**: Toolchain paths, versions, and validation timestamps are cached in SQLite, reducing pre-flight verification from ~1.5s to <50ms on repeated builds.
+
+---
 
 ## 🔌 Quick Integration Examples
 

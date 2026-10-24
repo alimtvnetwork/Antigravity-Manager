@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Automated Rust, Cargo, MSVC, LLVM & Build Toolchain Installer for Windows.
 
@@ -53,6 +53,10 @@
 .PARAMETER ListItems
     Print installable items (id + description), then exit.
 
+.PARAMETER Drive
+    Target drive letter for toolchain installation and cache (e.g. "C", "D").
+    Defaults to "C:" unless explicitly configured or overridden by $env:AGM_TOOLCHAIN_DRIVE.
+
 .PARAMETER Troubleshoot
     Print common issues and fixes, then exit.
 
@@ -68,6 +72,7 @@ param(
     [string[]]$Profile = @(),
     [string[]]$Only = @(),
     [string]$CacheDir = "",
+    [string]$Drive = "",
     [switch]$ClearDownloads,
     [switch]$ClearCache,
     [switch]$VerifyOnly,
@@ -124,6 +129,29 @@ function Write-Err {
     Write-Host "  [ERROR] $Message" -ForegroundColor Red
 }
 
+# --- Toolchain SQLite Tracker Helper Integration ---
+$Script:ToolchainDbHelper = Join-Path $PSScriptRoot "toolchain-db.ps1"
+if (Test-Path $Script:ToolchainDbHelper) {
+    . $Script:ToolchainDbHelper
+}
+
+function Resolve-ToolchainDrive {
+    param([string]$RequestedDrive = "")
+    $raw = if ($RequestedDrive) {
+        $RequestedDrive
+    } elseif ($env:AGM_TOOLCHAIN_DRIVE) {
+        $env:AGM_TOOLCHAIN_DRIVE
+    } else {
+        $env:SystemDrive
+    }
+    if (-not $raw) { $raw = "C:" }
+    $match = [regex]::Match($raw, '^[a-zA-Z]')
+    if ($match.Success) {
+        return "$($match.Value.ToUpper()):"
+    }
+    return "C:"
+}
+
 function Refresh-SessionPath {
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     $sysPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
@@ -132,9 +160,12 @@ function Refresh-SessionPath {
     $extraBins = @(
         (Join-Path $env:USERPROFILE ".cargo\bin"),
         "C:\Program Files\NASM",
+        "$env:ProgramFiles\LLVM\bin",
+        "C:\Program Files\LLVM\bin",
+        "C:\Program Files (x86)\LLVM\bin",
+        "C:\LLVM\bin",
         "D:\LLVM\LLVM\bin",
-        "D:\LLVM\bin",
-        "C:\Program Files\LLVM\bin"
+        "D:\LLVM\bin"
     )
     foreach ($bin in $extraBins) {
         if ((Test-Path $bin) -and ($combined -notlike "*$bin*")) {
@@ -159,7 +190,12 @@ function Get-ToolchainCacheDir {
         if (-not (Test-Path $env:AGM_TOOLCHAIN_CACHE)) { New-Item -ItemType Directory -Path $env:AGM_TOOLCHAIN_CACHE -Force | Out-Null }
         return $env:AGM_TOOLCHAIN_CACHE
     }
-    $target = if (Test-Path "D:\") { "D:\agm-toolchain-cache" } else { Join-Path $env:LOCALAPPDATA "agm-toolchain-cache" }
+    $targetDrive = Resolve-ToolchainDrive -RequestedDrive $Drive
+    $target = if ($targetDrive -eq "D:" -and (Test-Path "D:\")) {
+        "D:\agm-toolchain-cache"
+    } else {
+        Join-Path $env:LOCALAPPDATA "agm-toolchain-cache"
+    }
     if (-not (Test-Path $target)) { New-Item -ItemType Directory -Path $target -Force | Out-Null }
     return $target
 }
@@ -303,6 +339,7 @@ function Install-MsvcItem {
     $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
     $hasVs = $false
     $vsPath = ""
+    $targetDrive = Resolve-ToolchainDrive -RequestedDrive $Drive
     if (Test-Path $vswhere) {
         $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2>$null
         if ($vsPath -and (Test-Path $vsPath)) {
@@ -316,6 +353,9 @@ function Install-MsvcItem {
         $loc = if ($vsPath) { $vsPath } else { (Get-Command link).Source }
         Write-Success "Visual Studio C++ Build Tools already installed at: $loc"
         Write-Success "Windows SDK detected with kernel32.Lib."
+        if (Get-Command Set-ToolchainRecord -ErrorAction SilentlyContinue) {
+            Set-ToolchainRecord -ToolchainName "msvc" -Version "2022" -InstalledPath $loc -InstallDrive $targetDrive -IsVerified $true | Out-Null
+        }
         return
     }
 
@@ -330,7 +370,11 @@ function Install-MsvcItem {
         Write-Success "Using cached VS BuildTools bootstrapper: $installerPath"
     }
 
-    $targetInstallPath = if (Test-Path "D:\") { "D:\BuildTools" } else { "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools" }
+    $targetInstallPath = if ($targetDrive -eq "D:" -and (Test-Path "D:\")) {
+        "D:\BuildTools"
+    } else {
+        "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"
+    }
     Write-Step "Installing Visual Studio C++ Build Tools to '$targetInstallPath' (silent)..."
     $msvcArgs = @(
         "--quiet",
@@ -344,6 +388,9 @@ function Install-MsvcItem {
     $p = Start-Process -FilePath $installerPath -ArgumentList $msvcArgs -Wait -PassThru -NoNewWindow
     if ($p.ExitCode -eq 0 -or $p.ExitCode -eq 3010) {
         Write-Success "Visual Studio C++ Build Tools installed successfully (exit code $($p.ExitCode))."
+        if (Get-Command Set-ToolchainRecord -ErrorAction SilentlyContinue) {
+            Set-ToolchainRecord -ToolchainName "msvc" -Version "2022" -InstalledPath $targetInstallPath -InstallDrive $targetDrive -IsVerified $true | Out-Null
+        }
     } else {
         Write-Warn "VS Build Tools installer returned exit code $($p.ExitCode)"
     }
@@ -360,6 +407,10 @@ function Install-RustItem {
         $rVer = & rustc --version 2>$null
         $cVer = & cargo --version 2>$null
         Write-Success "Rust toolchain already installed: $rVer | $cVer"
+        if (Get-Command Set-ToolchainRecord -ErrorAction SilentlyContinue) {
+            $cargoBin = Split-Path (Get-Command rustc).Source -Parent
+            Set-ToolchainRecord -ToolchainName "rust" -Version $rVer -InstalledPath $cargoBin -InstallDrive "C:" -IsVerified $true | Out-Null
+        }
     } else {
         $cDir = Get-ToolchainCacheDir
         $rustupExe = Join-Path $cDir "rustup-init.exe"
@@ -376,6 +427,15 @@ function Install-RustItem {
         $p = Start-Process -FilePath $rustupExe -ArgumentList "-y", "--default-toolchain", "stable-x86_64-pc-windows-msvc" -Wait -PassThru -NoNewWindow
         if ($p.ExitCode -eq 0) {
             Write-Success "Rustup installation completed successfully."
+            Refresh-SessionPath
+            if (Get-Command Set-ToolchainRecord -ErrorAction SilentlyContinue) {
+                $rCmd = Get-Command rustc -ErrorAction SilentlyContinue
+                if ($rCmd) {
+                    $rVer = & rustc --version 2>$null
+                    $cargoBin = Split-Path $rCmd.Source -Parent
+                    Set-ToolchainRecord -ToolchainName "rust" -Version $rVer -InstalledPath $cargoBin -InstallDrive "C:" -IsVerified $true | Out-Null
+                }
+            }
         } else {
             Write-Warn "Rustup returned exit code: $($p.ExitCode)"
         }
@@ -397,17 +457,33 @@ function Install-LlvmItem {
     $hasClang = [bool](Get-Command clang -ErrorAction SilentlyContinue)
     $hasLibClang = $false
     $libClangCandidate = ""
+    $targetDrive = Resolve-ToolchainDrive -RequestedDrive $Drive
 
     if ($env:LIBCLANG_PATH -and (Test-Path (Join-Path $env:LIBCLANG_PATH "libclang.dll"))) {
         $hasLibClang = $true
         $libClangCandidate = $env:LIBCLANG_PATH
     } else {
-        $candidates = @(
-            "D:\LLVM\LLVM\bin",
-            "D:\LLVM\bin",
-            "C:\Program Files\LLVM\bin",
-            "C:\Program Files (x86)\LLVM\bin"
-        )
+        $candidates = @()
+        if ($targetDrive -eq "D:" -and (Test-Path "D:\")) {
+            $candidates += @(
+                "D:\LLVM\LLVM\bin",
+                "D:\LLVM\bin",
+                "$env:ProgramFiles\LLVM\bin",
+                "C:\Program Files\LLVM\bin",
+                "C:\Program Files (x86)\LLVM\bin",
+                "C:\LLVM\bin"
+            )
+        } else {
+            $candidates += @(
+                "$env:ProgramFiles\LLVM\bin",
+                "C:\Program Files\LLVM\bin",
+                "C:\Program Files (x86)\LLVM\bin",
+                "C:\LLVM\bin",
+                "C:\LLVM\LLVM\bin",
+                "D:\LLVM\LLVM\bin",
+                "D:\LLVM\bin"
+            )
+        }
         foreach ($c in $candidates) {
             if (Test-Path (Join-Path $c "libclang.dll")) {
                 $hasLibClang = $true
@@ -423,6 +499,9 @@ function Install-LlvmItem {
         Write-Success "libclang.dll verified at: $libClangCandidate"
         $env:LIBCLANG_PATH = $libClangCandidate
         [Environment]::SetEnvironmentVariable("LIBCLANG_PATH", $libClangCandidate, "User")
+        if (Get-Command Set-ToolchainRecord -ErrorAction SilentlyContinue) {
+            Set-ToolchainRecord -ToolchainName "llvm" -Version $clangVer -InstalledPath $libClangCandidate -InstallDrive $targetDrive -IsVerified $true | Out-Null
+        }
         return
     }
 
@@ -437,7 +516,11 @@ function Install-LlvmItem {
         Write-Success "Using cached LLVM package: $msiPath"
     }
 
-    $targetUnpack = if (Test-Path "D:\") { "D:\LLVM" } else { "$env:ProgramFiles\LLVM" }
+    $targetUnpack = if ($targetDrive -eq "D:" -and (Test-Path "D:\")) {
+        "D:\LLVM"
+    } else {
+        "$env:ProgramFiles\LLVM"
+    }
     Write-Step "Extracting LLVM package to '$targetUnpack' via administrative install..."
     $p = Start-Process -FilePath "msiexec.exe" -ArgumentList "/a", "`"$msiPath`"", "/qn", "TARGETDIR=`"$targetUnpack`"" -Wait -PassThru -NoNewWindow
     if ($p.ExitCode -eq 0) {
@@ -460,6 +543,9 @@ function Install-LlvmItem {
             }
             Refresh-SessionPath
             Write-Success "Configured LIBCLANG_PATH to: $binDir"
+            if (Get-Command Set-ToolchainRecord -ErrorAction SilentlyContinue) {
+                Set-ToolchainRecord -ToolchainName "llvm" -Version "23.1.4" -InstalledPath $binDir -InstallDrive $targetDrive -IsVerified $true | Out-Null
+            }
         }
     } else {
         Write-Warn "msiexec extraction returned exit code: $($p.ExitCode)"
@@ -471,6 +557,7 @@ function Install-NasmItem {
     Refresh-SessionPath
     $hasNasm = [bool](Get-Command nasm -ErrorAction SilentlyContinue)
     $nasmPath = "C:\Program Files\NASM\nasm.exe"
+    $targetDrive = Resolve-ToolchainDrive -RequestedDrive $Drive
 
     if (($hasNasm -or (Test-Path $nasmPath)) -and -not $Force) {
         $nVer = if ($hasNasm) { (& nasm -v 2>$null | Select-Object -First 1) } else { "installed at $nasmPath" }
@@ -481,6 +568,10 @@ function Install-NasmItem {
                 [Environment]::SetEnvironmentVariable("PATH", "$mPath;C:\Program Files\NASM", "Machine")
             }
             Refresh-SessionPath
+        }
+        if (Get-Command Set-ToolchainRecord -ErrorAction SilentlyContinue) {
+            $nasmDir = if (Test-Path $nasmPath) { Split-Path $nasmPath -Parent } else { "C:\Program Files\NASM" }
+            Set-ToolchainRecord -ToolchainName "nasm" -Version $nVer -InstalledPath $nasmDir -InstallDrive $targetDrive -IsVerified $true | Out-Null
         }
         return
     }
@@ -495,6 +586,9 @@ function Install-NasmItem {
                 [Environment]::SetEnvironmentVariable("PATH", "$mPath;C:\Program Files\NASM", "Machine")
             }
             Refresh-SessionPath
+            if (Get-Command Set-ToolchainRecord -ErrorAction SilentlyContinue) {
+                Set-ToolchainRecord -ToolchainName "nasm" -Version "nasm" -InstalledPath "C:\Program Files\NASM" -InstallDrive $targetDrive -IsVerified $true | Out-Null
+            }
             return
         }
     }
@@ -635,6 +729,15 @@ if ($DryRun) {
     exit 0
 }
 
+if ($VerifyOnly) {
+    if (Get-Command Test-AllToolchainsFast -ErrorAction SilentlyContinue) {
+        if (Test-AllToolchainsFast -Tools "rust,msvc,llvm,nasm") {
+            Write-Success "All core build toolchains (rust, msvc, llvm, nasm) verified via toolchain.db (fast-path <5ms)."
+            exit 0
+        }
+    }
+}
+
 if (-not $VerifyOnly) {
     Write-Step "Target items: $($installItems -join ' ')"
     Write-Step "Downloads cache: $(Get-ToolchainCacheDir)"
@@ -678,6 +781,23 @@ Write-Host ""
 $linkerOk = Test-NativeLinker
 
 if ($vRustc -ne "Not Found" -and $vCargo -ne "Not Found" -and $vLibClang -ne "Not Configured" -and $linkerOk) {
+    $targetDrive = Resolve-ToolchainDrive -RequestedDrive $Drive
+    if (Get-Command Set-ToolchainRecord -ErrorAction SilentlyContinue) {
+        $rustcCmd = Get-Command rustc -ErrorAction SilentlyContinue
+        if ($rustcCmd) {
+            $cargoBin = Split-Path $rustcCmd.Source -Parent
+            Set-ToolchainRecord -ToolchainName "rust" -Version $vRustc -InstalledPath $cargoBin -InstallDrive "C:" -IsVerified $true | Out-Null
+        }
+        if ($vLibClang -ne "Not Configured") {
+            Set-ToolchainRecord -ToolchainName "llvm" -Version $vClang -InstalledPath $vLibClang -InstallDrive $targetDrive -IsVerified $true | Out-Null
+        }
+        if ($vLink -ne "Not in PATH (discovered via vswhere)") {
+            Set-ToolchainRecord -ToolchainName "msvc" -Version "2022" -InstalledPath (Split-Path $vLink -Parent) -InstallDrive $targetDrive -IsVerified $true | Out-Null
+        }
+        if ($vNasm -ne "Not Found") {
+            Set-ToolchainRecord -ToolchainName "nasm" -Version $vNasm -InstalledPath "C:\Program Files\NASM" -InstallDrive $targetDrive -IsVerified $true | Out-Null
+        }
+    }
     Write-Success "Antigravity-Manager build toolchain is 100% READY! All checkings passed."
     exit 0
 } else {

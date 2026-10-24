@@ -28,6 +28,10 @@
 .PARAMETER Uninstall
     Remove Antigravity Tools installation, shortcuts, and PATH entries.
 
+.PARAMETER Drive
+    Target drive letter for toolchain installation and cache (e.g. "C", "D").
+    Defaults to "C:" unless explicitly configured.
+
 .EXAMPLE
     irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
     .\install.ps1 -Version "4.9.0"
@@ -51,6 +55,7 @@ param(
     [switch]$BuildTools,
     [string]$Profile = "",
     [string]$CacheDir = "",
+    [string]$Drive = "",
     [switch]$ClearDownloads,
     [switch]$ClearCache,
     [switch]$VerifyOnly
@@ -1050,6 +1055,7 @@ if ($BuildTools -or ($Profile -and $Profile -match '^(build-tools|agm-build-tool
     $toolchainParams = @{}
     if ($Profile) { $toolchainParams["Profile"] = @($Profile) } else { $toolchainParams["Profile"] = @("agm-build-tools") }
     if ($CacheDir) { $toolchainParams["CacheDir"] = $CacheDir }
+    if ($Drive) { $toolchainParams["Drive"] = $Drive }
     if ($DryRun) { $toolchainParams["DryRun"] = $true }
     if ($Force) { $toolchainParams["Force"] = $true }
     if ($VerifyOnly) { $toolchainParams["VerifyOnly"] = $true }
