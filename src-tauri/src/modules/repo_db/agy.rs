@@ -28,14 +28,14 @@ fn truncate_utf8(value: &str, max_bytes: usize) -> &str {
     &value[..end]
 }
 
-/// `agy` resumes a conversation with `--conversation`. A synthetic `conv-` id means
-/// "start a new turn", and a project key (`name__instance`) is not a conversation id.
+/// `agy` resumes a conversation with `--conversation`.
+/// `conv-` ids are real conversation keys (IDE summaries and session rows).
+/// `new`, project keys, prompt ids (`p-`), and queue tokens are not.
 fn agy_conversation_id(session: &str) -> Option<&str> {
     let trimmed = session.trim();
     let trimmed = trimmed.strip_prefix("prompt-").unwrap_or(trimmed);
     if trimmed.is_empty()
         || trimmed == "-"
-        || trimmed.starts_with("conv-")
         || trimmed.starts_with("proj-")
         || trimmed == "new"
         || trimmed.starts_with("p-")
@@ -1407,7 +1407,8 @@ mod agy_flag_tests {
     fn conversation_flag_keeps_real_ids_and_skips_synthetic_keys() {
         assert_eq!(agy_conversation_id("cid-e2e-probe"), Some("cid-e2e-probe"));
         assert_eq!(agy_conversation_id("  abc  "), Some("abc"));
-        assert_eq!(agy_conversation_id("conv-11111111"), None);
+        assert_eq!(agy_conversation_id("conv-11111111"), Some("conv-11111111"));
+        assert_eq!(agy_conversation_id("conv-abc-456"), Some("conv-abc-456"));
         assert_eq!(agy_conversation_id("-"), None);
         assert_eq!(
             agy_conversation_id("prompt-bc221407-c445-415a-9034-b1179a550a79"),

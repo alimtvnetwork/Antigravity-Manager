@@ -967,9 +967,9 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 />
 
                 {/* Top Indeterminate Progress Bar */}
-                {(isLoading || isAutoSyncing || isResetting) && (
+                {(isLoading || isResetting) && (
                     <div className="w-full h-0.5 bg-purple-950/40 dark:bg-[#40285e]/40 overflow-hidden shrink-0">
-                        <div className="h-full bg-[#1af18d] shadow-[0_0_8px_#1af18d] animate-pulse w-full" />
+                        <div className="h-full bg-sky-500 w-full" />
                     </div>
                 )}
 

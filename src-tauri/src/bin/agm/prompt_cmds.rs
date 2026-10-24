@@ -189,7 +189,7 @@ fn resolve_destination_session(args: &[String], repo_path: &str) -> Option<Strin
         return Some(conv);
     }
     if is_explicit_new {
-        return Some(format!("conv-{}", uuid::Uuid::new_v4()));
+        return Some("new".to_string());
     }
     if is_explicit_existing {
         if let Ok(conn) = repo_db::connect_db() {
@@ -289,7 +289,7 @@ pub(crate) fn cmd_prompts_send(args: &[String]) {
         std::process::exit(1);
     }
 
-    let session_id = session_id.or_else(|| Some(format!("conv-{}", uuid::Uuid::new_v4())));
+    let session_id = session_id.or_else(|| Some("new".to_string()));
 
     // Query smart process cache / OS process table
     let cached_proc = instance::get_or_detect_instance_process(&resolved_inst);

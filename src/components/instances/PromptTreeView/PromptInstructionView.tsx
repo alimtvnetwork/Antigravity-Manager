@@ -241,7 +241,16 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
     return (
         <div
             className="relative group shrink-0"
-            onClick={() => onPreview(resolvedSrc, img.alt)}
+            onClick={() => {
+                const raw = img.src.trim();
+                let localPath = extractLocalPathFromUri(raw) || raw;
+                const isAbsolute = /^[a-zA-Z]:[\\/]/.test(localPath) || localPath.startsWith('\\\\');
+                if (!isAbsolute && repoPath && repoPath.trim().length > 0 && !raw.startsWith('data:') && !raw.startsWith('http')) {
+                    const sep = repoPath.includes('/') ? '/' : '\\';
+                    localPath = `${repoPath.replace(/[/\\]+$/, '')}${sep}${localPath.replace(/^(\.[/\\]|[/\\])+/, '')}`;
+                }
+                onPreview(isAbsolute || /^[a-zA-Z]:[\\/]/.test(localPath) ? localPath : resolvedSrc, img.alt);
+            }}
             onContextMenu={(e) => onContextMenu(e, resolvedSrc, img.alt, img.src)}
         >
             {!hasFailed ? (
@@ -371,6 +380,20 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
 
     const handleOpenPreview = (src: string, alt?: string) => {
         setContextMenu((prev) => ({ ...prev, isOpen: false }));
+        const fileTarget = src.trim().replace(/^<|>$/g, '');
+        const isDiskFile = /^[a-zA-Z]:[\\/]/.test(fileTarget) || fileTarget.startsWith('file:');
+        if (isDiskFile) {
+            void import('@tauri-apps/plugin-opener')
+                .then(({ openPath }) => openPath(fileTarget.replace(/^file:\/\//i, '')))
+                .catch((err: unknown) => {
+                    useErrorStore.getState().trackWarning(err, {
+                        source: 'PromptInstructionView.handleOpenPreview',
+                        triggerAction: 'open_image_file',
+                    });
+                    setPreviewImage({ src, alt });
+                });
+            return;
+        }
         setPreviewImage({ src, alt });
     };
 
