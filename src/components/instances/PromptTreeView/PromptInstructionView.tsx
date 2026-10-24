@@ -3,7 +3,7 @@ import { Check, Copy, RotateCcw, ChevronUp, ChevronDown, Clock, Image as LucideI
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../../utils/cn';
 import { PromptViewMode, type AgmConversationNode, type AgmProjectTreeNode, type ViewMode } from './types';
-import { RichMarkdownRenderer } from './markdown';
+import { RichMarkdownRenderer, openFileInIde } from './markdown';
 import { countWords, formatPromptForMarkdown } from './formatters';
 import { PromptImagePreviewModal } from './PromptImagePreviewModal';
 import { PromptImageContextMenu } from './PromptImageContextMenu';
@@ -219,10 +219,13 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
                     return;
                 }
             } catch (err: unknown) {
-                useErrorStore.getState().trackWarning(err, {
-                    source: 'PromptThumbnailCard.load_base64',
-                    triggerAction: 'read_image_as_base64_proactive',
-                });
+                const msg = err instanceof Error ? err.message : String(err);
+                if (!msg.includes('file_not_found') && !msg.includes('path_not_found')) {
+                    useErrorStore.getState().trackWarning(err, {
+                        source: 'PromptThumbnailCard.load_base64',
+                        triggerAction: 'read_image_as_base64_proactive',
+                    });
+                }
             }
             if (!isCancelled) {
                 setResolvedSrc(resolveImageSrc(img.src, repoPath));
@@ -256,10 +259,13 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
                     return;
                 }
             } catch (err: unknown) {
-                useErrorStore.getState().trackWarning(err, {
-                    source: 'PromptThumbnailCard.handleImgError',
-                    triggerAction: 'read_image_as_base64_fallback',
-                });
+                const msg = err instanceof Error ? err.message : String(err);
+                if (!msg.includes('file_not_found') && !msg.includes('path_not_found')) {
+                    useErrorStore.getState().trackWarning(err, {
+                        source: 'PromptThumbnailCard.handleImgError',
+                        triggerAction: 'read_image_as_base64_fallback',
+                    });
+                }
             }
         }
         setHasFailed(true);
@@ -652,15 +658,13 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         const fileTarget = src.trim().replace(/^<|>$/g, '');
         const isDiskFile = /^[a-zA-Z]:[\\/]/.test(fileTarget) || fileTarget.startsWith('file:');
         if (isDiskFile) {
-            void import('@tauri-apps/plugin-opener')
-                .then(({ openPath }) => openPath(fileTarget.replace(/^file:\/\//i, '')))
-                .catch((err: unknown) => {
-                    useErrorStore.getState().trackWarning(err, {
-                        source: 'PromptInstructionView.handleOpenPreview',
-                        triggerAction: 'open_image_file',
-                    });
-                    setPreviewImage({ src, alt });
+            void openFileInIde(src).catch((err: unknown) => {
+                useErrorStore.getState().trackWarning(err, {
+                    source: 'PromptInstructionView.handleOpenPreview',
+                    triggerAction: 'open_image_file',
                 });
+                setPreviewImage({ src, alt });
+            });
             return;
         }
         setPreviewImage({ src, alt });

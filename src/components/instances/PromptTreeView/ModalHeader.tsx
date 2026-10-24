@@ -11,8 +11,6 @@ import {
     ChevronDown,
     Check,
     Image as ImageIcon,
-    Upload,
-    Download,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { SyncInterval } from '../../../services/instanceService';
@@ -140,32 +138,8 @@ export function ModalHeader(props: ModalHeaderProps) {
             {/* Top Right Header Controls: Single Contiguous Segmented Dark-Glass Pill Capsule */}
             <div className="flex items-center shrink-0">
                 <div className="inline-flex items-center rounded-full bg-slate-100/90 dark:bg-[#120d20]/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-900/50 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-900/40 shadow-2xs">
-                    {/* Segment 1: Import Prompts Icon Button */}
-                    <button
-                        type="button"
-                        onClick={onRestore}
-                        disabled={isLoading}
-                        className="flex items-center justify-center w-7 h-7 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer disabled:opacity-50"
-                        title="Import prompts"
-                        aria-label="Import prompts"
-                    >
-                        <Upload className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
-                    </button>
-
-                    {/* Segment 2: Export Prompts Icon Button */}
-                    <button
-                        type="button"
-                        onClick={onBackup}
-                        disabled={isLoading}
-                        className="flex items-center justify-center w-7 h-7 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer disabled:opacity-50"
-                        title="Export prompts"
-                        aria-label="Export prompts"
-                    >
-                        <Download className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
-                    </button>
-
-                    {/* Segment 3: Unified Import / Export section */}
-                    <div className="[&>div>button]:rounded-none">
+                    {/* Unified Import / Export section */}
+                    <div>
                         <ImportExportMenu
                             onExportSqlite={onExportSqlite}
                             onExportJson={onBackup}
@@ -196,7 +170,7 @@ export function ModalHeader(props: ModalHeaderProps) {
                         onClick={onRefreshAll}
                         disabled={isLoading}
                         className="flex items-center justify-center gap-1 h-7 px-2.5 text-[11px] font-semibold text-white bg-sky-600 hover:bg-sky-500 shadow-[0_2px_0_0_#0284c7] active:translate-y-0.5 active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Refresh the tree now (respects 30s cache otherwise)"
+                        title="Refresh the tree now"
                         aria-label="Refresh"
                     >
                         <RefreshCw className={cn("w-3.5 h-3.5 text-white", (isLoading || isAutoSyncing || isRefreshing) && "animate-spin")} />
@@ -275,8 +249,8 @@ export function ModalHeader(props: ModalHeaderProps) {
                             type="button"
                             onClick={onToggleTree}
                             className="flex items-center justify-center w-7 h-7 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-[#40285e]/90 transition-colors cursor-pointer"
-                            title="Toggle Tree View"
-                            aria-label="Toggle Tree View"
+                            title={isTreeCollapsed ? "Show Tree" : "Hide Tree"}
+                            aria-label={isTreeCollapsed ? "Show Tree" : "Hide Tree"}
                         >
                             {isTreeCollapsed ? (
                                 <PanelLeftOpen className="w-3.5 h-3.5 text-blue-500" />

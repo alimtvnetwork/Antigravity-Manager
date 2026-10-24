@@ -40,13 +40,13 @@ function InstanceCardQuotaSection({
 }: InstanceCardQuotaSectionProps) {
     if (geminiModel || weeklyQuota) {
         return (
-            <div className="p-2 rounded-md bg-gray-50/90 dark:bg-[var(--ui-surface-2)] border border-gray-200/70 dark:border-[var(--ui-border-subtle)] space-y-1.5 group-hover:[&_span.font-mono]:text-yellow-400 dark:group-hover:[&_span.font-mono]:text-yellow-200">
+            <div className="p-2 rounded-md bg-gray-50/90 dark:bg-[var(--ui-surface-2)] border border-gray-200/70 dark:border-[var(--ui-border-subtle)] space-y-1.5">
                 {geminiModel && (
                     <div className="space-y-0.5">
                         <div className="flex items-center justify-between text-xs">
                             <div className="flex items-center gap-1.5 min-w-0">
                                 <Gemini.Color className="w-3.5 h-3.5 shrink-0" />
-                                <span className="font-semibold text-gray-800 dark:text-gray-200 text-xs truncate transition-colors group-hover:text-yellow-500 dark:group-hover:text-yellow-200">
+                                <span className="font-semibold text-gray-800 dark:text-gray-200 text-xs truncate transition-colors rounded-sm group-hover:bg-[#FACC15] group-hover:text-black dark:group-hover:text-zinc-950">
                                     {geminiModel.display_name || geminiModel.name || 'Gemini 3.1 Pro'} (4H)
                                 </span>
                             </div>
@@ -60,7 +60,7 @@ function InstanceCardQuotaSection({
                 {weeklyQuota && (
                     <div className={cn('space-y-0.5', geminiModel && 'pt-1 border-t border-gray-200/60 dark:border-[#40285e]/60')}>
                         <div className="flex items-center justify-between text-xs">
-                            <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300 transition-colors group-hover:text-yellow-500 dark:group-hover:text-yellow-200">
+                            <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300 transition-colors rounded-sm group-hover:bg-[#FACC15] group-hover:text-black dark:group-hover:text-zinc-950">
                                 Weekly Quota
                             </span>
                         </div>
@@ -219,7 +219,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                 <button
                                     disabled={isBusy}
                                     onClick={handleSetDefault}
-                                    className="h-5 px-1.5 rounded-[5px] text-[9px] font-medium text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-dashed border-gray-300 dark:border-[#40285e] transition-colors cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="h-5 px-1.5 rounded-[5px] text-[9px] font-medium text-gray-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-slate-200/80 dark:border-[#40285e] transition-colors cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Set as default profile"
                                 >
                                     <Star className="w-2.5 h-2.5" />
@@ -236,7 +236,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                 <button
                                     disabled={isBusy}
                                     onClick={() => setActiveInstance(inst.config.id)}
-                                    className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors font-medium mr-0.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors font-medium px-2 py-0.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Set as active instance for account switches"
                                 >
                                     Set Active
@@ -306,7 +306,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                     }
                                 >
                                     <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-500 dark:bg-[#1af18d]" />
-                                    <span className="truncate transition-colors group-hover:text-yellow-400 hover:text-yellow-300 dark:group-hover:text-yellow-200 dark:hover:text-yellow-200">
+                                    <span className="truncate transition-colors rounded-sm group-hover:bg-[#FACC15] group-hover:text-black dark:group-hover:text-zinc-950 hover:bg-[#FDE047] hover:text-black">
                                         {isEmailRevealed ? displayEmail : maskEmail(displayEmail)}
                                     </span>
                                 </button>

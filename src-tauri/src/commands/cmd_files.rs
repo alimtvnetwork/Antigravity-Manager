@@ -28,6 +28,12 @@ fn resolve_existing_or_parent(path: &Path) -> Result<PathBuf, String> {
     let parent = path
         .parent()
         .ok_or_else(|| "invalid_path: missing parent directory".to_string())?;
+    if !parent.exists() {
+        return Err(format!(
+            "path_not_found: neither file nor parent directory exists ({})",
+            path.display()
+        ));
+    }
     let canonical_parent = parent
         .canonicalize()
         .map_err(|e| format!("invalid_path: parent directory cannot be opened ({e})"))?;
@@ -310,12 +316,37 @@ pub async fn read_text_file(path: String) -> Result<String, String> {
 #[tauri::command]
 pub async fn read_image_as_base64(path: String) -> Result<String, String> {
     let clean_path = crate::modules::repo_db::failed_commands::decode_uri_to_path(&path);
-    let trimmed = clean_path.trim().replace(r"\\?\", "").replace(r"\?\", "");
+    let raw_trimmed = clean_path.trim().replace(r"\\?\", "").replace(r"\?\", "");
+    #[cfg(target_os = "windows")]
+    let trimmed = {
+        if (raw_trimmed.starts_with('/') || raw_trimmed.starts_with('\\'))
+            && raw_trimmed.len() > 2
+            && raw_trimmed
+                .chars()
+                .nth(1)
+                .map_or(false, |c| c.is_ascii_alphabetic())
+            && raw_trimmed.chars().nth(2) == Some(':')
+        {
+            raw_trimmed[1..].to_string()
+        } else {
+            raw_trimmed
+        }
+    };
+    #[cfg(not(target_os = "windows"))]
+    let trimmed = raw_trimmed;
     let requested = PathBuf::from(&trimmed);
     if requested.as_os_str().is_empty() {
         return Err("invalid_path: empty path".to_string());
     }
-    let resolved = resolve_existing_or_parent(&requested)?;
+    if !requested.exists() {
+        return Err(format!(
+            "file_not_found: image file does not exist at {}",
+            requested.display()
+        ));
+    }
+    let resolved = requested
+        .canonicalize()
+        .map_err(|e| format!("failed_to_resolve_path: {}", e))?;
     if is_sensitive_path(&resolved) || is_os_protected_path(&resolved) {
         return Err("security_denied: sensitive path".to_string());
     }

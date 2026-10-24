@@ -38,7 +38,10 @@ fn workspace_relative_media(path: &str, repo: &str) -> String {
 
     let lower_path = normalized.to_lowercase();
     let lower_repo = repo_trim.to_lowercase();
-    if lower_path.starts_with(&lower_repo) {
+    let matches_repo = lower_path.starts_with(&lower_repo)
+        && (lower_path.len() == lower_repo.len()
+            || lower_path.as_bytes().get(lower_repo.len()) == Some(&b'/'));
+    if matches_repo {
         return normalized[repo_trim.len()..]
             .trim_start_matches('/')
             .to_string();
@@ -438,8 +441,9 @@ pub(crate) fn build_active_prompt_conv_nodes(
                         if let Some(ref payload) = ap.image_payload {
                             let paths: Vec<String> = payload
                                 .split(';')
-                                .map(|s| s.trim().to_string())
+                                .map(|s| s.trim())
                                 .filter(|s| !s.is_empty())
+                                .map(|path| workspace_relative_media(path, norm_path))
                                 .collect();
                             (paths.clone(), paths)
                         } else {
@@ -693,8 +697,9 @@ pub(crate) fn build_active_prompt_conv_nodes(
             {
                 let paths: Vec<String> = payload
                     .split(';')
-                    .map(|s| s.trim().to_string())
+                    .map(|s| s.trim())
                     .filter(|s| !s.is_empty())
+                    .map(|path| workspace_relative_media(path, norm_path))
                     .collect();
                 (paths.clone(), paths)
             } else {
@@ -851,5 +856,37 @@ mod tests {
     fn test_is_owning_instance_alive_fallback() {
         let registry = crate::models::instance::InstanceRegistry::default();
         let _ = is_owning_instance_alive("non_existent_instance", &registry);
+    }
+
+    #[test]
+    fn test_conversation_display_title() {
+        assert_eq!(
+            conversation_display_title("Untitled", "Fix login timeout"),
+            "Fix login timeout"
+        );
+        assert_eq!(
+            conversation_display_title("New Conversation", "Ship the release notes"),
+            "Ship the release notes"
+        );
+        assert_eq!(
+            conversation_display_title("Fix login bug", "some other prompt text"),
+            "Fix login bug"
+        );
+    }
+
+    #[test]
+    fn test_workspace_relative_media() {
+        assert_eq!(
+            workspace_relative_media("C:/repo/assets/shot.png", "C:/repo"),
+            "assets/shot.png"
+        );
+        assert_eq!(
+            workspace_relative_media("D:/other/img.png", "C:/repo"),
+            "file:///D:/other/img.png"
+        );
+        assert_eq!(
+            workspace_relative_media("C:/repo-other/img.png", "C:/repo"),
+            "file:///C:/repo-other/img.png"
+        );
     }
 }

@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.259.0)
+> Professional AI Account Management & Protocol Proxy System (v4.260.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.259.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.260.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.260.0**: Prompt tree local E2E, Current Conv isolation, file image open, and one instance-card action capsule — `agm prompts tree --json --local` rebuilt 144 conversations with 0 untitled titles and 68 `file:///` image paths; `agm prompts send --conversation conv-e2e-probe` on a new `test-create` instance kept `session_id=conv-e2e-probe` without stopping the caller IDE; image clicks open through `openFileInIde`; instance card actions are one full-width capsule. (Thanks to @aukgit)
 
 > Latest version **v4.259.0**: Prompt Tree UX Overhaul, Header Compaction, Hover Border Stabilization, Segmented Pill Capsules, Combined Send/Enqueue/Rerun Dropdown & CLI Error Management — Compacted Prompt Tree View header height to `< 42px` in `src/components/instances/PromptTreeView/ModalHeader.tsx` and tightened node spacing in `TreePanel.tsx`; converted Import/Export text actions to Lucide icons (`Download`, `Upload`) with tooltips and converted Hide Tree View to `PanelLeftClose`/`PanelLeftOpen` icon button; relabeled the yellow button adjacent to Refresh to "Reset" with high-contrast amber styling (`text-zinc-950 font-bold bg-amber-400 hover:bg-amber-300 shadow-[0_2px_0_0_#b45309]`) and 3D tactile elevation; eliminated green hover outline shifts in `ConversationNode.tsx` using permanent base `border border-transparent` and subtle background tint transitions; enforced a strict 30-second TTL cooldown guard (`TREE_CACHE_TTL_MS = 30000`) in `usePromptTreeData.ts` to prevent mouseover-induced refetches; reunited Send, Enqueue, and Rerun into a contiguous segmented dropdown pill capsule in `PromptInstructionView.tsx` with borderless transparent destination selectors; resolved the Root Cause Analysis (RCA) defect in `usePromptTreePromptActions.ts` and `src-tauri/src/modules/repo_db/dispatch.rs` where "Current Conversation" mode was erroneously routing to new conversations; implemented `formatIdeClickableFileLink` in `clipboard.ts` and `markdown.tsx` formatting images and file paths into RFC-8089 `file:///` clickable links with a 1-click "Open in IDE" preview button; harmonized toolbar action clusters in `InstanceRowActions.tsx` and `AccountCardActions.tsx` into contiguous segmented pill capsules with high-contrast yellow hover states; verified CLI error inspection commands (`agm errors list`, `agm errors inspect`, `agm errors clear`, `agm errors fix`); authored canonical agent skill `.agents/skills/agm-error-inspection/skill.md`; and passed all 28/28 verification gates in `scripts/test-agm-gitmap-running-backup-e2e.ps1`. (Thanks to @aukgit)
 

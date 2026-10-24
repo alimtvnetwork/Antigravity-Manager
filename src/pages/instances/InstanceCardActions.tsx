@@ -59,9 +59,9 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
     const onSwitchAccount = () => setSwitchTargetInstance(inst);
 
     return (
-        <div className="pt-2.5 border-t border-gray-100 dark:border-[#40285e]/80 mt-2 space-y-1.5">
-                                                {/* Row 1: Primary Actions Capsule (Launch/Stop, Switch Account, Fast-Forward, Sync PID) */}
-                                                <div className="flex w-full items-stretch overflow-hidden rounded-full border border-slate-200/80 bg-slate-100 shadow-2xs divide-x divide-slate-200 dark:border-[#40285e] dark:bg-[#090611] dark:divide-[#40285e]">
+        <div className="pt-2.5 border-t border-gray-100 dark:border-[#40285e]/80 mt-2">
+                                                {/* Full-width actions capsule (primary + secondary) */}
+                                                <div className="relative flex w-full items-stretch overflow-hidden rounded-full border border-slate-200/80 bg-slate-100 shadow-2xs divide-x divide-slate-200 dark:border-[#40285e] dark:bg-[#090611] dark:divide-[#40285e]">
                                                     {inst.is_running ? (
                                                         <div className="flex-1 flex items-center divide-x divide-slate-200 dark:divide-[#40285e]">
                                                             <button
@@ -154,11 +154,8 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                     >
                                                         <Cpu className={cn("w-3.5 h-3.5 text-teal-500", (currentAction === 'sync' || syncingInstanceIds[inst.config.id]) && "animate-pulse")} />
                                                     </button>
-                                                </div>
 
-                                                {/* Row 2: Secondary Actions Capsule (Prompts Tree, Settings, Clone Profile, Audit, More Popover) */}
-                                                <div className="relative flex w-full items-stretch overflow-hidden rounded-full border border-slate-200/80 bg-slate-100 shadow-2xs divide-x divide-slate-200 dark:border-[#40285e] dark:bg-[#090611] dark:divide-[#40285e]">
-                                                    {/* Slot 1: Prompts Tree */}
+                                                    {/* Prompts Tree */}
                                                     <button
                                                         id={`prompt-tree-btn-${inst.config.id}`}
                                                         type="button"
@@ -221,7 +218,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                                 setCardMoreId(cardMoreId === inst.config.id ? null : inst.config.id);
                                                             }}
                                                             className={cn(
-                                                                "w-full flex items-center justify-center py-1 rounded-r-[4px] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+                                                                "w-full flex items-center justify-center py-1 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
                                                                 cardMoreId === inst.config.id
                                                                     ? "bg-slate-200 dark:bg-[#40285e] text-slate-900 dark:text-white"
                                                                     : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#40285e]"

@@ -44,6 +44,7 @@ export async function openFileInIde(pathOrUri: string): Promise<void> {
             source: 'markdown.openFileInIde',
             triggerAction: 'open_path',
         });
+        throw err;
     }
 }
 
@@ -140,7 +141,7 @@ export function MarkdownImage({
                                 });
                             });
                     }
-                    onClick?.(currentSrc, alt);
+                    onClick?.(src, alt);
                 }}
                 onContextMenu={(e) => onContextMenu?.(e, currentSrc, alt)}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 my-1 rounded-md text-[11px] font-mono bg-slate-100/90 dark:bg-[#120a1f]/90 text-amber-600 dark:text-amber-400 border border-amber-500/30 backdrop-blur-md shadow-2xs cursor-pointer hover:bg-amber-500/10 transition-colors"
@@ -158,7 +159,7 @@ export function MarkdownImage({
             <img
                 src={currentSrc}
                 alt={alt || ''}
-                onClick={() => onClick?.(currentSrc, alt)}
+                onClick={() => onClick?.(src, alt)}
                 onContextMenu={(e) => {
                     if (onContextMenu) {
                         e.preventDefault();
@@ -186,7 +187,7 @@ export function MarkdownImage({
                                 });
                             });
                     } else if (onClick) {
-                        onClick(currentSrc, alt);
+                        onClick(src, alt);
                     }
                 }}
                 className="absolute top-1 right-1 hidden group-hover:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-sans font-medium bg-black/80 text-white backdrop-blur-md border border-white/20 shadow-xs cursor-pointer hover:bg-black/95 transition-all select-none"
@@ -643,7 +644,12 @@ export function RichMarkdownRenderer({
                                 type="button"
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    void openFileInIde(imgSrc);
+                                    void openFileInIde(imgSrc).catch((err: unknown) => {
+                                        useErrorStore.getState().trackWarning(err, {
+                                            source: 'RichMarkdownRenderer.openInIde',
+                                            triggerAction: 'open_standalone_image',
+                                        });
+                                    });
                                 }}
                                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 border border-cyan-300/40 dark:border-cyan-800/40 transition-colors cursor-pointer"
                                 title="Open in IDE / OS Viewer"

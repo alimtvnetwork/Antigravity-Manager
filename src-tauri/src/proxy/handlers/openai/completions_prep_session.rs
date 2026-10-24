@@ -125,7 +125,7 @@ pub(crate) async fn completions_prep_session(
     );
     let signature_read_key = previous_response_id.clone();
 
-    let mut bounded_session_input = None;
+    let bounded_session_input = None;
 
     Ok(CompletionsSessionPrep {
         body,

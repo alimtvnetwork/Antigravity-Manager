@@ -1,6 +1,6 @@
 # 223 Prompt Tree View Issues
 
-Status: active
+Status: verified
 
 ## Root cause
 
@@ -21,5 +21,7 @@ Current Conv already passes `conversationTargetMode=current` and the selected `c
 `agm errors list` reads `errors.db`. The dashboard drawer reads the in-memory store and is not cleared by `agm errors clear`. Codes without an `[E####]` tag are stored as E9001. See `.agents/skills/agm-error-manager-cli/skill.md`.
 
 `NowRunningUpNext: prompt prompt-<uuid> not found in tree` is `trackWarning` from `PromptTreeViewModal.tsx` when `findStripConversation` misses. Historical rows that say `failed_to_resolve_parent` plus os error 123 were written before `src-tauri/src/commands/cmd_files.rs` switched that failure to `invalid_path: parent directory cannot be opened`. Do not reintroduce the old prefix.
+
+`agm prompts tree --json --local` rebuilds the tree in the current `agm` binary and skips the running GUI daemon cache. Use that flag for CLI E2E.
 
 Fast-forward rules to revalidate live in `02-spec/21-app/222-fast-forward-algorithm-issues-and-confirmation/spec.md`. Do not open sequence 224 for this task.

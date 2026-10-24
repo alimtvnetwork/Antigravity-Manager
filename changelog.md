@@ -1,5 +1,19 @@
 # Changelog
 
+## [v4.260.0] - 2026-10-24
+
+### Fixed
+- Prompt tree titles and out-of-workspace images now rebuild in the current `agm` binary. `agm prompts tree --json --local` skips the GUI daemon cache. A local dump of 144 conversations returned 0 untitled titles and 68 `file:///` media paths with 0 raw drive paths (Thanks to @aukgit)
+- Current Conv keeps `conv-` ids. An isolated `agm instances test-create` sandbox received `session_id=conv-e2e-probe` from `agm prompts send --conversation`. Caller instances were not stopped (Thanks to @aukgit)
+- Image clicks open the original file through `openFileInIde` in `src/components/instances/PromptTreeView/markdown.tsx` instead of stripping `file:///` into a broken `/C:/` path (Thanks to @aukgit)
+- Instance card root actions are one full-width `rounded-full divide-x` capsule in `src/pages/instances/InstanceCardActions.tsx`. Yellow hover uses black text (Thanks to @aukgit)
+- Tree header keeps a single Import/Export menu. Hide Tree and Show Tree are icon tooltips. Reset and Refresh stay labeled (Thanks to @aukgit)
+
+### Added
+- Error CLI skill at `.agents/skills/agm-error-manager-cli/skill.md` for `agm errors list|inspect|count|fix|clear` (Thanks to @aukgit)
+
+---
+
 ## [v4.259.0] - 2026-10-24
 
 ### Fixed
@@ -1251,6 +1265,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.260.0 (2026-10-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.259.0 (2026-10-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

@@ -163,7 +163,6 @@ pub(crate) async fn completions_prep_setup(
     let token_manager = state.token_manager.clone();
 
     let mut compression_applied = false;
-    let mut is_purified = false;
 
     if compression_level == "high" {
         let context_limit = if mapped_model.contains("flash") {
@@ -249,7 +248,6 @@ pub(crate) async fn completions_prep_setup(
                     );
 
                     openai_req = forked_req;
-                    is_purified = false;
 
                     let new_raw = crate::proxy::mappers::context_manager::ContextManager::estimate_openai_token_usage(&openai_req);
                     let new_usage = calibrator.calibrate(new_raw);
@@ -302,17 +300,17 @@ pub(crate) async fn completions_prep_setup(
     // [FIX #3485] Maximum number of retries for adaptive multi-account pool and single-account backoff (3 times for a single account, two rounds for the entire pool with multiple accounts)
     let max_attempts = crate::proxy::handlers::common::calculate_max_retry_attempts(pool_size);
 
-    let mut last_error = String::new();
-    let mut last_email: Option<String> = None;
-    let mut retry_state = RequestRetryState::default();
-    let mut retry_credentials: Option<(String, String, String, String, u64)> = None;
-    let mut failure_statuses = FailureStatusTracker::default();
-    let mut used_attempts = 0;
+    let last_error = String::new();
+    let last_email: Option<String> = None;
+    let retry_state = RequestRetryState::default();
+    let retry_credentials: Option<(String, String, String, String, u64)> = None;
+    let failure_statuses = FailureStatusTracker::default();
+    let used_attempts = 0;
 
     let clean_ms = clean_start.elapsed().as_micros() as f64 / 1000.0;
-    let mut norm_ms = 0.0f64;
-    let mut think_fill_ms = 0.0f64;
-    let mut ttft_ms = 0.0f64;
+    let norm_ms = 0.0f64;
+    let think_fill_ms = 0.0f64;
+    let ttft_ms = 0.0f64;
 
     if debug_logger::is_enabled(&debug_cfg) {
         let payload = json!({
@@ -331,7 +329,7 @@ pub(crate) async fn completions_prep_setup(
         .await;
     }
 
-    let mut force_rotate = false;
+    let force_rotate = false;
 
     Ok(CompletionsSetup {
         openai_req,

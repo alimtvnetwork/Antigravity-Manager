@@ -133,7 +133,7 @@ pub(crate) fn cmd_prompts_tree(args: &[String]) {
         .unwrap_or_else(|_| "default".to_string());
     let repo_filter = ctx.repo_path.as_deref();
     if ctx.json_output {
-        if is_daemon_running() {
+        if !ctx.local_only && is_daemon_running() {
             let path = format!("/prompts/tree?instanceId={}", target_instance);
             if let Ok(resp) =
                 forward_to_local_rest::<serde_json::Value>(reqwest::Method::GET, &path, None)
