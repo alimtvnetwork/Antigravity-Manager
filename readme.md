@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.257.2-3B82F6?style=flat-square" alt="Version v4.257.2">
+    <img src="https://img.shields.io/badge/Version-v4.257.3-3B82F6?style=flat-square" alt="Version v4.257.3">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,9 +116,9 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.257.2)**
+**Bar 2: Version-Based Installation (v4.257.3)**
 ```powershell
-& ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.257.2/install.ps1))) -Version "4.257.2"
+& ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.257.3/install.ps1))) -Version "v4.257.3"
 ```
 
 ---
@@ -130,9 +130,9 @@ irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/ins
 curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.sh | bash
 ```
 
-**Bar 2: Version-Based Installation (v4.257.2)**
+**Bar 2: Version-Based Installation (v4.257.3)**
 ```bash
-curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.257.2/install.sh | bash -s -- --version "4.257.2"
+curl -fsSL https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.257.3/install.sh | bash -s -- --version "v4.257.3"
 ```
 
 > [!TIP]
@@ -149,7 +149,7 @@ This version pinning matrix allows developers, enterprise deployments, and users
 <!-- STAMP:VERSION_PIN_TABLE_START -->
 | Target Release | Release Date | Quality Gate | Windows PowerShell (One-Liner) | Linux / macOS (Bash) | Git Tag Checkout |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| **v4.257.2** (Latest) | 2026-10-24 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.257.2/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.257.2/install.sh \| bash` | `git checkout v4.257.2` |
+| **v4.257.3** (Latest) | 2026-10-24 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.257.3/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.257.3/install.sh \| bash` | `git checkout v4.257.3` |
 | **v4.257.1** | 2026-10-24 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.257.1/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.257.1/install.sh \| bash` | `git checkout v4.257.1` |
 | **v4.257.0** | 2026-10-24 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.257.0/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.257.0/install.sh \| bash` | `git checkout v4.257.0` |
 | **v4.256.4** | 2026-10-24 | 🟢 Verified | `irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.256.4/install.ps1 \| iex` | `curl -fsSL https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/v4.256.4/install.sh \| bash` | `git checkout v4.256.4` |
@@ -646,7 +646,7 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 
 ## 📝 Changelog
 
-> Latest version **v4.257.2**: Prompt tree titles and file image URIs — placeholder titles use the prompt's first line, and images outside the workspace are `file:///` URIs the IDE can open. `agm prompts tree --json` reported 146 conversations, 0 untitled titles, and 0 raw drive image paths. (Thanks to @aukgit)
+> Latest version **v4.257.3**: Prompt tree titles and file image URIs — placeholder titles use the prompt's first line, and images outside the workspace are `file:///` URIs the IDE can open. `agm prompts tree --json` reported 146 conversations, 0 untitled titles, and 0 raw drive image paths. (Thanks to @aukgit)
 
 > Latest version **v4.257.0**: Prompt tree Current Conv, silent sync, and image files — Current conversation send keeps `conv-` ids on `agy --conversation` instead of opening a new chat; `agm prompt send --new` uses the `new` sentinel; background sync no longer draws the green top bar; clicking an attached image opens the disk file; dispatched image markdown stays workspace-relative. (Thanks to @aukgit)
 
