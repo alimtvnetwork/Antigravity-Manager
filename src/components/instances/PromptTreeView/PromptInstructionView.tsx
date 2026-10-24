@@ -656,7 +656,13 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
     const handleOpenPreview = (src: string, alt?: string) => {
         setContextMenu((prev) => ({ ...prev, isOpen: false }));
         const fileTarget = src.trim().replace(/^<|>$/g, '');
-        const isDiskFile = /^[a-zA-Z]:[\\/]/.test(fileTarget) || fileTarget.startsWith('file:');
+        const isPosixAbs =
+            fileTarget.startsWith('/') &&
+            !fileTarget.startsWith('file:') &&
+            !fileTarget.startsWith('http') &&
+            !fileTarget.startsWith('data');
+        const isDiskFile =
+            /^[a-zA-Z]:[\\/]/.test(fileTarget) || fileTarget.startsWith('file:') || isPosixAbs;
         if (isDiskFile) {
             void openFileInIde(src).catch((err: unknown) => {
                 useErrorStore.getState().trackWarning(err, {

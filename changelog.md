@@ -1,5 +1,14 @@
 # Changelog
 
+## [v4.261.0] - 2026-10-24
+
+### Fixed
+- Inspector markdown image clicks now open disk files through `openFileInIde` in `src/components/instances/PromptTreeView/PromptMarkdownPreview.tsx`. The in-app modal is only used for `data:`/`http` images or opener failure (Thanks to @aukgit)
+- POSIX absolute image paths are treated as disk files in `src/components/instances/PromptTreeView/PromptInstructionView.tsx` (Thanks to @aukgit)
+- Removed unused `mut` on `stderr_reader` in `src-tauri/src/modules/repo_db/agy.rs` (Thanks to @aukgit)
+
+---
+
 ## [v4.260.0] - 2026-10-24
 
 ### Fixed
@@ -1265,6 +1274,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.261.0 (2026-10-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.260.0 (2026-10-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

@@ -8,6 +8,7 @@ import { TruncatedContextCallout } from './TruncatedContextCallout';
 import { PromptImagePreviewModal } from './PromptImagePreviewModal';
 import { PromptImageContextMenu } from './PromptImageContextMenu';
 import { resolveImageSrc } from './clipboard';
+import { openFileInIde } from './markdown';
 
 export interface PromptMarkdownPreviewProps {
     content: string;
@@ -358,9 +359,32 @@ export function PromptMarkdownPreview({
     const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
 
     const handleImageClick = useCallback((src: string, alt?: string) => {
-        setPreviewImageSrc(src);
-        setPreviewAltText(alt || '');
-        setIsPreviewOpen(true);
+        const openModal = () => {
+            setPreviewImageSrc(src);
+            setPreviewAltText(alt || '');
+            setIsPreviewOpen(true);
+        };
+
+        const fileTarget = src.trim().replace(/^<|>$/g, '');
+        const isRemoteOrData = /^(https?:|data:)/i.test(fileTarget);
+        const isDiskFile =
+            !isRemoteOrData &&
+            (fileTarget.startsWith('file:') ||
+                /^[a-zA-Z]:[\\/]/.test(fileTarget) ||
+                fileTarget.startsWith('/'));
+
+        if (isDiskFile) {
+            void openFileInIde(src).catch((err: unknown) => {
+                useErrorStore.getState().trackWarning(err, {
+                    source: 'PromptMarkdownPreview.handleImageClick',
+                    triggerAction: 'open_image_file',
+                });
+                openModal();
+            });
+            return;
+        }
+
+        openModal();
     }, []);
 
     const handleImageContextMenu = useCallback((e: React.MouseEvent, src: string, alt?: string) => {

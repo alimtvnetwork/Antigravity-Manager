@@ -341,7 +341,7 @@ pub fn spawn_or_replace_prompt_via_agy(
                 let monitor_res = std::thread::Builder::new()
                     .name(format!("agy-monitor-{}", prompt_id))
                     .spawn(move || {
-                        let mut stderr_reader = child.stderr.take();
+                        let stderr_reader = child.stderr.take();
                         match child.wait() {
                             Ok(status) => {
                                 {

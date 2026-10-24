@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.261.0 (2026-10-24)**:
+        -   **[Inspector Image Open and Isolated Current Conv E2E] Markdown inspector clicks open IDE files, and Current Conv was re-proven on a new test instance without stopping the caller (Thanks to @aukgit)**:
+            -   **Description**: `handleImageClick` in `src/components/instances/PromptTreeView/PromptMarkdownPreview.tsx` now calls `openFileInIde` for `file:`, drive-letter, and POSIX `/` paths. `PromptInstructionView.tsx` treats POSIX absolute paths as disk files. `agy.rs` dropped unused `mut` on `stderr_reader`. `gitmap cargo build --bin agm` and `npm run build` passed. `agm prompts tree --json --local` reported 144 conversations, 0 untitled titles, 68 `file:///` paths. `agm prompts send --conversation conv-e2e-probe2` on a new `test-create` instance stored `session_id=conv-e2e-probe2`. Caller `default` and `v2-3127` stayed running. (Thanks to @aukgit)
+
     *   **v4.260.0 (2026-10-24)**:
         -   **[Prompt Tree Local E2E, Current Conv Isolation, File Image Open, and Single Action Capsule] Built `agm`, dumped the tree with `--local`, proved Current Conv on a new test instance, and cleaned that instance without stopping the caller IDE (Thanks to @aukgit)**:
             -   **Description**: `agm prompts tree --json --local` rebuilds titles and media in the current binary. The local dump reported 144 conversations, 0 untitled titles, 68 `file:///` image paths, and 0 raw drive paths. `workspace_relative_media` in `src-tauri/src/modules/repo_db/tree_node_conv.rs` now requires a path boundary and is used for active-prompt images. `agy_conversation_id` keeps `conv-` ids; `agm prompts send --conversation conv-e2e-probe` on `agm instances test-create` stored `session_id=conv-e2e-probe`. Image clicks use `openFileInIde`. Instance card actions are one capsule in `src/pages/instances/InstanceCardActions.tsx`. Error CLI skill: `.agents/skills/agm-error-manager-cli/skill.md`. (Thanks to @aukgit)
