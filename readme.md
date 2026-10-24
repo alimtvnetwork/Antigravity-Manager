@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.266.0-3B82F6?style=flat-square" alt="Version v4.266.0">
+    <img src="https://img.shields.io/badge/Version-v4.267.0-3B82F6?style=flat-square" alt="Version v4.267.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,7 +116,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.266.0)**
+**Bar 2: Version-Based Installation (v4.267.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.258.0/install.ps1))) -Version "v4.258.0"
 ```
@@ -645,6 +645,8 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
 ## 📝 Changelog
+
+> Latest version **v4.267.0**: Routine minor version bump — all 14 version locations synchronized via `scripts/bump-version.mjs`; no functional code changes in this bump, the v4.266.0 feature and fix set ships in its own release. (Thanks to @aukgit)
 
 > Latest version **v4.266.0**: Compact dispatch UI, anti-repeat random nudge dispatching & recent-on-top tree view — Streamlined Prompt Tree View and Rerun dispatch workflow with compact `<select>` dropdown reducing popup height by >75%; added `extractUsedNudgesFromConversation` to strictly exclude already used questions from multi-round rerun dispatches; inverted prompt turns and subagents to keep recent and running items on top; and added weekly quota UI fallback for unpopulated quota groups. (Thanks to @aukgit)
 

@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.266.0)
+> Professional AI Account Management & Protocol Proxy System (v4.267.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.266.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.267.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.267.0**: Routine minor version bump — all 14 version locations synchronized via `scripts/bump-version.mjs`; no functional code changes in this bump, the v4.266.0 feature and fix set ships in its own release. (Thanks to @aukgit)
 
 > Latest version **v4.266.0**: Compact dispatch UI, anti-repeat random nudge dispatching & recent-on-top tree view — Streamlined Prompt Tree View and Rerun dispatch workflow with compact `<select>` dropdown reducing popup height by >75%; added `extractUsedNudgesFromConversation` to strictly exclude already used questions from multi-round rerun dispatches; inverted prompt turns and subagents to keep recent and running items on top; and added weekly quota UI fallback for unpopulated quota groups. (Thanks to @aukgit)
 

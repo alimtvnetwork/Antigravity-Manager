@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.267.0] - 2026-10-25
+
+### Changed
+- Routine minor version bump from 4.266.0 to 4.267.0: all 14 version locations synchronized via `scripts/bump-version.mjs` (`package.json`, `package-lock.json`, `version.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, `src-tauri/hooks.nsh`, `Casks/antigravity-tools.rb`, `readme.md`, `readme_en.md`, `src/components/layout/MiniView.tsx`, `releases-manifest.json`, `changelog.md`, `changelog_en.md`). No functional code changes in this bump; the v4.266.0 feature and fix set ships in its own release (Thanks to @aukgit)
+
+---
+
 ## [v4.266.0] - 2026-10-25
 
 ### Added
@@ -1322,6 +1329,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.267.0 (2026-10-25)**:
+        -   **[Routine Minor Bump] Version sync to 4.267.0 with no functional code changes (Thanks to @aukgit)**:
+            -   **Description**: Routine minor version bump from 4.266.0 to 4.267.0: all 14 version locations synchronized via `scripts/bump-version.mjs` (`package.json`, `package-lock.json`, `version.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, `src-tauri/hooks.nsh`, `Casks/antigravity-tools.rb`, `readme.md`, `readme_en.md`, `src/components/layout/MiniView.tsx`, `releases-manifest.json`, `changelog.md`, `changelog_en.md`). No functional code changes in this bump; the v4.266.0 feature and fix set ships in its own release. (Thanks to @aukgit)
+
+
     *   **v4.266.0 (2026-10-25)**:
         -   **[Tree View & Rerun UX] Compact Dispatch UI, Anti-Repeat Random Nudge Selection & Recent-on-Top Hierarchy (Thanks to @aukgit)**:
             -   **Description**: Streamlined the Prompt Tree View and Rerun dispatch workflow: replaced verbose 17-item radio list and 37-variation bullet dump with a compact `<select>` dropdown and dynamic status pill (`Auto-picks random unused (N of 37 left)`); implemented `extractUsedNudgesFromConversation` in `src/components/instances/PromptTreeView/usePromptTreePromptActions.ts` to strictly exclude already used questions from multi-round rerun dispatches; inverted prompt turn and subagent hierarchy in `src/components/instances/PromptTreeView/ConversationNode.tsx` and `tierClassification.ts` to display running, queued, and newest turns on top; and added weekly quota fallback in `src/pages/instances/instanceCardData.ts` to ensure full GUI parity with CLI. (Thanks to @aukgit)
