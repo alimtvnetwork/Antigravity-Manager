@@ -327,7 +327,7 @@ export function TreePanel(props: TreePanelProps) {
     return (
         <div className="w-full flex-1 min-h-0 flex flex-col overflow-hidden">
             {/* Search Input & Filter Controls */}
-            <div className="relative z-10 bg-slate-50/95 dark:bg-[#0c0817]/95 backdrop-blur-md p-3 border-b border-slate-200 dark:border-[#40285e] shrink-0 space-y-2">
+            <div className="relative z-10 bg-slate-50/95 dark:bg-[#0c0817]/95 backdrop-blur-md px-2 py-1 border-b border-slate-200 dark:border-[#40285e] shrink-0 space-y-1">
                 {/* Project Scope Dropdown & Quick Pin Header */}
                 <div className="flex items-center justify-between gap-1.5 bg-white dark:bg-[#171025] px-2 py-1 rounded-lg border border-slate-200 dark:border-[#40285e]">
                     <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -390,13 +390,13 @@ export function TreePanel(props: TreePanelProps) {
 
                 {/* Search Input */}
                 <div className="relative">
-                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                    <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
                     <input
                         type="text"
                         placeholder="Search projects, convos, or prompts..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full rounded-lg bg-white dark:bg-[#171025] pl-9 pr-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#40285e] focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                        className="w-full rounded-lg bg-white dark:bg-[#171025] pl-8 pr-2 py-1 text-xs text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#40285e] focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                     />
                 </div>
 
@@ -594,7 +594,7 @@ export function TreePanel(props: TreePanelProps) {
             </div>
 
             {/* Tree Items List */}
-            <div className="flex-1 overflow-y-auto p-1.5 space-y-1">
+            <div className="flex-1 overflow-y-auto p-1 space-y-0.5">
                 {activeFilter === 'archived' ? (
                     effectiveArchivedProjects.length === 0 ? (
                         <div className="py-12 text-center text-xs text-slate-400">

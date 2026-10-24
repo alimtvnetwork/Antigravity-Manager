@@ -155,7 +155,7 @@ export function ModalHeader(props: ModalHeaderProps) {
                         type="button"
                         onClick={onResetTree}
                         disabled={isLoading || isResetting}
-                        className="flex items-center justify-center gap-1 h-7 px-2 text-[11px] font-semibold text-black bg-amber-400 hover:bg-amber-300 shadow-[0_2px_0_0_#92400e] active:translate-y-px active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center justify-center gap-1 h-7 px-2 text-[11px] font-semibold text-black bg-amber-400 hover:bg-amber-500 hover:text-black shadow-[0_2px_0_0_#92400e] active:translate-y-px active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Reset tree from disk transcripts"
                         aria-label="Reset"
                     >
@@ -168,7 +168,7 @@ export function ModalHeader(props: ModalHeaderProps) {
                         type="button"
                         onClick={onRefreshAll}
                         disabled={isLoading}
-                        className="flex items-center justify-center gap-1 h-7 px-2 text-[11px] font-semibold text-white bg-sky-600 hover:bg-sky-500 shadow-[0_2px_0_0_#0369a1] active:translate-y-px active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center justify-center gap-1 h-7 px-2 text-[11px] font-semibold text-white bg-sky-600 hover:bg-sky-800 shadow-[0_2px_0_0_#0369a1] active:translate-y-px active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Refresh the tree now. Automatic refresh follows the Sync interval only."
                         aria-label="Refresh"
                     >

@@ -6,7 +6,7 @@ import { formatRelativeRecency } from './formatters';
 import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { CopyFormat, type AgmConversationNode } from './types';
-import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
+import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, dispatchConversationId, workspaceImageMarkdown, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
 import { isGhostConversation } from './conversationGuards';
 import { persistClientCrash } from '../../../lib/error-listener';
 import { useErrorStore } from '../../../stores/error-store';
@@ -326,9 +326,11 @@ export function DetailHeader(props: DetailHeaderProps) {
         setRerunFlash(null);
         try {
             const targetInstId = selectedConversation.instance_id?.trim() || propInstanceId?.trim() || 'default';
-            const targetConvId = conversationTargetMode === 'new'
-                ? (newConversationTitle?.trim() || undefined)
-                : selectedConversation.conversation_id;
+            const targetConvId = dispatchConversationId(
+                conversationTargetMode,
+                selectedConversation.conversation_id,
+                Boolean(selectedConversation.is_running)
+            );
 
             // Resolve originalPrompt from active turns / prompt history rather than leaving it undefined
             let originalPrompt = activePromptText?.trim() || '';
@@ -364,11 +366,11 @@ export function DetailHeader(props: DetailHeaderProps) {
             if (existingMedia.length > 0) {
                 const missing = existingMedia.filter((p: string) => p && !promptWithImage.includes(p));
                 if (missing.length > 0) {
-                    promptWithImage += '\n\n' + missing.map((p: string, idx: number) => `![Turn Image ${idx + 1}](${p})`).join('\n\n');
+                    promptWithImage += '\n\n' + missing.map((p: string, idx: number) => workspaceImageMarkdown(p, effectiveRepoPath, idx + 1)).join('\n\n');
                 }
             }
             if (attachedImage && !promptWithImage.includes(attachedImage.path)) {
-                promptWithImage = `${promptWithImage.trim()}\n\n![attached-image](${attachedImage.path})`;
+                promptWithImage = `${promptWithImage.trim()}\n\n${workspaceImageMarkdown(attachedImage.path, effectiveRepoPath, existingMedia.length + 1)}`;
             }
 
             const rerunMediaList: string[] = Array.from(new Set([

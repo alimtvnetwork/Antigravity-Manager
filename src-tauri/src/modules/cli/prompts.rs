@@ -187,11 +187,12 @@ pub(crate) fn execute_prompts_send(sub_args: &[String]) {
     let is_json = is_flag_present(sub_args, &["--json", "-j"]);
     let instance_opt = extract_flag_value(sub_args, &["--instance", "-i", "--profile"]);
     let repo_opt = extract_flag_value(sub_args, &["--repo", "-r", "--workspace"]);
+    let conversation_opt = extract_flag_value(sub_args, &["--conversation"]);
     let positional = extract_positional_args(sub_args);
 
     if positional.is_empty() {
         eprintln!(
-            "Error: Usage: agm prompts send <prompt_text> [-i <instance>] [-r <repo>] [--json]"
+            "Error: Usage: agm prompts send <prompt_text> [-i <instance>] [-r <repo>] [--conversation <id>] [--json]"
         );
         std::process::exit(1);
     }
@@ -206,7 +207,12 @@ pub(crate) fn execute_prompts_send(sub_args: &[String]) {
             .unwrap_or_else(|_| ".".to_string())
     });
 
-    match repo_db::send_prompt_now_for_instance(&target_inst, &target_repo, &prompt_text, None) {
+    match repo_db::send_prompt_now_for_instance(
+        &target_inst,
+        &target_repo,
+        &prompt_text,
+        conversation_opt.as_deref(),
+    ) {
         Ok(active_prompt) => {
             if is_json {
                 let payload = serde_json::json!({
@@ -241,11 +247,12 @@ pub(crate) fn execute_prompts_enqueue(sub_args: &[String]) {
     let is_json = is_flag_present(sub_args, &["--json", "-j"]);
     let instance_opt = extract_flag_value(sub_args, &["--instance", "-i", "--profile"]);
     let repo_opt = extract_flag_value(sub_args, &["--repo", "-r", "--workspace"]);
+    let conversation_opt = extract_flag_value(sub_args, &["--conversation"]);
     let positional = extract_positional_args(sub_args);
 
     if positional.is_empty() {
         eprintln!(
-            "Error: Usage: agm prompts enqueue <prompt_text> [-i <instance>] [-r <repo>] [--json]"
+            "Error: Usage: agm prompts enqueue <prompt_text> [-i <instance>] [-r <repo>] [--conversation <id>] [--json]"
         );
         std::process::exit(1);
     }
@@ -264,7 +271,7 @@ pub(crate) fn execute_prompts_enqueue(sub_args: &[String]) {
         &target_inst,
         &prompt_text,
         Some(&target_repo),
-        None,
+        conversation_opt.as_deref(),
         None,
     ) {
         Ok(row_id) => {

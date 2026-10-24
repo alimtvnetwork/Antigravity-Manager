@@ -227,7 +227,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                 </button>
                             )}
                         </div>
-                        <div className="shrink-0 flex items-center gap-1">
+                        <div className="shrink-0 inline-flex items-center overflow-hidden rounded-full border border-slate-200 dark:border-[#40285e] divide-x divide-slate-200 dark:divide-[#40285e]">
                             {isActive ? (
                                 <span className={cn(ACTIVE_PILL_CLASSES, 'text-[9px] px-1.5 py-0.2 tracking-wider')}>
                                     Active
@@ -248,7 +248,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                     setEditTargetId(inst.config.id);
                                     setEditInstanceName(inst.config.name);
                                 }}
-                                className="p-1 rounded-[5px] text-gray-500 dark:text-[var(--ui-text-secondary)] hover:text-blue-600 dark:hover:text-[var(--ui-interactive)] hover:bg-blue-50 dark:hover:bg-[var(--ui-surface-hover)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="p-1 text-gray-500 dark:text-[var(--ui-text-secondary)] hover:text-blue-600 dark:hover:text-[var(--ui-interactive)] hover:bg-blue-50 dark:hover:bg-[var(--ui-surface-hover)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 title={t('instances.edit_title', 'Rename profile')}
                             >
                                 <Pencil className="w-3 h-3" />
@@ -256,7 +256,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                             <button
                                 disabled={isBusy}
                                 onClick={() => openCopyDialog(inst.config.id, inst.config.name)}
-                                className="p-1 rounded-[5px] text-gray-500 dark:text-[var(--ui-text-secondary)] hover:text-blue-600 dark:hover:text-[var(--ui-interactive)] hover:bg-blue-50 dark:hover:bg-[var(--ui-surface-hover)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="p-1 text-gray-500 dark:text-[var(--ui-text-secondary)] hover:text-blue-600 dark:hover:text-[var(--ui-interactive)] hover:bg-blue-50 dark:hover:bg-[var(--ui-surface-hover)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Clone / Duplicate profile settings and extensions"
                             >
                                 <Copy className="w-3 h-3" />
@@ -265,7 +265,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                 <button
                                     onClick={() => handleDelete(inst.config.id)}
                                     disabled={inst.is_running || isBusy || deletingId === inst.config.id}
-                                    className="p-1 rounded-[5px] text-gray-500 dark:text-[var(--ui-text-secondary)] hover:text-red-600 dark:hover:text-[var(--ui-danger)] hover:bg-red-50 dark:hover:bg-[var(--ui-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                                    className="p-1 text-gray-500 dark:text-[var(--ui-text-secondary)] hover:text-red-600 dark:hover:text-[var(--ui-danger)] hover:bg-red-50 dark:hover:bg-[var(--ui-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                                     title="Delete profile"
                                 >
                                     {currentAction === 'delete' ? (

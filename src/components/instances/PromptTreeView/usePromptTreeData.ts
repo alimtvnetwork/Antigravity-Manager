@@ -307,7 +307,6 @@ export function usePromptTreeData({
     initialSelectedProjectId,
 }: UsePromptTreeDataProps): PromptTreeData {
     const {
-        treeData,
         setTreeData,
         setIsLoading,
         setIsAutoSyncing,
@@ -675,8 +674,6 @@ export function usePromptTreeData({
                 // Immediate SWR render
                 setTreeData(cached.data);
                 performAutoSelection(cached.data, latestArchived, latestPinned);
-                // Revalidate in background using force: false to leverage backend SQLite cache
-                loadTree(false, false, latestArchived, latestPinned);
             } else {
                 // Initial load using force: false to leverage backend SQLite cache
                 loadTree(true, false, latestArchived, latestPinned);

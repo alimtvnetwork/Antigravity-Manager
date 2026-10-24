@@ -27,7 +27,21 @@ import {
 
 export { copyPromptWithRichImages } from './clipboard';
 
-function workspaceImageMarkdown(absPath: string, repoPath: string, index: number): string {
+export function dispatchConversationId(
+    mode: 'current' | 'new',
+    conversationId: string | undefined,
+    isRunning: boolean
+): string | undefined {
+    if (mode === 'new') {
+        return 'new';
+    }
+    if (isRunning) {
+        return undefined;
+    }
+    return conversationId;
+}
+
+export function workspaceImageMarkdown(absPath: string, repoPath: string, index: number): string {
     const normalized = absPath.replace(/\\/g, '/');
     const repo = repoPath.replace(/\\/g, '/').replace(/\/+$/, '');
     const hasRepoPrefix = repo.length > 0 && normalized.toLowerCase().startsWith(repo.toLowerCase());
@@ -445,9 +459,11 @@ export function usePromptTreePromptActions({
             }
             const repoPath = proj?.repo_path || selectedProject?.repo_path || (conv as { repo_path?: string })?.repo_path || '';
             const targetInstId = selectedConversation?.instance_id || conv?.instance_id || proj?.instance_id || instanceId || 'default';
-            const targetConvId = conversationTargetMode === 'new'
-                ? undefined
-                : conv?.conversation_id;
+            const targetConvId = dispatchConversationId(
+                conversationTargetMode,
+                conv?.conversation_id,
+                Boolean(conv?.is_running)
+            );
             if (conversationTargetMode === 'new' && newConversationTitle?.trim()) {
                 promptContent = `# ${newConversationTitle.trim()}\n\n${promptContent}`;
             }
@@ -687,9 +703,11 @@ ${activePromptText}
             }
             const repoPath = proj?.repo_path || selectedProject?.repo_path || (conv as { repo_path?: string })?.repo_path || '';
             const targetInstId = selectedConversation?.instance_id || conv.instance_id || proj?.instance_id || instanceId || 'default';
-            const targetConvId = conversationTargetMode === 'new'
-                ? undefined
-                : conv.conversation_id;
+            const targetConvId = dispatchConversationId(
+                conversationTargetMode,
+                conv.conversation_id,
+                Boolean(conv.is_running)
+            );
             if (conversationTargetMode === 'new' && newConversationTitle?.trim()) {
                 promptContent = `# ${newConversationTitle.trim()}\n\n${promptContent}`;
             }

@@ -68,7 +68,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                                 type="button"
                                                                 disabled={isBusy}
                                                                 onClick={() => handleStop(inst.config.id, inst.pid ?? undefined)}
-                                                                className="flex-1 flex items-center justify-center py-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-l-[4px] transition-colors cursor-pointer disabled:opacity-50"
+                                                                className="flex-1 flex items-center justify-center py-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer disabled:opacity-50"
                                                                 title="Stop Instance"
                                                             >
                                                                 {currentAction === 'stop' ? (
@@ -96,7 +96,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                             type="button"
                                                             disabled={isBusy}
                                                             onClick={() => handleLaunch(inst.config.id)}
-                                                            className="flex-1 flex items-center justify-center py-1 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 rounded-l-[4px] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            className="flex-1 flex items-center justify-center py-1 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                             title="Launch Instance"
                                                         >
                                                             {currentAction === 'launch' ? (
@@ -149,7 +149,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                         type="button"
                                                         disabled={isBusy || Boolean(syncingInstanceIds[inst.config.id])}
                                                         onClick={() => handleSync(inst.config.id)}
-                                                        className="flex-1 flex items-center justify-center py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#40285e] rounded-r-[4px] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                        className="flex-1 flex items-center justify-center py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                         title="Sync PID and Quota"
                                                     >
                                                         <Cpu className={cn("w-3.5 h-3.5 text-teal-500", (currentAction === 'sync' || syncingInstanceIds[inst.config.id]) && "animate-pulse")} />
@@ -157,7 +157,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                 </div>
 
                                                 {/* Row 2: Secondary Actions Capsule (Prompts Tree, Settings, Clone Profile, Audit, More Popover) */}
-                                                <div className="flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#090611] border border-slate-200/80 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs w-full relative">
+                                                <div className="flex items-center rounded-full overflow-hidden bg-slate-100 dark:bg-[#090611] border border-slate-200/80 dark:border-[#40285e] divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs w-full relative">
                                                     {/* Slot 1: Prompts Tree */}
                                                     <button
                                                         id={`prompt-tree-btn-${inst.config.id}`}
@@ -165,7 +165,7 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                                                         disabled={isBusy}
                                                         onClick={() => openPromptTree(inst.config.id)}
                                                         className={cn(
-                                                            "flex-1 flex items-center justify-center py-1 transition-colors cursor-pointer relative rounded-l-[4px] disabled:opacity-50 disabled:cursor-not-allowed",
+                                                            "flex-1 flex items-center justify-center py-1 transition-colors cursor-pointer relative disabled:opacity-50 disabled:cursor-not-allowed",
                                                             hasActiveTask
                                                                 ? "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-300 hover:bg-cyan-100 dark:hover:bg-cyan-900/50"
                                                                 : "text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 hover:bg-slate-200 dark:hover:bg-[#40285e]"

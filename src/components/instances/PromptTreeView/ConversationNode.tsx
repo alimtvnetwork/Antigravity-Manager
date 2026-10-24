@@ -165,7 +165,7 @@ export function ConversationNode({
                     });
                 }}
                 className={cn(
-                    'group flex items-center justify-between rounded-md px-1.5 py-0.5 text-xs cursor-pointer transition-colors duration-150 relative outline-none focus-visible:ring-1 focus-visible:ring-purple-500/50 border border-transparent',
+                    'group flex items-center justify-between rounded-md px-1.5 py-0.5 text-xs cursor-pointer transition-colors duration-150 relative outline-none focus-visible:!outline-none border border-transparent',
                     isSelected && selectedTurnNumber === null
                         ? 'bg-gradient-to-r from-violet-600/30 to-purple-600/20 text-white font-medium'
                         : isSelected
@@ -405,10 +405,10 @@ export function ConversationNode({
                                     });
                                 }}
                                 className={cn(
-                                    "group/turn flex items-center justify-between rounded-md px-1.5 py-1 text-xs cursor-pointer transition-colors outline-none focus-visible:ring-1 focus-visible:ring-sky-500/50",
+                                    "group/turn flex items-center justify-between rounded-md px-1.5 py-1 text-xs cursor-pointer transition-colors outline-none focus-visible:!outline-none border-l-2",
                                     isTurnActive
-                                        ? "bg-sky-500/10 border-l-2 border-sky-500 text-sky-400 font-medium"
-                                        : "hover:bg-slate-100 dark:hover:bg-[#1a1228]"
+                                        ? "bg-sky-500/10 border-sky-500 text-sky-400 font-medium"
+                                        : "border-transparent hover:bg-slate-100 dark:hover:bg-[#1a1228]"
                                 )}
                                 title={`Turn ${turn.turn_number} (${turn.status}) · Click to inspect prompt`}
                             >

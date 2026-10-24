@@ -37,6 +37,7 @@ fn agy_conversation_id(session: &str) -> Option<&str> {
         || trimmed == "-"
         || trimmed.starts_with("conv-")
         || trimmed.starts_with("proj-")
+        || trimmed == "new"
         || trimmed.starts_with("p-")
         || trimmed.starts_with("queued-")
     {
@@ -1412,7 +1413,8 @@ mod agy_flag_tests {
             agy_conversation_id("prompt-bc221407-c445-415a-9034-b1179a550a79"),
             Some("bc221407-c445-415a-9034-b1179a550a79")
         );
-        assert_eq!(agy_conversation_id("p-12345678"), None);
+        assert_eq!(agy_conversation_id("new"), None);
+    assert_eq!(agy_conversation_id("p-12345678"), None);
         assert_eq!(agy_conversation_id("queued-12345678"), None);
         assert_eq!(agy_conversation_id("repo__default"), None);
         assert_eq!(agy_conversation_id("C:/repo"), None);

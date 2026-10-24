@@ -134,7 +134,7 @@ function ConversationListWithGrouping({
     return (
         <>
             {hierarchy.map((root, rIdx) => (
-                <div key={`root-${root.primaryNode.conversation_id}`} className="space-y-1.5">
+                <div key={`root-${root.primaryNode.conversation_id}`} className="space-y-0.5">
                     <ConversationNode
                         conv={root.primaryNode}
                         project={project}
@@ -151,7 +151,7 @@ function ConversationListWithGrouping({
 
                     {/* Rendering Child Sub-Points (Indented with Branch Glyphs) */}
                     {root.subagents.length > 0 && (
-                        <div className="ml-5 pl-3 space-y-1.5 border-l-2 border-purple-300/40 dark:border-purple-800/40 my-1">
+                        <div className="ml-5 pl-3 space-y-0.5 border-l-2 border-purple-300/40 dark:border-purple-800/40">
                             {root.subagents.map((subNode, subIdx) => {
                                 const isSubSelected = selectedConversationId === subNode.primaryNode.conversation_id;
                                 const { isRunning: isSubRunning } = getConversationStatus(subNode.primaryNode);
@@ -558,7 +558,7 @@ export function ProjectNode(props: ProjectNodeProps) {
             {/* Layer 2: Conversations List */}
             {(isExpanded || isScopedSingleProject) && (
                 <div className={cn(
-                    "space-y-2 py-1",
+                    "space-y-0.5 py-0.5",
                     !isScopedSingleProject && "ml-5 pl-3 border-l-2 border-slate-300/60 dark:border-purple-900/50"
                 )}>
                     {/* Active Conversations */}

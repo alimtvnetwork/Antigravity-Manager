@@ -1711,6 +1711,34 @@ main() {
     local is_update_only=0
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            --build-tools|--toolchain)
+                local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+                local toolchain_script="${script_dir}/scripts/install-rust-toolchain.sh"
+                if [[ -f "$toolchain_script" ]]; then
+                    shift
+                    exec sh "$toolchain_script" install --profile agm-build-tools "$@"
+                fi
+                ;;
+            --clear-downloads|--clear-cache)
+                local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+                local toolchain_script="${script_dir}/scripts/install-rust-toolchain.sh"
+                if [[ -f "$toolchain_script" ]]; then
+                    shift
+                    exec sh "$toolchain_script" --clear-downloads "$@"
+                fi
+                ;;
+            --profile)
+                if [[ $# -gt 1 && "$2" =~ ^(build-tools|agm-build-tools|dev-rust|rust-dev|minimal|full)$ ]]; then
+                    local p="$2"
+                    shift 2
+                    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+                    local toolchain_script="${script_dir}/scripts/install-rust-toolchain.sh"
+                    if [[ -f "$toolchain_script" ]]; then
+                        exec sh "$toolchain_script" install --profile "$p" "$@"
+                    fi
+                fi
+                shift
+                ;;
             --help|-h)
                 show_help
                 ;;

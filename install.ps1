@@ -47,7 +47,13 @@ param(
     [switch]$Update,
     [switch]$NoLaunch,
     [switch]$Force,
-    [switch]$isPinned
+    [switch]$isPinned,
+    [switch]$BuildTools,
+    [string]$Profile = "",
+    [string]$CacheDir = "",
+    [switch]$ClearDownloads,
+    [switch]$ClearCache,
+    [switch]$VerifyOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -1021,6 +1027,34 @@ function Pin-StartMenuOnce {
     try {
         Set-Content -Path $pinMarker -Value "pinned" -Force -ErrorAction SilentlyContinue
     } catch {}
+}
+
+# --- CLEAR DOWNLOADS / CACHE FLOW ---
+if ($ClearDownloads -or $ClearCache) {
+    $toolchainScript = Join-Path $PSScriptRoot "scripts\install-rust-toolchain.ps1"
+    if (Test-Path $toolchainScript) {
+        & $toolchainScript -ClearDownloads
+    } else {
+        Write-Warn "scripts/install-rust-toolchain.ps1 not found."
+    }
+    exit 0
+}
+
+# --- BUILD TOOLS / TOOLCHAIN FLOW ---
+if ($BuildTools -or ($Profile -and $Profile -match '^(build-tools|agm-build-tools|dev-rust|rust-dev|minimal|full)$')) {
+    $toolchainScript = Join-Path $PSScriptRoot "scripts\install-rust-toolchain.ps1"
+    if (-not (Test-Path $toolchainScript)) {
+        Write-Err "Toolchain installer not found at: $toolchainScript"
+        exit 1
+    }
+    $toolchainParams = @{}
+    if ($Profile) { $toolchainParams["Profile"] = @($Profile) } else { $toolchainParams["Profile"] = @("agm-build-tools") }
+    if ($CacheDir) { $toolchainParams["CacheDir"] = $CacheDir }
+    if ($DryRun) { $toolchainParams["DryRun"] = $true }
+    if ($Force) { $toolchainParams["Force"] = $true }
+    if ($VerifyOnly) { $toolchainParams["VerifyOnly"] = $true }
+    & $toolchainScript @toolchainParams
+    exit $LASTEXITCODE
 }
 
 # --- UNINSTALL FLOW ---
