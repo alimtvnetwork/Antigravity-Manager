@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.266.0 (2026-10-25)**:
+        -   **[Tree View & Rerun UX] Compact Dispatch UI, Anti-Repeat Random Nudge Selection & Recent-on-Top Hierarchy (Thanks to @aukgit)**:
+            -   **Description**: Streamlined the Prompt Tree View and Rerun dispatch workflow: replaced verbose 17-item radio list and 37-variation bullet dump with a compact `<select>` dropdown and dynamic status pill (`Auto-picks random unused (N of 37 left)`); implemented `extractUsedNudgesFromConversation` in `src/components/instances/PromptTreeView/usePromptTreePromptActions.ts` to strictly exclude already used questions from multi-round rerun dispatches; inverted prompt turn and subagent hierarchy in `src/components/instances/PromptTreeView/ConversationNode.tsx` and `tierClassification.ts` to display running, queued, and newest turns on top; and added weekly quota fallback in `src/pages/instances/instanceCardData.ts` to ensure full GUI parity with CLI. (Thanks to @aukgit)
+
     *   **v4.265.0 (2026-10-25)**:
         -   **[CI Concurrency SHA Scoping & Release Resilience] Isolated main branch CI concurrency to commit SHA to prevent rapid sequential push cancellations (Thanks to @aukgit)**:
             -   **Description**: Scoped CI concurrency group on `main` in `.github/workflows/ci.yml` to the specific commit SHA (`group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}`), ensuring subsequent commits on `main` never cancel in-flight CI workflows. Expanded 4-part Root Cause Analysis in `.ai-memory/cicd-issues/47-release-gate-ci-race-condition-rca.md` and verified clean release gate polling and execution. (Thanks to @aukgit)
