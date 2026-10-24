@@ -1,5 +1,14 @@
 # Changelog
 
+## [v4.257.0] - 2026-10-24
+
+### Fixed
+- Current conversation send keeps `conv-` conversation ids on `agy --conversation` instead of opening a new chat. The `new` sentinel still starts a new chat, and `agm prompt send --new` uses that sentinel instead of a synthetic `conv-{uuid}` (Thanks to @aukgit)
+- Background prompt-tree sync no longer draws the green bar across the top. The tree reloads on the Sync interval or the Refresh button (Thanks to @aukgit)
+- Clicking an attached image opens the disk file. Dispatched image markdown stays workspace-relative (Thanks to @aukgit)
+
+---
+
 ## [v4.256.2] - 2026-10-24
 
 ### Added
@@ -1204,6 +1213,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.257.0 (2026-10-24)**:
+        -   **[Prompt Tree Current Conversation, Silent Sync, and Image Files] Current Conv passes real `conv-` ids to `agy --conversation`, background sync no longer paints a layout-shifting bar, and image clicks open the file (Thanks to @aukgit)**:
+            -   **Description**: `agy_conversation_id` in `src-tauri/src/modules/repo_db/agy.rs` now keeps `conv-` conversation ids and still rejects `new`, `p-`, `proj-`, `queued-`, and path-like values. `agm prompt send --new` and a send with no session pass the `new` sentinel in `src-tauri/src/bin/agm/prompt_cmds.rs`. The prompt tree hides the top progress bar during background sync in `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx`. Thumbnail clicks open the disk file through the opener in `src/components/instances/PromptTreeView/PromptInstructionView.tsx`. Verified with `cargo build --bin agm`, the conversation-id unit test, `npm run build`, and `agm errors list`. (Thanks to @aukgit)
+
+
     *   **v4.256.0 (2026-10-24)**:
         -   **[Single-Prompt Resume After Switch & Fast-Forward] After an account switch or fast-forward, re-dispatch exactly one prompt — the most recently active backed-up prompt strictly belonging to the target instance — while every other backed-up prompt stays backed up, replacing the previous whole-queue re-injection (Thanks to @aukgit)**:
             -   **Description**: Added `dispatch_single_latest_prompt` in `src-tauri/src/modules/repo_db/dispatch.rs`, which selects the single most recently active backed-up prompt for the target instance (greatest `updated_at`, ties broken by `created_at` then `id`) under a strict instance match with no cross-instance fallback, and sends it through the same resume-file + agy/CDP path as full dispatch; the STAGE_5_RESTORE stage in `src-tauri/src/modules/instance/post_switch_resume.rs` now uses this single-prompt dispatch, `has_auto_resume = false` fully suppresses the re-dispatch while restore bookkeeping still runs, and the duplicate inline auto-resume of recent prompts was removed from the switch path in `src-tauri/src/modules/instance/workspace.rs` so resume happens exactly once after the prompt channel is up (the manual auto-resume command path is unchanged); FIFO ordering of the remaining backlog is unchanged, and unit tests cover the latest-prompt selection. (Thanks to @aukgit)
