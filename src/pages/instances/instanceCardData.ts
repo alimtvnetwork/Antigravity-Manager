@@ -56,9 +56,15 @@ export function useInstanceCardData(
     const displayEmail =
         inst.config.bound_email || boundAccount?.email || (isActive && curEmail ? curEmail : null);
 
-    const geminiPro = findQuotaModel(boundAccount?.quota?.models, 'gemini-pro');
+    const targetModel = config?.auto_profile_switcher?.target_model;
+    const targetQuotaModel = targetModel
+        ? boundAccount?.quota?.models?.find(
+              (m) => m.name.toLowerCase() === targetModel.toLowerCase() || m.name.toLowerCase().includes(targetModel.toLowerCase())
+          )
+        : undefined;
     const geminiFlash = findQuotaModel(boundAccount?.quota?.models, 'gemini-flash');
-    const geminiModel = geminiPro || geminiFlash || null;
+    const geminiPro = findQuotaModel(boundAccount?.quota?.models, 'gemini-pro');
+    const geminiModel = targetQuotaModel || geminiFlash || geminiPro || null;
 
     const weeklyBucket = (boundAccount?.quota?.quota_groups || [])
         .find((item) => {

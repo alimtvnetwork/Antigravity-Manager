@@ -26,6 +26,8 @@ export {
     findImageQuotaModel,
     ensurePinnedImageSelector,
     DEFAULT_IMAGE_PIN_SELECTOR,
+    DEFAULT_LATEST_MODEL_LABEL,
+    DEFAULT_LATEST_MODEL_ID,
     resolveQuotaModels,
     type ModelCategory,
     type QuotaModelSelection,

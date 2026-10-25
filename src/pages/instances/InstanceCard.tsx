@@ -16,6 +16,7 @@ import { maskEmail } from '../../utils/maskEmail';
 import { Gemini } from '@lobehub/icons';
 import { TierBadge } from '../../components/common/TierBadge';
 import { QuotaProgressBar } from '../../components/accounts/QuotaProgressBar';
+import { DEFAULT_LATEST_MODEL_LABEL, getModelDisplayName } from '../../config/modelConfig';
 import { SELECTED_CARD_CLASSES, ACTIVE_PILL_CLASSES } from '../../components/common/selectedState';
 import { showToast } from '../../components/common/ToastContainer';
 import type { InstanceStatus } from '../../services/instanceService';
@@ -46,8 +47,8 @@ function InstanceCardQuotaSection({
                         <div className="flex items-center justify-between text-xs">
                             <div className="flex items-center gap-1.5 min-w-0">
                                 <Gemini.Color className="w-3.5 h-3.5 shrink-0" />
-                                <span className="font-semibold text-gray-800 dark:text-gray-200 text-xs truncate transition-colors rounded-sm group-hover:bg-[#FACC15] group-hover:text-black dark:group-hover:text-zinc-950">
-                                    {geminiModel.display_name || geminiModel.name || 'Gemini 3.1 Pro'} (4H)
+                                <span className="font-semibold text-gray-800 dark:text-gray-200 text-xs truncate">
+                                    {geminiModel.display_name || (geminiModel.name ? getModelDisplayName(geminiModel) : DEFAULT_LATEST_MODEL_LABEL)} (4H)
                                 </span>
                             </div>
                         </div>
@@ -60,7 +61,7 @@ function InstanceCardQuotaSection({
                 {weeklyQuota && (
                     <div className={cn('space-y-0.5', geminiModel && 'pt-1 border-t border-gray-200/60 dark:border-[#40285e]/60')}>
                         <div className="flex items-center justify-between text-xs">
-                            <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300 transition-colors rounded-sm group-hover:bg-[#FACC15] group-hover:text-black dark:group-hover:text-zinc-950">
+                            <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">
                                 Weekly Quota
                             </span>
                         </div>
@@ -184,7 +185,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                 className={cn(
                                     'w-2.5 h-2.5 rounded-full shrink-0',
                                     inst.is_running
-                                        ? 'bg-[#1af18d] shadow-[0_0_6px_rgba(26,241,141,0.9)] animate-pulse'
+                                        ? 'bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]'
                                         : 'bg-gray-300 dark:bg-gray-600'
                                 )}
                             />
@@ -204,10 +205,10 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                 <button
                                     type="button"
                                     onClick={() => openPromptTree(inst.config.id)}
-                                    className="inline-flex items-center gap-1 px-1.5 h-5 rounded-[5px] text-[9px] font-bold bg-[#1af18d]/15 hover:bg-[#1af18d]/25 text-emerald-700 dark:text-[#1af18d] border border-[#1af18d]/30 shrink-0 cursor-pointer transition-colors shadow-2xs"
+                                    className="inline-flex items-center gap-1 px-1.5 h-5 rounded-[5px] text-[9px] font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 shrink-0 cursor-pointer transition-colors shadow-2xs"
                                     title="Active prompt/task running - Click to open Prompt Tree"
                                 >
-                                    <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] shadow-[0_0_4px_rgba(26,241,141,0.9)] animate-pulse shrink-0" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_3px_rgba(16,185,129,0.5)] shrink-0" />
                                     <span>Prompt</span>
                                 </button>
                             )}
@@ -305,8 +306,8 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                             : `${maskEmail(displayEmail)} (Click to reveal)`
                                     }
                                 >
-                                    <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-500 dark:bg-[#1af18d]" />
-                                    <span className="truncate transition-colors rounded-sm group-hover:bg-[#FACC15] group-hover:text-black dark:group-hover:text-zinc-950 hover:bg-[#FDE047] hover:text-black">
+                                    <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-500 dark:bg-sky-400" />
+                                    <span className="truncate transition-colors">
                                         {isEmailRevealed ? displayEmail : maskEmail(displayEmail)}
                                     </span>
                                 </button>
@@ -332,20 +333,20 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                         <div className="flex items-center justify-between gap-1.5 flex-wrap">
                             {inst.is_running ? (
                                 <span
-                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#1af18d]/10 text-emerald-700 dark:text-[#1af18d] border border-[#1af18d]/30 shadow-2xs font-mono backdrop-blur-xs"
+                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 shadow-2xs font-mono backdrop-blur-xs"
                                     title={inst.pid ? `Process ID (PID): ${inst.pid} — Active and Running` : 'Process ID (PID): Active and Running'}
                                 >
-                                    <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] shadow-[0_0_4px_rgba(26,241,141,0.9)] animate-pulse shrink-0" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_3px_rgba(16,185,129,0.5)] shrink-0" />
                                     <span>Running</span>
                                     {inst.pid ? (
                                         <>
-                                            <span className="text-emerald-500/50 dark:text-[#1af18d]/50 font-sans select-none">·</span>
+                                            <span className="text-emerald-500/50 dark:text-emerald-400/50 font-sans select-none">·</span>
                                             <span>PID: {inst.pid}</span>
                                         </>
                                     ) : null}
                                     {inst.memory_mb ? (
                                         <>
-                                            <span className="text-emerald-500/50 dark:text-[#1af18d]/50 font-sans select-none">·</span>
+                                            <span className="text-emerald-500/50 dark:text-emerald-400/50 font-sans select-none">·</span>
                                             <span>{Math.round(inst.memory_mb)}MB</span>
                                         </>
                                     ) : null}

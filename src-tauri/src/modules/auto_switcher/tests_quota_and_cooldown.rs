@@ -73,4 +73,37 @@ mod tests {
         let predicted = tracker.predict_next_reset("unknown_account", 5000);
         assert_eq!(predicted, 5000 + 18000);
     }
+
+    #[test]
+    fn test_calculate_claude_quota_and_limit_detection() {
+        use super::super::quota::{calculate_claude_quota, is_account_claude_limited};
+        use super::super::tests_a::make_test_account;
+
+        // Account with healthy Claude model
+        let mut acc = make_test_account("acc1", "user1@example.com", "claude-sonnet-4-6", 80, "");
+        assert_eq!(calculate_claude_quota(&acc), Some(80.0));
+        assert!(!is_account_claude_limited(&acc, 15.0, 1000));
+
+        // Account with low Claude model
+        acc.quota.as_mut().unwrap().models[0].percentage = 10;
+        assert_eq!(calculate_claude_quota(&acc), Some(10.0));
+        assert!(is_account_claude_limited(&acc, 15.0, 1000));
+
+        // Account with live rate limit for Claude
+        let mut acc_limited =
+            make_test_account("acc2", "user2@example.com", "gemini-3.8-flash", 100, "");
+        acc_limited.live_limited_models.insert(
+            "claude-sonnet-4-6".to_string(),
+            crate::models::account::LiveLimitStatus {
+                model: "claude-sonnet-4-6".to_string(),
+                status: 429,
+                reason: "QuotaExhausted".to_string(),
+                until: 2000,
+                detected_at: 1000,
+                message: Some("QUOTA_EXHAUSTED".to_string()),
+            },
+        );
+        assert!(is_account_claude_limited(&acc_limited, 15.0, 1000));
+        assert!(!is_account_claude_limited(&acc_limited, 15.0, 3000));
+    }
 }

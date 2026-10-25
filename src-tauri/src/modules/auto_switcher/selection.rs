@@ -42,6 +42,10 @@ pub(crate) fn is_account_period_finished(acc: &Account, target_model: &str, now_
 /// Check if account is in proxy rate limit cooldown for target model (or account-wide 429)
 pub(crate) fn is_account_rate_limited(acc: &Account, target_model: &str, now_sec: i64) -> bool {
     let target = target_model.trim().to_lowercase();
+    let is_target_claude = target.contains("claude")
+        || target.contains("sonnet")
+        || target.contains("opus")
+        || target.contains("haiku");
     acc.live_limited_models.iter().any(|(model, status)| {
         if status.until <= now_sec {
             return false;
@@ -52,6 +56,12 @@ pub(crate) fn is_account_rate_limited(acc: &Account, target_model: &str, now_sec
             || (!target.is_empty() && (m.contains(&target) || target.contains(&m)))
             || (target.contains("flash") && m.contains("flash"))
             || (target.contains("pro") && m.contains("pro"))
+            || (is_target_claude
+                && (m.contains("claude")
+                    || m.contains("sonnet")
+                    || m.contains("opus")
+                    || m.contains("haiku")
+                    || m.contains("3p")))
     })
 }
 
@@ -261,6 +271,13 @@ pub fn select_candidate_profiles(
                 ));
                 continue;
             }
+            if is_account_claude_limited(&acc, 15.0, now_sec) {
+                logger::log_info(&format!(
+                    "[AutoSwitcher] Bound account '{}' has reached Claude limits. Skipping...",
+                    acc.email
+                ));
+                continue;
+            }
             // Strictly skip accounts leased by another active machine/node
             if crate::modules::workspace_lease_manager::is_account_or_email_leased_by_other(
                 &acc.id, &acc.email,
@@ -309,6 +326,13 @@ pub fn select_candidate_profiles(
             logger::log_info(&format!(
                 "[AutoSwitcher] Account '{}' is currently in proxy rate-limit cooldown for model '{}'. Skipping...",
                 acc.email, target_model
+            ));
+            continue;
+        }
+        if is_account_claude_limited(acc, 15.0, now_sec) {
+            logger::log_info(&format!(
+                "[AutoSwitcher] Account '{}' has reached Claude limits. Skipping...",
+                acc.email
             ));
             continue;
         }

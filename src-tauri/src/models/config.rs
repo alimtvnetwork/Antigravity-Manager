@@ -334,6 +334,9 @@ fn default_account_cooldown_minutes() -> u32 {
     60
 }
 
+pub const DEFAULT_TARGET_MODEL: &str = "gemini-3.8-flash-high";
+pub const DEFAULT_EVALUATION_MODEL_LABEL: &str = "Gemini 3.8 Flash";
+
 /// Auto profile switcher configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutoProfileSwitcherConfig {
@@ -406,7 +409,7 @@ impl Default for AutoProfileSwitcherConfig {
             is_enabled: true,
             check_interval_seconds: 300,
             low_quota_threshold_percent: 15.0,
-            target_model: "gemini-3.8-flash-high".to_string(),
+            target_model: DEFAULT_TARGET_MODEL.to_string(),
             has_auto_resume: true,
             cooldown_seconds: 180,
             caution_interval_seconds: 60,

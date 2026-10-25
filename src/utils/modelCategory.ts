@@ -20,13 +20,20 @@ export interface ModelDisplayNameInput {
     display_name?: string;
 }
 
+export const DEFAULT_LATEST_MODEL_LABEL = 'Gemini 3.8 Flash';
+export const DEFAULT_LATEST_MODEL_ID = 'gemini-3.8-flash';
+
 const DEFAULT_MODEL_LABELS: Record<string, string> = {
     'gemini-pro-agent': 'gemini-3.1-pro-high',
     'gemini-3.1-pro-high': 'gemini-3.1-pro-high',
     'gemini-3.1-pro': 'gemini-3.1-pro',
     'gemini-3.1-pro-low': 'gemini-3.1-pro-low',
     'gemini-2.5-pro': 'gemini-2.5-pro',
-    'gemini-3.8-flash': 'gemini-3.8-flash',
+    'gemini-3.8-flash': 'Gemini 3.8 Flash',
+    'gemini-3.8-flash-tiered': 'Gemini 3.8 Flash',
+    'gemini-3.8-flash-high': 'Gemini 3.8 Flash (High)',
+    'gemini-3.8-flash-medium': 'Gemini 3.8 Flash (Medium)',
+    'gemini-3.8-flash-low': 'Gemini 3.8 Flash (Low)',
     'gemini-3.7-flash': 'gemini-3.7-flash',
     'gemini-3.5-flash': 'gemini-3.5-flash',
     'gemini-3-flash': 'gemini-3-flash',
@@ -62,7 +69,14 @@ export function findQuotaModel<T extends { name: string }>(
     if (!models || models.length === 0) return undefined;
     const preferred: Partial<Record<ModelCategory, string[]>> = {
         'gemini-pro': ['gemini-pro-agent', 'gemini-3.1-pro-high', 'gemini-3.1-pro', 'gemini-3.1-pro-low', 'gemini-2.5-pro'],
-        'gemini-flash': ['gemini-3-flash-agent', 'gemini-3-flash', 'gemini-3.5-flash'],
+        'gemini-flash': [
+            'gemini-3.8-flash',
+            'gemini-3.8-flash-high',
+            'gemini-3.8-flash-tiered',
+            'gemini-3-flash-agent',
+            'gemini-3-flash',
+            'gemini-3.5-flash',
+        ],
         'claude': ['claude-sonnet-4-6', 'claude-opus-4-6-thinking'],
     };
     const names = preferred[category];

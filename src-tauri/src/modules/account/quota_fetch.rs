@@ -66,7 +66,7 @@ pub(crate) fn store_l1_quota_cache(account_id: &str, quota_data: &QuotaData, now
 
     let target_model = crate::modules::config::load_app_config()
         .map(|c| c.auto_profile_switcher.target_model)
-        .unwrap_or_else(|_| "gemini-2.5-pro".to_string());
+        .unwrap_or_else(|_| crate::models::config::DEFAULT_TARGET_MODEL.to_string());
 
     let mut detected_percentage: Option<f64> = None;
 

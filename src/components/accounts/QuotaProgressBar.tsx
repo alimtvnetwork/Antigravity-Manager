@@ -37,11 +37,11 @@ export function QuotaProgressBar({
     const clamped = Math.min(100, Math.max(0, Number.isFinite(percentage) ? percentage : 0));
 
     const getPercentColorClass = (pct: number) => {
-        if (pct >= 80) return 'text-[#1af18d] dark:text-[#1af18d]';
-        if (pct >= 60) return 'text-[#10b981] dark:text-[#10b981]';
-        if (pct >= 40) return 'text-[#eab308] dark:text-[#eab308]';
-        if (pct >= 20) return 'text-[#f97316] dark:text-[#f97316]';
-        return 'text-[#ef4444] dark:text-[#ef4444]';
+        if (pct >= 80) return 'text-emerald-500 dark:text-emerald-400';
+        if (pct >= 60) return 'text-teal-500 dark:text-teal-400';
+        if (pct >= 40) return 'text-amber-500 dark:text-amber-400';
+        if (pct >= 20) return 'text-orange-500 dark:text-orange-400';
+        return 'text-rose-500 dark:text-rose-400';
     };
 
     const getMilestoneNodeStyle = (cp: number, isFilled: boolean) => {
@@ -80,16 +80,16 @@ export function QuotaProgressBar({
         if (cp <= 80) {
             return {
                 bg: '#10b981',
-                border: '#1af18d',
-                shadow: '0 0 8px rgba(16, 185, 129, 0.6)',
+                border: '#059669',
+                shadow: '0 0 6px rgba(16, 185, 129, 0.4)',
                 iconColor: 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]',
             };
         }
         return {
-            bg: '#1af18d',
-            border: '#1af18d',
-            shadow: '0 0 10px rgba(26, 241, 141, 0.8)',
-            iconColor: 'text-slate-950 font-black',
+            bg: '#10b981',
+            border: '#059669',
+            shadow: '0 0 6px rgba(16, 185, 129, 0.4)',
+            iconColor: 'text-white',
         };
     };
 
@@ -97,9 +97,9 @@ export function QuotaProgressBar({
         if (!time) return 'text-gray-400 dark:text-gray-500';
         const color = getTimeRemainingColor(time);
         switch (color) {
-            case 'success': return 'text-emerald-700 dark:text-[var(--ui-success)]';
-            case 'warning': return 'text-amber-700 dark:text-[var(--ui-warning)]';
-            default: return 'text-blue-700 dark:text-blue-400';
+            case 'success': return 'text-emerald-600 dark:text-emerald-400';
+            case 'warning': return 'text-amber-600 dark:text-amber-400';
+            default: return 'text-blue-600 dark:text-blue-400';
         }
     };
 
@@ -113,7 +113,7 @@ export function QuotaProgressBar({
             id="agm-progress-container"
             data-ui-name="quota-progress-container"
             className={cn(
-                "w-full flex items-center opacity-85 hover:opacity-100 group-hover:opacity-100 transition-all duration-200 hover:drop-shadow-[0_0_3px_rgba(26,241,141,0.18)] group-hover:drop-shadow-[0_0_3px_rgba(26,241,141,0.18)]",
+                "w-full flex items-center opacity-85 hover:opacity-100 group-hover:opacity-100 transition-all duration-200",
                 compact ? "gap-1" : "gap-2",
                 className
             )}
@@ -165,10 +165,10 @@ export function QuotaProgressBar({
                     />
                 </div>
 
-                {/* Ambient neon glow element */}
+                {/* Ambient glow element */}
                 <div
                     id="agm-progress-glow"
-                    className="absolute inset-0 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity duration-200 shadow-[0_0_5px_rgba(26,241,141,0.22)]"
+                    className="absolute inset-0 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity duration-200 shadow-[0_0_4px_rgba(16,185,129,0.15)]"
                 />
 
                 {/* Milestone Checkpoint Nodes (protruding nodes, centered vertically) */}
@@ -224,30 +224,17 @@ export function QuotaProgressBar({
             {/* Single Column for Remaining Time and Percentage */}
             <div className={cn("flex flex-col items-end shrink-0 gap-0.5", compact ? "leading-none" : "leading-tight")}>
                 {resetTime ? (
-                    getTimeRemainingColor(resetTime) === 'success' ? (
-                        <span
-                            className={cn(
-                                "font-bold flex items-center gap-0.5 font-mono px-1.5 py-0.5 rounded-[4px] bg-emerald-500/15 text-emerald-950 dark:text-emerald-200 border border-emerald-500/30 shadow-2xs",
-                                compact ? "text-[8.5px]" : "text-[9.5px]"
-                            )}
-                            title={`Resets in ${formatTimeRemaining(resetTime)}`}
-                        >
-                            <Clock className={cn("shrink-0", compact ? "w-2 h-2" : "w-2.5 h-2.5")} />
-                            {formatTimeRemaining(resetTime)}
-                        </span>
-                    ) : (
-                        <span
-                            className={cn(
-                                "font-bold flex items-center gap-0.5 font-mono",
-                                compact ? "text-[9px]" : "text-[10px]",
-                                getTimeColorClass(resetTime)
-                            )}
-                            title={`Resets in ${formatTimeRemaining(resetTime)}`}
-                        >
-                            <Clock className={cn("shrink-0", compact ? "w-2 h-2" : "w-2.5 h-2.5")} />
-                            {formatTimeRemaining(resetTime)}
-                        </span>
-                    )
+                    <span
+                        className={cn(
+                            "font-bold flex items-center gap-0.5 font-mono",
+                            compact ? "text-[8.5px]" : "text-[9.5px]",
+                            getTimeColorClass(resetTime)
+                        )}
+                        title={`Resets in ${formatTimeRemaining(resetTime)}`}
+                    >
+                        <Clock className={cn("shrink-0", compact ? "w-2 h-2" : "w-2.5 h-2.5")} />
+                        {formatTimeRemaining(resetTime)}
+                    </span>
                 ) : null}
 
                 <div className="flex items-center gap-1 justify-end">
@@ -274,15 +261,12 @@ export function QuotaProgressBar({
                         )}>
                             {clamped}%
                         </span>
-                    ) : clamped >= 60 ? (
-                        <span className={cn(
-                            "font-bold font-mono px-1.5 py-0.5 rounded-[4px] bg-emerald-500/15 text-emerald-950 dark:text-emerald-200 border border-emerald-500/30 shadow-2xs",
-                            compact ? "text-[9px]" : "text-[10px]"
-                        )}>
-                            {clamped}%
-                        </span>
                     ) : (
-                        <span className={cn("font-black font-mono", compact ? "text-[9px]" : "text-[10px]", getPercentColorClass(clamped))}>
+                        <span className={cn(
+                            "font-black font-mono",
+                            compact ? "text-[9px]" : "text-[10px]",
+                            getPercentColorClass(clamped)
+                        )}>
                             {clamped}%
                         </span>
                     )}

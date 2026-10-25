@@ -161,7 +161,12 @@ pub async fn switch_account(
     let (prev_4h, prev_weekly) = if prev_email.is_some() {
         prev_acc_opt
             .as_ref()
-            .map(|a| crate::modules::auto_switcher::extract_dual_window_quotas(a, "gemini-2.5-pro"))
+            .map(|a| {
+                crate::modules::auto_switcher::extract_dual_window_quotas(
+                    a,
+                    crate::models::config::DEFAULT_TARGET_MODEL,
+                )
+            })
             .unwrap_or((None, None))
     } else {
         (None, None)
@@ -204,8 +209,10 @@ pub async fn switch_account(
         account.email
     ));
 
-    let (target_4h, target_weekly) =
-        crate::modules::auto_switcher::extract_dual_window_quotas(&account, "gemini-2.5-pro");
+    let (target_4h, target_weekly) = crate::modules::auto_switcher::extract_dual_window_quotas(
+        &account,
+        crate::models::config::DEFAULT_TARGET_MODEL,
+    );
 
     let followup_id = account.id.clone();
     let followup_email = account.email.clone();
@@ -219,7 +226,7 @@ pub async fn switch_account(
         }
         let predicted_next_email = crate::modules::auto_switcher::select_candidate_profiles(
             &followup_target,
-            "gemini-2.5-pro",
+            crate::models::config::DEFAULT_TARGET_MODEL,
             15.0,
             &pred_exclusions,
         )

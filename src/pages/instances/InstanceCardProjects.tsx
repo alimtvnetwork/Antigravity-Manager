@@ -89,8 +89,8 @@ export function InstanceCardProjects({ api, inst }: { api: InstancePageApi; inst
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
                                     {isProjRunning && (
-                                        <span className="px-1 py-0.2 rounded-[4px] text-[9px] font-bold bg-[#1af18d]/15 text-emerald-700 dark:text-[#1af18d] border border-[#1af18d]/30 flex items-center gap-0.5 shadow-2xs">
-                                            <span className="w-1 h-1 rounded-full bg-[#1af18d] shadow-[0_0_4px_rgba(26,241,141,0.9)] animate-pulse" />
+                                        <span className="px-1 py-0.2 rounded-[4px] text-[9px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 flex items-center gap-0.5 shadow-2xs">
+                                            <span className="w-1 h-1 rounded-full bg-emerald-500 shadow-[0_0_2px_rgba(16,185,129,0.5)]" />
                                             RUNNING
                                         </span>
                                     )}
