@@ -1077,15 +1077,41 @@ ${activePromptText}
         async (overrides?: Partial<HandleRerunConversationOptions>): Promise<RerunDispatchResult> => {
             const conv = selectedConversationRef.current || selectedConversation;
             const proj = selectedProjectRef.current || selectedProject;
-            return handleRerunConversation({
+            const res = await handleRerunConversation({
                 conversation: conv,
                 project: proj,
                 instanceId,
                 activePromptText: editedPromptText.trim() || activePromptTextRef.current || activePromptText,
                 ...overrides,
             });
+            if (res.dispatched > 0) {
+                const targetInstId = conv?.instance_id || instanceId;
+                if (isTauri()) {
+                    try {
+                        await invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId }).catch(async () => {
+                            await invoke('reset_prompt_tree_cache', { instanceId: targetInstId });
+                        });
+                    } catch (cacheErr: unknown) {
+                        useErrorStore.getState().trackWarning(cacheErr, {
+                            source: 'usePromptTreePromptActions.handleRerunConversationAction',
+                            triggerAction: 'invalidate_prompt_tree_cache',
+                        });
+                    }
+                }
+                if (loadTree) {
+                    try {
+                        await loadTree(true, true);
+                    } catch (loadErr: unknown) {
+                        useErrorStore.getState().trackWarning(loadErr, {
+                            source: 'usePromptTreePromptActions.handleRerunConversationAction',
+                            triggerAction: 'loadTree',
+                        });
+                    }
+                }
+            }
+            return res;
         },
-        [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, instanceId, editedPromptText, activePromptText, activePromptTextRef]
+        [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, instanceId, editedPromptText, activePromptText, activePromptTextRef, loadTree]
     );
 
     return {
@@ -1541,6 +1567,9 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
         }
     }
 
+    let lastFormattedPrompt: string | undefined;
+    let lastRerunMedia: string[] | undefined;
+
     for (let i = 0; i < requested; i += 1) {
         const { message: rawMessage, pickedIndex } = resolveRerunMessage(ctx.messageOption, usedIndices);
         if (pickedIndex !== null) {
@@ -1565,6 +1594,9 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
             ...images.map((img) => img.dataUri),
         ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
         const formattedPrompt = formatPromptWithAttachments(message, rerunMedia, { repoPath: ctx.repoPath });
+        lastFormattedPrompt = formattedPrompt;
+        lastRerunMedia = rerunMedia;
+
         try {
             // CRITICAL INVARIANT: RERUN MUST ALWAYS ENQUEUE, NEVER SEND DIRECTLY.
             // All rounds (round 0 as well as rounds 1..N-1) are enqueued sequentially into the FIFO queue.
@@ -1578,14 +1610,6 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
             );
             result.dispatched += 1;
             result.messages?.push(rawMessage);
-            try {
-                await copyPromptWithRichImages(formattedPrompt, undefined, undefined, rerunMedia.length > 0 ? rerunMedia : undefined);
-            } catch (clipErr) {
-                useErrorStore.getState().trackWarning(clipErr, {
-                    source: 'usePromptTreePromptActions.dispatchRerunMessages',
-                    triggerAction: 'copy_rerun_rich_images',
-                });
-            }
             await auditRecord({
                 ...auditBase,
                 params: {
@@ -1626,12 +1650,22 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
                 message: errorObj.message,
             });
         }
-
-        // Add a small async interval between iterations to pace queue placement
-        if (i < requested - 1) {
-            await new Promise((r) => setTimeout(r, 300));
-        }
     }
+
+    if (lastFormattedPrompt && result.dispatched > 0) {
+        copyPromptWithRichImages(
+            lastFormattedPrompt,
+            undefined,
+            undefined,
+            lastRerunMedia && lastRerunMedia.length > 0 ? lastRerunMedia : undefined
+        ).catch((clipErr: unknown) => {
+            useErrorStore.getState().trackWarning(clipErr, {
+                source: 'usePromptTreePromptActions.dispatchRerunMessages',
+                triggerAction: 'copy_rerun_rich_images',
+            });
+        });
+    }
+
     result.history = recentHistory;
     return result;
 }

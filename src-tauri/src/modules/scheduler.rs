@@ -421,6 +421,13 @@ pub async fn trigger_warmup_for_account(account: &Account) {
 /// Start prompt queue scheduler that runs on an adaptive FIFO background ticker.
 /// When pending prompts are queued, ticks every 5 seconds to immediately dispatch
 /// as soon as projects become idle. When queue is empty, backs off to 30 seconds.
+pub static PROMPT_QUEUE_NOTIFY: once_cell::sync::Lazy<tokio::sync::Notify> =
+    once_cell::sync::Lazy::new(tokio::sync::Notify::new);
+
+pub fn notify_prompt_queue() {
+    PROMPT_QUEUE_NOTIFY.notify_one();
+}
+
 pub fn start_prompt_queue_scheduler() {
     tauri::async_runtime::spawn(async move {
         logger::log_info(
@@ -435,7 +442,7 @@ pub fn start_prompt_queue_scheduler() {
             .await
             .unwrap_or(0);
 
-            if pending_count > 0 {
+            let poll_interval = if pending_count > 0 {
                 // Fast ticker interval when prompts are queued waiting for project to become idle
                 match tauri::async_runtime::spawn_blocking(|| {
                     crate::modules::repo_db::check_and_dispatch_enqueued_prompts(None)
@@ -463,10 +470,17 @@ pub fn start_prompt_queue_scheduler() {
                         ));
                     }
                 }
-                tokio::time::sleep(PROMPT_QUEUE_ACTIVE_POLL_INTERVAL).await;
+                PROMPT_QUEUE_ACTIVE_POLL_INTERVAL
             } else {
                 // Idle backoff interval when queue is empty
-                tokio::time::sleep(PROMPT_QUEUE_IDLE_BACKOFF_INTERVAL).await;
+                PROMPT_QUEUE_IDLE_BACKOFF_INTERVAL
+            };
+
+            tokio::select! {
+                _ = PROMPT_QUEUE_NOTIFY.notified() => {
+                    crate::modules::logger::log_info("[PromptQueueScheduler] Prompt queue notified; waking up immediately");
+                }
+                _ = tokio::time::sleep(poll_interval) => {}
             }
         }
     });

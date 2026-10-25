@@ -433,6 +433,13 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 const previewMsg = res.messages?.[0] ? ` ("${res.messages[0]}")` : '';
                 setActionMsg(`Rerun ×${res.dispatched} dispatched successfully!${previewMsg}`);
                 setTimeout(() => setActionMsg(null), 3500);
+                void invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId }).catch((cacheErr: unknown) => {
+                    useErrorStore.getState().trackWarning(cacheErr, {
+                        source: 'PromptTreeViewModal.onRerunConversation',
+                        triggerAction: 'invalidate_prompt_tree_cache',
+                    });
+                });
+                void loadTree(true, true);
             } else if (res.failed > 0) {
                 setActionMsg(`Rerun failed: ${res.failed} of ${res.requested} dispatch(es) failed`);
                 useErrorStore.getState().captureError(
@@ -1148,6 +1155,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                         onRenameConversation={handleRenameConversation}
                                         setActionMsg={setActionMsg}
                                         onOpenInspector={(conv) => promptActions.openInspector(conv, selectedProject?.repo_path || '')}
+                                        loadTree={loadTree}
                                     />
 
                                     <DetailTabs

@@ -1,5 +1,17 @@
 # Changelog
 
+## [v4.268.0] - 2026-10-25
+
+### Added
+- Added Gemini 3.8 Flash model constants and hardened auto-switcher Claude limits detection (Thanks to @aukgit)
+
+### Fixed
+- Instant Rerun Enqueue & Latency Fix: Eliminated 30s background scheduler idle backoff via `tokio::sync::Notify` wakeup, immediate idle queue dispatch on enqueue, removal of 1.6s blocking CDP loop, and elimination of frontend 300ms pacing delay (Thanks to @aukgit)
+- Image Attachment Normalization: Standardized multimodal image attachments into canonical bracketed format `Attachments:\n1. @[<path>]` across Copy, Send, Enqueue, and Rerun (Thanks to @aukgit)
+- Rerun Enqueue Invariant: Guaranteed that rerun actions always enqueue into SQLite FIFO queue, eliminating immediate task preemption (Thanks to @aukgit)
+
+---
+
 ## [v4.267.0] - 2026-10-25
 
 ### Changed
@@ -1329,6 +1341,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.268.0 (2026-10-25)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.267.0 (2026-10-25)**:
         -   **[Routine Minor Bump] Version sync to 4.267.0 with no functional code changes (Thanks to @aukgit)**:
             -   **Description**: Routine minor version bump from 4.266.0 to 4.267.0: all 14 version locations synchronized via `scripts/bump-version.mjs` (`package.json`, `package-lock.json`, `version.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, `src-tauri/hooks.nsh`, `Casks/antigravity-tools.rb`, `readme.md`, `readme_en.md`, `src/components/layout/MiniView.tsx`, `releases-manifest.json`, `changelog.md`, `changelog_en.md`). No functional code changes in this bump; the v4.266.0 feature and fix set ships in its own release. (Thanks to @aukgit)

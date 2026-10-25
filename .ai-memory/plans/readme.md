@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [50-instant-rerun-enqueue-and-minor-release.md](./pending/50-instant-rerun-enqueue-and-minor-release.md) | `COMPLETED` | Root cause elimination of rerun dispatch latency: eliminates 30s idle backoff via notify wakeup, triggers immediate idle queue dispatch on enqueue, removes 300ms pacing sleeps, and executes v4.268.0 release ceremony. |
 | [49-image-attachment-format-and-rerun-enqueue.md](./pending/49-image-attachment-format-and-rerun-enqueue.md) | `COMPLETED` | Standardize prompt image attachment formatting to bracketed list (`Attachments:\n1. @[<path>]`) across copy, send, enqueue, and rerun; enforce rerun enqueue invariant. |
 | [221-gitmap-and-antigravity-tools-manager-updates-and-testing.md](./completed/221-gitmap-and-antigravity-tools-manager-updates-and-testing.md) | `COMPLETED` | Execution of 5 tasks: GitMap PA updates, prompt restore & reconnect sweep, rerun randomizer anti-repeat UX, GitMap cmdpull CG execute, and master deferred E2E testing (Steps 316–320). |
 | [220-gitmap-and-antigravity-tools-manager-updates-and-testing.md](./completed/220-gitmap-and-antigravity-tools-manager-updates-and-testing.md) | `COMPLETED` | Execution of 5 tasks: GitMap PA updates, prompt restore on quota finish, rerun randomizer auto-pick UX, GitMap CG execute, and master deferred E2E testing (Steps 311–315). |

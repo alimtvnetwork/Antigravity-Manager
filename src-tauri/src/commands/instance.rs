@@ -737,6 +737,12 @@ pub async fn enqueue_prompt(
                     );
                 }
             }
+            crate::modules::scheduler::notify_prompt_queue();
+            // Justification: immediate dispatch check for idle instance is best-effort; background scheduler retries if busy or failed
+            crate::error::record_ignored(
+                crate::modules::repo_db::check_and_dispatch_enqueued_prompts(Some(&resolved_id)),
+                "dispatch enqueued prompt immediately",
+            );
             Ok(prompt)
         })
     })

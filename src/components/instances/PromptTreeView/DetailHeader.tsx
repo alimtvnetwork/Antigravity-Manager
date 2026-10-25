@@ -3,6 +3,7 @@ import { formatPromptWithAttachments } from '../../../utils/promptAttachment';
 import { copyImageAsMarkdownText, writePureImageToClipboard, copyPromptWithRichImages, extractAssets, stripImagesFromPrompt, copyAllImagesToClipboard, copyPromptWithLocalFileLinks, copyPromptWithBase64Images } from './clipboard';
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from '../../../utils/env';
 import { formatRelativeRecency } from './formatters';
 import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat, Send } from 'lucide-react';
 import { cn } from '../../../utils/cn';
@@ -92,6 +93,7 @@ export interface DetailHeaderProps {
     onFocusIde: () => void;
     onResend: () => void;
     onEnqueue: () => void;
+    loadTree?: (isInitialLoad?: boolean, isForce?: boolean) => Promise<void>;
     /** Optional repo path used as the rerun dispatch target (falls back to ''). */
     rerunRepoPath?: string;
     rerunHistory?: string[];
@@ -124,6 +126,7 @@ export function DetailHeader(props: DetailHeaderProps) {
         onCopyAllWithRichImages, onCopyCleanText, onCopyImageAsText,
         onCopyImageForOneNoteOrIde, onCopySingleImagePng,
         onCopyWithImages, onSaveImages, onExport, onFocusIde, onResend, onEnqueue, rerunRepoPath,
+        loadTree,
         rerunHistory: propRerunHistory, onRerunHistoryChange,
         onOpenInspector,
         onRenameConversation,
@@ -404,6 +407,23 @@ export function DetailHeader(props: DetailHeaderProps) {
                 if (result.messages && result.messages.length > 0) {
                     const nextHistory = [...rerunHistory, ...result.messages].slice(-10);
                     setRerunHistory(nextHistory);
+                }
+
+                if (isTauri()) {
+                    try {
+                        await invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId }).catch(async () => {
+                            await invoke('reset_prompt_tree_cache', { instanceId: targetInstId });
+                        });
+                    } catch (cacheErr: unknown) {
+                        useErrorStore.getState().trackWarning(cacheErr, {
+                            source: 'DetailHeader.handleRerun',
+                            triggerAction: 'invalidate_prompt_tree_cache',
+                        });
+                    }
+                }
+
+                if (loadTree) {
+                    void loadTree(true, true);
                 }
             }
         } catch (err) {

@@ -10,6 +10,7 @@ export interface PromptTreeDetailProps {
     headerProps: Omit<DetailHeaderProps, 'selectedConversation' | 'activePromptText'>;
     viewMode?: ViewMode;
     onOpenInspector?: (conv: AgmConversationNode, repoPath: string) => void;
+    loadTree?: (isInitialLoad?: boolean, isForce?: boolean) => Promise<void>;
 }
 
 export function PromptTreeDetail({
@@ -19,6 +20,7 @@ export function PromptTreeDetail({
     headerProps,
     viewMode = 'preview',
     onOpenInspector,
+    loadTree,
 }: PromptTreeDetailProps) {
     const [showFullText, setShowFullText] = useState(false);
     const displayedText = activePromptText || selectedConversation.full_prompt_text || selectedConversation.prompt_preview_200w || '';
@@ -29,6 +31,7 @@ export function PromptTreeDetail({
             <DetailHeader
                 selectedConversation={selectedConversation}
                 activePromptText={activePromptText}
+                loadTree={loadTree ?? headerProps.loadTree}
                 {...headerProps}
             />
 

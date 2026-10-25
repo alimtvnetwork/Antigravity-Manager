@@ -1049,38 +1049,6 @@ pub fn enqueue_prompt_for_instance(
         image_payload: initial_img,
     };
 
-    // If instance is running, forward directly into Antigravity IDE UI queue via CDP (without cancelling running turn)
-    let (is_running, _, pids) =
-        crate::modules::instance::is_instance_process_running_smart(&canonical_inst);
-    let target_is_new = conversation_id.map(str::trim) == Some("new");
-    if is_running {
-        crate::modules::instance::focus_running_instance(&pids, Some(repo_path));
-        let cdp_prompt = if clean_prompt.trim().is_empty() {
-            prompt_content.trim()
-        } else {
-            clean_prompt.as_str()
-        };
-        match crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance_with_mode(
-            &canonical_inst,
-            cdp_prompt,
-            false,
-            target_is_new,
-        ) {
-            Ok(()) => {
-                crate::modules::logger::log_info(&format!(
-                    "[RepoDB] enqueue_prompt_for_instance forwarded prompt directly to Antigravity IDE queue via CDP for instance '{}' (new_chat: {})",
-                    canonical_inst, target_is_new
-                ));
-            }
-            Err(e) => {
-                crate::modules::logger::log_warn(&format!(
-                    "[RepoDB] enqueue_prompt_for_instance CDP delivery warning for instance '{}': {}",
-                    canonical_inst, e
-                ));
-            }
-        }
-    }
-
     save_or_requeue_prompt(&active_prompt)?;
 
     if !repo_path.trim().is_empty() {

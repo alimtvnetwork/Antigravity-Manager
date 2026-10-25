@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.267.0-3B82F6?style=flat-square" alt="Version v4.267.0">
+    <img src="https://img.shields.io/badge/Version-v4.268.0-3B82F6?style=flat-square" alt="Version v4.268.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,7 +116,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.267.0)**
+**Bar 2: Version-Based Installation (v4.268.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.258.0/install.ps1))) -Version "v4.258.0"
 ```
@@ -645,6 +645,8 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
 ## 📝 Changelog
+
+> Latest version **v4.268.0**: Instant Rerun Enqueue & Latency Fix, Image Attachment Normalization, Rerun FIFO Invariant, Gemini 3.8 Flash & Claude Limits — Eliminated 30s background scheduler idle backoff via `tokio::sync::Notify` wakeup, immediate idle queue dispatch on enqueue, removal of 1.6s blocking CDP loop, and elimination of frontend 300ms pacing delay; standardized multimodal image attachments into canonical bracketed format `Attachments:\n1. @[<path>]` across Copy, Send, Enqueue, and Rerun; guaranteed rerun actions always enqueue into SQLite FIFO queue, eliminating immediate task preemption; and added Gemini 3.8 Flash model constants with hardened auto-switcher Claude limits detection. (Thanks to @aukgit)
 
 > Latest version **v4.267.0**: Routine minor version bump — all 14 version locations synchronized via `scripts/bump-version.mjs`; no functional code changes in this bump, the v4.266.0 feature and fix set ships in its own release. (Thanks to @aukgit)
 
