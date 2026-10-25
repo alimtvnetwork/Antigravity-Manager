@@ -1815,11 +1815,13 @@ export async function dispatchMultiPromptResend(
             ...images.map((img) => img.dataUri),
         ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
         try {
-            await sendPromptNow(
+            // CRITICAL INVARIANT: Multi-prompt resends must strictly enqueue into the FIFO queue.
+            await enqueuePrompt(
                 options.instanceId,
                 options.repoPath,
                 rewrittenPrompt,
                 options.conversationId,
+                undefined,
                 promptMedia.length > 0 ? promptMedia : undefined
             );
             result.sent += 1;

@@ -29,6 +29,9 @@ export interface ExtractedImage {
 export function normalizeMediaUri(uri: string): string {
     if (!uri || !uri.trim()) return '';
     let clean = uri.trim();
+    if (/^file;\s*/i.test(clean)) {
+        clean = clean.replace(/^file;\s*/i, '');
+    }
     if (clean.startsWith('file:///')) {
         if (/^file:\/\/\/[a-zA-Z]:[\\/]/.test(clean)) {
             clean = clean.slice(8);
@@ -138,10 +141,14 @@ function extractImagesFromPrompt(
         }
     }
 
-    // 2.5 From canonical bracketed image attachments @[...]
-    const bracketedRegex = /@\[(.*?)\]/g;
+    // 2.5 From canonical bracketed image attachments @[...] or @[file;...]
+    const bracketedRegex = /@\[(?:file;\s*)?(.*?)\]/g;
     while ((match = bracketedRegex.exec(text)) !== null) {
-        const rawPath = match[1]?.trim();
+        let rawPath = match[1]?.trim();
+        if (!rawPath) continue;
+        if (/^file;\s*/i.test(rawPath)) {
+            rawPath = rawPath.replace(/^file;\s*/i, '');
+        }
         if (!rawPath) continue;
 
         const isImage = /\.(png|jpe?g|webp|gif|svg|bmp|ico)$/i.test(rawPath) ||

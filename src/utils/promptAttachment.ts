@@ -3,8 +3,8 @@
  * multimodal prompt attachments in the canonical bracketed format:
  *
  * Attachments:
- * 1. @[C:\path\to\image.png]
- * 2. @[C:\path\to\image2.png]
+ * 1. @[file;C:\path\to\image.png]
+ * 2. @[file;C:\path\to\image2.png]
  */
 
 export type PromptAttachmentInput =
@@ -48,6 +48,9 @@ function isWindowsPlatform(
 
 function stripProtocolPrefix(raw: string): string {
     let clean = raw.trim();
+    if (/^file;\s*/i.test(clean)) {
+        clean = clean.replace(/^file;\s*/i, '');
+    }
     if (clean.startsWith('agm-asset://')) {
         clean = clean.slice('agm-asset://'.length);
     }
@@ -104,6 +107,9 @@ export function normalizeAttachmentPath(
         return '';
     }
     let clean = stripProtocolPrefix(rawPathOrUri);
+    if (/^file;\s*/i.test(clean)) {
+        clean = clean.replace(/^file;\s*/i, '');
+    }
     clean = safeDecodeUri(clean);
     clean = clean.replace(/^[\\/]+\?[\\/]+/, '');
     if (/^\/[a-zA-Z]:[\\/]/.test(clean)) {
@@ -141,7 +147,7 @@ export function stripAttachmentsFromPrompt(prompt: string): string {
         .replace(/!\[.*?\]\((?:data:image\/[^;]+;base64,[A-Za-z0-9+/=]+|https?:\/\/[^\s)]+|[^\s)]+?)\)/gi, '')
         .replace(/!\[.*?\]\(.*?\)/gi, '');
     const withoutAttachments = withoutLegacyImages.replace(
-        /(?:\r?\n)*\bAttachments:\s*(?:\r?\n\s*\d+\.\s*@\[.*?\])+/gi,
+        /(?:\r?\n)*\bAttachments:\s*(?:\r?\n\s*\d+\.\s*@\[(?:file;\s*)?.*?\])+/gi,
         ''
     );
     const collapsed = withoutAttachments.replace(/\n{3,}/g, '\n\n');
@@ -180,11 +186,17 @@ function deduplicatePaths(paths: string[], isWindows: boolean): string[] {
 
 function collectPromptAttachmentRawTargets(prompt: string): string[] {
     const matches: { index: number; raw: string }[] = [];
-    const bracketRegex = /@\[(.*?)\]/g;
+    const bracketRegex = /@\[(?:file;\s*)?(.*?)\]/gi;
     let bracketMatch: RegExpExecArray | null;
     while ((bracketMatch = bracketRegex.exec(prompt)) !== null) {
         if (bracketMatch[1]) {
-            matches.push({ index: bracketMatch.index, raw: bracketMatch[1].trim() });
+            let target = bracketMatch[1].trim();
+            if (/^file;\s*/i.test(target)) {
+                target = target.replace(/^file;\s*/i, '');
+            }
+            if (target) {
+                matches.push({ index: bracketMatch.index, raw: target });
+            }
         }
     }
     const mdRegex = /!\[.*?\]\((.*?)\)/g;
@@ -223,20 +235,31 @@ export function extractAttachmentsFromPrompt(
 
 function extractRawTarget(input: PromptAttachmentInput): string {
     if (typeof input === 'string') {
-        const bracketMatch = /@\[(.*?)\]/.exec(input);
+        const bracketMatch = /@\[(?:file;\s*)?(.*?)\]/i.exec(input);
         if (bracketMatch) {
-            return bracketMatch[1].trim();
+            let target = bracketMatch[1].trim();
+            if (/^file;\s*/i.test(target)) {
+                target = target.replace(/^file;\s*/i, '');
+            }
+            return target;
         }
         const mdMatch = /!\[.*?\]\((.*?)\)/.exec(input);
         if (mdMatch) {
             return mdMatch[1].trim();
         }
-        return input.trim();
+        let clean = input.trim();
+        if (/^file;\s*/i.test(clean)) {
+            clean = clean.replace(/^file;\s*/i, '');
+        }
+        return clean;
     }
     if (input && typeof input === 'object') {
-        if (input.path) return input.path.trim();
-        if (input.src) return input.src.trim();
-        if (input.dataUri) return input.dataUri.trim();
+        const val = input.path || input.src || input.dataUri || '';
+        let clean = val.trim();
+        if (/^file;\s*/i.test(clean)) {
+            clean = clean.replace(/^file;\s*/i, '');
+        }
+        return clean;
     }
     return '';
 }
@@ -259,7 +282,7 @@ function cleanLegacyMarkdownImages(prompt: string): string {
 }
 
 function buildAttachmentsBlock(paths: string[]): string {
-    const lines = paths.map((p, idx) => `${idx + 1}. @[${p}]`);
+    const lines = paths.map((p, idx) => `${idx + 1}. @[file;${p}]`);
     return `Attachments:\n${lines.join('\n')}`;
 }
 
@@ -312,7 +335,7 @@ export function formatPromptWithAttachments(
 
     const strippedLegacy = cleanLegacyMarkdownImages(prompt);
     const withoutOldBlocks = strippedLegacy.replace(
-        /(?:\r?\n)*\bAttachments:\s*(?:\r?\n\s*\d+\.\s*@\[.*?\])+/gi,
+        /(?:\r?\n)*\bAttachments:\s*(?:\r?\n\s*\d+\.\s*@\[(?:file;\s*)?.*?\])+/gi,
         ''
     );
     const cleanedPrompt = cleanPromptWhitespace(withoutOldBlocks.replace(/\n{3,}/g, '\n\n'));

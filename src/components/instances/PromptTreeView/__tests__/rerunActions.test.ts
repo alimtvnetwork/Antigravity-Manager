@@ -89,6 +89,7 @@ import {
     loadPersistedRerunCount,
     savePersistedRerunCount,
     dispatchRerunMessages,
+    dispatchMultiPromptResend,
     extractUsedNudgesFromConversation,
     dispatchConversationId,
     rewritePromptImageTargets,
@@ -530,6 +531,116 @@ test('extractUsedNudgesFromConversation extracts used variations from conversati
     assertTrue(used.includes('Is it completed?'));
     assertTrue(used.includes('Is it finished?'));
     assertEqual(used.length, 3);
+});
+
+await test('verifies dispatchMultiPromptResend enqueues all selected prompts via enqueue_prompt and 0 via send_prompt_now', async () => {
+    mockInvokeCalls.length = 0;
+    mockInvokeFailCmd = null;
+
+    const result = await dispatchMultiPromptResend({
+        instanceId: 'inst-multi-resend-1',
+        repoPath: '/work/test-repo',
+        conversationId: 'conv-multi-resend-1',
+        count: 3,
+        delayMs: 0,
+        prompts: [
+            'Prompt turn 1: setup architecture',
+            'Prompt turn 2: implement components',
+            'Prompt turn 3: verify test suite',
+        ],
+        mediaPaths: ['assets/diagram.png'],
+    });
+
+    assertEqual(result.sent, 3, 'All 3 prompts should be marked as sent');
+    assertEqual(result.failed, 0, 'No prompt should have failed');
+
+    const sendCalls = mockInvokeCalls.filter((c) => c.cmd === 'send_prompt_now');
+    assertEqual(sendCalls.length, 0, 'Multi-prompt resend must NEVER call send_prompt_now directly');
+
+    const enqueueCalls = mockInvokeCalls.filter((c) => c.cmd === 'enqueue_prompt');
+    assertEqual(enqueueCalls.length, 3, 'All 3 prompts must be routed to enqueue_prompt in FIFO order');
+
+    for (let i = 0; i < 3; i++) {
+        const call = enqueueCalls[i];
+        assertEqual(call.args.instanceId, 'inst-multi-resend-1');
+        assertEqual(call.args.repoPath, '/work/test-repo');
+        assertEqual(call.args.conversationId, 'conv-multi-resend-1');
+        assertTrue(Array.isArray(call.args.mediaPaths), 'mediaPaths must be an array');
+        assertTrue(call.args.mediaPaths.includes('assets/diagram.png'), 'mediaPaths must preserve attachment');
+    }
+
+    assertTrue(enqueueCalls[0].args.promptContent.includes('Prompt turn 1'));
+    assertTrue(enqueueCalls[1].args.promptContent.includes('Prompt turn 2'));
+    assertTrue(enqueueCalls[2].args.promptContent.includes('Prompt turn 3'));
+});
+
+await test('verifies dispatchMultiPromptResend isolates individual failures without aborting remaining batch items', async () => {
+    mockInvokeCalls.length = 0;
+    mockInvokeFailCmd = 'enqueue_prompt';
+    mockInvokeFailAfterCount = 1;
+
+    const result = await dispatchMultiPromptResend({
+        instanceId: 'inst-multi-fail-1',
+        repoPath: '/work/test-repo',
+        conversationId: 'conv-multi-fail-1',
+        count: 3,
+        delayMs: 0,
+        prompts: ['Step 1 ok', 'Step 2 boom', 'Step 3 boom'],
+    });
+
+    assertEqual(result.sent, 1, 'Only the first prompt should be marked as sent');
+    assertEqual(result.failed, 2, 'Two subsequent prompts should be recorded as failed');
+
+    const sendCalls = mockInvokeCalls.filter((c) => c.cmd === 'send_prompt_now');
+    assertEqual(sendCalls.length, 0, 'send_prompt_now must remain 0 even when enqueue fails');
+
+    mockInvokeFailCmd = null;
+    mockInvokeFailAfterCount = null;
+});
+
+await test('verifies prompt rerun attachment formatting with mediaPaths produces canonical @[file;...] bracket syntax', async () => {
+    mockInvokeCalls.length = 0;
+    mockInvokeFailCmd = null;
+
+    const result = await dispatchRerunMessages({
+        targetInstId: 'inst-rerun-media-1',
+        repoPath: '/work/test-repo',
+        convId: 'conv-rerun-media-1',
+        count: 1,
+        messageOption: 'is-it-completed',
+        originalPrompt: 'Verify rerun with media attachment',
+        source: 'testRunner',
+        mediaPaths: ['assets/test.png'],
+    });
+
+    assertEqual(result.dispatched, 1);
+    assertEqual(result.failed, 0);
+
+    const sendCalls = mockInvokeCalls.filter((c) => c.cmd === 'send_prompt_now');
+    assertEqual(sendCalls.length, 0, 'Must never call send_prompt_now');
+
+    const enqueueCalls = mockInvokeCalls.filter((c) => c.cmd === 'enqueue_prompt');
+    assertEqual(enqueueCalls.length, 1, 'Must invoke enqueue_prompt once');
+
+    const promptCall = enqueueCalls[0];
+    assertEqual(promptCall.args.instanceId, 'inst-rerun-media-1');
+    assertEqual(promptCall.args.conversationId, 'conv-rerun-media-1');
+
+    const content = String(promptCall.args.promptContent);
+    assertTrue(
+        content.includes('@[file;'),
+        `Enqueued prompt content must contain canonical "@[file;" third-bracket prefix. Got:\n${content}`
+    );
+    assertTrue(
+        content.includes('1. @[file;assets/test.png]') ||
+        content.includes('@[file;/work/test-repo/assets/test.png]') ||
+        content.includes('@[file;\\work\\test-repo\\assets\\test.png]'),
+        `Enqueued prompt content must format attachment canonically with @[file;...]. Got:\n${content}`
+    );
+    assertFalse(
+        /1\.\s*@\[(?!file;).*?assets\/test\.png\]/.test(content),
+        'Enqueued prompt must not contain legacy @[path] attachment format without file; prefix'
+    );
 });
 
 // ===========================================================================

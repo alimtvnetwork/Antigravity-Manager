@@ -1174,16 +1174,52 @@ async fn dispatch_turn_rerun_execution(
         raw_prompt.clone()
     };
 
-    let args = format!("{} --instance {} {}", full_cid, instance_id, injected_text);
-    let injected = execute_prompt_injection(&args).await;
+    let action_label = if is_verify {
+        "verification"
+    } else {
+        "turn rerun"
+    };
 
-    // Trigger direct CDP submission for instance
-    let _cdp_ok = crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
+    let mut enqueued = match crate::modules::repo_db::enqueue_prompt_for_instance(
         instance_id,
+        repo_path,
         &injected_text,
-        true,
-    )
-    .is_ok();
+        Some(full_cid),
+    ) {
+        Ok(p) => p,
+        Err(err) => {
+            return (
+                format!(
+                    "⚠️ <b>Failed to enqueue {}:</b> <code>{}</code>",
+                    action_label,
+                    clean_for_telegram_html(&err, 200)
+                ),
+                None,
+            );
+        }
+    };
+
+    // Preserve or update image payload if media detected
+    let (_, detected_images) =
+        crate::modules::repo_db::extract_image_payload_or_path(&injected_text);
+    if !detected_images.is_empty() {
+        enqueued.image_payload = Some(detected_images.join(";"));
+        // Justification: Persisting detected media paths to SQLite queue is best-effort cache sync
+        crate::error::record_ignored(
+            crate::modules::repo_db::save_or_requeue_prompt(&enqueued),
+            "persist media paths for turn rerun prompt",
+        );
+    }
+
+    // Wake background scheduler immediately
+    crate::modules::scheduler::notify_prompt_queue();
+
+    // Immediate dispatch check if the instance is currently idle
+    // Justification: Idle dispatch check is best-effort; background scheduler picks up prompt if busy
+    crate::error::record_ignored(
+        crate::modules::repo_db::check_and_dispatch_enqueued_prompts(Some(instance_id)),
+        "check and dispatch enqueued turn rerun prompt immediately if idle",
+    );
 
     // Detach visual proof capture into background task to eliminate 3-12s blocking wait
     tauri::async_runtime::spawn(async move {
@@ -1197,22 +1233,20 @@ async fn dispatch_turn_rerun_execution(
     let now_utc = Utc::now();
     let utc_str = now_utc.to_rfc3339();
     let local_str = Local::now().format("%Y-%m-%d %I:%M:%S %p").to_string();
-    let (_, detected_images) =
-        crate::modules::repo_db::extract_image_payload_or_path(&injected_text);
     let media_count = detected_images.len();
 
     let reply = format!(
-        "{icon} <b>Prompt {action} Dispatched & Acknowledged</b>\n\
+        "{icon} <b>Prompt {action} Enqueued in FIFO Queue</b>\n\
         ━━━━━━━━━━━━━━━━━━━━━━━━\n\
-        • <b>Dispatched At:</b> <code>{utc_str}</code> ({local_str})\n\
+        • <b>Status:</b> <code>queued</code> (Queue ID: <code>{queue_id}</code>)\n\
+        • <b>Enqueued At:</b> <code>{utc_str}</code> ({local_str})\n\
         • <b>Target:</b> <code>[AGM:{seq} | {gm}]</code> · <code>#{c_seq}</code> (<code>{cid8}</code>)\n\
         • <b>Instance:</b> <code>{inst}</code> · <b>Workspace:</b> <code>{ws}</code>\n\
         • <b>Turn:</b> #{turn} ({words} words)\n\
         • <b>Attached Media:</b> {media_count} image(s)\n\
         • <b>Mode:</b> {mode}\n\n\
-        <b>Dispatched Prompt:</b>\n\
+        <b>Enqueued Prompt:</b>\n\
         <blockquote expandable><pre><code class=\"language-markdown\">{preview}</code></pre></blockquote>\n\n\
-        {injected}\n\n\
         {proof}",
         icon = if is_verify { "🛡️" } else { "🔁" },
         action = if is_verify {
@@ -1220,6 +1254,7 @@ async fn dispatch_turn_rerun_execution(
         } else {
             "Turn Rerun"
         },
+        queue_id = clean_for_telegram_html(&enqueued.id, 24),
         seq = clean_for_telegram_html(seq_code, 16),
         gm = clean_for_telegram_html(gitmap_seq_code, 24),
         c_seq = clean_for_telegram_html(seq_code, 16),
@@ -1234,7 +1269,6 @@ async fn dispatch_turn_rerun_execution(
             "🔁 Verbatim Turn Rerun"
         },
         preview = clean_for_telegram_html(&preview_200w, 2000),
-        injected = injected,
         proof = proof,
     );
 

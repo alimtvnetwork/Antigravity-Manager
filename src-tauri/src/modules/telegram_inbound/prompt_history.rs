@@ -2,8 +2,8 @@
 //!
 //! There is no per-instance sent-prompt history table. This surface lists
 //! rows from `active_prompts` (via `repo_db::list_all_prompts`) newest-first
-//! and offers a rerun button per row that re-dispatches through the SAME
-//! canonical path as `/send` (`execute_prompt_injection`).
+//! and offers a rerun button per row that re-dispatches through the FIFO
+//! queue (`repo_db::enqueue_prompt_for_instance`).
 //!
 //! `ActivePrompt` carries no Telegram chat-id attribution. The bot serves a
 //! single allowed chat, so history is per-bot rather than per-user — noted
@@ -90,9 +90,9 @@ pub fn format_prompt_history(limit: usize) -> (String, Value) {
     (text, json!({ "inline_keyboard": keyboard }))
 }
 
-/// Re-dispatch a previously sent prompt through the SAME path as `/send`:
-/// rebuild the `execute_prompt_injection` args string and call it directly
-/// (no fork). `ActivePrompt` has no machine field, so reruns always target
+/// Re-dispatch a previously sent prompt by enqueuing into the FIFO queue:
+/// routes through `repo_db::enqueue_prompt_for_instance`.
+/// `ActivePrompt` has no machine field, so reruns always target
 /// the LOCAL instance — remote-node reruns are out of scope.
 pub async fn rerun_prompt_by_id(id8: &str) -> (String, Option<Value>) {
     let key = id8.trim();
@@ -135,8 +135,6 @@ pub async fn rerun_prompt_by_id(id8: &str) -> (String, Option<Value>) {
         );
     };
 
-    // Same argument shape `dispatch_send_prompt` (send_flow.rs) builds for
-    // local targets: `<conversation> --instance <id> <prompt text>`.
     let conversation = rerun_conversation(&prompt);
     let instance = prompt.instance_id.trim();
     let instance = if instance.is_empty() {
@@ -144,18 +142,51 @@ pub async fn rerun_prompt_by_id(id8: &str) -> (String, Option<Value>) {
     } else {
         instance
     };
-    let args = format!(
-        "{conversation} --instance {instance} {}",
-        prompt.prompt_content
+    let session_opt = prompt
+        .session_id
+        .as_deref()
+        .filter(|s| !s.trim().is_empty());
+
+    let mut enqueued = match crate::modules::repo_db::enqueue_prompt_for_instance(
+        instance,
+        prompt.repo_path.trim(),
+        &prompt.prompt_content,
+        session_opt,
+    ) {
+        Ok(p) => p,
+        Err(err) => {
+            return (
+                format!(
+                    "⚠️ <b>Failed to enqueue rerun:</b> <code>{}</code>",
+                    clean_for_telegram_html(&err, 200)
+                ),
+                None,
+            );
+        }
+    };
+
+    // Preserve original image payload if present
+    if let Some(ref img) = prompt.image_payload {
+        let clean_img = img.trim();
+        if !clean_img.is_empty() {
+            enqueued.image_payload = Some(clean_img.to_string());
+            // Justification: Persisting preserved image payload to SQLite queue is best-effort cache sync
+            crate::error::record_ignored(
+                crate::modules::repo_db::save_or_requeue_prompt(&enqueued),
+                "persist preserved image payload for rerun prompt",
+            );
+        }
+    }
+
+    // Wake background scheduler immediately
+    crate::modules::scheduler::notify_prompt_queue();
+
+    // Immediate dispatch check if the instance is currently idle
+    // Justification: Idle dispatch check is best-effort; background scheduler picks up prompt if busy
+    crate::error::record_ignored(
+        crate::modules::repo_db::check_and_dispatch_enqueued_prompts(Some(instance)),
+        "check and dispatch enqueued rerun prompt immediately if idle",
     );
-    // DECISION (unwrap vs wrapped): resend the STORED bytes verbatim so the
-    // agent receives exactly the text it ran before. `execute_prompt_injection`
-    // wraps again via `wrap_telegram_prompt`, but that is a no-op unless the
-    // stored text itself contains template directives (`--prefix`/`--suffix`
-    // or a single-token template slug) — an acceptable edge case. Unwrapping
-    // is not attempted because template expansion is not invertible (resolved
-    // template bodies are opaque text).
-    let injected = super::injection::execute_prompt_injection(&args).await;
 
     // Send immediate confirmation to Telegram chat
     let (token, chat_id) = match super::config::load_config() {
@@ -171,7 +202,7 @@ pub async fn rerun_prompt_by_id(id8: &str) -> (String, Option<Value>) {
             super::formatting::send_telegram_message(
                 &token,
                 chat_id,
-                "✅ Prompt dispatched to IDE!",
+                "✅ Prompt enqueued for execution (FIFO queue)!",
             )
             .await,
             "send immediate rerun confirmation",
@@ -184,26 +215,36 @@ pub async fn rerun_prompt_by_id(id8: &str) -> (String, Option<Value>) {
         tracing::info!("Background rerun proof shot completed: {proof_res}");
     });
     let proof = "📸 <i>Delivery proof screenshot is being captured in background...</i>";
-    let image_note = prompt
+    let image_note = enqueued
         .image_payload
         .as_deref()
         .map(str::trim)
         .filter(|payload| !payload.is_empty())
-        .map(|_| "\n• <b>Image:</b> <i>original had an image attachment — text re-sent only</i>")
+        .map(|_| "\n• <b>Image:</b> <i>original image attachment preserved and queued</i>")
         .unwrap_or("");
+    let summary_words = super::config::load_config()
+        .map(|c| c.prompt_summary_words)
+        .unwrap_or(100);
+    let preview = prompt_preview(&enqueued, summary_words);
     let reply = format!(
-        "🔁 <b>Prompt re-run dispatched</b>\n\
+        "🔁 <b>Prompt Re-Run Enqueued</b>\n\
+        • <b>Queue ID:</b> <code>{queue_id}</code>\n\
+        • <b>Status:</b> <code>queued</code> (FIFO Order)\n\
         • <b>Machine:</b> <code>{machine}</code>\n\
         • <b>Instance:</b> <code>{instance}</code>\n\
         • <b>Conversation:</b> <code>{conversation}</code>\n\
         • <b>Source prompt:</b> <code>{source}</code> <i>{sent_at}</i>{image_note}\n\n\
-        {injected}\n\n\
+        <b>Enqueued Prompt Preview:</b>\n\
+        <pre>{preview}</pre>\n\n\
         {proof}",
+        queue_id = clean_for_telegram_html(&enqueued.id, 24),
         machine = clean_for_telegram_html(&local_machine_label(), META_CHARS),
         instance = clean_for_telegram_html(instance, META_CHARS),
         conversation = clean_for_telegram_html(&conversation, META_CHARS),
         source = clean_for_telegram_html(&id_prefix(&prompt.id), 16),
         sent_at = format_sent_at(prompt.created_at),
+        preview = preview,
+        proof = proof,
     );
     (reply, None)
 }

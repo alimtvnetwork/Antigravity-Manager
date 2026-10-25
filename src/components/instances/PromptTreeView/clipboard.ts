@@ -176,11 +176,14 @@ export function extractAssets(text: string): { images: string[]; files: string[]
         }
     }
 
-    const bracketRegex = /@\[(.*?)\]/g;
+    const bracketRegex = /@\[(?:file;\s*)?(.*?)\]/gi;
     let bracketMatch: RegExpExecArray | null;
     while ((bracketMatch = bracketRegex.exec(text)) !== null) {
         if (bracketMatch[1]) {
-            const raw = bracketMatch[1].trim();
+            let raw = bracketMatch[1].trim();
+            if (/^file;\s*/i.test(raw)) {
+                raw = raw.replace(/^file;\s*/i, '');
+            }
             const isImg = Boolean(raw.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i));
             const key = (extractLocalPathFromUri(raw) || raw).replace(/\\/g, '/').toLowerCase();
             if (isImg) {
@@ -248,6 +251,10 @@ export function extractLocalPathFromUri(uri: string): string | null {
     // Already a data URI or blob URI
     if (clean.startsWith('data:') || clean.startsWith('blob:')) {
         return null;
+    }
+
+    if (/^file;\s*/i.test(clean)) {
+        clean = clean.replace(/^file;\s*/i, '');
     }
 
     // Check Tauri asset protocol URLs
@@ -991,9 +998,12 @@ export async function copyPromptWithRichImages(
             }
         }
 
-        const attachmentMatches = Array.from(effectiveMarkdown.matchAll(/@\[(.*?)\]/g));
+        const attachmentMatches = Array.from(effectiveMarkdown.matchAll(/@\[(?:file;\s*)?(.*?)\]/gi));
         for (const match of attachmentMatches) {
-            const rawSrc = match[1].trim();
+            let rawSrc = match[1].trim();
+            if (/^file;\s*/i.test(rawSrc)) {
+                rawSrc = rawSrc.replace(/^file;\s*/i, '');
+            }
             if (rawSrc && !srcMap.has(rawSrc)) {
                 const base64Uri = await convertImageUriToBase64(rawSrc, repoPath);
                 srcMap.set(rawSrc, base64Uri || rawSrc);
@@ -1019,15 +1029,18 @@ export async function copyPromptWithRichImages(
                 const resolvedSrc = srcMap.get(cleanSrc) || cleanSrc;
                 return `<p style="margin:12px 0;"><img src="${resolvedSrc}" alt="${alt || 'image'}" style="max-width:100%;height:auto;border-radius:6px;display:block;box-shadow:0 2px 8px rgba(0,0,0,0.15);" /></p>`;
             })
-            // Canonical attachment bracket syntax: @[path] -> formatted paragraph with embedded Base64 image
-            .replace(/@\[(.*?)\]/g, (_m, src) => {
-                const cleanSrc = src.trim();
+            // Canonical attachment bracket syntax: @[file;path] or @[path] -> formatted paragraph with embedded Base64 image
+            .replace(/@\[(?:file;\s*)?(.*?)\]/gi, (fullBracket, rawPath) => {
+                let cleanSrc = rawPath.trim();
+                if (/^file;\s*/i.test(cleanSrc)) {
+                    cleanSrc = cleanSrc.replace(/^file;\s*/i, '');
+                }
                 const resolvedSrc = srcMap.get(cleanSrc) || cleanSrc;
                 const isImg = Boolean(cleanSrc.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i));
                 if (isImg && resolvedSrc) {
-                    return `@[${cleanSrc}]<p style="margin:12px 0;"><img src="${resolvedSrc}" alt="attachment" style="max-width:100%;height:auto;border-radius:6px;display:block;box-shadow:0 2px 8px rgba(0,0,0,0.15);" /></p>`;
+                    return `${fullBracket}<p style="margin:12px 0;"><img src="${resolvedSrc}" alt="attachment" style="max-width:100%;height:auto;border-radius:6px;display:block;box-shadow:0 2px 8px rgba(0,0,0,0.15);" /></p>`;
                 }
-                return `@[${cleanSrc}]`;
+                return fullBracket;
             })
             // Paragraphs and line breaks
             .replace(/\n\n+/g, '</p><p style="margin:8px 0;line-height:1.6;">')

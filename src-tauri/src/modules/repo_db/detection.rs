@@ -357,6 +357,33 @@ pub fn extract_image_uris_or_paths(content: &str) -> (Vec<String>, Vec<String>) 
     }
 
     let img_exts = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".bmp"];
+
+    // Also scan explicit bracket attachments @[...] or @[file;...]
+    let mut search_from = 0;
+    while let Some(rel) = content[search_from..].find("@[") {
+        let start = search_from + rel + 2;
+        if let Some(end_rel) = content[start..].find(']') {
+            let inner = content[start..start + end_rel].trim();
+            let without_file = inner
+                .strip_prefix("file;")
+                .or_else(|| inner.strip_prefix("FILE;"))
+                .unwrap_or(inner)
+                .trim();
+            let lower = without_file.to_lowercase();
+            if img_exts.iter().any(|ext| lower.ends_with(ext)) {
+                let p_str = without_file.strip_prefix("file:///").unwrap_or_else(|| {
+                    without_file.strip_prefix("file://").unwrap_or(without_file)
+                });
+                if !found_paths.contains(&p_str.to_string()) {
+                    found_paths.push(p_str.to_string());
+                }
+            }
+            search_from = start + end_rel + 1;
+        } else {
+            break;
+        }
+    }
+
     for token in content.split_whitespace() {
         let clean = token.trim_matches(|c| {
             c == '"'
@@ -369,11 +396,22 @@ pub fn extract_image_uris_or_paths(content: &str) -> (Vec<String>, Vec<String>) 
                 || c == '>'
                 || c == '@'
         });
-        let lower = clean.to_lowercase();
+        // Strip canonical "file;" prefix if present
+        let without_file_prefix = clean
+            .strip_prefix("file;")
+            .or_else(|| clean.strip_prefix("FILE;"))
+            .unwrap_or(clean)
+            .trim();
+
+        let lower = without_file_prefix.to_lowercase();
         if img_exts.iter().any(|ext| lower.ends_with(ext)) {
-            let p_str = clean
+            let p_str = without_file_prefix
                 .strip_prefix("file:///")
-                .unwrap_or_else(|| clean.strip_prefix("file://").unwrap_or(clean));
+                .unwrap_or_else(|| {
+                    without_file_prefix
+                        .strip_prefix("file://")
+                        .unwrap_or(without_file_prefix)
+                });
             if !found_paths.contains(&p_str.to_string()) {
                 found_paths.push(p_str.to_string());
             }
@@ -676,7 +714,7 @@ mod tests {
 
     #[test]
     fn test_extract_bracketed_image_attachment() {
-        let content = "Please check this bug:\nAttachments:\n1. @[C:\\path\\to\\image.png]\n2. @[file:///path/to/test.webp]\n3. @[relative/shot.png]";
+        let content = "Please check this bug:\nAttachments:\n1. @[file;C:\\path\\to\\image.png]\n2. @[file;file:///path/to/test.webp]\n3. @[file;relative/shot.png]\n4. @[legacy/path.png]";
         let (data_uris, paths) = extract_image_uris_or_paths(content);
         assert!(data_uris.is_empty());
         assert_eq!(
@@ -684,7 +722,37 @@ mod tests {
             vec![
                 "C:\\path\\to\\image.png".to_string(),
                 "path/to/test.webp".to_string(),
+                "relative/shot.png".to_string(),
+                "legacy/path.png".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_extract_canonical_bracketed_image_attachment() {
+        let content = "Please check this bug:\nAttachments:\n1. @[file;fixtures/screenshots/image.png]\n2. @[file;file:///path/to/test.webp]\n3. @[file;relative/shot.png]";
+        let (data_uris, paths) = extract_image_uris_or_paths(content);
+        assert!(data_uris.is_empty());
+        assert_eq!(
+            paths,
+            vec![
+                "fixtures/screenshots/image.png".to_string(),
+                "path/to/test.webp".to_string(),
                 "relative/shot.png".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn test_extract_mixed_bracketed_image_attachments() {
+        let content = "Check:\n1. @[file;assets/canonical.png]\n2. @[assets/legacy.png]";
+        let (data_uris, paths) = extract_image_uris_or_paths(content);
+        assert!(data_uris.is_empty());
+        assert_eq!(
+            paths,
+            vec![
+                "assets/canonical.png".to_string(),
+                "assets/legacy.png".to_string()
             ]
         );
     }
