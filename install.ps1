@@ -707,7 +707,7 @@ function Remove-PreviousInstallations {
                     } catch {}
                 }
 
-                if ($isSameDir -and -not $Force -and -not $isPinned) {
+                if ($isSameDir) {
                     Write-Step "Previous installation is in the current target directory ($InstallDir); preserving installation files and pinned shortcuts for in-place upgrade."
                     continue
                 }
@@ -807,9 +807,9 @@ function Get-PinnedTaskbarShortcuts {
                 $target = $sc.TargetPath
                 $name = $lnk.Name
                 $isOurApp = $false
-                if ($name -match '(?i)(agm-alim|Antigravity Manager Tools|AGM by Alim|Anti-Gravity Tools by Alim|Antigravity Tools|antigravity-tools|Agm - Alim)') {
+                if ($name -match '(?i)(agm-alim|Antigravity Manager|AGM by Alim|Anti-Gravity Tools|Antigravity Tools|antigravity-tools|Agm - Alim|agm-ui)') {
                     $isOurApp = $true
-                } elseif ($target -and ($target -match '(?i)(agm-alim\.exe|agm\.exe)' -or $target -match '(?i)Programs\\agm-alim' -or ($InstallDir -and $target -like "*$InstallDir*"))) {
+                } elseif ($target -and ($target -match '(?i)(agm-alim\.exe|agm\.exe|agm-ui\.exe)' -or $target -match '(?i)Programs\\agm-alim' -or ($InstallDir -and $target -like "*$InstallDir*"))) {
                     $isOurApp = $true
                 }
                 if ($isOurApp) {
