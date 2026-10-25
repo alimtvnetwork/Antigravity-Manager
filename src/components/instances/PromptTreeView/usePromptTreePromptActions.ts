@@ -1650,6 +1650,11 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
                 message: errorObj.message,
             });
         }
+
+        if (i < requested - 1) {
+            // Yield briefly to ensure monotonic timestamp separation across queued rounds
+            await new Promise((resolve) => setTimeout(resolve, 60));
+        }
     }
 
     if (lastFormattedPrompt && result.dispatched > 0) {

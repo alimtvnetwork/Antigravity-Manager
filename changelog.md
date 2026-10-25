@@ -1,5 +1,15 @@
 # Changelog
 
+## [v4.269.0] - 2026-10-25
+
+### Fixed
+- Rerun 3 & Numbered Rerun Resolution: Added 1-based history row resolution for Telegram `/rerun 3`, `/rerun #3`, and `/rr 3`, selecting the 3rd prompt from recent history before falling back to UUID prefix search (Thanks to @aukgit)
+- Monotonic FIFO Queue Ordering: Enforced monotonic millisecond timestamps and sequence counters in `enqueue_prompt_for_instance` alongside pacing in `dispatchRerunMessages`, guaranteeing multi-round reruns (e.g. Rerun ×3) sort and drain in exact chronological sequence (`ORDER BY created_at ASC, id ASC`) (Thanks to @aukgit)
+- Canonical Attachment Syntax (`@[file;<path>]`): Enforced canonical third-bracket syntax `@[file;<file_path>]` with `file;` prefix across prompt attachment builders and upgraded all regex parsers in TypeScript and Rust with backward compatibility (Thanks to @aukgit)
+- Rerun Enqueue Invariant: Routed all Telegram inbound reruns and frontend multi-resends strictly into SQLite FIFO queue with `status: 'queued'`, eliminating immediate injection and CDP task preemption (Thanks to @aukgit)
+
+---
+
 ## [v4.268.0] - 2026-10-25
 
 ### Added
@@ -1341,6 +1351,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.269.0 (2026-10-25)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.268.0 (2026-10-25)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

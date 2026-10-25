@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.268.0)
+> Professional AI Account Management & Protocol Proxy System (v4.269.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.268.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.269.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.269.0**: Rerun 3 & Numbered Rerun Resolution, Monotonic FIFO Queue Ordering, Canonical Attachment Syntax — Added 1-based index resolution for Telegram `/rerun 3`, `/rerun #3`, and `/rr 3` to pick the 3rd prompt from recent history before fallback; enforced monotonic millisecond timestamps and sequence counters in `enqueue_prompt_for_instance` alongside 60ms pacing in `dispatchRerunMessages` to guarantee multi-round reruns (e.g. Rerun ×3) sort and drain in exact chronological sequence (`ORDER BY created_at ASC, id ASC`); enforced canonical third-bracket syntax `@[file;<file_path>]` across prompt attachment builders and upgraded all regex parsers in TypeScript and Rust with backward compatibility; and routed all Telegram inbound reruns and frontend multi-resends strictly into SQLite FIFO queue with `status: 'queued'`, eliminating immediate injection and CDP task preemption. (Thanks to @aukgit)
 
 > Latest version **v4.268.0**: Instant Rerun Enqueue & Latency Fix, Image Attachment Normalization, Rerun FIFO Invariant, Gemini 3.8 Flash & Claude Limits — Eliminated 30s background scheduler idle backoff via `tokio::sync::Notify` wakeup, immediate idle queue dispatch on enqueue, removal of 1.6s blocking CDP loop, and elimination of frontend 300ms pacing delay; standardized multimodal image attachments into canonical bracketed format `Attachments:\n1. @[<path>]` across Copy, Send, Enqueue, and Rerun; guaranteed rerun actions always enqueue into SQLite FIFO queue, eliminating immediate task preemption; and added Gemini 3.8 Flash model constants with hardened auto-switcher Claude limits detection. (Thanks to @aukgit)
 

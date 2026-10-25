@@ -1001,7 +1001,15 @@ pub fn enqueue_prompt_for_instance(
     let canonical_inst = crate::modules::instance::resolve_instance_id(clean_inst)
         .unwrap_or_else(|_| clean_inst.to_string());
 
-    let prompt_id = format!("queued-{}", &uuid::Uuid::new_v4().to_string()[..8]);
+    static ENQUEUE_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = ENQUEUE_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let now_ms = Utc::now().timestamp_millis();
+    let prompt_id = format!(
+        "queued-{:013}-{:04x}-{}",
+        now_ms,
+        seq % 0x10000,
+        &uuid::Uuid::new_v4().to_string()[..6]
+    );
     let clean_repo_name = Path::new(repo_path)
         .file_name()
         .map(|n| n.to_string_lossy().to_string())

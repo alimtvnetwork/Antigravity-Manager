@@ -105,34 +105,55 @@ pub async fn rerun_prompt_by_id(id8: &str) -> (String, Option<Value>) {
             None,
         );
     }
-    let mut matches: Vec<ActivePrompt> = match crate::modules::repo_db::list_all_prompts() {
-        Ok(rows) => rows
-            .into_iter()
-            .filter(|prompt| prompt.id.starts_with(key))
-            .collect(),
-        Err(err) => {
+    // Check if key is a 1-based index from /history (e.g. "/rerun 3" or "/rerun #3")
+    let prompt_opt: Option<ActivePrompt> = if let Some(idx) = key
+        .strip_prefix('#')
+        .unwrap_or(key)
+        .parse::<usize>()
+        .ok()
+        .filter(|&i| i >= 1)
+    {
+        match load_recent_prompts(HISTORY_ROWS) {
+            Ok(recent) if idx <= recent.len() => Some(recent[idx - 1].clone()),
+            _ => None,
+        }
+    } else {
+        None
+    };
+
+    let prompt = if let Some(p) = prompt_opt {
+        p
+    } else {
+        let mut matches: Vec<ActivePrompt> = match crate::modules::repo_db::list_all_prompts() {
+            Ok(rows) => rows
+                .into_iter()
+                .filter(|prompt| prompt.id.starts_with(key))
+                .collect(),
+            Err(err) => {
+                return (
+                    db_failure("Rerun failed", "load prompts for telegram rerun", err),
+                    None,
+                );
+            }
+        };
+        // An 8-char prefix of a UUID-style id is effectively unique. If several
+        // rows share it (short custom ids), rerun the newest and name it below.
+        matches.sort_by(|left, right| {
+            right
+                .created_at
+                .cmp(&left.created_at)
+                .then_with(|| right.id.cmp(&left.id))
+        });
+        let Some(p) = matches.into_iter().next() else {
             return (
-                db_failure("Rerun failed", "load prompts for telegram rerun", err),
+                format!(
+                    "⚠️ <b>No prompt found</b> for id or row <code>{}</code>. Send <code>/history</code> to pick one.",
+                    clean_for_telegram_html(key, 32)
+                ),
                 None,
             );
-        }
-    };
-    // An 8-char prefix of a UUID-style id is effectively unique. If several
-    // rows share it (short custom ids), rerun the newest and name it below.
-    matches.sort_by(|left, right| {
-        right
-            .created_at
-            .cmp(&left.created_at)
-            .then_with(|| right.id.cmp(&left.id))
-    });
-    let Some(prompt) = matches.into_iter().next() else {
-        return (
-            format!(
-                "⚠️ <b>No prompt found</b> for id <code>{}</code>. Send <code>/history</code> to pick one.",
-                clean_for_telegram_html(key, 32)
-            ),
-            None,
-        );
+        };
+        p
     };
 
     let conversation = rerun_conversation(&prompt);

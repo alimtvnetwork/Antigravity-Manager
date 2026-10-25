@@ -3,6 +3,16 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.269.0 (2026-10-25)**:
+        -   **[Rerun 3 & Numbered Rerun] 1-based index resolution for Telegram reruns (Thanks to @aukgit)**:
+            -   **Description**: Added 1-based history row resolution for Telegram `/rerun 3`, `/rerun #3`, and `/rr 3`, cleanly picking the 3rd prompt from recent history before falling back to UUID prefix search. (Thanks to @aukgit)
+        -   **[Monotonic FIFO Queue Ordering] Monotonic millisecond timestamps and sequence counters (Thanks to @aukgit)**:
+            -   **Description**: Enforced monotonic millisecond timestamps and sequence counters in `enqueue_prompt_for_instance` alongside 60ms pacing in `dispatchRerunMessages`, guaranteeing multi-round reruns (e.g. Rerun ×3) sort and drain in exact chronological sequence (`ORDER BY created_at ASC, id ASC`) without random UUID reordering. (Thanks to @aukgit)
+        -   **[Canonical Attachment Syntax] Standardized third-bracket format with file semicolon syntax (Thanks to @aukgit)**:
+            -   **Description**: Enforced canonical third-bracket syntax `@[file;<file_path>]` with `file;` prefix across prompt attachment builders and upgraded all regex parsers in TypeScript and Rust with backward compatibility. (Thanks to @aukgit)
+        -   **[Rerun Enqueue Invariant] Guaranteed FIFO queueing across all rerun entrypoints (Thanks to @aukgit)**:
+            -   **Description**: Routed all Telegram inbound reruns and frontend multi-resends strictly into SQLite FIFO queue with `status: 'queued'`, eliminating immediate injection and CDP task preemption. (Thanks to @aukgit)
+
     *   **v4.268.0 (2026-10-25)**:
         -   **[Instant Rerun Enqueue & Latency Fix] Eliminated background scheduler idle backoff and pacing delays (Thanks to @aukgit)**:
             -   **Description**: Eliminated 30s background scheduler idle backoff via `tokio::sync::Notify` wakeup, immediate idle queue dispatch on enqueue, removal of 1.6s blocking CDP loop, and elimination of frontend 300ms pacing delay. (Thanks to @aukgit)
