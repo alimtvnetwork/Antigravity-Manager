@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [49-image-attachment-format-and-rerun-enqueue.md](./pending/49-image-attachment-format-and-rerun-enqueue.md) | `COMPLETED` | Standardize prompt image attachment formatting to bracketed list (`Attachments:\n1. @[<path>]`) across copy, send, enqueue, and rerun; enforce rerun enqueue invariant. |
 | [221-gitmap-and-antigravity-tools-manager-updates-and-testing.md](./completed/221-gitmap-and-antigravity-tools-manager-updates-and-testing.md) | `COMPLETED` | Execution of 5 tasks: GitMap PA updates, prompt restore & reconnect sweep, rerun randomizer anti-repeat UX, GitMap cmdpull CG execute, and master deferred E2E testing (Steps 316–320). |
 | [220-gitmap-and-antigravity-tools-manager-updates-and-testing.md](./completed/220-gitmap-and-antigravity-tools-manager-updates-and-testing.md) | `COMPLETED` | Execution of 5 tasks: GitMap PA updates, prompt restore on quota finish, rerun randomizer auto-pick UX, GitMap CG execute, and master deferred E2E testing (Steps 311–315). |
 | [219-gitmap-and-antigravity-tools-manager-updates-and-testing.md](./completed/219-gitmap-and-antigravity-tools-manager-updates-and-testing.md) | `COMPLETED` | Execution of 5 tasks: GitMap PA updates, prompt restore & quota drop recovery, rerun randomizer auto-pick, GitMap CG execute, and master E2E verification (Steps 306–310). |

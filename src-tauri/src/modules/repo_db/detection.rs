@@ -367,6 +367,7 @@ pub fn extract_image_uris_or_paths(content: &str) -> (Vec<String>, Vec<String>) 
                 || c == ']'
                 || c == '<'
                 || c == '>'
+                || c == '@'
         });
         let lower = clean.to_lowercase();
         if img_exts.iter().any(|ext| lower.ends_with(ext)) {
@@ -670,6 +671,21 @@ mod tests {
         assert_eq!(
             extract_screenshot_id_token("prompt with no screenshot token"),
             None
+        );
+    }
+
+    #[test]
+    fn test_extract_bracketed_image_attachment() {
+        let content = "Please check this bug:\nAttachments:\n1. @[C:\\path\\to\\image.png]\n2. @[file:///path/to/test.webp]\n3. @[relative/shot.png]";
+        let (data_uris, paths) = extract_image_uris_or_paths(content);
+        assert!(data_uris.is_empty());
+        assert_eq!(
+            paths,
+            vec![
+                "C:\\path\\to\\image.png".to_string(),
+                "path/to/test.webp".to_string(),
+                "relative/shot.png".to_string()
+            ]
         );
     }
 }

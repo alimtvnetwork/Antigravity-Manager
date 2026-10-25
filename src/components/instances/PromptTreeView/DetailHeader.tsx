@@ -1,4 +1,5 @@
 import { copyToClipboard } from '../../../utils/clipboard';
+import { formatPromptWithAttachments } from '../../../utils/promptAttachment';
 import { copyImageAsMarkdownText, writePureImageToClipboard, copyPromptWithRichImages, extractAssets, stripImagesFromPrompt, copyAllImagesToClipboard, copyPromptWithLocalFileLinks, copyPromptWithBase64Images } from './clipboard';
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
@@ -6,7 +7,7 @@ import { formatRelativeRecency } from './formatters';
 import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat, Send } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { CopyFormat, type AgmConversationNode } from './types';
-import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, dispatchConversationId, workspaceImageMarkdown, rewritePromptImageTargets, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, extractUsedNudgesFromConversation, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
+import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, dispatchConversationId, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, extractUsedNudgesFromConversation, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
 import { isGhostConversation } from './conversationGuards';
 import { persistClientCrash } from '../../../lib/error-listener';
 import { useErrorStore } from '../../../stores/error-store';
@@ -361,26 +362,20 @@ export function DetailHeader(props: DetailHeaderProps) {
             // 3-tier fallback for repoPath: rerunRepoPath -> conversation repo_path -> default workspace
             const effectiveRepoPath = rerunRepoPath || (selectedConversation as { repo_path?: string })?.repo_path || '.';
 
-            // Preserve both existing conversation media paths and any newly attached rerun image
-            let promptWithImage = originalPrompt;
+            // Consolidate conversation media paths and staged rerun attachment into canonical format
             const existingMedia: string[] = selectedConversation?.media_paths || [];
-            if (existingMedia.length > 0) {
-                const missing = existingMedia.filter((p: string) => p && !promptWithImage.includes(p));
-                if (missing.length > 0) {
-                    promptWithImage += '\n\n' + missing.map((p: string, idx: number) => workspaceImageMarkdown(p, effectiveRepoPath, idx + 1)).join('\n\n');
-                }
-            }
-            if (attachedImage && !promptWithImage.includes(attachedImage.path)) {
-                promptWithImage = `${promptWithImage.trim()}\n\n${workspaceImageMarkdown(attachedImage.path, effectiveRepoPath, existingMedia.length + 1)}`;
-            }
-
-            const rerunMediaList: string[] = Array.from(new Set([
+            const allMedia: string[] = Array.from(new Set([
                 ...existingMedia,
                 ...(attachedImage ? [attachedImage.dataUri, attachedImage.path] : []),
             ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
 
+            const promptWithImage = formatPromptWithAttachments(
+                originalPrompt,
+                allMedia,
+                { repoPath: effectiveRepoPath }
+            );
+
             const effectiveOption: RerunMessageOption = rerunMessageOption || 'randomized';
-            promptWithImage = rewritePromptImageTargets(promptWithImage, effectiveRepoPath);
             const combinedHistory = extractUsedNudgesFromConversation(selectedConversation, rerunHistory);
             const result = await dispatchRerunMessages({
                 targetInstId,
@@ -390,7 +385,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                 messageOption: effectiveOption,
                 originalPrompt: promptWithImage,
                 source: 'DetailHeader.rerunSection',
-                mediaPaths: rerunMediaList,
+                mediaPaths: allMedia,
                 history: combinedHistory,
             });
             if (result.failed > 0) {
@@ -402,8 +397,8 @@ export function DetailHeader(props: DetailHeaderProps) {
                 );
             } else if (result.dispatched > 0) {
                 const previewMsg = result.messages?.[0] ? ` ("${result.messages[0]}")` : '';
-                setRerunFlash(`Sent ×${result.dispatched}`);
-                setActionMsg?.(`Rerun ×${result.dispatched} dispatched successfully!${previewMsg}`);
+                setRerunFlash(`Enqueued ×${result.dispatched}`);
+                setActionMsg?.(`Rerun ×${result.dispatched} enqueued in prompt queue!${previewMsg}`);
                 setTimeout(() => setRerunFlash(null), 2500);
                 setAttachedImage(null);
                 if (result.messages && result.messages.length > 0) {
@@ -1005,7 +1000,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                 primaryDispatchAction === 'enqueue'
                                     ? "Enqueue (FIFO): Stages prompt into FIFO queue (Hotkey: Q)"
                                     : primaryDispatchAction === 'rerun'
-                                      ? `Rerun Turn (×${rerunCount}): Reruns previous turn (Hotkey: R)`
+                                      ? `Rerun Turn (×${rerunCount}): Enqueues previous turn into FIFO queue (Hotkey: R)`
                                       : "Send (Preempt): Cancels active task and executes immediately (Hotkey: N)"
                             }
                             aria-label="Run selected dispatch mode"
@@ -1098,7 +1093,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                          <button
                                              type="button"
                                              onClick={() => handleSwitchDispatchMode('rerun')}
-                                             title="Rerun Turn: Reruns turn N times with verification or nudge (Hotkey: R)"
+                                             title="Rerun Turn: Enqueues turn N times into FIFO queue (Hotkey: R)"
                                              className={cn(
                                                  "flex items-center gap-1 px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                  primaryDispatchAction === 'rerun'
@@ -1446,7 +1441,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                                 });
                                             }}
                                             disabled={isRerunning}
-                                            aria-label={`Rerun ×${rerunCount} Now: Dispatches ${rerunMessageOption} completion or release nudge`}
+                                            aria-label={`Rerun ×${rerunCount} Now: Enqueues ${rerunMessageOption} completion or release nudge into FIFO queue`}
                                             className="w-full flex items-center justify-center gap-2 py-1.5 px-3 bg-sky-500/15 hover:bg-sky-500/25 text-sky-700 dark:text-sky-300 border border-sky-500/30 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
                                         >
                                             <Repeat className={cn('w-3.5 h-3.5 text-sky-500', isRerunning && 'animate-spin')} />

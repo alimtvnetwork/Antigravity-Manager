@@ -9,8 +9,8 @@
  * 5. loadPersistedRerunMessageOption and savePersistedRerunMessageOption work with both
  *    primary and legacy localStorage keys.
  * 6. loadPersistedRerunCount and savePersistedRerunCount clamp to valid range [1, 8].
- * 7. dispatchRerunMessages auto-picks randomized messages, sends Round 1 immediately
- *    via sendPromptNow, and enqueues Rounds 2..N via enqueuePrompt.
+ * 7. dispatchRerunMessages auto-picks randomized messages and enqueues all rounds (1..N)
+ *    via enqueuePrompt (never calling sendPromptNow).
  * 8. dispatchRerunMessages handles errors gracefully without unhandled crashes.
  *
  * Run: node scripts/run-frontend-tests.mjs rerunActions
@@ -24,6 +24,7 @@ interface MockInvokeCall {
 
 const mockInvokeCalls: MockInvokeCall[] = [];
 let mockInvokeFailCmd: string | null = null;
+let mockInvokeFailAfterCount: number | null = null;
 
 // Mock window, localStorage and Tauri IPC internals if running in Node.js
 if (typeof (globalThis as any).window === 'undefined') {
@@ -46,8 +47,11 @@ if (typeof (globalThis as any).window === 'undefined') {
         __TAURI_INTERNALS__: {
             invoke: async (cmd: string, args: any) => {
                 mockInvokeCalls.push({ cmd, args });
+                const matchingCalls = mockInvokeCalls.filter((c) => c.cmd === cmd).length;
                 if (mockInvokeFailCmd && cmd === mockInvokeFailCmd) {
-                    throw new Error(`Mock invoke failure for ${cmd}`);
+                    if (mockInvokeFailAfterCount === null || matchingCalls > mockInvokeFailAfterCount) {
+                        throw new Error(`Mock invoke failure for ${cmd}`);
+                    }
                 }
                 return 'ok';
             },
@@ -58,8 +62,11 @@ if (typeof (globalThis as any).window === 'undefined') {
     (globalThis as any).window.__TAURI_INTERNALS__ = {
         invoke: async (cmd: string, args: any) => {
             mockInvokeCalls.push({ cmd, args });
+            const matchingCalls = mockInvokeCalls.filter((c) => c.cmd === cmd).length;
             if (mockInvokeFailCmd && cmd === mockInvokeFailCmd) {
-                throw new Error(`Mock invoke failure for ${cmd}`);
+                if (mockInvokeFailAfterCount === null || matchingCalls > mockInvokeFailAfterCount) {
+                    throw new Error(`Mock invoke failure for ${cmd}`);
+                }
             }
             return 'ok';
         },
@@ -277,7 +284,7 @@ await test('verifies loadPersistedRerunCount clamps values within bounds [1, RER
     assertEqual(loadPersistedRerunCount(), RERUN_MAX_COUNT);
 });
 
-await test('verifies dispatchRerunMessages sends round 1 immediately and enqueues rounds 2..N with varied randomized messages', async () => {
+await test('verifies dispatchRerunMessages enqueues all rounds (1..N) via enqueue_prompt and 0 via send_prompt_now', async () => {
     mockInvokeCalls.length = 0;
     mockInvokeFailCmd = null;
 
@@ -305,24 +312,52 @@ await test('verifies dispatchRerunMessages sends round 1 immediately and enqueue
     const promptCalls = mockInvokeCalls.filter((c) => c.cmd === 'send_prompt_now' || c.cmd === 'enqueue_prompt');
     assertEqual(promptCalls.length, 3);
 
-    // Round 1 must be send_prompt_now (immediate preempt)
-    assertEqual(promptCalls[0].cmd, 'send_prompt_now');
-    assertEqual(promptCalls[0].args.instanceId, 'inst-test-1');
-    assertEqual(promptCalls[0].args.conversationId, 'conv-test-1');
+    // Invariant: Rerun ALWAYS enqueues into SQLite queue and NEVER sends directly
+    const sendCalls = mockInvokeCalls.filter((c) => c.cmd === 'send_prompt_now');
+    assertEqual(sendCalls.length, 0, 'Rerun must never call send_prompt_now directly');
 
-    // Rounds 2 and 3 must be enqueue_prompt (FIFO enqueued)
-    assertEqual(promptCalls[1].cmd, 'enqueue_prompt');
-    assertEqual(promptCalls[1].args.instanceId, 'inst-test-1');
-    assertEqual(promptCalls[1].args.conversationId, 'conv-test-1');
+    const enqueueCalls = mockInvokeCalls.filter((c) => c.cmd === 'enqueue_prompt');
+    assertEqual(enqueueCalls.length, 3, 'All 3 rerun rounds must be enqueued via enqueue_prompt');
 
-    assertEqual(promptCalls[2].cmd, 'enqueue_prompt');
-    assertEqual(promptCalls[2].args.instanceId, 'inst-test-1');
-    assertEqual(promptCalls[2].args.conversationId, 'conv-test-1');
+    // All rounds must be enqueue_prompt (FIFO enqueued)
+    for (let i = 0; i < 3; i++) {
+        assertEqual(promptCalls[i].cmd, 'enqueue_prompt');
+        assertEqual(promptCalls[i].args.instanceId, 'inst-test-1');
+        assertEqual(promptCalls[i].args.conversationId, 'conv-test-1');
+    }
+});
+
+await test('verifies dispatchRerunMessages for single count strictly enqueues and never sends directly', async () => {
+    mockInvokeCalls.length = 0;
+    mockInvokeFailCmd = null;
+
+    const result = await dispatchRerunMessages({
+        targetInstId: 'inst-single-1',
+        repoPath: '/work/test-repo',
+        convId: 'conv-single-1',
+        count: 1,
+        messageOption: 'randomized',
+        originalPrompt: 'Single count rerun test',
+        source: 'testRunner',
+    });
+
+    assertEqual(result.requested, 1);
+    assertEqual(result.dispatched, 1);
+    assertEqual(result.failed, 0);
+
+    const sendCalls = mockInvokeCalls.filter((c) => c.cmd === 'send_prompt_now');
+    assertEqual(sendCalls.length, 0, 'Single count rerun must never call send_prompt_now');
+
+    const enqueueCalls = mockInvokeCalls.filter((c) => c.cmd === 'enqueue_prompt');
+    assertEqual(enqueueCalls.length, 1, 'Single count rerun must call enqueue_prompt');
+    assertEqual(enqueueCalls[0].args.instanceId, 'inst-single-1');
+    assertEqual(enqueueCalls[0].args.conversationId, 'conv-single-1');
 });
 
 await test('verifies dispatchRerunMessages handles errors gracefully without crashing', async () => {
     mockInvokeCalls.length = 0;
     mockInvokeFailCmd = 'enqueue_prompt'; // Round 2..N will fail
+    mockInvokeFailAfterCount = 1;         // Round 1 succeeds, Round 2 fails
 
     const result = await dispatchRerunMessages({
         targetInstId: 'inst-err-1',
@@ -339,7 +374,11 @@ await test('verifies dispatchRerunMessages handles errors gracefully without cra
     assertEqual(result.failed, 1);     // Round 2 failed
     assertEqual(result.messages!.length, 1);
 
+    const sendCalls = mockInvokeCalls.filter((c) => c.cmd === 'send_prompt_now');
+    assertEqual(sendCalls.length, 0, 'Rerun must never call send_prompt_now even during errors');
+
     mockInvokeFailCmd = null;
+    mockInvokeFailAfterCount = null;
 });
 
 await test('verifies all 10 diverse actionable questions are present in RERUN_RANDOM_MESSAGE_SET', () => {
@@ -444,15 +483,20 @@ await test('verifies dispatchRerunMessages carries history and enforces anti-rep
     const combined = [...run1.messages!, ...run2.messages!];
     assertEqual(new Set(combined).size, 5);
 
-    // Verify Round 1 of each run was send_prompt_now and Round 2..N were enqueue_prompt
-    const promptCalls = mockInvokeCalls.filter((c) => c.cmd === 'send_prompt_now' || c.cmd === 'enqueue_prompt');
-    const run1Calls = promptCalls.slice(0, 3);
-    assertEqual(run1Calls[0].cmd, 'send_prompt_now');
+    // Verify ALL rounds across both runs strictly enqueue via enqueue_prompt, zero send_prompt_now
+    const sendCalls = mockInvokeCalls.filter((c) => c.cmd === 'send_prompt_now');
+    assertEqual(sendCalls.length, 0, 'Rerun must never call send_prompt_now directly across any run');
+
+    const enqueueCalls = mockInvokeCalls.filter((c) => c.cmd === 'enqueue_prompt');
+    assertEqual(enqueueCalls.length, 5, 'All 5 rerun dispatches across both runs must call enqueue_prompt');
+
+    const run1Calls = enqueueCalls.slice(0, 3);
+    assertEqual(run1Calls[0].cmd, 'enqueue_prompt');
     assertEqual(run1Calls[1].cmd, 'enqueue_prompt');
     assertEqual(run1Calls[2].cmd, 'enqueue_prompt');
 
-    const run2Calls = promptCalls.slice(3, 5);
-    assertEqual(run2Calls[0].cmd, 'send_prompt_now');
+    const run2Calls = enqueueCalls.slice(3, 5);
+    assertEqual(run2Calls[0].cmd, 'enqueue_prompt');
     assertEqual(run2Calls[1].cmd, 'enqueue_prompt');
 });
 

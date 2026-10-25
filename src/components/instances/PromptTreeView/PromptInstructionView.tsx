@@ -14,6 +14,7 @@ import { formatDateTime, formatDateOnly } from '../../../utils/date';
 import { VERIFICATION_OPTIONS, parseVerificationTypeFromSuffix, getCustomSuffixTemplates, type SuffixTemplate } from './verificationTemplates';
 import { dispatchConversationId, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, type RerunMessageOption } from './usePromptTreePromptActions';
 import { sendPromptNow, enqueuePrompt } from '../../../services/instanceService';
+import { formatPromptWithAttachments } from '../../../utils/promptAttachment';
 
 export interface ExtractedImage {
     src: string;
@@ -133,6 +134,26 @@ function extractImagesFromPrompt(
             if (!seen.has(key)) {
                 seen.add(key);
                 list.push({ src, alt });
+            }
+        }
+    }
+
+    // 2.5 From canonical bracketed image attachments @[...]
+    const bracketedRegex = /@\[(.*?)\]/g;
+    while ((match = bracketedRegex.exec(text)) !== null) {
+        const rawPath = match[1]?.trim();
+        if (!rawPath) continue;
+
+        const isImage = /\.(png|jpe?g|webp|gif|svg|bmp|ico)$/i.test(rawPath) ||
+            rawPath.includes('.user_uploaded') ||
+            rawPath.startsWith('data:image/');
+
+        if (isImage) {
+            const key = normalizeMediaUri(rawPath) || rawPath;
+            if (!seen.has(key)) {
+                seen.add(key);
+                const fileName = rawPath.split(/[/\\]/).pop() || 'Attached Image';
+                list.push({ src: rawPath, alt: fileName });
             }
         }
     }
@@ -529,7 +550,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
 
     const executeDirectRerun = async () => {
         setLocalIsRerunning(true);
-        setActionMsg(`Rerunning turn (${rerunCount} round(s))...`);
+        setActionMsg(`Enqueuing rerun (${rerunCount} round(s))...`);
         try {
             const targetInstId = selectedConversation.instance_id || 'default';
             const repoPath = selectedProject?.repo_path || '';
@@ -540,9 +561,10 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
             ) || (conversationTargetMode === 'current' ? 'current' : undefined);
             const content = editedPromptText.trim() || activePromptText;
             const mediaList = extractImagesFromPrompt(content, selectedConversation).map((img) => img.src).filter(Boolean);
+            const formattedContent = formatPromptWithAttachments(content, mediaList, { repoPath });
 
-            await sendPromptNow(targetInstId, repoPath, content, targetConvId, mediaList.length > 0 ? mediaList : undefined);
-            setActionMsg('Turn rerun dispatched!');
+            await enqueuePrompt(targetInstId, repoPath, formattedContent, targetConvId, undefined, mediaList.length > 0 ? mediaList : undefined);
+            setActionMsg('Prompt enqueued successfully into FIFO queue!');
             setTimeout(() => setActionMsg(null), 3000);
         } catch (err) {
             const errorObj = err instanceof Error ? err : new Error(String(err));
@@ -550,7 +572,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                 source: 'PromptInstructionView.executeDirectRerun',
                 triggerAction: 'rerun_prompt',
             });
-            setActionMsg('Failed to rerun turn');
+            setActionMsg('Failed to enqueue rerun');
             setTimeout(() => setActionMsg(null), 3500);
         } finally {
             setLocalIsRerunning(false);

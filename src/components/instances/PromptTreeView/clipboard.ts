@@ -1,20 +1,16 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { copyToClipboard, ensureDocumentFocus } from '../../../utils/clipboard';
+import { formatPromptWithAttachments, stripAttachmentsFromPrompt } from '../../../utils/promptAttachment';
 import { useErrorStore } from '../../../stores/error-store';
 import { showToast } from '../../common/ToastContainer';
 import type { ExtractedPromptImage, PromptRewriteResult } from './types';
 
 /**
- * Strips all markdown image tags (![alt](url/dataUri)) and image references from prompt text,
+ * Strips all markdown image tags and canonical attachment blocks from prompt text,
  * returning clean text suitable for text-only copying and tokens counting.
  */
 export function stripImagesFromPrompt(text: string): string {
-    if (!text) return '';
-    return text
-        .replace(/!\[.*?\]\((?:data:image\/[^;]+;base64,[A-Za-z0-9+/=]+|https?:\/\/[^\s)]+|[^\s)]+?\.(?:png|jpe?g|gif|webp|svg))\)/gi, '')
-        .replace(/!\[.*?\]\(.*?\)/gi, '')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim();
+    return stripAttachmentsFromPrompt(text);
 }
 
 /**
@@ -180,7 +176,26 @@ export function extractAssets(text: string): { images: string[]; files: string[]
         }
     }
 
-    const fileRegex = /(?:file:\/\/\/|[a-zA-Z]:\\|\/)[^\s)"]+/g;
+    const bracketRegex = /@\[(.*?)\]/g;
+    let bracketMatch: RegExpExecArray | null;
+    while ((bracketMatch = bracketRegex.exec(text)) !== null) {
+        if (bracketMatch[1]) {
+            const raw = bracketMatch[1].trim();
+            const isImg = Boolean(raw.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i));
+            const key = (extractLocalPathFromUri(raw) || raw).replace(/\\/g, '/').toLowerCase();
+            if (isImg) {
+                if (!seenImages.has(key)) {
+                    seenImages.add(key);
+                    images.push(raw);
+                }
+            } else if (!seenFiles.has(key)) {
+                seenFiles.add(key);
+                files.push(raw);
+            }
+        }
+    }
+
+    const fileRegex = /(?:file:\/\/\/|[a-zA-Z]:\\|\/)[^\s)"\]]+/g;
     let fileMatch: RegExpExecArray | null;
     while ((fileMatch = fileRegex.exec(text)) !== null) {
         const raw = fileMatch[0].trim();
@@ -944,14 +959,11 @@ export async function copyPromptWithRichImages(
         return false;
     }
 
-    // Gather turn media paths not already in markdown
-    let effectiveMarkdown = markdownText;
-    if (mediaPaths && mediaPaths.length > 0) {
-        const missingPaths = mediaPaths.filter((p) => p && !effectiveMarkdown.includes(p));
-        if (missingPaths.length > 0) {
-            effectiveMarkdown += '\n\n' + missingPaths.map((p, idx) => `![Turn Image ${idx + 1}](${p})`).join('\n\n');
-        }
-    }
+    const effectiveMarkdown = formatPromptWithAttachments(
+        markdownText,
+        mediaPaths || [],
+        { repoPath }
+    );
 
     if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
         const fallbackOk = await copyToClipboard(effectiveMarkdown);
@@ -979,6 +991,15 @@ export async function copyPromptWithRichImages(
             }
         }
 
+        const attachmentMatches = Array.from(effectiveMarkdown.matchAll(/@\[(.*?)\]/g));
+        for (const match of attachmentMatches) {
+            const rawSrc = match[1].trim();
+            if (rawSrc && !srcMap.has(rawSrc)) {
+                const base64Uri = await convertImageUriToBase64(rawSrc, repoPath);
+                srcMap.set(rawSrc, base64Uri || rawSrc);
+            }
+        }
+
         // Extract embedded image URLs and format rich HTML with embedded Base64 <img> tags
         let htmlBody = effectiveMarkdown
             // Escape special HTML chars in text while preserving markdown tokens
@@ -997,6 +1018,16 @@ export async function copyPromptWithRichImages(
                 const cleanSrc = src.trim();
                 const resolvedSrc = srcMap.get(cleanSrc) || cleanSrc;
                 return `<p style="margin:12px 0;"><img src="${resolvedSrc}" alt="${alt || 'image'}" style="max-width:100%;height:auto;border-radius:6px;display:block;box-shadow:0 2px 8px rgba(0,0,0,0.15);" /></p>`;
+            })
+            // Canonical attachment bracket syntax: @[path] -> formatted paragraph with embedded Base64 image
+            .replace(/@\[(.*?)\]/g, (_m, src) => {
+                const cleanSrc = src.trim();
+                const resolvedSrc = srcMap.get(cleanSrc) || cleanSrc;
+                const isImg = Boolean(cleanSrc.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i));
+                if (isImg && resolvedSrc) {
+                    return `@[${cleanSrc}]<p style="margin:12px 0;"><img src="${resolvedSrc}" alt="attachment" style="max-width:100%;height:auto;border-radius:6px;display:block;box-shadow:0 2px 8px rgba(0,0,0,0.15);" /></p>`;
+                }
+                return `@[${cleanSrc}]`;
             })
             // Paragraphs and line breaks
             .replace(/\n\n+/g, '</p><p style="margin:8px 0;line-height:1.6;">')

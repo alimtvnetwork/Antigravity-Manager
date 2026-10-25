@@ -16,6 +16,7 @@ import { isGhostConversation } from './conversationGuards';
 import { detectPromptCategory } from './tierClassification';
 import type { PromptTreeState } from './usePromptTreeState';
 import { copyPromptWithRichImages, extractPromptImages } from './clipboard';
+import { formatPromptWithAttachments } from '../../../utils/promptAttachment';
 import {
     buildRichVerificationPrompt,
     buildRerunPrompt,
@@ -71,12 +72,14 @@ export function workspaceRelativeImageTarget(absPath: string, repoPath: string):
     return relative;
 }
 
+/** @deprecated Use formatPromptWithAttachments from 'src/utils/promptAttachment' */
 export function workspaceImageMarkdown(absPath: string, repoPath: string, index: number): string {
     const relative = workspaceRelativeImageTarget(absPath, repoPath);
 
     return `![Attached Image ${index}](${relative})`;
 }
 
+/** @deprecated Use formatPromptWithAttachments from 'src/utils/promptAttachment' */
 export function rewritePromptImageTargets(prompt: string, repoPath: string): string {
     return prompt.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (full, alt: string, src: string) => {
         const cleaned = src.trim();
@@ -510,7 +513,7 @@ export function usePromptTreePromptActions({
                 }
             }
 
-            // Append attached images from conversation media_paths or media_thumbnails if not already in markdown
+            // Format prompt and attached images using canonical Antigravity attachment format
             const activeTurn = conv?.selected_turn_number != null
                 ? conv.prompts?.find((t) => t.turn_number === conv.selected_turn_number)
                 : undefined;
@@ -522,19 +525,8 @@ export function usePromptTreePromptActions({
                 ...(conv?.prompts?.flatMap((p) => p.media_paths || []) || []),
                 ...(conv?.sub_runs?.flatMap((s) => s.media_paths || []) || []),
             ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
-            if (mediaList.length > 0) {
-                const missing = mediaList.filter((p) => p && !promptContent.includes(p));
-                if (missing.length > 0) {
-                    const imagesBlock = '\n\n' + missing.map((p, idx) => workspaceImageMarkdown(p, repoPath, idx + 1)).join('\n\n');
-                    if (promptContent.includes('</USER_REQUEST>')) {
-                        promptContent = promptContent.replace('</USER_REQUEST>', imagesBlock + '\n</USER_REQUEST>');
-                    } else {
-                        promptContent += imagesBlock;
-                    }
-                }
-            }
 
-            promptContent = rewritePromptImageTargets(promptContent, repoPath);
+            promptContent = formatPromptWithAttachments(promptContent, mediaList, { repoPath });
 
             // Dispatch real prompt content directly to running instance via sendPromptNow without stripping Base64 images to non-existent relative attachments
             // Track real dispatch outcome: the backend returns Err when the agy
@@ -756,7 +748,7 @@ ${activePromptText}
                 }
             }
 
-            // Append attached images from conversation media_paths or media_thumbnails if not already in markdown
+            // Format prompt and attached images using canonical Antigravity attachment format
             const activeTurn = conv?.selected_turn_number != null
                 ? conv.prompts?.find((t) => t.turn_number === conv.selected_turn_number)
                 : undefined;
@@ -768,20 +760,8 @@ ${activePromptText}
                 ...(conv?.prompts?.flatMap((p) => p.media_paths || []) || []),
                 ...(conv?.sub_runs?.flatMap((s) => s.media_paths || []) || []),
             ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
-            if (mediaList.length > 0) {
-                const missing = mediaList.filter((p) => p && !promptContent.includes(p));
-                if (missing.length > 0) {
-                    const imagesBlock = '\n\n' + missing.map((p, idx) => workspaceImageMarkdown(p, repoPath, idx + 1)).join('\n\n');
-                    if (promptContent.includes('</USER_REQUEST>')) {
-                        promptContent = promptContent.replace('</USER_REQUEST>', imagesBlock + '\n</USER_REQUEST>');
-                    } else {
-                        promptContent += imagesBlock;
-                    }
-                }
-            }
 
-            // Enqueue prompt into FIFO queue (preserving real Base64 image data URIs and file paths)
-            promptContent = rewritePromptImageTargets(promptContent, repoPath);
+            promptContent = formatPromptWithAttachments(promptContent, mediaList, { repoPath });
             await enqueuePrompt(targetInstId, repoPath, promptContent, targetConvId, undefined, mediaList);
 
             // Invalidate prompt tree cache first so tree reload fetches fresh state including enqueued turn
@@ -1531,10 +1511,10 @@ export interface RerunDispatchResult {
 }
 
 /**
- * Dispatch the chosen rerun message N times through the canonical `sendPromptNow`
- * path (the same function handleResendPrompt uses). Each rerun is audit-logged
- * individually; a failed rerun is audit-logged as `result: 'error'` and routed
- * into the error module — failures are never silent.
+ * Dispatch the chosen rerun message N times into the FIFO queue via `enqueuePrompt`.
+ * CRITICAL INVARIANT: RERUN MUST ALWAYS ENQUEUE, NEVER SEND DIRECTLY.
+ * Each rerun is audit-logged individually; a failed rerun is audit-logged as
+ * `result: 'error'` and routed into the error module — failures are never silent.
  */
 export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<RerunDispatchResult> {
     const requested = Math.min(
@@ -1578,38 +1558,28 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
             repoPath: ctx.repoPath,
         });
         const message = richPrompt || rawMessage;
-        const { rewrittenPrompt, images } = extractPromptImages(message);
+        const { images } = extractPromptImages(message);
         const rerunMedia: string[] = Array.from(new Set([
             ...(ctx.mediaPaths || []),
             ...((ctx as { media_paths?: string[] }).media_paths || []),
             ...images.map((img) => img.dataUri),
         ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+        const formattedPrompt = formatPromptWithAttachments(message, rerunMedia, { repoPath: ctx.repoPath });
         try {
-            // Canonical dispatch path: First round cancels active tasks and starts immediately
-            // via sendPromptNow. Subsequent rounds are enqueued into the FIFO queue via enqueuePrompt
-            // so they execute sequentially without prematurely aborting previous rounds.
-            if (i === 0) {
-                await (sendPromptNow as any)(
-                    ctx.targetInstId,
-                    ctx.repoPath,
-                    rewrittenPrompt,
-                    ctx.convId,
-                    rerunMedia.length > 0 ? rerunMedia : undefined
-                );
-            } else {
-                await (enqueuePrompt as any)(
-                    ctx.targetInstId,
-                    ctx.repoPath,
-                    rewrittenPrompt,
-                    ctx.convId,
-                    undefined,
-                    rerunMedia.length > 0 ? rerunMedia : undefined
-                );
-            }
+            // CRITICAL INVARIANT: RERUN MUST ALWAYS ENQUEUE, NEVER SEND DIRECTLY.
+            // All rounds (round 0 as well as rounds 1..N-1) are enqueued sequentially into the FIFO queue.
+            await enqueuePrompt(
+                ctx.targetInstId,
+                ctx.repoPath,
+                formattedPrompt,
+                ctx.convId,
+                undefined,
+                rerunMedia.length > 0 ? rerunMedia : undefined
+            );
             result.dispatched += 1;
             result.messages?.push(rawMessage);
             try {
-                await copyPromptWithRichImages(message, undefined, undefined, rerunMedia.length > 0 ? rerunMedia : undefined);
+                await copyPromptWithRichImages(formattedPrompt, undefined, undefined, rerunMedia.length > 0 ? rerunMedia : undefined);
             } catch (clipErr) {
                 useErrorStore.getState().trackWarning(clipErr, {
                     source: 'usePromptTreePromptActions.dispatchRerunMessages',
@@ -1626,14 +1596,14 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
                     rerunIndex: i + 1,
                     rerunTotal: requested,
                     messagePickedIndex: pickedIndex,
-                    message,
+                    message: formattedPrompt,
                 },
                 result: 'ok',
             });
         } catch (err) {
             result.failed += 1;
             const errorObj = err instanceof Error ? err : new Error(String(err) || 'rerun dispatch failed');
-            // sendPromptNow already routed this into the error store (captureError);
+            // enqueuePrompt already routed this into the error store (captureError);
             // persist the crash record as well so the failure stays visible.
             persistClientCrash(errorObj, 'usePromptTreePromptActions.dispatchRerunMessages');
             useErrorStore.getState().captureException(errorObj, {
@@ -1811,7 +1781,7 @@ export async function dispatchMultiPromptResend(
             ...images.map((img) => img.dataUri),
         ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
         try {
-            await (sendPromptNow as any)(
+            await sendPromptNow(
                 options.instanceId,
                 options.repoPath,
                 rewrittenPrompt,
@@ -1973,7 +1943,7 @@ export async function handleCloneAndCompactConversation(
             ...(sourceConv.sub_runs?.flatMap((s) => s.media_paths || []) || []),
             ...images.map((img) => img.dataUri),
         ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
-        await (enqueuePrompt as any)(
+        await enqueuePrompt(
             instanceId,
             repoPath,
             rewrittenPrompt,
