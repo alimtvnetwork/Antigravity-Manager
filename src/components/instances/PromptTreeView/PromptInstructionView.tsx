@@ -204,6 +204,72 @@ function extractImagesFromPrompt(
     return list;
 }
 
+interface ImageQueueItem {
+    path: string;
+    resolve: (data: string) => void;
+    reject: (err: unknown) => void;
+}
+
+/**
+ * Bounded Concurrency Worker Pool & In-Memory LRU Cache for base64 image reads.
+ * Limits concurrent IPC reads to 3 so conversations with 30+ screenshots do not
+ * starve the WebView2/Win32 message pump, preventing DWM '(Not Responding)' freezes.
+ */
+class BoundedImageLoaderPool {
+    private concurrency = 3;
+    private running = 0;
+    private queue: ImageQueueItem[] = [];
+    private cache = new Map<string, string>();
+    private maxCacheSize = 200;
+
+    public async loadBase64(filePath: string): Promise<string> {
+        const normalized = filePath.trim();
+        if (this.cache.has(normalized)) {
+            return this.cache.get(normalized)!;
+        }
+
+        return new Promise<string>((resolve, reject) => {
+            this.queue.push({ path: normalized, resolve, reject });
+            this.processNext();
+        });
+    }
+
+    public clearQueue(): void {
+        this.queue = [];
+    }
+
+    private async processNext(): Promise<void> {
+        if (this.running >= this.concurrency || this.queue.length === 0) {
+            return;
+        }
+
+        const task = this.queue.shift();
+        if (!task) return;
+
+        this.running++;
+        try {
+            const data = await invoke<string>('read_image_as_base64', { path: task.path });
+            if (this.cache.size >= this.maxCacheSize) {
+                const firstKey = this.cache.keys().next().value;
+                if (firstKey) this.cache.delete(firstKey);
+            }
+            this.cache.set(task.path, data);
+            task.resolve(data);
+        } catch (err: unknown) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'BoundedImageLoaderPool.loadBase64',
+                triggerAction: 'read_image_as_base64_throttled',
+            });
+            task.reject(err);
+        } finally {
+            this.running--;
+            this.processNext();
+        }
+    }
+}
+
+export const imageLoaderPool = new BoundedImageLoaderPool();
+
 interface PromptThumbnailCardProps {
     img: ExtractedImage;
     repoPath?: string;
@@ -233,7 +299,7 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
             }
 
             try {
-                const base64Data = await invoke<string>('read_image_as_base64', { path: localPath });
+                const base64Data = await imageLoaderPool.loadBase64(localPath);
                 if (!isCancelled && base64Data && base64Data.startsWith('data:image/')) {
                     setResolvedSrc(base64Data);
                     setHasFailed(false);
@@ -273,7 +339,7 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
             }
 
             try {
-                const base64Data = await invoke<string>('read_image_as_base64', { path: localPath });
+                const base64Data = await imageLoaderPool.loadBase64(localPath);
                 if (base64Data && base64Data.startsWith('data:image/')) {
                     setResolvedSrc(base64Data);
                     setHasFailed(false);
@@ -467,6 +533,13 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
     useEffect(() => {
         setCustomTemplates(getCustomSuffixTemplates());
     }, [isDispatchMenuOpen]);
+
+    // Purge pending un-executed image tasks when turn or conversation changes
+    useEffect(() => {
+        return () => {
+            imageLoaderPool.clearQueue();
+        };
+    }, [selectedConversation?.conversation_id, selectedTurnNumberProp]);
 
     const primaryDispatchAction = propPrimaryDispatchAction ?? localDispatchMode;
     const setPrimaryDispatchAction = propSetPrimaryDispatchAction ?? setLocalDispatchMode;

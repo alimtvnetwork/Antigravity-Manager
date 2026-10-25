@@ -3,6 +3,23 @@ use super::*;
 use std::fs;
 use std::path::PathBuf;
 
+/// Real-time progress update emitted during deep instance cloning.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CloneProgressPayload {
+    /// Source instance identifier being cloned.
+    pub source_id: String,
+    /// Destination instance display name.
+    pub target_name: String,
+    /// Discrete stage identifier: "initializing" | "user_settings" | "sqlite_databases" | "workspace_storage" | "telemetry_sync" | "complete"
+    pub stage: String,
+    /// Numeric completion percentage (10, 30, 50, 75, 95, 100).
+    pub percentage: u8,
+    /// Human-readable description of current operation.
+    pub message: String,
+    /// Unix timestamp in milliseconds when stage began.
+    pub timestamp_ms: u64,
+}
+
 /// Copy/clone an existing profile with options (optionally copying open projects and recent paths)
 pub fn copy_instance_with_options(
     source_id: &str,
@@ -10,6 +27,31 @@ pub fn copy_instance_with_options(
     clone_mode: Option<&str>,
     copy_projects: bool,
 ) -> Result<InstanceConfig, String> {
+    copy_instance_with_progress(
+        source_id,
+        target_name,
+        clone_mode,
+        copy_projects,
+        |_, _, _| {},
+    )
+}
+
+/// Copy/clone an existing profile with real-time progress reporting across discrete stages.
+pub fn copy_instance_with_progress<F>(
+    source_id: &str,
+    target_name: String,
+    clone_mode: Option<&str>,
+    copy_projects: bool,
+    mut progress: F,
+) -> Result<InstanceConfig, String>
+where
+    F: FnMut(&str, u8, &str),
+{
+    progress(
+        "initializing",
+        10,
+        "Initializing clone environment and resolving target paths...",
+    );
     let resolved_source_id =
         resolve_instance_id(source_id).unwrap_or_else(|_| source_id.to_string());
     let registry = load_registry()?;
@@ -42,6 +84,11 @@ pub fn copy_instance_with_options(
 
     let has_src = src_path.exists();
     if has_src {
+        progress(
+            "user_settings",
+            30,
+            "Replicating user settings, keybindings, snippets, and security policies...",
+        );
         if is_profile_only {
             let user_settings_src = src_path.join("User");
             let has_user_dir = user_settings_src.exists();
@@ -71,6 +118,11 @@ pub fn copy_instance_with_options(
         }
 
         // Specifically ensure state.vscdb is cloned using safe_clone_sqlite_db
+        progress(
+            "sqlite_databases",
+            50,
+            "Safely cloning SQLite state databases and storage identifiers...",
+        );
         let src_vscdb = src_path
             .join("User")
             .join("globalStorage")
@@ -378,6 +430,11 @@ pub fn copy_instance_with_options(
         ));
     }
 
+    progress(
+        "workspace_storage",
+        75,
+        "Cloning workspace storage trees, open projects, and recent folders...",
+    );
     if copy_projects {
         // Justification: background detection; re-runs on the next refresh tick
         crate::error::record_ignored(
@@ -439,6 +496,11 @@ pub fn copy_instance_with_options(
         purge_recent_project_paths(&new_instance);
     }
 
+    progress(
+        "telemetry_sync",
+        95,
+        "Scrubbing hardware telemetry salts and enforcing IDE parity...",
+    );
     // Justification: post-clone hygiene; stale summaries are regenerated on demand
     crate::error::record_ignored(
         sanitize_cloned_instance_summaries(&new_instance.id),
@@ -478,6 +540,7 @@ pub fn copy_instance_with_options(
         Some(&new_instance.id),
     );
 
+    progress("complete", 100, "Clone completed successfully.");
     Ok(new_instance)
 }
 
@@ -548,7 +611,10 @@ pub fn scrub_storage_json_telemetry(dst_data_dir: &std::path::Path, instance_id:
 
                     if let Ok(serialized) = serde_json::to_string_pretty(&json) {
                         // Justification: best-effort telemetry scrubbing for cloned profile isolation
-                        let _ = std::fs::write(storage_path, serialized);
+                        crate::error::record_ignored(
+                            std::fs::write(storage_path, serialized),
+                            "scrub telemetry in storage.json",
+                        );
                     }
                 }
             }

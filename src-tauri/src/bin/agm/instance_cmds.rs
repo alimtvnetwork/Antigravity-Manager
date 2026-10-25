@@ -97,6 +97,9 @@ pub(crate) fn dispatch_instance_domain(subcommand: &str, args: &[String]) {
             forward_args.extend(args.to_vec());
             crate::instance_dispatch::cmd_instances(&forward_args);
         }
+        "ide" => {
+            antigravity_tools_lib::modules::cli::handle_ide_subcommand(args);
+        }
         _ => crate::common::handle_unknown_domain_command("instances", subcommand, args),
     }
 }

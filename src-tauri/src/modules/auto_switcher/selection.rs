@@ -115,6 +115,50 @@ pub(crate) fn is_account_bound_to_running_sibling(
     })
 }
 
+/// Helper checking if an account qualifies for the Urgent Expiration Tier (T_remaining <= 24h & Q_weekly >= 15%)
+/// Returns Some(remaining_hours) if urgent, None otherwise.
+pub(crate) fn extract_urgent_expiration_hours(acc: &Account, now_sec: i64) -> Option<f64> {
+    let quota_data = acc.quota.as_ref()?;
+    let groups = quota_data.quota_groups.as_ref()?;
+    let mut min_hours: Option<f64> = None;
+    for g in groups {
+        for b in &g.buckets {
+            if is_gemini_weekly_bucket(&b.window, &b.bucket_id) {
+                if !(0.0..=1.0).contains(&b.remaining_fraction) {
+                    continue;
+                }
+                let pct = (b.remaining_fraction * 100.0).round();
+                if pct >= 15.0 {
+                    let rem = compute_weekly_remaining_headroom_hours(b, now_sec);
+                    if (0.0..=24.0).contains(&rem) {
+                        min_hours = Some(min_hours.map_or(rem, |cur| cur.min(rem)));
+                    }
+                }
+            }
+        }
+    }
+
+    if min_hours.is_some() {
+        return min_hours;
+    }
+
+    // Fallback: check models if no weekly groups found
+    for m in &quota_data.models {
+        if is_gemini_native_model(&m.name) && m.percentage >= 15 {
+            if let Some(reset_ts) = parse_reset_time_to_unix(&m.reset_time) {
+                if reset_ts > now_sec {
+                    let rem = (reset_ts - now_sec) as f64 / 3600.0;
+                    if (0.0..=24.0).contains(&rem) {
+                        min_hours = Some(min_hours.map_or(rem, |cur| cur.min(rem)));
+                    }
+                }
+            }
+        }
+    }
+
+    min_hours
+}
+
 /// Discover, score, and rank candidate profiles with 100% 4h quota accounts prioritized
 pub fn select_candidate_profiles(
     current_instance_id: &str,
@@ -225,6 +269,8 @@ pub fn select_candidate_profiles(
     let mut available_pool: Vec<ProfileCandidate> = Vec::new();
     let mut cooldown_pool: Vec<(ProfileCandidate, i64)> = Vec::new();
     let mut seen_account_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut urgent_hours_map: std::collections::HashMap<String, f64> =
+        std::collections::HashMap::new();
 
     // 1. Inspect instances not in active use
     for inst in &registry.instances {
@@ -293,6 +339,9 @@ pub fn select_candidate_profiles(
                 let score = score_candidate_account(&acc, target_model, now_sec);
                 if score > 0.0 {
                     seen_account_ids.insert(acc.id.clone());
+                    if let Some(uh) = extract_urgent_expiration_hours(&acc, now_sec) {
+                        urgent_hours_map.insert(acc.id.clone(), uh);
+                    }
                     let candidate = ProfileCandidate {
                         instance_id: current_instance_id.to_string(),
                         account_id: acc.id.clone(),
@@ -356,6 +405,9 @@ pub fn select_candidate_profiles(
             let score = score_candidate_account(acc, target_model, now_sec);
             if score > 0.0 {
                 seen_account_ids.insert(acc.id.clone());
+                if let Some(uh) = extract_urgent_expiration_hours(acc, now_sec) {
+                    urgent_hours_map.insert(acc.id.clone(), uh);
+                }
                 let candidate = ProfileCandidate {
                     instance_id: current_instance_id.to_string(),
                     account_id: acc.id.clone(),
@@ -408,6 +460,9 @@ pub fn select_candidate_profiles(
                 let score = score_candidate_account_fallback(acc, target_model, now_sec);
                 if score > 0.0 {
                     seen_account_ids.insert(acc.id.clone());
+                    if let Some(uh) = extract_urgent_expiration_hours(acc, now_sec) {
+                        urgent_hours_map.insert(acc.id.clone(), uh);
+                    }
                     let candidate = ProfileCandidate {
                         instance_id: current_instance_id.to_string(),
                         account_id: acc.id.clone(),
@@ -458,6 +513,9 @@ pub fn select_candidate_profiles(
                 let score = score_candidate_account_fallback(acc, target_model, now_sec);
                 if score > 0.0 {
                     seen_account_ids.insert(acc.id.clone());
+                    if let Some(uh) = extract_urgent_expiration_hours(acc, now_sec) {
+                        urgent_hours_map.insert(acc.id.clone(), uh);
+                    }
                     let candidate = ProfileCandidate {
                         instance_id: current_instance_id.to_string(),
                         account_id: acc.id.clone(),
@@ -481,15 +539,52 @@ pub fn select_candidate_profiles(
     // fall back to the cooldown pool sorted by oldest `last_used` so the system never gets stuck.
     let selected_candidates = if !available_pool.is_empty() {
         // Priority Sorting for available pool:
-        // Sort by subscription tier score descending (Ultra > Pro > Free).
-        // Tie-breaker: deterministic email ordering.
-        available_pool.sort_by(|a, b| match b.score.partial_cmp(&a.score) {
+        // Tier 1: Urgent Expiration candidates (T_remaining <= 24h & Q_weekly >= 15%).
+        //         Sorted ASCENDING by remaining reset hours (burn closest-to-expire first).
+        //         Tie-breaker: descending by score, then ascending by email.
+        // Tier 2: Standard candidates.
+        //         Sorted DESCENDING by score.
+        //         Tie-breaker: deterministic email ordering.
+        let mut urgent_pool: Vec<ProfileCandidate> = Vec::new();
+        let mut standard_pool: Vec<ProfileCandidate> = Vec::new();
+
+        for cand in available_pool {
+            if urgent_hours_map.contains_key(&cand.account_id) {
+                urgent_pool.push(cand);
+            } else {
+                standard_pool.push(cand);
+            }
+        }
+
+        urgent_pool.sort_by(|a, b| {
+            let hours_a = urgent_hours_map
+                .get(&a.account_id)
+                .copied()
+                .unwrap_or(f64::INFINITY);
+            let hours_b = urgent_hours_map
+                .get(&b.account_id)
+                .copied()
+                .unwrap_or(f64::INFINITY);
+            match hours_a.partial_cmp(&hours_b) {
+                Some(std::cmp::Ordering::Equal) | None => match b.score.partial_cmp(&a.score) {
+                    Some(std::cmp::Ordering::Equal) | None => {
+                        a.email.to_lowercase().cmp(&b.email.to_lowercase())
+                    }
+                    Some(ord) => ord,
+                },
+                Some(ord) => ord,
+            }
+        });
+
+        standard_pool.sort_by(|a, b| match b.score.partial_cmp(&a.score) {
             Some(std::cmp::Ordering::Equal) | None => {
                 a.email.to_lowercase().cmp(&b.email.to_lowercase())
             }
             Some(ord) => ord,
         });
-        available_pool
+
+        urgent_pool.extend(standard_pool);
+        urgent_pool
     } else if !cooldown_pool.is_empty() {
         crate::modules::logger::log_info(&format!(
             "[AutoSwitcher] All {} healthy account(s) are currently in cooldown. Triggering graceful fallback to oldest last_used account.",

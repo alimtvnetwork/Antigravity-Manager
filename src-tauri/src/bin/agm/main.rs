@@ -125,6 +125,9 @@ fn main() {
         "instances" | "instance" | "intrance" | "intrances" | "profile" | "profiles" => {
             crate::instance_cmds::dispatch_instance_domain_from_args(&cmd_args);
         }
+        "ide" | "ides" => {
+            antigravity_tools_lib::modules::cli::handle_ide_subcommand(&cmd_args);
+        }
         "ls" | "list" => {
             if cmd_args
                 .first()

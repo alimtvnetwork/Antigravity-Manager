@@ -20,9 +20,13 @@ import {
     RotateCcw,
     Mail,
     Layers,
+    Trash2,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { showToast } from '../../components/common/ToastContainer';
+import { IdeBundleModal } from '../../components/instances/IdeBundleModal';
+import { PurgeReinstallModal } from '../../components/instances/PurgeReinstallModal';
+import { InstallIdeModal } from '../../components/instances/InstallIdeModal';
 import {
     downloadPromptTreeStatusJson,
     openAndRestorePromptBackupFile,
@@ -67,6 +71,9 @@ export function InstancesHeader({ api }: { api: InstancePageApi }) {
     const [isRunningDetailsOpen, setIsRunningDetailsOpen] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     const [isResending, setIsResending] = useState(false);
+    const [isIdeBundleOpen, setIsIdeBundleOpen] = useState(false);
+    const [isPurgeModalOpen, setIsPurgeModalOpen] = useState(false);
+    const [isInstallIdeOpen, setIsInstallIdeOpen] = useState(false);
 
     const importExportBtnRef = useRef<HTMLButtonElement>(null);
     const runningBadgeRef = useRef<HTMLButtonElement>(null);
@@ -482,12 +489,38 @@ export function InstancesHeader({ api }: { api: InstancePageApi }) {
                                 </div>
                                 <button
                                     type="button"
+                                    onClick={() => {
+                                        setIsImportExportOpen(false);
+                                        setIsIdeBundleOpen(true);
+                                    }}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] text-left cursor-pointer transition-colors"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <FolderArchive className="w-3.5 h-3.5 text-blue-500" />
+                                        <span className="font-semibold">IDE Profile Bundle (.agmide)...</span>
+                                    </div>
+                                </button>
+                                <button
+                                    type="button"
                                     onClick={handleOpenBackup}
                                     className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#40285e] text-left cursor-pointer transition-colors"
                                 >
                                     <div className="flex items-center gap-2">
                                         <FolderArchive className="w-3.5 h-3.5 text-purple-500" />
                                         <span>Unified Instance Vault Backup & Restore...</span>
+                                    </div>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsImportExportOpen(false);
+                                        setIsPurgeModalOpen(true);
+                                    }}
+                                    className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-left cursor-pointer transition-colors"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                                        <span className="font-semibold">Clean Purge & Reinstall...</span>
                                     </div>
                                 </button>
                             </div>
@@ -537,6 +570,15 @@ export function InstancesHeader({ api }: { api: InstancePageApi }) {
                     >
                         <Sparkles className={cn('w-3.5 h-3.5 text-amber-500', isLoading && 'animate-spin')} />
                         <span>Eval Quota</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setIsInstallIdeOpen(true)}
+                        className="flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                        title="Multi-IDE Installation Engine: Install Antigravity, Cursor, or VS Code"
+                    >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        <span>Install IDE</span>
                     </button>
                     <button
                         type="button"
@@ -631,6 +673,32 @@ export function InstancesHeader({ api }: { api: InstancePageApi }) {
                     </button>
                 </div>
             </div>
+
+            {/* IDE Profile Bundle Modal */}
+            <IdeBundleModal
+                isOpen={isIdeBundleOpen}
+                onClose={() => setIsIdeBundleOpen(false)}
+                instances={instances.map((inst) => ({
+                    id: inst.config.id,
+                    name: inst.config.name,
+                    is_default: inst.config.is_default,
+                }))}
+                onSuccess={fetchInstances}
+            />
+
+            {/* Clean Purge & Reinstall Modal */}
+            <PurgeReinstallModal
+                isOpen={isPurgeModalOpen}
+                onClose={() => setIsPurgeModalOpen(false)}
+                onSuccess={fetchInstances}
+            />
+
+            {/* Multi-IDE Installer Modal */}
+            <InstallIdeModal
+                isOpen={isInstallIdeOpen}
+                onClose={() => setIsInstallIdeOpen(false)}
+                onSuccess={fetchInstances}
+            />
         </div>
     );
 }

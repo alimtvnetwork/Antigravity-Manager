@@ -25,6 +25,12 @@ pub fn handle_cli_arguments() -> bool {
     };
 
     match cmd.as_str() {
+        // IDE Profile Bundle, Clean Purge & Reinstall, and IDE Installer commands
+        "ide" => {
+            handle_ide_subcommand(&rest_args);
+            true
+        }
+
         // Multi-Instance & Profile commands
         "instances" | "instance" | "intrance" | "intrances" | "profile" | "profiles" | "ls" => {
             handle_instance_subcommand(&rest_args);
@@ -151,6 +157,7 @@ pub fn handle_cli_arguments() -> bool {
                 let sub_low = sub.trim_start_matches('-').to_lowercase();
                 match sub_low.as_str() {
                     "instance" | "instances" | "intrance" | "create" => print_instance_cli_help(),
+                    "ide" => print_ide_cli_help(),
                     "switch" | "switch-account" | "account" => print_switch_cli_help(),
                     "auto-switch" | "autoswitch" | "auto" => print_auto_switch_cli_help(),
                     "agy" | "cache" | "clean" => print_agy_cli_help(),

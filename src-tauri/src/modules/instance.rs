@@ -8,6 +8,12 @@
 pub mod active;
 #[path = "instance/arg_normalizer.rs"]
 pub mod arg_normalizer;
+#[path = "instance/bundle_export.rs"]
+pub mod bundle_export;
+#[path = "instance/bundle_import.rs"]
+pub mod bundle_import;
+#[path = "instance/bundle_types.rs"]
+pub mod bundle_types;
 #[path = "instance/cdp_onboarding.rs"]
 pub mod cdp_onboarding;
 #[path = "instance/child_health_monitor.rs"]
@@ -177,6 +183,8 @@ pub mod projects_copy;
 pub mod prompt_tree_branch_hierarchy_formatter;
 #[path = "instance/protection.rs"]
 pub mod protection;
+#[path = "instance/purge_reinstall.rs"]
+pub mod purge_reinstall;
 #[path = "instance/query.rs"]
 pub mod query;
 #[path = "instance/registry.rs"]
@@ -461,6 +469,9 @@ pub use active::{
 };
 pub use batch_file_execution_interceptor::*;
 pub use binary_execution_probe::*;
+pub use bundle_export::*;
+pub use bundle_import::*;
+pub use bundle_types::*;
 pub use caller_ide_exit_code_enforcer::*;
 pub use caller_ide_heartbeat_watchdog::*;
 pub use caller_process_ancestry_tree_scanner::*;
@@ -581,6 +592,7 @@ pub use projects::{
 pub use projects_copy::{copy_instance_projects, find_instance_by_executable};
 pub use prompt_tree_branch_hierarchy_formatter::*;
 pub use protection::{other_instance_protection, should_spare_pid};
+pub use purge_reinstall::*;
 pub use query::list_instances;
 pub use registry::{export_instances_envelope, load_registry, save_registry};
 pub use remote_debugging_port_allocator::*;

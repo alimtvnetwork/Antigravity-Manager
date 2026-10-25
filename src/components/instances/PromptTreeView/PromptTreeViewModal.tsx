@@ -439,7 +439,9 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                         triggerAction: 'invalidate_prompt_tree_cache',
                     });
                 });
-                void loadTree(true, true);
+                if (!isAutoSyncing) {
+                    void loadTree(true, true);
+                }
             } else if (res.failed > 0) {
                 setActionMsg(`Rerun failed: ${res.failed} of ${res.requested} dispatch(es) failed`);
                 useErrorStore.getState().captureError(
@@ -881,6 +883,31 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         ?? instanceName
         ?? 'Default';
 
+    const lastManualRefreshRef = useRef<number>(0);
+    const handleDebouncedRefreshAll = useCallback(async () => {
+        const now = Date.now();
+        // Guard against colliding with active 30s auto-sync, active loading, or rapid clicks
+        if (isAutoSyncing || isLoading || isResetting || (now - lastManualRefreshRef.current < 2000)) {
+            return;
+        }
+        lastManualRefreshRef.current = now;
+        setActionMsg('Refreshing prompt tree...');
+        try {
+            await loadTree(false, true);
+            setActionMsg('Prompt tree refreshed');
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'PromptTreeViewModal.onRefreshAll',
+                triggerAction: 'refresh_prompt_tree',
+            });
+            setActionMsg('Prompt tree refresh failed');
+        } finally {
+            setTimeout(() => {
+                setActionMsg(null);
+            }, 2500);
+        }
+    }, [isAutoSyncing, isLoading, isResetting, loadTree, setActionMsg]);
+
     if (!isOpen) return null;
 
     const modalContent = (
@@ -903,7 +930,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             <div
                 onClick={(e) => e.stopPropagation()}
                 onDoubleClick={(e) => e.stopPropagation()}
-                className={`flex flex-col overflow-hidden bg-white dark:bg-[#0c0817]/95 backdrop-blur-2xl shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-slate-200 dark:border-purple-900/40 transition-all relative z-10 ${isFullscreen
+                className={`flex flex-col overflow-hidden bg-white dark:bg-[#0c0817] shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-slate-200 dark:border-purple-900/40 transition-all relative z-10 ${isFullscreen
                     ? "h-full w-full rounded-none border-0"
                     : "h-[90vh] w-full max-w-7xl rounded-2xl"
                     }`}
@@ -929,23 +956,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                     onCopyAllTreePrompts={coreActions.handleCopyAllTreePrompts}
                     onFileRestore={coreActions.handleFileRestore}
                     isAutoSyncing={isAutoSyncing}
-                    onRefreshAll={async () => {
-                        setActionMsg('Refreshing prompt tree...');
-                        try {
-                            await loadTree(false, true);
-                            setActionMsg('Prompt tree refreshed');
-                        } catch (err) {
-                            useErrorStore.getState().trackWarning(err, {
-                                source: 'PromptTreeViewModal.onRefreshAll',
-                                triggerAction: 'refresh_prompt_tree',
-                            });
-                            setActionMsg('Prompt tree refresh failed');
-                        } finally {
-                            setTimeout(() => {
-                                setActionMsg(null);
-                            }, 2500);
-                        }
-                    }}
+                    onRefreshAll={handleDebouncedRefreshAll}
                     isResetting={isResetting}
                     onResetTree={async () => {
                         setIsResetting(true);
@@ -1359,12 +1370,14 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 instanceName={instanceName || 'Default Instance'}
                 onExecuteImport={coreActions.executeSectionImport}
                 onImportComplete={() => {
-                    void loadTree(false, true);
+                    if (!isAutoSyncing) {
+                        void loadTree(false, true);
+                    }
                 }}
             />
 
             {isAutoSyncing && (
-                <div className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs text-blue-600 dark:text-cyan-400 backdrop-blur-md shadow-lg pointer-events-none z-50">
+                <div className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs text-blue-600 dark:text-cyan-400 shadow-lg pointer-events-none z-50">
                     <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                     Syncing...
                 </div>
@@ -1372,7 +1385,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
 
             {/* Non-Displacing Absolute Floating Action Toast */}
             {actionMsg && (
-                <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/95 dark:bg-[#171025]/95 backdrop-blur-md border border-slate-700/60 dark:border-purple-500/40 text-xs font-medium text-slate-200 dark:text-purple-200 shadow-2xl pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-150">
+                <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/95 dark:bg-[#171025] border border-slate-700/60 dark:border-purple-500/40 text-xs font-medium text-slate-200 dark:text-purple-200 shadow-2xl pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-150">
                     <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
                     <span>{actionMsg}</span>
                 </div>
@@ -1380,7 +1393,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
 
             {/* Non-Displacing Absolute Floating Error Toast */}
             {error && (
-                <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-950/95 backdrop-blur-md border border-rose-500/50 text-xs font-medium text-rose-200 shadow-2xl pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-150">
+                <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-950/95 border border-rose-500/50 text-xs font-medium text-rose-200 shadow-2xl pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-150">
                     <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
                     <span>{error}</span>
                 </div>

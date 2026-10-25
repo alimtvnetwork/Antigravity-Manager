@@ -230,20 +230,51 @@ pub async fn fast_forward_instance(instance_id: String) -> Result<String, String
 }
 
 #[tauri::command]
-pub fn copy_instance(
+pub async fn copy_instance(
+    app: tauri::AppHandle,
     source_id: String,
     target_name: String,
     clone_mode: Option<String>,
     copy_projects: Option<bool>,
 ) -> Result<InstanceConfig, String> {
+    use tauri::Emitter;
     let resolved_src = instance::resolve_instance_id(&source_id).unwrap_or(source_id);
     let should_copy_projs = copy_projects.unwrap_or(true);
-    instance::copy_instance_with_options(
-        &resolved_src,
-        target_name,
-        clone_mode.as_deref(),
-        should_copy_projs,
-    )
+    let effective_mode = clone_mode.unwrap_or_else(|| "full".to_string());
+    let app_handle = app.clone();
+
+    tokio::task::spawn_blocking(move || {
+        let target_name_clone = target_name.clone();
+        let resolved_src_clone = resolved_src.clone();
+        let emit_progress = move |stage: &str, percentage: u8, msg: &str| {
+            let payload = instance::clone::CloneProgressPayload {
+                source_id: resolved_src_clone.clone(),
+                target_name: target_name_clone.clone(),
+                stage: stage.to_string(),
+                percentage,
+                message: msg.to_string(),
+                timestamp_ms: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64,
+            };
+            // Justification: best-effort UI event emission; UI state is re-derived on completion
+            crate::error::record_ignored(
+                app_handle.emit("instance-clone-progress", payload),
+                "emit instance-clone-progress",
+            );
+        };
+
+        instance::clone::copy_instance_with_progress(
+            &resolved_src,
+            target_name,
+            Some(&effective_mode),
+            should_copy_projs,
+            emit_progress,
+        )
+    })
+    .await
+    .map_err(|e| format!("Clone task join error: {}", e))?
 }
 
 #[tauri::command]
@@ -1064,4 +1095,76 @@ pub async fn rename_conversation(
     })
     .await
     .map_err(|e| AppError::Process(format!("Task execution failed: {e}")))?
+}
+
+// -----------------------------------------------------------------------------
+// IDE Profile Bundle, Clean Purge & Multi-IDE Installer Commands
+// -----------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn export_ide_bundle(
+    instance_id: String,
+    output_path: Option<String>,
+) -> Result<crate::modules::instance::AgmIdeProfileBundle, AppError> {
+    tokio::task::spawn_blocking(move || {
+        let out = output_path.as_deref().map(std::path::Path::new);
+        crate::modules::instance::export_ide_profile_bundle(&instance_id, out)
+    })
+    .await
+    .map_err(|e| AppError::Process(format!("Bundle export thread join failed: {e}")))?
+}
+
+#[tauri::command]
+pub async fn import_ide_bundle(
+    bundle_path: String,
+    target_instance_id: Option<String>,
+    new_instance_name: Option<String>,
+    force: Option<bool>,
+) -> Result<crate::modules::instance::ImportResult, AppError> {
+    tokio::task::spawn_blocking(move || {
+        let path = std::path::Path::new(&bundle_path);
+        let options = crate::modules::instance::ImportOptions {
+            target_instance_id,
+            new_instance_name,
+            force: force.unwrap_or(false),
+        };
+        crate::modules::instance::import_ide_profile_bundle(path, options)
+    })
+    .await
+    .map_err(|e| AppError::Process(format!("Bundle import thread join failed: {e}")))?
+}
+
+#[tauri::command]
+pub async fn execute_purge_reinstall(
+    options: crate::modules::instance::PurgeOptions,
+) -> Result<crate::modules::instance::PurgeSummary, AppError> {
+    tokio::task::spawn_blocking(move || crate::modules::instance::execute_purge_protocol(options))
+        .await
+        .map_err(|e| AppError::Process(format!("Purge protocol thread join failed: {e}")))?
+}
+
+#[tauri::command]
+pub async fn install_ide_target(
+    target: String,
+    dry_run: Option<bool>,
+) -> Result<crate::modules::ide_installer::InstallResult, AppError> {
+    tokio::task::spawn_blocking(move || {
+        let parsed_target = crate::modules::ide_installer::IdeTarget::from_str(&target)
+            .ok_or_else(|| AppError::Config(format!("Unknown IDE target: {target}")))?;
+        let options = crate::modules::ide_installer::InstallOptions {
+            dry_run: dry_run.unwrap_or(false),
+            verbose: true,
+        };
+        crate::modules::ide_installer::install_ide(parsed_target, options)
+    })
+    .await
+    .map_err(|e| AppError::Process(format!("IDE installation thread join failed: {e}")))?
+}
+
+#[tauri::command]
+pub async fn detect_ide_installation_status(
+) -> Result<Vec<crate::modules::ide_installer::IdeStatusInfo>, AppError> {
+    tokio::task::spawn_blocking(move || crate::modules::ide_installer::detect_all_ide_status())
+        .await
+        .map_err(|e| AppError::Process(format!("IDE status scan thread join failed: {e}")))?
 }

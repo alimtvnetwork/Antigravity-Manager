@@ -104,6 +104,9 @@ export interface MultiplicativeCandidateResult {
     score: number;
     activeFactor: number;
     tierMultiplier: number;
+    urgencyMultiplier?: number;
+    isUrgentExpiration?: boolean;
+    remainingHoursUntilReset?: number | null;
     weeklyQuotaPercent: number;
     fourHourQuotaPercent: number;
     daysUntilRefill: number;
@@ -261,6 +264,78 @@ function calculateAccountRefillDays(acc: Account, nowMs: number): number {
 }
 
 /**
+ * Computes the Expiration Urgency Multiplier matching the Rust backend:
+ * - If weekly percentage < floor (default 15%), returns 1.0
+ * - If remaining hours <= 24.0, returns 5.0 .. 10.0 (closest to reset = highest)
+ * - If remaining hours <= 48.0, returns 1.5 .. 5.0
+ * - Otherwise returns 1.0 (neutral)
+ */
+export function computeExpirationUrgencyMultiplier(
+    weeklyPct: number,
+    remainingHours: number | null | undefined,
+    weeklyFloor: number = 15
+): number {
+    if (weeklyPct < weeklyFloor || remainingHours === null || remainingHours === undefined) {
+        return 1.0;
+    }
+    if (remainingHours <= 24.0 && remainingHours >= 0.0) {
+        const fraction = (24.0 - remainingHours) / 24.0;
+        return Number((5.0 + fraction * 5.0).toFixed(4));
+    }
+    if (remainingHours <= 48.0 && remainingHours > 24.0) {
+        const fraction = (48.0 - remainingHours) / 24.0;
+        return Number((1.5 + fraction * 3.5).toFixed(4));
+    }
+    return 1.0;
+}
+
+/**
+ * Extracts remaining hours until weekly quota reset for the account.
+ */
+export function extractWeeklyRemainingHours(acc: Account, nowMs: number = Date.now()): number | null {
+    let minHours: number | null = null;
+    const quotaGroups = acc.quota?.quota_groups;
+    if (quotaGroups && quotaGroups.length > 0) {
+        for (const group of quotaGroups) {
+            const buckets = group.buckets || [];
+            for (const b of buckets) {
+                const win = (b.window || '').toLowerCase();
+                const id = (b.bucket_id || '').toLowerCase();
+                const isWeekly = win.includes('week') || id.includes('week');
+                if (isWeekly && b.reset_time) {
+                    const resetDate = parseFlexibleDate(b.reset_time);
+                    if (resetDate) {
+                        const diffMs = resetDate.getTime() - nowMs;
+                        if (diffMs > 0) {
+                            const hours = diffMs / 3600000;
+                            minHours = minHours === null ? hours : Math.min(minHours, hours);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (minHours !== null) {
+        return Math.round(minHours * 10) / 10;
+    }
+
+    const models = acc.quota?.models || [];
+    for (const m of models) {
+        if (!m.reset_time) continue;
+        const resetDate = parseFlexibleDate(m.reset_time);
+        if (!resetDate) continue;
+        const diffMs = resetDate.getTime() - nowMs;
+        if (diffMs > 0) {
+            const hours = diffMs / 3600000;
+            minHours = minHours === null ? hours : Math.min(minHours, hours);
+        }
+    }
+
+    return minHours !== null ? Math.round(minHours * 10) / 10 : null;
+}
+
+/**
  * Normalized Multiplicative Candidate Scoring Algorithm (divided by 1000 for minimal compact numbers):
  * - Anyone with < 100% 4h quota gets a score of `0`.
  * - Otherwise: Score = (S_active * M_tier * Q_weekly) / 1000
@@ -288,6 +363,11 @@ export function calculateMultiplicativeScore(
     const weeklyQuotaPercent = extractWeeklyQuotaPercent(acc);
     const fourHourQuotaPercent = extract4hWindowQuotaPercent(acc, targetModel);
 
+    const nowMs = Date.now();
+    const remainingHours = extractWeeklyRemainingHours(acc, nowMs);
+    const urgencyMultiplier = computeExpirationUrgencyMultiplier(weeklyQuotaPercent, remainingHours);
+    const isUrgentExpiration = remainingHours !== null && remainingHours <= 24 && weeklyQuotaPercent >= 15;
+
     // Primary 100% 4-Hour Quota Gate:
     // Any candidate with < 100% 4-hour quota (even reduced by 1% or 2%) strictly evaluates to 0 score.
     if (fourHourQuotaPercent < 100 || activeFactor === 0) {
@@ -296,6 +376,9 @@ export function calculateMultiplicativeScore(
             score: 0,
             activeFactor: 0,
             tierMultiplier,
+            urgencyMultiplier: 1.0,
+            isUrgentExpiration: false,
+            remainingHoursUntilReset: remainingHours,
             weeklyQuotaPercent,
             fourHourQuotaPercent,
             daysUntilRefill: 0,
@@ -304,10 +387,9 @@ export function calculateMultiplicativeScore(
         };
     }
 
-    const rawScore = activeFactor * tierMultiplier * weeklyQuotaPercent;
+    const rawScore = activeFactor * tierMultiplier * (weeklyQuotaPercent * urgencyMultiplier);
     const score = Number((rawScore / 1000).toFixed(4));
 
-    const nowMs = Date.now();
     const daysUntilRefill = calculateAccountRefillDays(acc, nowMs);
     const nowSec = Math.floor(nowMs / 1000);
     const idleSec = acc.last_used ? Math.max(0, nowSec - acc.last_used) : 0;
@@ -318,6 +400,9 @@ export function calculateMultiplicativeScore(
         score,
         activeFactor,
         tierMultiplier,
+        urgencyMultiplier,
+        isUrgentExpiration,
+        remainingHoursUntilReset: remainingHours,
         weeklyQuotaPercent,
         fourHourQuotaPercent,
         daysUntilRefill,
@@ -329,7 +414,7 @@ export function calculateMultiplicativeScore(
 /**
  * Proportional Sub-100% Fallback Candidate Scoring Algorithm (matches backend Step 3 fallback in selection.rs / scoring.rs):
  * Used when no candidate account has >= 100% 4-hour rolling window quota.
- * Scales the primary score proportionally by `(weeklyQuotaPercent / 100) * (effectiveFourHourPercent / 100) * 100`.
+ * Scales the primary score proportionally by `(weeklyQuotaPercent / 100) * (effectiveFourHour / 100) * 100 * urgencyMultiplier`.
  */
 export function calculateFallbackMultiplicativeScore(
     acc: Account,
@@ -354,6 +439,11 @@ export function calculateFallbackMultiplicativeScore(
     const weeklyQuotaPercent = extractWeeklyQuotaPercent(acc);
     const fourHourQuotaPercent = extract4hWindowQuotaPercent(acc, targetModel);
 
+    const nowMs = Date.now();
+    const remainingHours = extractWeeklyRemainingHours(acc, nowMs);
+    const urgencyMultiplier = computeExpirationUrgencyMultiplier(weeklyQuotaPercent, remainingHours);
+    const isUrgentExpiration = remainingHours !== null && remainingHours <= 24 && weeklyQuotaPercent >= 15;
+
     const effectiveFourHour = fourHourQuotaPercent;
     if (
         activeFactor === 0 ||
@@ -368,6 +458,9 @@ export function calculateFallbackMultiplicativeScore(
             score: 0,
             activeFactor: 0,
             tierMultiplier,
+            urgencyMultiplier: 1.0,
+            isUrgentExpiration: false,
+            remainingHoursUntilReset: remainingHours,
             weeklyQuotaPercent,
             fourHourQuotaPercent,
             daysUntilRefill: 0,
@@ -377,10 +470,9 @@ export function calculateFallbackMultiplicativeScore(
     }
 
     const proportionalQuota = (weeklyQuotaPercent / 100) * (effectiveFourHour / 100) * 100;
-    const rawScore = activeFactor * tierMultiplier * proportionalQuota;
+    const rawScore = activeFactor * tierMultiplier * (proportionalQuota * urgencyMultiplier);
     const score = Number((rawScore / 1000).toFixed(4));
 
-    const nowMs = Date.now();
     const daysUntilRefill = calculateAccountRefillDays(acc, nowMs);
     const nowSec = Math.floor(nowMs / 1000);
     const idleSec = acc.last_used ? Math.max(0, nowSec - acc.last_used) : 0;
@@ -391,6 +483,9 @@ export function calculateFallbackMultiplicativeScore(
         score,
         activeFactor,
         tierMultiplier,
+        urgencyMultiplier,
+        isUrgentExpiration,
+        remainingHoursUntilReset: remainingHours,
         weeklyQuotaPercent,
         fourHourQuotaPercent: effectiveFourHour,
         daysUntilRefill,
@@ -408,6 +503,22 @@ export function scoreAccountForSelectionFallback(
 }
 
 function compareScoredCandidates(a: MultiplicativeCandidateResult, b: MultiplicativeCandidateResult): number {
+    // 0. Urgent Expiration Tier Priority:
+    // Accounts expiring within 24h with >= 15% quota rank first, sorted ascending by remaining hours (closest to reset first)
+    const isUrgentA = Boolean(a.isUrgentExpiration);
+    const isUrgentB = Boolean(b.isUrgentExpiration);
+
+    if (isUrgentA && !isUrgentB) return -1;
+    if (!isUrgentA && isUrgentB) return 1;
+
+    if (isUrgentA && isUrgentB) {
+        const remA = a.remainingHoursUntilReset ?? 999;
+        const remB = b.remainingHoursUntilReset ?? 999;
+        if (Math.abs(remA - remB) >= 0.1) {
+            return remA - remB;
+        }
+    }
+
     // 1. Highest normalized score first
     if (b.score !== a.score) {
         return b.score - a.score;

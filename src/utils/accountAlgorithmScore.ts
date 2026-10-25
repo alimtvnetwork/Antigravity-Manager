@@ -3,6 +3,8 @@ import {
     extractWeeklyQuotaPercent,
     extract4hWindowQuotaPercent,
     getSubscriptionTierMultiplier,
+    computeExpirationUrgencyMultiplier,
+    extractWeeklyRemainingHours,
     DEFAULT_TIER_MULTIPLIERS,
 } from '../services/instanceService/scoring';
 import type { TierMultipliers } from '../services/instanceService/scoring';
@@ -34,6 +36,9 @@ export interface AccountAlgorithmScoreResult {
     rawScore: number; // raw points, e.g. 200
     tier: 'ultra' | 'pro' | 'free';
     tierMultiplier: number;
+    urgencyMultiplier: number; // E_urgency (1.0 .. 10.0)
+    isUrgentExpiration: boolean; // true if T_remaining <= 24h & Q >= 15%
+    remainingHoursUntilReset: number | null; // hours until weekly reset
     activeFactor: number; // 1 or 0
     weeklyQuotaPercent: number; // bottleneck weekly %
     fourHourQuotaPercent: number; // 4h window %
@@ -145,6 +150,10 @@ export function computeAccountAlgorithmScore(
     const weeklyQuotaPercent = extractWeeklyQuotaPercent(account);
     const fourHourQuotaPercent = extract4hWindowQuotaPercent(account, options?.targetModel);
 
+    const remainingHoursUntilReset = extractWeeklyRemainingHours(account, nowMs);
+    const urgencyMultiplier = computeExpirationUrgencyMultiplier(weeklyQuotaPercent, remainingHoursUntilReset);
+    const isUrgentExpiration = remainingHoursUntilReset !== null && remainingHoursUntilReset <= 24 && weeklyQuotaPercent >= 15;
+
     const hasResetTimePassed = (account.quota?.models || []).some(m => {
         if (!m.reset_time) return false;
         const rDate = parseFlexibleDate(m.reset_time);
@@ -164,17 +173,17 @@ export function computeAccountAlgorithmScore(
 
     if (activeFactor === 1) {
         if (!isFallback) {
-            // Pass 1: Primary scoring
-            rawScore = activeFactor * tierMultiplier * weeklyQuotaPercent;
+            // Pass 1: Primary scoring with Expiration Urgency Multiplier
+            rawScore = activeFactor * tierMultiplier * (weeklyQuotaPercent * urgencyMultiplier);
             score = Number((rawScore / 1000).toFixed(4));
             percentage = maxTierScore > 0 ? Number(((score / maxTierScore) * 100).toFixed(1)) : 0;
             percentage = Math.min(100, Math.max(0, percentage));
         } else {
-            // Pass 2: Sub-100% Proportional fallback scoring
+            // Pass 2: Sub-100% Proportional fallback scoring with Expiration Urgency Multiplier
             if (effectiveFourHour > 0 && weeklyQuotaPercent >= 8) {
                 const proportionalQuota = (weeklyQuotaPercent / 100) * (effectiveFourHour / 100) * 100;
-                propQuotaVal = Number(proportionalQuota.toFixed(1));
-                rawScore = activeFactor * tierMultiplier * proportionalQuota;
+                propQuotaVal = Number((proportionalQuota * urgencyMultiplier).toFixed(1));
+                rawScore = activeFactor * tierMultiplier * proportionalQuota * urgencyMultiplier;
                 score = Number((rawScore / 1000).toFixed(4));
                 percentage = maxTierScore > 0 ? Number(((score / maxTierScore) * 100).toFixed(1)) : 0;
                 percentage = Math.min(100, Math.max(0, percentage));
@@ -196,8 +205,12 @@ export function computeAccountAlgorithmScore(
     }
 
     const formulaString = isFallback
-        ? 'Score = (S_active × M_tier × (Q_weekly × Q_4h / 100)) / 1000'
-        : 'Score = (S_active × M_tier × Q_weekly) / 1000';
+        ? urgencyMultiplier > 1.0
+            ? 'Score = (S_active × M_tier × (Q_weekly × Q_4h / 100) × E_urgency) / 1000'
+            : 'Score = (S_active × M_tier × (Q_weekly × Q_4h / 100)) / 1000'
+        : urgencyMultiplier > 1.0
+            ? 'Score = (S_active × M_tier × (Q_weekly × E_urgency)) / 1000'
+            : 'Score = (S_active × M_tier × Q_weekly) / 1000';
 
     const activeTerm = activeFactor === 1
         ? 'S_active = 1 (Idle & Ready)'
@@ -206,15 +219,21 @@ export function computeAccountAlgorithmScore(
     const tierTitle = tier === 'ultra' ? 'Ultra' : tier === 'pro' ? 'Pro' : 'Free';
     const tierTerm = `M_tier = ${tierMultiplier.toFixed(1)} (${tierTitle} Tier)`;
 
-    const quotaTerm = `Q_weekly = ${weeklyQuotaPercent}%`;
+    const quotaTerm = urgencyMultiplier > 1.0 && remainingHoursUntilReset !== null
+        ? `Q_weekly = ${weeklyQuotaPercent}% (Urgency ${urgencyMultiplier.toFixed(2)}x, reset in ${remainingHoursUntilReset.toFixed(1)}h)`
+        : `Q_weekly = ${weeklyQuotaPercent}%`;
 
     const fourHourTerm = !isFallback
         ? `Q_4h = ${fourHourQuotaPercent}% (Pass 1 Primary)`
         : `Q_4h = ${fourHourQuotaPercent}% (Sub-100% Fallback)`;
 
     const multStepOperand = !isFallback
-        ? weeklyQuotaPercent
-        : (Number.isInteger(propQuotaVal) ? propQuotaVal : propQuotaVal.toFixed(1));
+        ? urgencyMultiplier > 1.0
+            ? `${weeklyQuotaPercent} × ${urgencyMultiplier.toFixed(2)}`
+            : `${weeklyQuotaPercent}`
+        : urgencyMultiplier > 1.0
+            ? `${Number.isInteger(propQuotaVal) ? propQuotaVal : propQuotaVal.toFixed(1)} × ${urgencyMultiplier.toFixed(2)}`
+            : (Number.isInteger(propQuotaVal) ? propQuotaVal : propQuotaVal.toFixed(1));
 
     const multiplicationStep = `${activeFactor} × ${tierMultiplier.toFixed(1)} × ${multStepOperand} = ${rawScore.toFixed(1)}`;
 
@@ -251,6 +270,9 @@ export function computeAccountAlgorithmScore(
         rawScore: Number(rawScore.toFixed(1)),
         tier,
         tierMultiplier,
+        urgencyMultiplier,
+        isUrgentExpiration,
+        remainingHoursUntilReset,
         activeFactor,
         weeklyQuotaPercent,
         fourHourQuotaPercent,
@@ -273,7 +295,9 @@ export function computeAccountAlgorithmScore(
 }
 
 /**
- * Compares two scored account results descending (highest score first, then 4h quota, then weekly quota, then deterministic email).
+ * Compares two scored account results descending.
+ * Prioritizes urgent expiration accounts (<= 24h to reset with usable quota),
+ * then highest score, 4h quota, weekly quota, and deterministic email.
  */
 export function compareAccountAlgorithmScores(
     a: AccountAlgorithmScoreResult,
@@ -281,6 +305,22 @@ export function compareAccountAlgorithmScores(
     accountA?: Account,
     accountB?: Account
 ): number {
+    // 0. Urgent Expiration Tier Priority:
+    // Accounts expiring within 24h with >= 15% quota rank first, sorted ascending by remaining hours
+    const isUrgentA = Boolean(a.isUrgentExpiration);
+    const isUrgentB = Boolean(b.isUrgentExpiration);
+
+    if (isUrgentA && !isUrgentB) return -1;
+    if (!isUrgentA && isUrgentB) return 1;
+
+    if (isUrgentA && isUrgentB) {
+        const remA = a.remainingHoursUntilReset ?? 999;
+        const remB = b.remainingHoursUntilReset ?? 999;
+        if (Math.abs(remA - remB) >= 0.1) {
+            return remA - remB;
+        }
+    }
+
     if (b.score !== a.score) {
         return b.score - a.score;
     }
