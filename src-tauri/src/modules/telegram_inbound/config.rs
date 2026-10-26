@@ -50,6 +50,52 @@ pub fn save_config(config: &TelegramConfig) -> Result<(), AppError> {
     Ok(())
 }
 
+/// Permanently delete any active webhook configuration on Telegram Bot API
+/// to allow getUpdates long-polling to function without HTTP 409 Conflict.
+pub async fn delete_telegram_webhook(bot_token: &str) -> Result<bool, AppError> {
+    let clean_token = bot_token.trim();
+    if clean_token.is_empty() {
+        return Err(AppError::Config("Bot token cannot be empty".to_string()));
+    }
+
+    let url = format!(
+        "https://api.telegram.org/bot{}/deleteWebhook?drop_pending_updates=false",
+        clean_token
+    );
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|e| AppError::Network(e.to_string(), None))?;
+
+    let resp = client
+        .post(&url)
+        .send()
+        .await
+        .map_err(|e| AppError::Network(e.to_string(), None))?;
+
+    let status = resp.status().as_u16();
+    if status != 200 {
+        return Err(AppError::Network(
+            format!("deleteWebhook failed with HTTP status {}", status),
+            Some(status),
+        ));
+    }
+
+    let body: Value = resp
+        .json()
+        .await
+        .map_err(|e| AppError::Network(e.to_string(), None))?;
+
+    let is_ok = body["ok"].as_bool().unwrap_or(false);
+    if is_ok {
+        tracing::info!("[TelegramConfig] Successfully deleted active Telegram webhook");
+    } else {
+        let desc = body["description"].as_str().unwrap_or("Unknown error");
+        tracing::warn!("[TelegramConfig] deleteWebhook returned non-ok: {}", desc);
+    }
+    Ok(is_ok)
+}
+
 /// Test connection to Telegram Bot API by calling getMe and registering slash commands
 pub async fn test_telegram_connection(bot_token: &str) -> Result<String, AppError> {
     let clean_token = bot_token.trim();
@@ -86,11 +132,16 @@ pub async fn test_telegram_connection(bot_token: &str) -> Result<String, AppErro
         .unwrap_or("UnknownBot")
         .to_string();
 
-    // Justification: best-effort call; failure logged without changing control flow
-    crate::error::record_ignored(
-        register_telegram_bot_commands(clean_token).await,
-        "register_telegram_bot_commands",
-    );
+    let token_clone = clean_token.to_string();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = register_telegram_bot_commands(&token_clone).await {
+            crate::error::record_ignored(
+                Err::<(), _>(e),
+                "telegram bot command registration in background",
+            );
+            // Justification: Non-fatal telemetry helper; failure to register commands does not invalidate token authenticity.
+        }
+    });
 
     Ok(username)
 }

@@ -271,6 +271,16 @@ pub async fn execute_prompt_injection(args_str: &str) -> String {
         );
     }
 
+    crate::modules::scheduler::notify_prompt_queue();
+    let dispatch_inst = resolved_instance.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::error::record_ignored(
+            crate::modules::repo_db::check_and_dispatch_enqueued_prompts(Some(&dispatch_inst)),
+            "telegram inbound immediate dispatch probe",
+        );
+        // Justification: Best-effort immediate dispatch probe; background scheduler will retry if probe fails.
+    });
+
     let spawned = match repo_db::spawn_prompt_via_agy(&active_prompt) {
         Ok(()) => true,
         Err(spawn_err) => {

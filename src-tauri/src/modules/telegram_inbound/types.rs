@@ -89,6 +89,15 @@ pub(crate) static LAST_TELEGRAM_STATUS: Lazy<Arc<RwLock<TelegramWatcherStatus>>>
         }))
     });
 
+/// Global notifier to wake the Telegram daemon immediately from sleep traps
+pub static TELEGRAM_DAEMON_NOTIFIER: once_cell::sync::Lazy<tokio::sync::Notify> =
+    once_cell::sync::Lazy::new(tokio::sync::Notify::new);
+
+/// Signal the Telegram daemon to break any idle/disabled sleep immediately
+pub fn notify_telegram_daemon() {
+    TELEGRAM_DAEMON_NOTIFIER.notify_one();
+}
+
 /// Execution status for inbound prompts injected into AGM
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

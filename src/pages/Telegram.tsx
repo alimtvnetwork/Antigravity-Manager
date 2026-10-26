@@ -130,14 +130,28 @@ export default function Telegram() {
         setIsDetecting(true);
         try {
             const detected = await telegramService.detectChatId(config.bot_token.trim());
-            setConfig((prev) => ({
-                ...prev,
+            const updatedConfig: TelegramConfig = {
+                ...config,
                 allowed_chat_id: detected.chat_id,
-            }));
+                is_enabled: true,
+            };
+            setConfig(updatedConfig);
             if (detected.bot_username) {
                 setBotUsername(detected.bot_username);
             }
-            showToast(`Chat ID detected: ${detected.chat_id} (${detected.chat_label})`, 'success');
+
+            try {
+                await telegramService.saveConfig(updatedConfig);
+                const newStat = await telegramService.getStatus();
+                setStatus(newStat);
+                showToast('Chat ID detected & configuration saved! Telegram daemon activated.', 'success');
+            } catch (saveErr) {
+                useErrorStore.getState().trackWarning(saveErr, {
+                    source: 'TelegramPage.handleDetectChat.autoSave',
+                    triggerAction: 'save_telegram_config',
+                });
+                showToast(`Chat ID detected: ${detected.chat_id}, but auto-save failed. Please click Save manually.`, 'warning');
+            }
         } catch (err) {
             showToast('No chat ID detected. Send a message to your bot on Telegram first, then try again.', 'warning');
             useErrorStore.getState().trackWarning(err, {

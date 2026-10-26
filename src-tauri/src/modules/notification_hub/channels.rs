@@ -263,21 +263,54 @@ pub(crate) fn record_channel(
 }
 
 async fn deliver_switch_channels(details: &SwitchNotificationDetails) -> String {
-    let email = record_channel(
-        NotificationChannelType::Email,
-        dispatch_email_switch_alert(details),
-    );
-    dispatch_self_json_in_use_broadcast(details);
-    let telegram = record_channel(
-        NotificationChannelType::Telegram,
-        dispatch_telegram_switch_alert(details).await,
-    );
-    let supabase = record_channel(
-        NotificationChannelType::Supabase,
-        crate::modules::supabase_sync::push_and_read_instance_email(&details.instance_id)
-            .await
-            .map_err(|err| redact_secrets(&err.to_string())),
-    );
+    let email_details = details.clone();
+    let email_task = tokio::task::spawn_blocking(move || {
+        record_channel(
+            NotificationChannelType::Email,
+            dispatch_email_switch_alert(&email_details),
+        )
+    });
+
+    let self_broadcast_details = details.clone();
+    let self_broadcast_task = tokio::task::spawn_blocking(move || {
+        dispatch_self_json_in_use_broadcast(&self_broadcast_details);
+    });
+
+    let telegram_fut = async {
+        record_channel(
+            NotificationChannelType::Telegram,
+            dispatch_telegram_switch_alert(details).await,
+        )
+    };
+
+    let supabase_fut = async {
+        record_channel(
+            NotificationChannelType::Supabase,
+            crate::modules::supabase_sync::push_and_read_instance_email(&details.instance_id)
+                .await
+                .map_err(|err| redact_secrets(&err.to_string())),
+        )
+    };
+
+    let (email_res, self_broadcast_res, telegram, supabase) =
+        tokio::join!(email_task, self_broadcast_task, telegram_fut, supabase_fut,);
+
+    crate::error::record_ignored(
+        self_broadcast_res.as_ref().map(|_| ()),
+        "deliver_switch_channels: self_broadcast_task",
+    ); // Justification: self JSON in-use broadcast is best-effort and failure does not halt other channels
+
+    crate::error::record_ignored(
+        email_res.as_ref().map(|_| ()),
+        "deliver_switch_channels: email_task",
+    ); // Justification: email dispatch is best-effort and failure does not halt other notification channels
+
+    let email = email_res.unwrap_or_else(|join_err| {
+        let err_msg = format!("email task panicked or cancelled: {}", join_err);
+        logger::log_error(&format!("[Notify] email: FAIL {}", err_msg));
+        format!("[Notify] email: FAIL {}", err_msg)
+    });
+
     format!("{}\n{}\n{}", email, telegram, supabase)
 }
 
