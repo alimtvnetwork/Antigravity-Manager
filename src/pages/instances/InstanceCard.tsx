@@ -17,7 +17,7 @@ import { Gemini } from '@lobehub/icons';
 import { TierBadge } from '../../components/common/TierBadge';
 import { QuotaProgressBar } from '../../components/accounts/QuotaProgressBar';
 import { DEFAULT_LATEST_MODEL_LABEL, getModelDisplayName } from '../../config/modelConfig';
-import { SELECTED_CARD_CLASSES, ACTIVE_PILL_CLASSES } from '../../components/common/selectedState';
+import { SELECTED_CARD_CLASSES } from '../../components/common/selectedState';
 import { showToast } from '../../components/common/ToastContainer';
 import type { InstanceStatus } from '../../services/instanceService';
 import { truncatePath, getActionLabel, type InstanceTheme } from './instancePageUtils';
@@ -162,7 +162,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
             key={inst.config.id}
             ref={isActive ? activeCardRef : undefined}
             className={cn(
-                'group relative rounded-[5px] border transition-colors duration-300 ease-in-out hover:shadow-md flex flex-col justify-between overflow-hidden backdrop-blur-xs',
+                'group relative rounded-[5px] border transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-md flex flex-col justify-between overflow-hidden backdrop-blur-xs',
                 isActive
                     ? SELECTED_CARD_CLASSES
                     : 'bg-white dark:bg-[var(--ui-surface-1)] border-gray-200/50 dark:border-[var(--ui-border-subtle)] hover:border-gray-300/80 dark:hover:border-[var(--ui-interactive-40)] hover:bg-slate-50/90 dark:hover:bg-[var(--ui-surface-hover)] shadow-xs'
@@ -230,7 +230,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                         </div>
                         <div className="shrink-0 inline-flex items-center overflow-hidden rounded-full border border-slate-200 dark:border-[#40285e] divide-x divide-slate-200 dark:divide-[#40285e]">
                             {isActive ? (
-                                <span className={cn(ACTIVE_PILL_CLASSES, 'text-[9px] px-1.5 py-0.2 tracking-wider')}>
+                                <span className="inline-flex items-center justify-center h-5 px-2 bg-amber-500/20 text-amber-600 dark:text-amber-300 text-[9px] font-bold tracking-wider rounded-none border-0">
                                     Active
                                 </span>
                             ) : (

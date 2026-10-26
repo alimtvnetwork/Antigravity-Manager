@@ -663,12 +663,18 @@ export function InstancesHeader({ api }: { api: InstancePageApi }) {
                     <button
                         type="button"
                         onClick={() => {
-                            setNewInstanceName('');
-                            setIsCreateOpen(true);
+                            if (api.openCreateDialog) {
+                                api.openCreateDialog();
+                            } else {
+                                const defaultId = instances.find((i) => i.config.is_default || i.config.id === 'default')?.config.id || 'default';
+                                api.setNewInstanceFromInstance?.(defaultId);
+                                setNewInstanceName('');
+                                setIsCreateOpen(true);
+                            }
                         }}
-                        className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-[4px] bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xs cursor-pointer transition-all duration-150 ease-out active:scale-[0.98]"
+                        className="group relative flex items-center gap-1.5 px-3.5 py-1.5 rounded-[4px] bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xs hover:shadow-md hover:shadow-blue-500/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer transition-all duration-200 ease-out"
                     >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Plus className="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-90 group-hover:scale-110" />
                         <span>{t('instances.create_btn', 'New Instance')}</span>
                     </button>
                 </div>

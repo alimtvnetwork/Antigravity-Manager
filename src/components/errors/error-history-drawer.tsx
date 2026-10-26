@@ -20,6 +20,7 @@ import {
 } from '../../lib/error-report-generator';
 import { showToast } from '../common/ToastContainer';
 import { cn } from '../../utils/cn';
+import { formatTime24 } from '../../utils/date';
 
 interface ErrorHistoryDrawerProps {
   isOpen: boolean;
@@ -362,11 +363,7 @@ export function ErrorHistoryDrawer({ isOpen, onClose }: ErrorHistoryDrawerProps)
             </div>
           ) : (
             filteredErrors.map((err) => {
-              const time = new Date(err.createdAt).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-              });
+              const time = formatTime24(err.createdAt, { withSeconds: true });
 
               return (
                 <div

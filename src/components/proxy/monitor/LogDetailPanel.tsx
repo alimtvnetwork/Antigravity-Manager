@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import type { TFunction } from 'i18next';
 import { X, Sparkles, FileCode2, Eye, EyeOff } from 'lucide-react';
 import { formatCompactNumber } from '../../../utils/format';
+import { formatDateTime24 } from '../../../utils/date';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { VirtualizedPayloadViewer } from '../VirtualizedPayloadViewer';
 import { extractConcisePayload } from './payloadExtractors';
@@ -106,7 +107,7 @@ export const LogDetailPanel: React.FC<LogDetailPanelProps> = ({
                                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                                     <div>
                                         <span className="block text-gray-500 dark:text-gray-400 uppercase font-bold text-[10px] tracking-wider">{t('monitor.details.time')}</span>
-                                        <span className="font-mono font-semibold text-gray-900 dark:text-white text-xs truncate block" title={new Date(log.timestamp).toLocaleString()}>{new Date(log.timestamp).toLocaleString()}</span>
+                                        <span className="font-mono font-semibold text-gray-900 dark:text-white text-xs truncate block" title={formatDateTime24(log.timestamp, { withSeconds: true })}>{formatDateTime24(log.timestamp, { withSeconds: true })}</span>
                                     </div>
                                     <div>
                                         <span className="block text-gray-500 dark:text-gray-400 uppercase font-bold text-[10px] tracking-wider">{t('monitor.details.duration')}</span>

@@ -1,6 +1,7 @@
 import { CheckCircle, Mail, Tag, Lock, Clock } from 'lucide-react';
 import { Account } from '../../types/account';
 import { formatTimeRemaining } from '../../utils/format';
+import { formatDateTime24 } from '../../utils/date';
 import { findQuotaModel, getModelProtectionKey, getModelDisplayName, findImageQuotaModel } from '../../config/modelConfig';
 import { useTranslation } from 'react-i18next';
 import { TierBadge } from '../common/TierBadge';
@@ -72,7 +73,7 @@ function CurrentAccount({ account, onSwitch }: CurrentAccountProps) {
                                 {getModelDisplayName(geminiProModel)}
                             </span>
                             <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-gray-400 dark:text-gray-500" title={`${t('accounts.reset_time')}: ${new Date(geminiProModel.reset_time).toLocaleString()}`}>
+                                <span className="text-[10px] text-gray-400 dark:text-gray-500" title={`${t('accounts.reset_time')}: ${formatDateTime24(geminiProModel.reset_time)}`}>
                                     {geminiProModel.reset_time ? `R: ${formatTimeRemaining(geminiProModel.reset_time)}` : t('common.unknown')}
                                 </span>
                                 <span className={`text-xs font-bold ${geminiProModel.percentage >= 50 ? 'text-emerald-600 dark:text-emerald-400' :
@@ -103,7 +104,7 @@ function CurrentAccount({ account, onSwitch }: CurrentAccountProps) {
                                 {getModelDisplayName(geminiImageModel)}
                             </span>
                             <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-gray-400 dark:text-gray-500" title={`${t('accounts.reset_time')}: ${new Date(geminiImageModel.reset_time).toLocaleString()}`}>
+                                <span className="text-[10px] text-gray-400 dark:text-gray-500" title={`${t('accounts.reset_time')}: ${formatDateTime24(geminiImageModel.reset_time)}`}>
                                     {geminiImageModel.reset_time ? `R: ${formatTimeRemaining(geminiImageModel.reset_time)}` : t('common.unknown')}
                                 </span>
                                 <span className={`text-xs font-bold ${geminiImageModel.percentage >= 50 ? 'text-emerald-600 dark:text-emerald-400' :
@@ -134,7 +135,7 @@ function CurrentAccount({ account, onSwitch }: CurrentAccountProps) {
                                 {getModelDisplayName(geminiFlashModel)}
                             </span>
                             <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-gray-400 dark:text-gray-500" title={`${t('accounts.reset_time')}: ${new Date(geminiFlashModel.reset_time).toLocaleString()}`}>
+                                <span className="text-[10px] text-gray-400 dark:text-gray-500" title={`${t('accounts.reset_time')}: ${formatDateTime24(geminiFlashModel.reset_time)}`}>
                                     {geminiFlashModel.reset_time ? `R: ${formatTimeRemaining(geminiFlashModel.reset_time)}` : t('common.unknown')}
                                 </span>
                                 <span className={`text-xs font-bold ${geminiFlashModel.percentage >= 50 ? 'text-emerald-600 dark:text-emerald-400' :
@@ -165,7 +166,7 @@ function CurrentAccount({ account, onSwitch }: CurrentAccountProps) {
                                 {getModelDisplayName(claudeModel, t('common.claude_series', 'Claude Series'))}
                             </span>
                             <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-gray-400 dark:text-gray-500" title={`${t('accounts.reset_time')}: ${new Date(claudeModel.reset_time).toLocaleString()}`}>
+                                <span className="text-[10px] text-gray-400 dark:text-gray-500" title={`${t('accounts.reset_time')}: ${formatDateTime24(claudeModel.reset_time)}`}>
                                     {claudeModel.reset_time ? `R: ${formatTimeRemaining(claudeModel.reset_time)}` : t('common.unknown')}
                                 </span>
                                 <span className={`text-xs font-bold ${claudeModel.percentage >= 50 ? 'text-cyan-600 dark:text-cyan-400' :

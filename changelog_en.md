@@ -3,6 +3,22 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.270.0 (2026-10-27)**:
+        -   **[Strict E2E & Pre-Deployment Prompts] Mandatory testing and release verification questions (Thanks to @aukgit)**:
+            -   **Description**: Injected mandatory verification questions ("Have you tested these below instructions with end-to-end testing?" and "Have you tested the below instructions with end-to-end testing and released it?") into verification templates, suffix presets, and rerun message sets so dispatched AI agents cannot skip testing and release validation. (Thanks to @aukgit)
+        -   **[Active Card & Inspector Tab UI Polish] Corner alignment, left rail, and translucent view accent (Thanks to @aukgit)**:
+            -   **Description**: Eliminated asymmetric corner clipping by replacing `border-l-[6px]` with clean `border-l-4` in `SELECTED_CARD_CLASSES` and `SELECTED_ROW_CLASSES`, removed nested pill double-borders in `InstanceCard.tsx`, aligned inspector tabs to a shared `h-7` vertical baseline, and replaced harsh opaque blue blocks with translucent dark-glass cyan/blue accents. (Thanks to @aukgit)
+        -   **[CSS3 Tactile Button Animations] Universal transition exemption & micro-interaction physics (Thanks to @aukgit)**:
+            -   **Description**: Exempted interactive buttons from universal 250ms CSS delays in `src/App.css` and added `.btn-tactile` micro-interactions (`100ms`, `active:scale-[0.985]`) for immediate responsive tactile feedback. (Thanks to @aukgit)
+        -   **[Top-Level Menu Capsule Geometry] Concentric curvature and overflow containment (Thanks to @aukgit)**:
+            -   **Description**: Resolved rectangular hover highlight defects across `NavSettings.tsx`, `InstanceSelector.tsx`, and `NavMenu.tsx` using inner `rounded-full overflow-hidden` tracks and concentric radii, eliminating sharp edges on middle buttons. (Thanks to @aukgit)
+        -   **[Default Instance Clone Invariant] New instances clone from Default profile (Thanks to @aukgit)**:
+            -   **Description**: Ensured opening the creation dialog via "+ New Instance" in header and empty states preselects the Default instance ID rather than blank, preserving extensions and workspace continuity, with responsive CSS3 hover animations. (Thanks to @aukgit)
+        -   **[Universal 24-Hour Clock Formatting] Elimination of uncontrolled locale AM/PM formatting (Thanks to @aukgit)**:
+            -   **Description**: Exported canonical `formatTime24` and `formatDateTime24` helpers in `src/utils/date.ts` (`hour12: false`) and eliminated uncontrolled `toLocaleTimeString()` and `toLocaleString()` calls across AuditPanel, LogTable, LogDetailPanel, ErrorModal, ErrorHistoryDrawer, NetworkMonitor, CurrentAccount, and IpAccessLogs. (Thanks to @aukgit)
+        -   **[Dispatch Modal Redesign & Rerun FIFO] Streamlined mode buttons, wider popover & FIFO sequencing (Thanks to @aukgit)**:
+            -   **Description**: Streamlined mode buttons to "Send", "Enqueue", and "Rerun", widened popover to `w-[26rem]` to eliminate message dropdown text clipping, added one-click Release Page actions, and unified `PromptInstructionView.tsx` `executeDirectRerun` to sequence all rounds via `dispatchRerunMessages` into the FIFO prompt queue. (Thanks to @aukgit)
+
     *   **v4.269.0 (2026-10-25)**:
         -   **[Rerun 3 & Numbered Rerun] 1-based index resolution for Telegram reruns (Thanks to @aukgit)**:
             -   **Description**: Added 1-based history row resolution for Telegram `/rerun 3`, `/rerun #3`, and `/rr 3`, cleanly picking the 3rd prompt from recent history before falling back to UUID prefix search. (Thanks to @aukgit)

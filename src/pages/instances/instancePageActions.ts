@@ -90,6 +90,7 @@ export interface PageActions {
     handleToggleAutoSwitcher: () => Promise<void>;
     handleTriggerRotation: () => Promise<void>;
     openSwitchDialog: (id: string) => void;
+    openCreateDialog: () => void;
     openAuditDialog: (id: string, name: string) => void;
     openSettingsDialog: (id: string) => void;
     openCopyDialog: (id: string, name: string) => void;
@@ -171,7 +172,8 @@ export function createPageActions(ctx: PageActionContext): PageActions {
                 }
                 setNewInstanceName('');
                 setNewInstanceBoundAccount('');
-                setNewInstanceFromInstance('');
+                const defaultInst = instances.find((i) => i.config.is_default || i.config.id === 'default');
+                setNewInstanceFromInstance(defaultInst?.config.id || 'default');
                 setNewInstanceLaunchImmediately(false);
                 setIsCreateOpen(false);
                 showToast(
@@ -420,6 +422,16 @@ export function createPageActions(ctx: PageActionContext): PageActions {
                 executablePath: target?.config.executable_path,
             });
         };
+    const openCreateDialog = () => {
+        setActionError(null);
+        setNewInstanceName('');
+        setNewInstanceBoundAccount('');
+        const defaultInst = instances.find((i) => i.config.is_default || i.config.id === 'default');
+        setNewInstanceFromInstance(defaultInst?.config.id || 'default');
+        setNewInstanceLaunchImmediately(false);
+        setIsCreateOpen(true);
+    };
+
     return {
         handleCreate,
         handleInitDefault,
@@ -441,6 +453,7 @@ export function createPageActions(ctx: PageActionContext): PageActions {
         handleToggleAutoSwitcher,
         handleTriggerRotation,
         openSwitchDialog,
+        openCreateDialog,
         openAuditDialog,
         openSettingsDialog,
         openCopyDialog,

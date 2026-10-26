@@ -57,7 +57,7 @@ export function useInstancePage(): InstancePageApi {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newInstanceName, setNewInstanceName] = useState('');
     const [newInstanceBoundAccount, setNewInstanceBoundAccount] = useState<string>('');
-    const [newInstanceFromInstance, setNewInstanceFromInstance] = useState<string>('');
+    const [newInstanceFromInstance, setNewInstanceFromInstance] = useState<string>('default');
     const [newInstanceLaunchImmediately, setNewInstanceLaunchImmediately] = useState<boolean>(false);
     const [switchTargetInstance, setSwitchTargetInstance] = useState<InstanceStatus | null>(null);
     const [accountSearchQuery, setAccountSearchQuery] = useState<string>('');
@@ -488,6 +488,7 @@ export function useInstancePage(): InstancePageApi {
         handleToggleAutoSwitcher: pageActions.handleToggleAutoSwitcher,
         handleTriggerRotation: pageActions.handleTriggerRotation,
         openSwitchDialog: pageActions.openSwitchDialog,
+        openCreateDialog: pageActions.openCreateDialog,
         openAuditDialog: pageActions.openAuditDialog,
         openSettingsDialog: pageActions.openSettingsDialog,
         openCopyDialog: pageActions.openCopyDialog,

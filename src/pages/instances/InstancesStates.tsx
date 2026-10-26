@@ -31,12 +31,18 @@ export function InstancesFilterBar({ api }: { api: InstancePageApi }) {
             </div>
             <button
                 onClick={() => {
-                    setNewInstanceName('');
-                    setIsCreateOpen(true);
+                    if (api.openCreateDialog) {
+                        api.openCreateDialog();
+                    } else {
+                        const defaultId = api.instances.find((i) => i.config.is_default || i.config.id === 'default')?.config.id || 'default';
+                        api.setNewInstanceFromInstance(defaultId);
+                        setNewInstanceName('');
+                        setIsCreateOpen(true);
+                    }
                 }}
-                className="btn btn-primary btn-sm gap-1.5 shadow-sm rounded-[4px] transition-all duration-150 ease-out active:scale-[0.98]"
+                className="btn btn-primary btn-sm gap-1.5 shadow-sm rounded-[4px] group hover:shadow-md hover:shadow-primary/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 ease-out"
             >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-4 h-4 transition-transform duration-300 group-hover:rotate-90 group-hover:scale-110" />
                 <span>{t('instances.create_btn', 'New Instance')}</span>
             </button>
         </div>
@@ -117,12 +123,18 @@ export function InstancesEmptyState({ api }: { api: InstancePageApi }) {
                 </button>
                 <button
                     onClick={() => {
-                        setNewInstanceName('');
-                        setIsCreateOpen(true);
+                        if (api.openCreateDialog) {
+                            api.openCreateDialog();
+                        } else {
+                            const defaultId = api.instances.find((i) => i.config.is_default || i.config.id === 'default')?.config.id || 'default';
+                            api.setNewInstanceFromInstance(defaultId);
+                            setNewInstanceName('');
+                            setIsCreateOpen(true);
+                        }
                     }}
-                    className="btn btn-outline btn-sm gap-1.5 rounded-[5px]"
+                    className="btn btn-outline btn-sm gap-1.5 rounded-[5px] group hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 ease-out"
                 >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-90 group-hover:scale-110" />
                     <span>{t('instances.create_custom', 'Create Custom Profile')}</span>
                 </button>
             </div>

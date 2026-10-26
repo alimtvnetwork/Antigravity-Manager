@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { request as invoke } from '../../utils/request';
+import { formatDateTime24 } from '../../utils/date';
 import { Search, AlertTriangle } from 'lucide-react';
 import { useErrorStore } from '../../stores/error-store';
 
@@ -153,7 +154,7 @@ export const IpAccessLogs: React.FC<Props> = ({ refreshKey }) => {
                                 <td className="font-bold text-xs">{log.method || '-'}</td>
                                 <td className="max-w-xs truncate text-gray-600 dark:text-gray-400" title={log.path}>{log.path || '-'}</td>
                                 <td className="text-right font-mono">{log.duration ? `${log.duration}ms` : '-'}</td>
-                                <td className="text-right text-xs text-gray-500">{new Date(log.timestamp * 1000).toLocaleString()}</td>
+                                <td className="text-right text-xs text-gray-500">{formatDateTime24(log.timestamp * 1000, { withSeconds: true })}</td>
                                 <td className="text-xs text-red-500 truncate" title={log.block_reason}>{log.block_reason}</td>
                             </tr>
                         ))}

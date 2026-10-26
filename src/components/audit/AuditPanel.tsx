@@ -32,6 +32,7 @@ import { useErrorStore } from '../../stores/error-store';
 import { copyToClipboard } from '../../utils/clipboard';
 import { cn } from '../../utils/cn';
 import { showToast } from '../common/ToastContainer';
+import { formatTime24 } from '../../utils/date';
 import { useAuditStore, type AuditActorFilter, type AuditResultFilter } from './audit-store';
 import type { AuditActor, AuditEntry, AuditStackFrame } from './audit-types';
 
@@ -117,7 +118,7 @@ function lastTwoCallerFrames(
 function formatTimestamp(timestamp: AuditEntry['timestamp']): string {
     const ms = typeof timestamp === 'number' ? timestamp : Date.parse(timestamp);
     if (Number.isNaN(ms)) return String(timestamp);
-    return new Date(ms).toLocaleTimeString();
+    return formatTime24(ms, { withSeconds: true });
 }
 
 function ActorBadge({ actor }: { actor: AuditActor }) {

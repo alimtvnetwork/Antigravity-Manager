@@ -12,9 +12,17 @@ import { useErrorStore } from '../../../stores/error-store';
 import { useConfigStore } from '../../../stores/useConfigStore';
 import { formatDateTime, formatDateOnly } from '../../../utils/date';
 import { VERIFICATION_OPTIONS, parseVerificationTypeFromSuffix, getCustomSuffixTemplates, type SuffixTemplate } from './verificationTemplates';
-import { dispatchConversationId, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, type RerunMessageOption } from './usePromptTreePromptActions';
+import {
+    dispatchConversationId,
+    loadPersistedRerunCount,
+    loadPersistedRerunMessageOption,
+    savePersistedRerunCount,
+    savePersistedRerunMessageOption,
+    type RerunMessageOption,
+    RERUN_MESSAGE_OPTIONS,
+    dispatchRerunMessages,
+} from './usePromptTreePromptActions';
 import { sendPromptNow, enqueuePrompt } from '../../../services/instanceService';
-import { formatPromptWithAttachments } from '../../../utils/promptAttachment';
 
 export interface ExtractedImage {
     src: string;
@@ -530,7 +538,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
     const [customTemplates, setCustomTemplates] = useState<SuffixTemplate[]>([]);
 
     const [rerunCount, setRerunCount] = useState<number>(() => loadPersistedRerunCount());
-    const [rerunMessageOption] = useState<RerunMessageOption>(() => loadPersistedRerunMessageOption());
+    const [rerunMessageOption, setRerunMessageOption] = useState<RerunMessageOption>(() => loadPersistedRerunMessageOption());
 
     useEffect(() => {
         savePersistedRerunMessageOption(rerunMessageOption);
@@ -641,10 +649,23 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
             ) || (conversationTargetMode === 'current' ? 'current' : undefined);
             const content = editedPromptText.trim() || activePromptText;
             const mediaList = extractImagesFromPrompt(content, selectedConversation).map((img) => img.src).filter(Boolean);
-            const formattedContent = formatPromptWithAttachments(content, mediaList, { repoPath });
 
-            await enqueuePrompt(targetInstId, repoPath, formattedContent, targetConvId, undefined, mediaList.length > 0 ? mediaList : undefined);
-            setActionMsg('Prompt enqueued successfully into FIFO queue!');
+            const result = await dispatchRerunMessages({
+                targetInstId,
+                repoPath,
+                convId: targetConvId,
+                count: rerunCount,
+                messageOption: rerunMessageOption || 'randomized',
+                originalPrompt: content,
+                source: 'PromptInstructionView.executeDirectRerun',
+                mediaPaths: mediaList.length > 0 ? mediaList : undefined,
+            });
+
+            if (result.dispatched > 0) {
+                setActionMsg(`Enqueued ${result.dispatched} rerun round(s) into FIFO queue!`);
+            } else if (result.failed > 0) {
+                setActionMsg(`Failed to enqueue rerun (${result.failed} error(s))`);
+            }
             setTimeout(() => setActionMsg(null), 3000);
         } catch (err) {
             const errorObj = err instanceof Error ? err : new Error(String(err));
@@ -1385,7 +1406,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                     primaryDispatchAction === 'enqueue'
                                         ? "Enqueue (FIFO): Stages prompt into FIFO queue (Hotkey: Alt+Q)"
                                         : primaryDispatchAction === 'rerun'
-                                          ? `Rerun Turn (×${rerunCount}): Reruns turn (Hotkey: Alt+R)`
+                                          ? `Rerun Turn (×${rerunCount}): Enqueues previous turn into FIFO queue (Hotkey: Alt+R)`
                                           : "Send (Preempt): Cancels active task and executes immediately (Hotkey: Alt+N)"
                                 }
                                 aria-label="Run selected dispatch mode"
@@ -1399,10 +1420,10 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                 )}
                                 <span>
                                     {primaryDispatchAction === 'enqueue'
-                                        ? (isEnqueueingActive ? 'Queueing…' : 'Enqueue (FIFO)')
+                                        ? (isEnqueueingActive ? 'Queueing…' : 'Enqueue')
                                         : primaryDispatchAction === 'rerun'
-                                          ? (isRerunningActive ? 'Rerunning…' : `Rerun Turn (×${rerunCount})`)
-                                          : (isResendingActive ? 'Sending…' : 'Send (Preempt)')}
+                                          ? (isRerunningActive ? 'Rerunning…' : `Rerun ×${rerunCount}`)
+                                          : (isResendingActive ? 'Sending…' : 'Send')}
                                 </span>
                             </button>
 
@@ -1422,7 +1443,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                             {/* Flyout: Unified Dispatch Configuration Popover */}
                             {isDispatchMenuOpen && (
                                 <div
-                                    className="absolute right-0 bottom-full mb-1.5 z-50 w-80 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl p-2.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-2"
+                                    className="absolute right-0 bottom-full mb-1.5 z-50 w-[26rem] rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl p-2.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-2"
                                     onMouseLeave={() => setIsDispatchMenuOpen(false)}
                                 >
                                     <div className="px-2 pt-0.5 pb-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -1439,9 +1460,9 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                             <button
                                                 type="button"
                                                 onClick={() => setPrimaryDispatchAction('send')}
-                                                title="Send (Preempt): Cancels active task and executes immediately"
+                                                title="Send (Preempt): Cancels active task and executes immediately (Hotkey: Alt+N)"
                                                 className={cn(
-                                                    "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                    "px-2.5 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                     primaryDispatchAction === 'send'
                                                         ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
                                                         : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -1452,9 +1473,9 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                             <button
                                                 type="button"
                                                 onClick={() => setPrimaryDispatchAction('enqueue')}
-                                                title="Enqueue (FIFO): Queues prompt behind active task in IDE"
+                                                title="Enqueue (FIFO): Queues prompt behind active task in IDE (Hotkey: Alt+Q)"
                                                 className={cn(
-                                                    "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                    "px-2.5 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                     primaryDispatchAction === 'enqueue'
                                                         ? "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-2xs font-semibold"
                                                         : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -1465,9 +1486,9 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                             <button
                                                 type="button"
                                                 onClick={() => setPrimaryDispatchAction('rerun')}
-                                                title="Rerun Turn: Reruns previous conversation turn"
+                                                title="Rerun Turn: Enqueues turn N times into FIFO queue (Hotkey: Alt+R)"
                                                 className={cn(
-                                                    "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                    "px-2.5 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                     primaryDispatchAction === 'rerun'
                                                         ? "bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
                                                         : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -1574,28 +1595,69 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
 
                                     {/* Rerun mode options */}
                                     {primaryDispatchAction === 'rerun' && (
-                                        <div className="flex items-center justify-between px-2 py-1 text-xs">
-                                            <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
-                                                Times (N):
-                                            </span>
-                                            <div className="inline-flex rounded-lg bg-slate-100 dark:bg-purple-950/40 p-0.5 border border-slate-200/80 dark:border-purple-500/20 text-[11px]">
-                                                {[1, 2, 3, 5].map((cnt) => (
-                                                    <button
-                                                        key={`rerun-times-${cnt}`}
-                                                        type="button"
-                                                        onClick={() => setRerunCount(cnt)}
-                                                        className={cn(
-                                                            "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
-                                                            rerunCount === cnt
-                                                                ? "bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
-                                                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
-                                                        )}
-                                                    >
-                                                        ×{cnt}
-                                                    </button>
-                                                ))}
+                                        <>
+                                            <div className="flex items-center justify-between px-2 py-1 text-xs">
+                                                <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
+                                                    Times (N):
+                                                </span>
+                                                <div className="inline-flex rounded-lg bg-slate-100 dark:bg-purple-950/40 p-0.5 border border-slate-200/80 dark:border-purple-500/20 text-[11px]">
+                                                    {[1, 2, 3, 4, 5, 8].map((cnt) => (
+                                                        <button
+                                                            key={`rerun-times-${cnt}`}
+                                                            type="button"
+                                                            onClick={() => setRerunCount(cnt)}
+                                                            className={cn(
+                                                                "px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                                rerunCount === cnt
+                                                                    ? "bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
+                                                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+                                                            )}
+                                                        >
+                                                            ×{cnt}
+                                                        </button>
+                                                    ))}
+                                                </div>
                                             </div>
-                                        </div>
+
+                                            {/* Message selector */}
+                                            <div className="flex items-center justify-between px-2 py-1 text-xs gap-2">
+                                                <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
+                                                    Message:
+                                                </span>
+                                                <select
+                                                    value={rerunMessageOption}
+                                                    onChange={(e) => setRerunMessageOption(e.target.value as RerunMessageOption)}
+                                                    className="flex-1 min-w-0 px-2 py-1 rounded-lg text-xs bg-slate-100 dark:bg-purple-950/40 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-purple-500/20 focus:outline-none cursor-pointer truncate"
+                                                >
+                                                    {RERUN_MESSAGE_OPTIONS.map((opt) => (
+                                                        <option key={opt.value} value={opt.value}>
+                                                            {opt.value === 'randomized' ? '🎲 Random from set (skips used)' : opt.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+
+                                            {/* View Release Page & Notes button */}
+                                            <div className="mx-2 pt-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={async () => {
+                                                        const url = 'https://github.com/aukgit/antigravity-manager/releases';
+                                                        try {
+                                                            const { openUrl } = await import('@tauri-apps/plugin-opener');
+                                                            await openUrl(url);
+                                                        } catch {
+                                                            window.open(url, '_blank', 'noopener,noreferrer');
+                                                        }
+                                                    }}
+                                                    className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs text-purple-700 dark:text-purple-300 hover:bg-purple-100/50 dark:hover:bg-purple-950/40 rounded-lg border border-purple-500/20 font-medium transition-colors cursor-pointer"
+                                                    title="View official release notes, tags, and changelogs on GitHub"
+                                                >
+                                                    <ExternalLink className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                                                    <span>View Release Page &amp; Notes</span>
+                                                </button>
+                                            </div>
+                                        </>
                                     )}
                                 </div>
                             )}

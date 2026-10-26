@@ -1,5 +1,24 @@
 # Changelog
 
+## [v4.270.0] - 2026-10-27
+
+### Added
+- Strict Pre-Deployment & E2E Verification Prompts: Injected mandatory verification questions ("Have you tested these below instructions with end-to-end testing?" and "Have you tested the below instructions with end-to-end testing and released it?") into verification templates, suffix presets, and rerun message sets so dispatched AI agents cannot skip testing and release validation (Thanks to @aukgit)
+- One-Click Release Page Action in Rerun: Added quick-action button in prompt instruction and header rerun flyouts to open release notes and changelogs directly (Thanks to @aukgit)
+- Future Dual-Channel Chat Architecture Spec: Authored comprehensive specification (`02-spec/21-app/228-ui-and-feature-enhancement-instructions/04-chat-section-architecture-spec.md`) defining Channel 1 (IDE workspace bridge via CDP WebSocket + deep transcript reverse scan) and Channel 2 (Direct API chat client via local proxy SSE) (Thanks to @aukgit)
+- 50+ Grounded System & UI Improvements Catalog: Documented 50 concrete, high-leverage improvement specifications (`02-spec/21-app/228-ui-and-feature-enhancement-instructions/05-fifty-plus-improvement-ideas-spec.md`) across Instances, Prompts, Databases, Proxy, and UI/UX (Thanks to @aukgit)
+
+### Fixed
+- Active Instance Card UI & Corner Artifacts: Eliminated asymmetric corner clipping by replacing `border-l-[6px]` with clean `border-l-4` in `SELECTED_CARD_CLASSES` and `SELECTED_ROW_CLASSES`, and resolved nested pill double-border and invalid `py-0.2` in `InstanceCard.tsx` (Thanks to @aukgit)
+- Prompt Inspector Tab Alignment & Translucent View Accent: Aligned Preview, Raw, Edit, and Details buttons in `DetailTabs.tsx` to a shared `h-7` vertical baseline with `leading-none`, and replaced the harsh opaque royal blue background with a translucent dark-glass cyan/blue accent (`bg-blue-500/15 text-blue-600 dark:text-cyan-300 font-semibold`) (Thanks to @aukgit)
+- CSS3 Tactile Button Animations: Exempted interactive buttons from the universal 250ms CSS delay in `src/App.css`, and introduced high-performance `.btn-tactile` micro-interactions (`100ms`, `active:scale-[0.985] active:translate-y-px`) for instantaneous response (Thanks to @aukgit)
+- Top-Level Menu Capsule Geometry: Resolved rectangular hover highlight defects across `NavSettings.tsx`, `InstanceSelector.tsx`, and `NavMenu.tsx` using inner `rounded-full overflow-hidden` tracks and concentric radii, eliminating sharp edges on middle buttons (Thanks to @aukgit)
+- "+ New Instance" Default-Clone Invariant: Ensured opening the creation dialog via "+ New Instance" in header and empty states preselects the Default instance ID rather than blank, preserving extensions and workspace continuity, with responsive CSS3 hover animations (Thanks to @aukgit)
+- Universal 24-Hour Clock Formatting: Exported canonical `formatTime24` and `formatDateTime24` helpers in `src/utils/date.ts` (`HH:mm` / `HH:mm:ss`, `hour12: false`) and eliminated uncontrolled `toLocaleTimeString()` and `toLocaleString()` calls across AuditPanel, LogTable, LogDetailPanel, ErrorModal, ErrorHistoryDrawer, NetworkMonitor, CurrentAccount, and IpAccessLogs (Thanks to @aukgit)
+- Dispatch Modal Redesign & Rerun FIFO: Streamlined mode buttons to "Send", "Enqueue", and "Rerun", widened popover to `w-[26rem]` to eliminate message dropdown text clipping, and unified `PromptInstructionView.tsx` `executeDirectRerun` to sequence all rounds via `dispatchRerunMessages` into the FIFO prompt queue (Thanks to @aukgit)
+
+---
+
 ## [v4.269.0] - 2026-10-25
 
 ### Fixed
@@ -1351,6 +1370,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.270.0 (2026-10-27)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.269.0 (2026-10-25)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

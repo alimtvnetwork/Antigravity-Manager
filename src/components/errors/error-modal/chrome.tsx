@@ -18,6 +18,7 @@ import {
 import { type CapturedError, type ErrorModalTab } from '../../../stores/error-store';
 import { showToast } from '../../common/ToastContainer';
 import { cn } from '../../../utils/cn';
+import { formatTime24 } from '../../../utils/date';
 
 interface ItemCopyButtonProps {
   text: string;
@@ -106,7 +107,7 @@ export function ModalHeader({
               {error.code}
             </span>
             <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-              {new Date(error.createdAt).toLocaleTimeString()}
+              {formatTime24(error.createdAt, { withSeconds: true })}
             </span>
             {error.endpoint && (
               <span className="text-[11px] font-mono text-slate-600 dark:text-slate-300 truncate max-w-[200px]">

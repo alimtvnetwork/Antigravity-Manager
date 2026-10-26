@@ -42,9 +42,9 @@ export function DetailTabs(props: DetailTabsProps) {
                         type="button"
                         onClick={() => setViewMode(PromptViewMode.Preview)}
                         className={cn(
-                            'p-1.5 px-2 rounded-l-md transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
+                            'h-7 px-2.5 flex items-center justify-center rounded-l-md text-xs transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
                             viewMode === PromptViewMode.Preview
-                                ? 'bg-blue-600 text-white shadow-2xs'
+                                ? 'bg-blue-500/15 text-blue-600 dark:bg-blue-500/20 dark:text-cyan-300 font-semibold shadow-2xs'
                                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80'
                         )}
                         aria-label="Preview"
@@ -55,9 +55,9 @@ export function DetailTabs(props: DetailTabsProps) {
                         type="button"
                         onClick={() => setViewMode(PromptViewMode.Raw)}
                         className={cn(
-                            'p-1.5 px-2 rounded-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
+                            'h-7 px-2.5 flex items-center justify-center rounded-none text-xs transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
                             viewMode === PromptViewMode.Raw
-                                ? 'bg-blue-600 text-white shadow-2xs'
+                                ? 'bg-blue-500/15 text-blue-600 dark:bg-blue-500/20 dark:text-cyan-300 font-semibold shadow-2xs'
                                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80'
                         )}
                         aria-label="Raw"
@@ -68,10 +68,10 @@ export function DetailTabs(props: DetailTabsProps) {
                         type="button"
                         onClick={() => setViewMode(PromptViewMode.Edit)}
                         className={cn(
-                            'p-1.5 px-2 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
+                            'h-7 px-2.5 flex items-center justify-center text-xs transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer',
                             setIsDetailsModalOpen ? 'rounded-none' : 'rounded-r-md',
                             viewMode === PromptViewMode.Edit
-                                ? 'bg-blue-600 text-white shadow-2xs'
+                                ? 'bg-blue-500/15 text-blue-600 dark:bg-blue-500/20 dark:text-cyan-300 font-semibold shadow-2xs'
                                 : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80'
                         )}
                         aria-label="Edit"
@@ -82,11 +82,11 @@ export function DetailTabs(props: DetailTabsProps) {
                         <button
                             type="button"
                             onClick={() => setIsDetailsModalOpen(true)}
-                            className="p-1.5 px-2.5 rounded-r-md flex items-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80 text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="h-7 px-2.5 rounded-r-md flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800/80 text-xs font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             title="Open Conversation & Instance Details"
                         >
                             <Activity className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                            <span>Details</span>
+                            <span className="leading-none">Details</span>
                             {selectedConversation?.is_running && (
                                 <span className="w-2 h-2 rounded-full bg-[#1af18d] shadow-[0_0_6px_#1af18d] animate-pulse shrink-0" />
                             )}

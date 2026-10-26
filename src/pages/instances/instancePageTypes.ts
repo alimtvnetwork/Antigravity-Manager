@@ -100,6 +100,7 @@ export interface InstancePageApi {
     handleToggleAutoSwitcher: () => Promise<void>;
     handleTriggerRotation: () => Promise<void>;
     openSwitchDialog: (id: string) => void;
+    openCreateDialog?: () => void;
     openAuditDialog: (id: string, name: string) => void;
     openSettingsDialog: (id: string) => void;
     openCopyDialog: (id: string, name: string) => void;

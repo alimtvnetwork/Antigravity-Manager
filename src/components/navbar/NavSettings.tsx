@@ -197,7 +197,7 @@ export function NavSettings({
                                 window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'theme-switcher' } }));
                             }
                         }}
-                        className="h-7 px-1.5 sm:px-2 hover:bg-gray-200 dark:hover:bg-[#40285e] flex items-center gap-1 transition-all duration-150 ease-out cursor-pointer text-[11px] font-semibold text-gray-700 dark:text-gray-300 border-r border-gray-200/50 dark:border-slate-700/60"
+                        className={`h-7 px-1.5 sm:px-2 rounded-[4px] mx-px ${isThemeOpen ? 'bg-gray-200 dark:bg-[#40285e]' : 'hover:bg-gray-200 dark:hover:bg-[#40285e]'} flex items-center gap-1 transition-all duration-150 ease-out cursor-pointer text-[11px] font-semibold text-gray-700 dark:text-gray-300 border-r border-gray-200/50 dark:border-slate-700/60`}
                         title={`Active Theme: ${currentPalette.label}`}
                         aria-expanded={isThemeOpen}
                     >
@@ -299,7 +299,7 @@ export function NavSettings({
                                 window.dispatchEvent(new CustomEvent('agm:dropdown-open', { detail: { source: 'nav-settings' } }));
                             }
                         }}
-                        className="h-7 px-1.5 sm:px-2 rounded-r-full hover:bg-gray-200 dark:hover:bg-[#40285e] flex items-center gap-1 transition-all duration-150 ease-out cursor-pointer text-[11px] font-semibold text-gray-700 dark:text-gray-300"
+                        className={`h-7 px-1.5 sm:px-2 rounded-r-full ${isPrefsOpen ? 'bg-gray-200 dark:bg-[#40285e]' : 'hover:bg-gray-200 dark:hover:bg-[#40285e]'} flex items-center gap-1 transition-all duration-150 ease-out cursor-pointer text-[11px] font-semibold text-gray-700 dark:text-gray-300`}
                         title="Theme & Language Preferences"
                     >
                         {theme === 'light' ? (
@@ -394,7 +394,7 @@ export function NavSettings({
 
             {/* Window controls (Minimize, Maximize/Restore, Close) - Tauri only: Permanently visible, never collapsed */}
             {isTauri() && (
-                <div className="flex items-center rounded-full bg-gray-100 dark:bg-[#171025]/90 border border-gray-200/60 dark:border-[#40285e] p-0.5 divide-x divide-gray-200/50 dark:divide-slate-700/60 shadow-xs z-50 shrink-0 mr-1">
+                <div className="flex items-center rounded-full overflow-hidden bg-gray-100 dark:bg-[#171025]/90 border border-gray-200/60 dark:border-[#40285e] p-0.5 divide-x divide-gray-200/50 dark:divide-slate-700/60 shadow-xs z-50 shrink-0 mr-1">
                     <button
                         type="button"
                         id="btn-window-minimize"
@@ -436,11 +436,11 @@ export function NavSettings({
                         name="window-close"
                         data-xpath="//*[@id='btn-window-close']"
                         onClick={handleClose}
-                        className="w-7 h-7 rounded-r-full hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white flex items-center justify-center transition-all duration-150 ease-out cursor-pointer group overflow-visible"
+                        className="w-7 h-7 rounded-r-full hover:bg-red-500 hover:text-white dark:hover:bg-red-500 dark:hover:text-white flex items-center justify-center transition-all duration-150 ease-out cursor-pointer group"
                         title={t('common.close', 'Close')}
                         aria-label="Close"
                     >
-                        <X className="w-3.5 h-3.5 text-gray-700 dark:text-gray-300 group-hover:text-white transition-colors duration-150 pointer-events-none overflow-visible" />
+                        <X className="w-3.5 h-3.5 text-gray-700 dark:text-gray-300 group-hover:text-white transition-colors duration-150 pointer-events-none" />
                     </button>
                 </div>
             )}

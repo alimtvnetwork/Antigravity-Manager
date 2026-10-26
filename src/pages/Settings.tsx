@@ -24,11 +24,11 @@ function Settings() {
                     {/* Top toolbar: Tab navigation and save button */}
                     <div className="flex flex-wrap gap-2 justify-between items-center">
                         {/* Tab navigation */}
-                        <div className="flex items-center gap-1 bg-gray-100 dark:bg-base-200 rounded-full p-1 w-fit">
+                        <div className="flex items-center gap-1 bg-gray-100/80 dark:bg-[#171025]/80 border border-gray-200/70 dark:border-[#40285e]/60 rounded-full p-1 w-fit backdrop-blur-md">
                             <button
                                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'general'
-                                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
-                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                    ? 'bg-white dark:bg-[#40285e] text-gray-900 dark:text-slate-100 shadow-xs'
+                                    : 'text-slate-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
                                     }`}
                                 onClick={() => startTransition(() => setActiveTab('general'))}
                             >
@@ -36,8 +36,8 @@ function Settings() {
                             </button>
                             <button
                                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'account'
-                                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
-                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                    ? 'bg-white dark:bg-[#40285e] text-gray-900 dark:text-slate-100 shadow-xs'
+                                    : 'text-slate-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
                                     }`}
                                 onClick={() => startTransition(() => setActiveTab('account'))}
                             >
@@ -45,8 +45,8 @@ function Settings() {
                             </button>
                             <button
                                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'proxy'
-                                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
-                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                    ? 'bg-white dark:bg-[#40285e] text-gray-900 dark:text-slate-100 shadow-xs'
+                                    : 'text-slate-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
                                     }`}
                                 onClick={() => startTransition(() => setActiveTab('proxy'))}
                             >
@@ -54,8 +54,8 @@ function Settings() {
                             </button>
                             <button
                                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'email'
-                                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
-                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                    ? 'bg-white dark:bg-[#40285e] text-gray-900 dark:text-slate-100 shadow-xs'
+                                    : 'text-slate-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
                                     }`}
                                 onClick={() => setActiveTab('email')}
                             >
@@ -63,8 +63,8 @@ function Settings() {
                             </button>
                             <button
                                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'ssh'
-                                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
-                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                    ? 'bg-white dark:bg-[#40285e] text-gray-900 dark:text-slate-100 shadow-xs'
+                                    : 'text-slate-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
                                     }`}
                                 onClick={() => setActiveTab('ssh')}
                             >
@@ -72,8 +72,8 @@ function Settings() {
                             </button>
                             <button
                                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'themes'
-                                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
-                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                    ? 'bg-white dark:bg-[#40285e] text-gray-900 dark:text-slate-100 shadow-xs'
+                                    : 'text-slate-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
                                     }`}
                                 onClick={() => setActiveTab('themes')}
                             >
@@ -81,8 +81,8 @@ function Settings() {
                             </button>
                             <button
                                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer ${activeTab === 'supabase'
-                                    ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
-                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                    ? 'bg-white dark:bg-[#40285e] text-gray-900 dark:text-slate-100 shadow-xs'
+                                    : 'text-slate-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
                                     }`}
                                 onClick={() => setActiveTab('supabase')}
                             >
@@ -92,7 +92,7 @@ function Settings() {
                             {/* Standalone Telegram Navigation Link */}
                             <Link
                                 to="/telegram"
-                                className="px-3.5 py-1.5 rounded-full text-sm font-medium transition-all text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 hover:bg-white/80 dark:hover:bg-gray-700 flex items-center gap-1.5 cursor-pointer"
+                                className="px-3.5 py-1.5 rounded-full text-sm font-medium transition-all text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 hover:bg-white/80 dark:hover:bg-[#40285e]/60 flex items-center gap-1.5 cursor-pointer"
                                 title="Telegram Remote Control Hub (Dedicated Navigation)"
                             >
                                 <MessageSquare className="w-3.5 h-3.5" />
@@ -104,8 +104,8 @@ function Settings() {
                                 <button
                                     type="button"
                                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 cursor-pointer ${['advanced', 'debug', 'about'].includes(activeTab)
-                                        ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-xs'
-                                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                        ? 'bg-white dark:bg-[#40285e] text-gray-900 dark:text-slate-100 shadow-xs'
+                                        : 'text-slate-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white'
                                         }`}
                                     onClick={() => setIsMoreDropdownOpen(!isMoreDropdownOpen)}
                                     title={t('settings.tabs.more', 'More Options')}
@@ -139,12 +139,12 @@ function Settings() {
                                             className="fixed inset-0 z-40"
                                             onClick={() => setIsMoreDropdownOpen(false)}
                                         />
-                                        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-base-100 rounded-2xl shadow-xl border border-gray-100 dark:border-base-300 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+                                        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-800 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
                                             <button
                                                 type="button"
                                                 className={`w-full px-3.5 py-2 text-left text-sm flex items-center gap-2.5 transition-colors cursor-pointer ${activeTab === 'advanced'
                                                     ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium'
-                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-base-200'
+                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800'
                                                     }`}
                                                 onClick={() => {
                                                     startTransition(() => setActiveTab('advanced'));
@@ -158,7 +158,7 @@ function Settings() {
                                                 type="button"
                                                 className={`w-full px-3.5 py-2 text-left text-sm flex items-center gap-2.5 transition-colors cursor-pointer ${activeTab === 'debug'
                                                     ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium'
-                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-base-200'
+                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800'
                                                     }`}
                                                 onClick={() => {
                                                     openDebugModal();
@@ -177,11 +177,11 @@ function Settings() {
                                                     </span>
                                                 </div>
                                             </button>
-                                            <div className="my-1 border-t border-gray-100 dark:border-base-300" />
+                                            <div className="my-1 border-t border-gray-100 dark:border-slate-800" />
                                             <Link
                                                 to="/telegram"
                                                 onClick={() => setIsMoreDropdownOpen(false)}
-                                                className="w-full px-3.5 py-2 text-left text-sm flex items-center justify-between text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-base-200 transition-colors cursor-pointer"
+                                                className="w-full px-3.5 py-2 text-left text-sm flex items-center justify-between text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                                                 title="Open dedicated Telegram Remote Control Hub"
                                             >
                                                 <div className="flex items-center gap-2.5">
@@ -192,12 +192,12 @@ function Settings() {
                                                     Dedicated ↗
                                                 </span>
                                             </Link>
-                                            <div className="my-1 border-t border-gray-100 dark:border-base-300" />
+                                            <div className="my-1 border-t border-gray-100 dark:border-slate-800" />
                                             <button
                                                 type="button"
                                                 className={`w-full px-3.5 py-2 text-left text-sm flex items-center gap-2.5 transition-colors cursor-pointer ${activeTab === 'about'
                                                     ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium'
-                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-base-200'
+                                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800'
                                                     }`}
                                                 onClick={() => {
                                                     startTransition(() => setActiveTab('about'));
@@ -216,7 +216,7 @@ function Settings() {
                         <div className="flex items-center gap-2">
                             <button
                                 type="button"
-                                className="px-3.5 py-2 bg-gray-100 dark:bg-base-200 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-base-300 transition-colors flex items-center gap-2 shadow-xs border border-gray-200 dark:border-base-100 cursor-pointer"
+                                className="h-9 px-3.5 py-1.5 bg-gray-100/80 dark:bg-[#171025]/90 text-gray-700 dark:text-slate-200 text-sm font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-[#40285e]/60 transition-colors flex items-center gap-2 shadow-xs border border-gray-200/70 dark:border-[#40285e]/60 cursor-pointer"
                                 onClick={() => setIsBackupModalOpen(true)}
                                 title="Encrypted Full System Backup & Restore"
                             >
@@ -225,7 +225,7 @@ function Settings() {
                             </button>
 
                             <button
-                                className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2 shadow-sm cursor-pointer"
+                                className="h-9 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 shadow-sm cursor-pointer"
                                 onClick={handleSave}
                             >
                                 <Save className="w-4 h-4" />
@@ -235,9 +235,7 @@ function Settings() {
                     </div>
 
                     {/* Settings form */}
-
-                {/* Settings form */}
-                <div className="bg-white dark:bg-base-100 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-base-200">
+                    <div className="rounded-2xl border border-gray-200/70 dark:border-[#40285e]/60 bg-white/60 dark:bg-[#171025]/60 backdrop-blur-md p-5 shadow-sm">
                     {activeTab === 'general' && <GeneralTab {...page} />}
                     {activeTab === 'account' && <AccountTab {...page} />}
                     {activeTab === 'advanced' && <AdvancedTab {...page} />}

@@ -100,6 +100,24 @@ input[type="range"] {
   transition-property: none;
 }
 
+/* Exempt interactive buttons from universal 250ms transition delay for instant tactile response */
+button,
+[role="button"],
+.btn {
+  transition-duration: 100ms;
+}
+
+/* Tactile button interaction with micro-scale physics */
+.btn-tactile {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 100ms;
+}
+
+.btn-tactile:active:not(:disabled) {
+  transform: translateY(1px) scale(0.985);
+}
+
 /* 禁止过度滚动和橡皮筋效果 */
 html,
 body {

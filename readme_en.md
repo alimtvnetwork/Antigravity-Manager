@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.269.0)
+> Professional AI Account Management & Protocol Proxy System (v4.270.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.269.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.270.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.270.0**: UI Polish, Active Card Invariant, CSS3 Tactile Buttons, Top-Bar Geometry, Default Instance Clone, Universal 24h Clock, Rerun FIFO & Strict E2E Prompts — Eliminated asymmetric corner clipping by replacing `border-l-[6px]` with clean `border-l-4` in `SELECTED_CARD_CLASSES`, removed nested pill double-borders in `InstanceCard.tsx`, aligned inspector tabs to a shared `h-7` vertical baseline with `leading-none`, and replaced harsh opaque blue blocks with translucent dark-glass cyan/blue accents; exempted interactive buttons from universal 250ms CSS delays in `src/App.css` and added `.btn-tactile` micro-interactions (`100ms`, `active:scale-[0.985]`) for immediate tactile response; resolved rectangular hover highlight defects across `NavSettings.tsx`, `InstanceSelector.tsx`, and `NavMenu.tsx` using inner `rounded-full overflow-hidden` tracks and concentric radii; ensured opening the creation dialog via "+ New Instance" in header and empty states preselects the Default instance ID rather than blank, preserving extensions and workspace continuity; exported canonical `formatTime24` and `formatDateTime24` helpers in `src/utils/date.ts` (`hour12: false`) and eliminated uncontrolled `toLocaleTimeString()` and `toLocaleString()` calls across AuditPanel, LogTable, LogDetailPanel, ErrorModal, ErrorHistoryDrawer, NetworkMonitor, CurrentAccount, and IpAccessLogs; streamlined dispatch mode buttons to "Send", "Enqueue", and "Rerun", widened popover to `w-[26rem]` to eliminate message dropdown text clipping, added one-click Release Page actions, and unified `PromptInstructionView.tsx` `executeDirectRerun` to sequence all rounds via `dispatchRerunMessages` into the FIFO prompt queue; and injected mandatory verification questions ("Have you tested these below instructions with end-to-end testing?" and "Have you tested the below instructions with end-to-end testing and released it?") into verification templates, suffix presets, and rerun message sets so dispatched AI agents cannot skip testing and release validation. (Thanks to @aukgit)
 
 > Latest version **v4.269.0**: Rerun 3 & Numbered Rerun Resolution, Monotonic FIFO Queue Ordering, Canonical Attachment Syntax — Added 1-based index resolution for Telegram `/rerun 3`, `/rerun #3`, and `/rr 3` to pick the 3rd prompt from recent history before fallback; enforced monotonic millisecond timestamps and sequence counters in `enqueue_prompt_for_instance` alongside 60ms pacing in `dispatchRerunMessages` to guarantee multi-round reruns (e.g. Rerun ×3) sort and drain in exact chronological sequence (`ORDER BY created_at ASC, id ASC`); enforced canonical third-bracket syntax `@[file;<file_path>]` across prompt attachment builders and upgraded all regex parsers in TypeScript and Rust with backward compatibility; and routed all Telegram inbound reruns and frontend multi-resends strictly into SQLite FIFO queue with `status: 'queued'`, eliminating immediate injection and CDP task preemption. (Thanks to @aukgit)
 

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Laptop, Pencil, X } from 'lucide-react';
 import type { InstancePageApi } from './instancePageTypes';
 
@@ -19,13 +20,21 @@ export function CreateInstanceDialog({ api }: { api: InstancePageApi }) {
         handleCreate,
     } = api;
 
+    useEffect(() => {
+        if (isCreateOpen && !newInstanceFromInstance) {
+            const defaultInst = instances.find((i) => i.config.is_default || i.config.id === 'default');
+            setNewInstanceFromInstance(defaultInst?.config.id || 'default');
+        }
+    }, [isCreateOpen, newInstanceFromInstance, instances, setNewInstanceFromInstance]);
+
     if (!isCreateOpen) return null;
 
     const close = () => {
         setIsCreateOpen(false);
         setNewInstanceName('');
         setNewInstanceBoundAccount('');
-        setNewInstanceFromInstance('');
+        const defaultInst = instances.find((i) => i.config.is_default || i.config.id === 'default');
+        setNewInstanceFromInstance(defaultInst?.config.id || 'default');
         setNewInstanceLaunchImmediately(false);
     };
 

@@ -103,7 +103,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         to="/accounts"
                         draggable="false"
                         className={cn(
-                            "flex items-center justify-center px-2.5 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-full",
+                            "flex items-center justify-center h-7 px-2.5 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-l-full",
                             isAccountsActive
                                 ? "bg-blue-600 text-white shadow-xs"
                                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-gray-200/80 dark:hover:bg-slate-800/60"
@@ -126,7 +126,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         to="/instances"
                         draggable="false"
                         className={cn(
-                            "flex items-center justify-center px-2.5 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-full",
+                            "flex items-center justify-center h-7 px-2.5 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-none",
                             isInstancesActive
                                 ? "bg-blue-600 text-white shadow-xs"
                                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-gray-200/80 dark:hover:bg-slate-800/60"
@@ -148,7 +148,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
                     type="button"
                     onClick={() => setIsTelegramGuideOpen(true)}
                     className={cn(
-                        "flex items-center justify-center px-2.5 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-full",
+                        "flex items-center justify-center h-7 px-2.5 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-none",
                         isActive(location.pathname, '/telegram')
                             ? "bg-blue-600 text-white shadow-xs"
                             : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-gray-200/80 dark:hover:bg-slate-800/60"
@@ -170,7 +170,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         to="/settings"
                         draggable="false"
                         className={cn(
-                            "flex items-center justify-center px-2.5 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-full",
+                            "flex items-center justify-center h-7 px-2.5 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-none",
                             isSettingsActive
                                 ? "bg-blue-600 text-white shadow-xs"
                                 : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-gray-200/80 dark:hover:bg-slate-800/60"
@@ -198,7 +198,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         }
                     }}
                     className={cn(
-                        "h-7 px-2 flex items-center justify-center transition-all duration-150 cursor-pointer rounded-full",
+                        "h-7 px-2 flex items-center justify-center transition-all duration-150 cursor-pointer rounded-r-full",
                         isDropdownRouteActive || isMenuOpen
                             ? "bg-blue-600 text-white shadow-xs"
                             : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-gray-200/80 dark:hover:bg-slate-800/60"

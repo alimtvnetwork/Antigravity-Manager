@@ -1161,6 +1161,8 @@ export type RerunMessageOption =
     | 'is-it-completed'
     | 'is-it-finished'
     | 'is-it-released'
+    | 'tested-e2e'
+    | 'tested-e2e-and-released'
     | 'is-it-done'
     | 'is-it-published'
     | 'verify-and-finish'
@@ -1185,6 +1187,16 @@ export const RERUN_MESSAGE_OPTIONS: ReadonlyArray<{ value: RerunMessageOption; l
     { value: 'is-it-completed', label: 'Is it completed?', hint: 'Send a completion-check nudge' },
     { value: 'is-it-finished', label: 'Is it finished?', hint: 'Send a finish-check nudge' },
     { value: 'is-it-released', label: 'Is it released?', hint: 'Send a release-status nudge' },
+    {
+        value: 'tested-e2e',
+        label: 'Have you tested these below instructions with end-to-end testing?',
+        hint: 'Send strict E2E testing verification question',
+    },
+    {
+        value: 'tested-e2e-and-released',
+        label: 'Have you tested the below instructions with end-to-end testing and released it?',
+        hint: 'Send strict E2E testing and release completion question',
+    },
     { value: 'is-it-done', label: 'Is it done?', hint: 'Send a standard done-check nudge' },
     { value: 'is-it-published', label: 'Is it published?', hint: 'Send a publish-status nudge' },
     { value: 'verify-and-finish', label: 'Verify and finish remaining items', hint: 'Send a verification reminder nudge' },
@@ -1205,6 +1217,8 @@ export const RERUN_RANDOM_MESSAGE_SET: ReadonlyArray<string> = [
     'Is it completed?',
     'Is it finished?',
     'Is it released?',
+    'Have you tested these below instructions with end-to-end testing?',
+    'Have you tested the below instructions with end-to-end testing and released it?',
     'Is it done?',
     'Is it published?',
     'Has this been fully implemented and verified?',
@@ -1245,6 +1259,8 @@ export const RERUN_FIXED_MESSAGES: Record<Exclude<RerunMessageOption, 'randomize
     'is-it-completed': 'Is it completed?',
     'is-it-finished': 'Is it finished?',
     'is-it-released': 'Is it released?',
+    'tested-e2e': 'Have you tested these below instructions with end-to-end testing?',
+    'tested-e2e-and-released': 'Have you tested the below instructions with end-to-end testing and released it?',
     'is-it-done': 'Is it done?',
     'is-it-published': 'Is it published?',
     'verify-and-finish': 'Please verify and finish the remaining items.',
@@ -1280,6 +1296,8 @@ export function isRerunMessageOption(value: string | null): value is RerunMessag
         value === 'is-it-completed' ||
         value === 'is-it-finished' ||
         value === 'is-it-released' ||
+        value === 'tested-e2e' ||
+        value === 'tested-e2e-and-released' ||
         value === 'is-it-done' ||
         value === 'is-it-published' ||
         value === 'verify-and-finish' ||

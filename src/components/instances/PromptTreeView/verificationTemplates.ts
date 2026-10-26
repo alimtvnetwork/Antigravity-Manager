@@ -14,6 +14,8 @@ import { useErrorStore } from '../../../stores/error-store';
 export type VerificationTemplateType =
     | 'is-it-done'
     | 'is-it-released'
+    | 'tested-e2e'
+    | 'tested-e2e-and-released'
     | 'are-you-confident'
     | 'edge-cases-and-tests'
     | 'security-audit'
@@ -145,6 +147,24 @@ export const VERIFICATION_OPTIONS: ReadonlyArray<VerificationOptionMeta> = [
         iconName: 'rocket',
     },
     {
+        value: 'tested-e2e',
+        label: 'Have you tested these below instructions with end-to-end testing?',
+        dropdownLabel: 'E2E Tested?',
+        badgeLabel: 'E2E Test',
+        description: 'Strict pre-deployment verification: Have you tested these below instructions with end-to-end testing?',
+        category: 'testing',
+        iconName: 'terminal',
+    },
+    {
+        value: 'tested-e2e-and-released',
+        label: 'Have you tested the below instructions with end-to-end testing and released it?',
+        dropdownLabel: 'E2E & Released?',
+        badgeLabel: 'E2E & Release',
+        description: 'Strict pre-deployment verification: Have you tested the below instructions with end-to-end testing and released it?',
+        category: 'release',
+        iconName: 'rocket',
+    },
+    {
         value: 'are-you-confident',
         label: 'Are you confident? (Quality Audit)',
         dropdownLabel: 'Sure?',
@@ -246,6 +266,24 @@ export function parseVerificationTypeFromSuffix(rawSuffix: string): Verification
     }
 
     if (
+        normalized === 'tested-e2e' ||
+        normalized === 'have you tested these below instructions with end-to-end testing?' ||
+        normalized.includes('tested-e2e') ||
+        normalized.includes('with end-to-end testing?')
+    ) {
+        return 'tested-e2e';
+    }
+
+    if (
+        normalized === 'tested-e2e-and-released' ||
+        normalized === 'have you tested the below instructions with end-to-end testing and released it?' ||
+        normalized.includes('tested-e2e-and-released') ||
+        normalized.includes('and released it?')
+    ) {
+        return 'tested-e2e-and-released';
+    }
+
+    if (
         normalized === 'are-you-confident' ||
         normalized === 'are you sure about it?' ||
         normalized === 'sure?' ||
@@ -336,6 +374,30 @@ export const BUILTIN_SUFFIX_TEMPLATES: ReadonlyArray<SuffixTemplate> = [
             '- Attributions strictly `@aukgit` (`(Thanks to @aukgit)`).',
             '- Synchronize README and README_EN update logs.',
             '- Run fmt, clippy, and build pre-flight gates.',
+        ].join('\n'),
+    },
+    {
+        id: 'tested-e2e',
+        name: 'E2E Tested? (End-to-End Verification)',
+        description: 'Strict pre-deployment: Have you tested these below instructions with end-to-end testing?',
+        category: 'testing',
+        template: [
+            '### End-to-End (E2E) Testing Verification:',
+            '- Have you tested these below instructions with end-to-end testing?',
+            '- Run end-to-end verification flows across polyglot components and verify all pass green.',
+            '- Inspect command logs and verify zero regressions in runtime behavior.',
+        ].join('\n'),
+    },
+    {
+        id: 'tested-e2e-and-released',
+        name: 'E2E & Released? (Deployment Clearance)',
+        description: 'Strict pre-deployment: Have you tested the below instructions with end-to-end testing and released it?',
+        category: 'release',
+        template: [
+            '### End-to-End (E2E) & Release Clearance:',
+            '- Have you tested the below instructions with end-to-end testing and released it?',
+            '- Verify full 14-location SemVer sync and release branch invariants.',
+            '- Confirm pre-flight gates (cargo fmt, clippy, build) are 100% green before release.',
         ].join('\n'),
     },
     {
@@ -584,6 +646,31 @@ function buildChapter2Checklist(type: VerificationTemplateType, customTemplateTe
                 '- [ ] **6. Git Tag Precision:** Does the git tag strictly match `CHANGELOG.md` heading character-for-character (`vX.Y.Z` on main, `vX.Y.Z-beta.N` on beta)?',
                 '- [ ] **7. Distribution Scripts:** Are `install.ps1` and `install.sh` verified for the target release?',
                 '- [ ] **8. Thinking Store Invalidation Toggle:** Is `SUGGESTION_DELETE_THINKING_STORE` correctly configured in `SuggestionDeleteThinkingModal.tsx`?',
+            ].join('\n');
+
+        case 'tested-e2e':
+            return [
+                '# 📊 CHAPTER 2: GROUNDED VERIFICATION MATRIX & ACTIONABLE CHECKLIST',
+                '',
+                '### Chapter 2.9: End-to-End (E2E) Pre-Deployment Verification',
+                '> **Mandatory Question:** Have you tested these below instructions with end-to-end testing?',
+                '- [ ] **1. End-to-End Test Execution:** Have you verified the full workflow from start to finish with concrete end-to-end tests?',
+                '- [ ] **2. Polyglot Pipeline Status:** Are frontend (`npm run build`), Rust backend (`cargo clippy`), and CLI commands passing without errors?',
+                '- [ ] **3. Runtime Verification:** Have you verified live state transitions and error logging in the running application?',
+                '- [ ] **4. Zero Regressions:** Are all existing behaviors preserved without unintended regressions?',
+            ].join('\n');
+
+        case 'tested-e2e-and-released':
+            return [
+                '# 📊 CHAPTER 2: GROUNDED VERIFICATION MATRIX & ACTIONABLE CHECKLIST',
+                '',
+                '### Chapter 2.10: End-to-End (E2E) Testing & Release Clearance',
+                '> **Mandatory Question:** Have you tested the below instructions with end-to-end testing and released it?',
+                '- [ ] **1. End-to-End Test Execution:** Have you verified the full workflow from start to finish with concrete end-to-end tests?',
+                '- [ ] **2. Release Channel & Branch:** Is the release tag on the proper branch (`main` for stable, `beta` for preview)?',
+                '- [ ] **3. Atomic SemVer Sync:** Are all 14 version manifest locations bumped and synchronized?',
+                '- [ ] **4. Changelog & Attribution Integrity:** Is attribution strictly `@aukgit` and are README release notes updated?',
+                '- [ ] **5. Release Gate Clearance:** Have all CI/CD pre-flight checks and packaging tests passed 100% green?',
             ].join('\n');
 
         case 'are-you-confident':
@@ -876,6 +963,8 @@ export function buildRerunPrompt(
                 clean.includes('status check') ||
                 clean.includes('progress update') ||
                 clean.includes('ping me when') ||
+                clean.includes('have you tested these below instructions with end-to-end testing') ||
+                clean.includes('have you tested the below instructions with end-to-end testing and released it') ||
                 (clean.length <= 120 && (
                     clean.endsWith('?') ||
                     clean.includes('done') ||
@@ -953,6 +1042,8 @@ export function buildRerunPrompt(
                 'Is it released?',
                 'Is it completed?',
                 'Please verify and finish the remaining items.',
+                'Have you tested these below instructions with end-to-end testing?',
+                'Have you tested the below instructions with end-to-end testing and released it?',
             ];
             customNudge = fallbackNudges[Math.floor(Math.random() * fallbackNudges.length)];
         }

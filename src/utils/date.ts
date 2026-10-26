@@ -96,6 +96,49 @@ export function formatDateOnly(value?: number | string | Date | null): string {
 }
 
 /**
+ * Formats time in 24-hour clock: HH:mm (or HH:mm:ss if withSeconds is set).
+ */
+export function formatTime24(
+    value?: number | string | Date | null,
+    options?: { withSeconds?: boolean }
+): string {
+    const ms = parseToMs(value);
+    if (ms === null) return '-';
+
+    const d = new Date(ms);
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    if (options?.withSeconds) {
+        const seconds = String(d.getSeconds()).padStart(2, '0');
+        return `${hours}:${minutes}:${seconds}`;
+    }
+    return `${hours}:${minutes}`;
+}
+
+/**
+ * Formats date and time in 24-hour clock: DD-MMM-YYYY HH:mm (or DD-MMM-YYYY HH:mm:ss if withSeconds is set).
+ */
+export function formatDateTime24(
+    value?: number | string | Date | null,
+    options?: { withSeconds?: boolean }
+): string {
+    const ms = parseToMs(value);
+    if (ms === null) return '-';
+
+    const d = new Date(ms);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = MONTH_NAMES[d.getMonth()] || 'Jan';
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    if (options?.withSeconds) {
+        const seconds = String(d.getSeconds()).padStart(2, '0');
+        return `${day}-${month}-${year} ${hours}:${minutes}:${seconds}`;
+    }
+    return `${day}-${month}-${year} ${hours}:${minutes}`;
+}
+
+/**
  * Formats relative recency delta (e.g., "just now", "5 minutes ago", "1 hour ago", "1 day ago")
  */
 export function formatRelativeTime(

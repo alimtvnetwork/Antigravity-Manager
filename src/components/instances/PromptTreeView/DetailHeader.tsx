@@ -1067,7 +1067,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                         {/* Flyout 2: Unified Dispatch Configuration Popover */}
                         {isMenuOpen && (
                             <div
-                                className="absolute right-0 top-full mt-1.5 z-50 w-80 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl p-2.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-2"
+                                className="absolute right-0 top-full mt-1.5 z-50 w-[26rem] rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl p-2.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-2"
                                 onMouseLeave={handleCloseDispatchMenu}
                             >
                                 {/* Menu Header */}
@@ -1076,7 +1076,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     <span className="text-[9px] text-slate-400">AGM:P001</span>
                                 </div>
 
-                                {/* Mode Switcher Segmented Pill: [ Send Now | Enqueue FIFO | Rerun Turn ] */}
+                                {/* Mode Switcher Segmented Pill: [ Send | Enqueue | Rerun ] */}
                                 <div className="flex items-center justify-between px-2 py-1 text-xs">
                                     <span className="text-slate-500 dark:text-slate-400 text-[11px] font-medium shrink-0">
                                         Mode:
@@ -1085,44 +1085,44 @@ export function DetailHeader(props: DetailHeaderProps) {
                                         <button
                                              type="button"
                                              onClick={() => handleSwitchDispatchMode('send')}
-                                             title="Cancel & Send / Send (Preempt): Cancels any running task to execute immediately (Hotkey: N)"
+                                             title="Send (Preempt): Cancels active task to execute immediately (Hotkey: N)"
                                              className={cn(
-                                                 "flex items-center gap-1 px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                 "flex items-center gap-1 px-2.5 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                  primaryDispatchAction === 'send'
                                                      ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
                                                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 dark:hover:bg-slate-800/80"
                                              )}
                                          >
                                              <Send className="w-2.5 h-2.5" />
-                                             <span>Send (Preempt)</span>
+                                             <span>Send</span>
                                          </button>
                                          <button
                                              type="button"
                                              onClick={() => handleSwitchDispatchMode('enqueue')}
                                              title="Enqueue (FIFO): Queues prompt behind active task in IDE (Hotkey: Q)"
                                              className={cn(
-                                                 "flex items-center gap-1 px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                 "flex items-center gap-1 px-2.5 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                  primaryDispatchAction === 'enqueue'
                                                      ? "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-2xs font-semibold"
                                                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 dark:hover:bg-slate-800/80"
                                              )}
                                          >
                                              <ListPlus className="w-2.5 h-2.5" />
-                                             <span>Enqueue (FIFO)</span>
+                                             <span>Enqueue</span>
                                          </button>
                                          <button
                                              type="button"
                                              onClick={() => handleSwitchDispatchMode('rerun')}
                                              title="Rerun Turn: Enqueues turn N times into FIFO queue (Hotkey: R)"
                                              className={cn(
-                                                 "flex items-center gap-1 px-2 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                 "flex items-center gap-1 px-2.5 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
                                                  primaryDispatchAction === 'rerun'
                                                      ? "bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
                                                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 dark:hover:bg-slate-800/80"
                                              )}
                                          >
                                              <Repeat className="w-2.5 h-2.5" />
-                                             <span>Rerun Turn</span>
+                                             <span>Rerun</span>
                                          </button>
                                      </div>
                                  </div>
@@ -1395,6 +1395,27 @@ export function DetailHeader(props: DetailHeaderProps) {
                                                     </div>
                                                 </div>
                                             )}
+                                        </div>
+
+                                        {/* View Release Page & Notes button */}
+                                        <div className="mx-2 pt-0.5">
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    const url = 'https://github.com/aukgit/antigravity-manager/releases';
+                                                    try {
+                                                        const { openUrl } = await import('@tauri-apps/plugin-opener');
+                                                        await openUrl(url);
+                                                    } catch {
+                                                        window.open(url, '_blank', 'noopener,noreferrer');
+                                                    }
+                                                }}
+                                                className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs text-purple-700 dark:text-purple-300 hover:bg-purple-100/50 dark:hover:bg-purple-950/40 rounded-lg border border-purple-500/20 font-medium transition-colors cursor-pointer"
+                                                title="View official release notes, tags, and changelogs on GitHub"
+                                            >
+                                                <ExternalLink className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+                                                <span>View Release Page &amp; Notes</span>
+                                            </button>
                                         </div>
                                     </>
                                 )}

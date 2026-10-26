@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNetworkMonitorStore, NetworkRequest } from '../../stores/networkMonitorStore';
 import { X, Play, Pause, Trash2, Activity, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { formatTime24, formatDateTime24 } from '../../utils/date';
 
 const NetworkMonitor: React.FC = () => {
     const { requests, isOpen, setIsOpen, isRecording, toggleRecording, clearRequests } = useNetworkMonitorStore();
@@ -93,7 +94,7 @@ const NetworkMonitor: React.FC = () => {
                                         {req.cmd}
                                     </td>
                                     <td className="text-right text-xs opacity-70">
-                                        {new Date(req.startTime).toLocaleTimeString()}
+                                        {formatTime24(req.startTime, { withSeconds: true })}
                                     </td>
                                     <td className="text-right text-xs opacity-70">
                                         {req.duration ? `${req.duration}ms` : '-'}
@@ -135,7 +136,7 @@ const NetworkMonitor: React.FC = () => {
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="opacity-70">{t('monitor.network.fields.start_time', 'Start Time')}:</span>
-                                        <span>{new Date(selectedRequest.startTime).toLocaleString()}</span>
+                                        <span>{formatDateTime24(selectedRequest.startTime, { withSeconds: true })}</span>
                                     </div>
                                     {selectedRequest.duration && (
                                         <div className="flex justify-between">

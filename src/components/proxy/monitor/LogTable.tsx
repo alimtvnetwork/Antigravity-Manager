@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { formatCompactNumber } from '../../../utils/format';
+import { formatTime24 } from '../../../utils/date';
 import { useErrorStore } from '../../../stores/error-store';
 import {
     DEFAULT_COL_WIDTHS,
@@ -239,7 +240,7 @@ export const LogTable: React.FC<LogTableProps> = ({
                             </td>
                             <td className="text-right text-gray-700 dark:text-gray-300 text-xs font-medium py-2 px-3 truncate" style={{ width: `${colWidths.duration}px`, maxWidth: `${colWidths.duration}px` }}>{log.duration}ms</td>
                             <td className="text-right text-gray-500 dark:text-gray-400 text-xs py-2 px-3 truncate" style={{ width: `${colWidths.time}px`, maxWidth: `${colWidths.time}px` }}>
-                                {new Date(log.timestamp).toLocaleTimeString()}
+                                {formatTime24(log.timestamp, { withSeconds: true })}
                             </td>
                         </tr>
                     ))}
