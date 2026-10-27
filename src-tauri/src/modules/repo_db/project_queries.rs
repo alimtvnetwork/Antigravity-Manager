@@ -51,7 +51,7 @@ pub fn list_all_prompts() -> Result<Vec<ActivePrompt>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
-             FROM active_prompts ORDER BY created_at ASC, id ASC LIMIT 500",
+             FROM active_prompts ORDER BY CASE WHEN status IN ('queued', 'running', 'dispatched', 'in_flight') THEN 0 ELSE 1 END ASC, created_at ASC, id ASC LIMIT 500",
         )
         .map_err(|e| format!("Failed to prepare list prompts query: {}", e))?;
 

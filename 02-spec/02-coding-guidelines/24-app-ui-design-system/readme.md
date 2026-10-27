@@ -27,7 +27,9 @@ App-specific UI and design-system specifications, theming rules, component patte
 
 ## Contents
 
-_No content yet. Add design system documents as numbered files within this folder._
+| # | Specification / Document | Purpose |
+|---|---|---|
+| 02 | [Tree View Design System](02-tree-view-design-system.md) | Canonical standards for tree views: geometry (280–480px), 4-tier origin badges, segmented capsules, zero-clipping filter rows, hover physics, and interactive truncation callouts |
 
 ---
 

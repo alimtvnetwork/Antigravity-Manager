@@ -31,6 +31,7 @@ This directory contains active issue tracking and bug reports.
 - [58-pro-badge-raw-tier-id-rca.md](./58-pro-badge-raw-tier-id-rca.md) (fetch-time normalization only; `standard-tier` stays raw; issue 47 still open)
 
 ## Resolved & Historical Application Issues
+- [65-anti-gravity-rerun-and-ui-fixes.md](./65-anti-gravity-rerun-and-ui-fixes.md) (resolved 2026-10-27; rerun target ID UUID, sequential enqueue retention, and filter compaction)
 - [56-release-fmt-gate-blocked-by-token-workflow-scope.md](./56-release-fmt-gate-blocked-by-token-workflow-scope.md) (resolved 2026-10-01, `6b18ddc4`)
 - [55-update-settings-missing-auto-check-rca.md](./55-update-settings-missing-auto-check-rca.md) (fixed 2026-09-30, `c4983761`)
 - [01-instance-launch-and-user-isolation-rca.md](./01-instance-launch-and-user-isolation-rca.md)

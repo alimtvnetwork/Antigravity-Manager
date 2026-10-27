@@ -163,6 +163,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         refreshingProjectId,
         confirmationSuffix, setConfirmationSuffix,
         conversationTargetMode, setConversationTargetMode,
+        newConversationTitle, setNewConversationTitle,
         selectedProjectScope, setSelectedProjectScope,
         isDetailsModalOpen, setIsDetailsModalOpen,
         copiedField, setCopiedField,
@@ -1210,6 +1211,20 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                             setActivePromptText={setActivePromptText}
                                             setActionMsg={setActionMsg}
                                             promptPreviewWords={promptPreviewWords}
+                                            onRerun={promptActions.handleRerunConversation}
+                                            onEnqueue={promptActions.handleEnqueuePrompt}
+                                            onResend={promptActions.handleResendPrompt}
+                                            isResending={promptActions.isResending}
+                                            isEnqueueing={promptActions.isEnqueueing}
+                                            isRerunning={promptActions.isRerunning}
+                                            loadTree={loadTree}
+                                            repoPath={selectedProject?.repo_path || ''}
+                                            conversationTargetMode={conversationTargetMode}
+                                            setConversationTargetMode={setConversationTargetMode}
+                                            newConversationTitle={newConversationTitle}
+                                            setNewConversationTitle={setNewConversationTitle}
+                                            confirmationSuffix={confirmationSuffix}
+                                            setConfirmationSuffix={setConfirmationSuffix}
                                         />
                                     ) : (
                                         <ResultsView

@@ -127,28 +127,54 @@ pub fn save_or_requeue_prompt(prompt: &ActivePrompt) -> Result<(), String> {
         .map_err(|e| format!("Failed to upsert running project: {e}"))?;
     }
 
-    // Live-status dedup invariant: never clobber an actively running or completed prompt with queued/backed_up
-    let live_status: Option<String> = tx
-        .query_row(
-            "SELECT status FROM active_prompts WHERE id = ?1",
-            params![&prompt.id],
+    // Live-status dedup invariant: never clobber an actively running or in-flight prompt with backed_up
+    let live_status: Option<String> = match tx.query_row(
+        "SELECT status FROM active_prompts WHERE id = ?1",
+        params![&prompt.id],
+        |r| r.get(0),
+    ) {
+        Ok(status) => Some(status),
+        Err(rusqlite::Error::QueryReturnedNoRows) => None,
+        Err(err) => {
+            tracing::warn!(
+                "[RepoDB] Failed to query prompt status by id '{}': {err}",
+                prompt.id
+            );
+            None
+        }
+    }
+    .or_else(|| {
+        let norm_path_slash = prompt.repo_path.trim().replace('\\', "/");
+        let norm_path_bslash = prompt.repo_path.trim().replace('/', "\\");
+        match tx.query_row(
+            "SELECT status FROM active_prompts 
+             WHERE (repo_path = ?1 OR repo_path = ?2 OR repo_path = ?3) 
+               AND prompt_content = ?4 
+               AND status IN ('running', 'in_flight', 'dispatched') 
+             LIMIT 1",
+            params![
+                &prompt.repo_path,
+                &norm_path_slash,
+                &norm_path_bslash,
+                &prompt.prompt_content
+            ],
             |r| r.get(0),
-        )
-        .ok()
-        .or_else(|| {
-            let norm_path_slash = prompt.repo_path.trim().replace('\\', "/");
-            let norm_path_bslash = prompt.repo_path.trim().replace('/', "\\");
-            tx.query_row(
-                "SELECT status FROM active_prompts WHERE (repo_path = ?1 OR repo_path = ?2 OR repo_path = ?3) AND prompt_content = ?4 LIMIT 1",
-                params![&prompt.repo_path, &norm_path_slash, &norm_path_bslash, &prompt.prompt_content],
-                |r| r.get(0),
-            )
-            .ok()
-        });
+        ) {
+            Ok(status) => Some(status),
+            Err(rusqlite::Error::QueryReturnedNoRows) => None,
+            Err(err) => {
+                tracing::warn!("[RepoDB] Failed to query active prompt status by content: {err}");
+                None
+            }
+        }
+    });
 
-    if matches!(live_status.as_deref(), Some("running") | Some("completed"))
-        && prompt.status != "completed"
+    if matches!(
+        live_status.as_deref(),
+        Some("running") | Some("in_flight") | Some("dispatched")
+    ) && prompt.status != "completed"
         && prompt.status != "running"
+        && prompt.status != "queued"
     {
         crate::modules::logger::log_info(&format!(
             "[RepoDB] Preserving live prompt '{}' (status '{}') - skipping overwrite with incoming '{}'",

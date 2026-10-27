@@ -11,7 +11,7 @@ import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 import { persistClientCrash } from '../../../lib/error-listener';
 import { auditRecord } from '../../audit/audit-client';
-import type { AgmConversationNode } from './types';
+import type { AgmConversationNode, AgmPromptTurnNode } from './types';
 import { isGhostConversation } from './conversationGuards';
 import { detectPromptCategory } from './tierClassification';
 import type { PromptTreeState } from './usePromptTreeState';
@@ -210,7 +210,10 @@ export interface PromptTreePromptActions {
     setIsVerificationModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
     verificationModalConv: AgmConversationNode | null;
     enqueueVerificationRounds: (options: MultiRoundVerificationOptions) => Promise<boolean>;
-    handleRerunConversation: (options?: Partial<HandleRerunConversationOptions>) => Promise<RerunDispatchResult>;
+    handleRerunConversation: (options?: Partial<HandleRerunConversationOptions>) => Promise<any>;
+    isResending: boolean;
+    isEnqueueing: boolean;
+    isRerunning: boolean;
 }
 
 interface UsePromptTreePromptActionsProps {
@@ -250,6 +253,8 @@ export function usePromptTreePromptActions({
         activePromptTextRef,
         setShowAllWords,
         setInspectorPrompt,
+        setTreeData,
+        setSelectedConversation,
     } = state;
 
     const extractAssets = useCallback((text: string) => {
@@ -568,7 +573,7 @@ export function usePromptTreePromptActions({
                 }
                 if (loadTree) {
                     try {
-                        await loadTree(true, true);
+                        await loadTree(false, true);
                     } catch (loadErr) {
                         useErrorStore.getState().trackWarning(loadErr, {
                             source: 'usePromptTreePromptActions.handleResendPrompt',
@@ -594,7 +599,7 @@ export function usePromptTreePromptActions({
         selectedConversation, selectedProject, treeData, archivedProjectIds,
         editedPromptText, activePromptText, confirmationSuffix, conversationTargetMode, newConversationTitle, instanceId,
         selectConversation, selectedConversationRef, selectedProjectRef,
-        activePromptTextRef, setSelectedProject, setActionMsg, setError, setIsResending,
+        activePromptTextRef, setSelectedProject, setActionMsg, setError, setIsResending, loadTree,
     ]);
 
     const handleExport = useCallback(
@@ -764,6 +769,63 @@ ${activePromptText}
             promptContent = formatPromptWithAttachments(promptContent, mediaList, { repoPath });
             await enqueuePrompt(targetInstId, repoPath, promptContent, targetConvId, undefined, mediaList);
 
+            // 0ms Optimistic UI Injection:
+            // Immediately inject a synthetic turn into selectedConversation and treeData
+            const targetConv = conv || selectedConversation;
+            if (targetConv) {
+                const existingTurns = targetConv.prompts || [];
+                const nextTurnNumber = existingTurns.length > 0
+                    ? Math.max(...existingTurns.map((t) => t.turn_number)) + 1
+                    : 1;
+
+                const syntheticTurn: AgmPromptTurnNode = {
+                    turn_number: nextTurnNumber,
+                    step_index: nextTurnNumber - 1,
+                    prompt_text: promptContent,
+                    preview_200w: promptContent.slice(0, 200),
+                    status: 'QUEUED',
+                    is_running: false,
+                    is_queued: true,
+                    timestamp: new Date().toISOString(),
+                    created_at: Date.now(),
+                    media_paths: mediaList,
+                    media_thumbnails: mediaList,
+                };
+                const updatedTurns = [...existingTurns, syntheticTurn];
+
+                setSelectedConversation((prev) => {
+                    if (!prev || prev.conversation_id !== targetConv.conversation_id) return prev;
+                    return {
+                        ...prev,
+                        is_queued: true,
+                        prompts: updatedTurns,
+                    };
+                });
+
+                if (selectedConversationRef.current && selectedConversationRef.current.conversation_id === targetConv.conversation_id) {
+                    selectedConversationRef.current = {
+                        ...selectedConversationRef.current,
+                        is_queued: true,
+                        prompts: updatedTurns,
+                    };
+                }
+
+                setTreeData((prevTree) =>
+                    prevTree.map((projNode) => ({
+                        ...projNode,
+                        conversations: projNode.conversations.map((c) =>
+                            c.conversation_id === targetConv.conversation_id
+                                ? {
+                                      ...c,
+                                      is_queued: true,
+                                      prompts: updatedTurns,
+                                  }
+                                : c
+                        ),
+                    }))
+                );
+            }
+
             // Invalidate prompt tree cache first so tree reload fetches fresh state including enqueued turn
             if (isTauri()) {
                 try {
@@ -778,10 +840,10 @@ ${activePromptText}
                 }
             }
 
-            // Trigger immediate tree refresh so tree view reflects enqueued turn
+            // Trigger immediate silent tree refresh so tree view reflects enqueued turn without top progress bar
             if (loadTree) {
                 try {
-                    await loadTree(true, true);
+                    await loadTree(false, true);
                 } catch (loadErr) {
                     useErrorStore.getState().trackWarning(loadErr, {
                         source: 'usePromptTreePromptActions.handleEnqueuePrompt',
@@ -818,7 +880,7 @@ ${activePromptText}
         treeData, archivedProjectIds, setSelectedProject,
         editedPromptText, activePromptText, activePromptTextRef, confirmationSuffix,
         conversationTargetMode, newConversationTitle, instanceId, selectConversation,
-        loadTree, setIsEnqueueing, setActionMsg, setError,
+        loadTree, setIsEnqueueing, setActionMsg, setError, setTreeData, setSelectedConversation,
     ]);
 
     const handleFocusIde = useCallback(async () => {
@@ -1073,45 +1135,111 @@ ${activePromptText}
         [instanceId, setActionMsg, setError]
     );
 
+    const [isRerunning, setIsRerunning] = useState(false);
+
     const handleRerunConversationAction = useCallback(
         async (overrides?: Partial<HandleRerunConversationOptions>): Promise<RerunDispatchResult> => {
-            const conv = selectedConversationRef.current || selectedConversation;
-            const proj = selectedProjectRef.current || selectedProject;
-            const res = await handleRerunConversation({
-                conversation: conv,
-                project: proj,
-                instanceId,
-                activePromptText: editedPromptText.trim() || activePromptTextRef.current || activePromptText,
-                ...overrides,
-            });
-            if (res.dispatched > 0) {
-                const targetInstId = conv?.instance_id || instanceId;
-                if (isTauri()) {
-                    try {
-                        await invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId }).catch(async () => {
-                            await invoke('reset_prompt_tree_cache', { instanceId: targetInstId });
+            setIsRerunning(true);
+            try {
+                const conv = selectedConversationRef.current || selectedConversation;
+                const proj = selectedProjectRef.current || selectedProject;
+                const res = await handleRerunConversation({
+                    conversation: conv,
+                    project: proj,
+                    instanceId,
+                    activePromptText: editedPromptText.trim() || activePromptTextRef.current || activePromptText,
+                    ...overrides,
+                });
+                if (res.dispatched > 0) {
+                    // 0ms Optimistic UI Injection for rerun rounds
+                    if (conv) {
+                        const existingTurns = conv.prompts || [];
+                        const baseTurnNumber = existingTurns.length > 0
+                            ? Math.max(...existingTurns.map((t) => t.turn_number)) + 1
+                            : 1;
+                        const dispatchedMessages = res.messages || [];
+                        const newTurns: AgmPromptTurnNode[] = [];
+                        for (let rIdx = 0; rIdx < res.dispatched; rIdx++) {
+                            const msgText = dispatchedMessages[rIdx] || conv.full_prompt_text || conv.prompt_preview_200w || 'Rerun turn';
+                            newTurns.push({
+                                turn_number: baseTurnNumber + rIdx,
+                                step_index: baseTurnNumber + rIdx - 1,
+                                prompt_text: msgText,
+                                preview_200w: msgText.slice(0, 200),
+                                status: 'QUEUED',
+                                is_running: false,
+                                is_queued: true,
+                                timestamp: new Date().toISOString(),
+                                created_at: Date.now() + rIdx,
+                                media_paths: conv.media_paths || [],
+                                media_thumbnails: conv.media_thumbnails || [],
+                            });
+                        }
+                        const updatedTurns = [...existingTurns, ...newTurns];
+
+                        setSelectedConversation((prev) => {
+                            if (!prev || prev.conversation_id !== conv.conversation_id) return prev;
+                            return {
+                                ...prev,
+                                is_queued: true,
+                                prompts: updatedTurns,
+                            };
                         });
-                    } catch (cacheErr: unknown) {
-                        useErrorStore.getState().trackWarning(cacheErr, {
-                            source: 'usePromptTreePromptActions.handleRerunConversationAction',
-                            triggerAction: 'invalidate_prompt_tree_cache',
-                        });
+
+                        if (selectedConversationRef.current && selectedConversationRef.current.conversation_id === conv.conversation_id) {
+                            selectedConversationRef.current = {
+                                ...selectedConversationRef.current,
+                                is_queued: true,
+                                prompts: updatedTurns,
+                            };
+                        }
+
+                        setTreeData((prevTree) =>
+                            prevTree.map((projNode) => ({
+                                ...projNode,
+                                conversations: projNode.conversations.map((c) =>
+                                    c.conversation_id === conv.conversation_id
+                                        ? {
+                                              ...c,
+                                              is_queued: true,
+                                              prompts: updatedTurns,
+                                          }
+                                        : c
+                                ),
+                            }))
+                        );
+                    }
+
+                    const targetInstId = conv?.instance_id || instanceId;
+                    if (isTauri()) {
+                        try {
+                            await invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId }).catch(async () => {
+                                await invoke('reset_prompt_tree_cache', { instanceId: targetInstId });
+                            });
+                        } catch (cacheErr: unknown) {
+                            useErrorStore.getState().trackWarning(cacheErr, {
+                                source: 'usePromptTreePromptActions.handleRerunConversationAction',
+                                triggerAction: 'invalidate_prompt_tree_cache',
+                            });
+                        }
+                    }
+                    if (loadTree) {
+                        try {
+                            await loadTree(false, true);
+                        } catch (loadErr: unknown) {
+                            useErrorStore.getState().trackWarning(loadErr, {
+                                source: 'usePromptTreePromptActions.handleRerunConversationAction',
+                                triggerAction: 'loadTree',
+                            });
+                        }
                     }
                 }
-                if (loadTree) {
-                    try {
-                        await loadTree(true, true);
-                    } catch (loadErr: unknown) {
-                        useErrorStore.getState().trackWarning(loadErr, {
-                            source: 'usePromptTreePromptActions.handleRerunConversationAction',
-                            triggerAction: 'loadTree',
-                        });
-                    }
-                }
+                return res;
+            } finally {
+                setIsRerunning(false);
             }
-            return res;
         },
-        [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, instanceId, editedPromptText, activePromptText, activePromptTextRef, loadTree]
+        [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, instanceId, editedPromptText, activePromptText, activePromptTextRef, loadTree, setTreeData, setSelectedConversation]
     );
 
     return {
@@ -1139,6 +1267,9 @@ ${activePromptText}
         verificationModalConv,
         enqueueVerificationRounds,
         handleRerunConversation: handleRerunConversationAction,
+        isResending: state.isResending,
+        isEnqueueing: state.isEnqueueing,
+        isRerunning,
     };
 }
 
@@ -1667,11 +1798,6 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
                 result: 'error',
                 message: errorObj.message,
             });
-        }
-
-        if (i < requested - 1) {
-            // Yield briefly to ensure monotonic timestamp separation across queued rounds
-            await new Promise((resolve) => setTimeout(resolve, 60));
         }
     }
 

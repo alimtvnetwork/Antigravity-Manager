@@ -51,6 +51,7 @@ Application-specific UI and design-system specifications for Antigravity-Manager
 | 02 | [Component & Layout Standards](#2-component-and-layout-standards) | Desktop shell, top header window drag region, cards, modals, form controls |
 | 03 | [Responsive Container Queries](#3-responsive-layout--container-queries) | `@container` query integration and desktop breakpoint behaviors |
 | 04 | [Accessibility & Interaction](#4-motion-and-interaction-standards) | View Transition API animations, Linux fallback, and focus states |
+| 05 | [Tree View Design System](../02-coding-guidelines/24-app-ui-design-system/02-tree-view-design-system.md) | Canonical tree view geometry (280–480px), 4-tier origin badges, segmented pill capsules, zero-clip filter rows, and interactive truncation callouts |
 
 ---
 
@@ -120,6 +121,8 @@ Desktop window framing synchronizes theme states across Webview and host OS:
 
 ## Cross-References
 
+- [Tree View Design System Guidelines](../02-coding-guidelines/24-app-ui-design-system/02-tree-view-design-system.md) — Grounded specification for tree views, 4-tier origins & segmented capsules
+- [Tree View Architecture & Filter Compaction Spec](../21-app/231-anti-gravity-rerun-and-ui-fixes/03-tree-view-design-system-spec.md) — Feature architecture & zero-clip filter row spec
 - [Frontend UI & State Management](../21-app/05-frontend-ui-and-state-management.md) — Frontend architecture & Zustand stores
 - [API Contracts & IPC Registry](../21-app/06-api-contracts-and-ipc-registry.md) — Native Tauri IPC commands
 - [Consolidated Design System](../17-consolidated-guidelines/10-design-system.md) — Meta-repository design guidelines

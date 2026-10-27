@@ -16,6 +16,7 @@ import {
     Eye,
     EyeOff,
     PanelLeftClose,
+    Image,
 } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import type { AgmConversationNode, AgmProjectTreeNode } from './types';
@@ -463,98 +464,119 @@ export function TreePanel(props: TreePanelProps) {
 
                 {/* Row 2: Status Filter Segmented Capsule & Archive Scope */}
                 <div className="flex items-center justify-between gap-1.5 pt-0.5 min-w-0">
-                    <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-[#40285e] bg-white/80 dark:bg-[#171025]/80 backdrop-blur-xs p-0.5 shadow-2xs divide-x divide-slate-200 dark:divide-[#40285e] shrink-0">
+                    {/* Status Capsule: Icon-first, short text, zero-clip footprint */}
+                    <div className="inline-flex items-center rounded-full border border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xs p-0.5 shadow-2xs divide-x divide-slate-200/60 dark:divide-slate-800/60 shrink-0">
+                        {/* Running */}
                         <button
                             type="button"
                             onClick={() => setActiveFilter(activeFilter === 'running' ? 'all' : 'running')}
                             className={cn(
-                                "px-2.5 py-0.5 text-[10px] font-medium rounded-l-md transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1",
+                                "px-2 py-0.5 text-[10px] font-medium rounded-l-full transition-all duration-300 whitespace-nowrap cursor-pointer flex items-center gap-1 active:scale-[0.985]",
                                 activeFilter === 'running'
                                     ? "bg-emerald-600 text-white shadow-2xs font-semibold"
-                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-[#1f1730]"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/60"
                             )}
                             aria-label="Active running prompts"
+                            title="Filter active running prompts"
                         >
                             <span className={cn("w-1.5 h-1.5 rounded-full", activeFilter === 'running' ? "bg-white" : "bg-emerald-500 animate-pulse")} />
-                            <span>Running</span>
+                            <span>Run</span>
                         </button>
+
+                        {/* Queued */}
                         <button
                             type="button"
                             onClick={() => setActiveFilter(activeFilter === 'queued' ? 'all' : 'queued')}
                             className={cn(
-                                "px-2.5 py-0.5 text-[10px] font-medium rounded-none transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1",
+                                "px-2 py-0.5 text-[10px] font-medium rounded-none transition-all duration-300 whitespace-nowrap cursor-pointer flex items-center gap-1 active:scale-[0.985]",
                                 activeFilter === 'queued'
                                     ? "bg-amber-600 text-white shadow-2xs font-semibold"
-                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-[#1f1730]"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/60"
                             )}
                             aria-label="Queued prompts"
+                            title="Filter queued prompts awaiting execution"
                         >
                             <span className={cn("w-1.5 h-1.5 rounded-full", activeFilter === 'queued' ? "bg-white" : "bg-amber-500")} />
-                            <span>Queued</span>
+                            <span>Queue</span>
                         </button>
+
+                        {/* Pinned */}
                         <button
                             type="button"
                             onClick={() => setActiveFilter(activeFilter === 'pinned' ? 'all' : 'pinned')}
                             className={cn(
-                                "px-2 py-0.5 text-[10px] font-medium transition-colors whitespace-nowrap cursor-pointer flex items-center gap-0.5",
+                                "px-1.5 py-0.5 text-[10px] font-medium rounded-none transition-all duration-300 whitespace-nowrap cursor-pointer flex items-center gap-0.5 active:scale-[0.985]",
                                 activeFilter === 'pinned'
                                     ? "bg-blue-600 text-white shadow-2xs font-semibold"
-                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-[#1f1730]"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/60"
                             )}
-                            aria-label="Pinned prompts"
+                            aria-label="Pinned projects"
+                            title="Filter pinned favorite projects"
                         >
                             <Pin className="w-2.5 h-2.5 shrink-0" />
-                            <span>Pinned</span>
+                            <span>Pin</span>
                         </button>
+
+                        {/* Images (Lucide Icon replacing raw unicode emoji) */}
                         <button
                             type="button"
                             onClick={() => imageFilterEmitter.set(!effectiveImageFilter)}
                             className={cn(
-                                "px-2 py-0.5 text-[10px] font-medium rounded-r-md transition-colors whitespace-nowrap cursor-pointer flex items-center gap-1",
+                                "px-1.5 py-0.5 text-[10px] font-medium rounded-r-full transition-all duration-300 whitespace-nowrap cursor-pointer flex items-center gap-1 active:scale-[0.985]",
                                 effectiveImageFilter
                                     ? "bg-sky-600 text-white shadow-2xs font-semibold"
-                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-[#1f1730]"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/60"
                             )}
                             aria-label="Filter prompts with attached images"
-                            title={effectiveImageFilter ? "Showing only conversations with images (Click to clear)" : "Filter projects and prompts with images"}
+                            title={effectiveImageFilter ? "Showing conversations with images (Click to clear)" : "Filter conversations with images"}
                         >
-                            <span className="text-[10px]">🖼️</span>
-                            <span>Images</span>
+                            <Image className="w-2.5 h-2.5 shrink-0" />
+                            <span>Img</span>
                         </button>
                     </div>
 
-                    <div className="inline-flex items-center rounded-lg border border-slate-200 dark:border-[#40285e] bg-white/80 dark:bg-[#171025]/80 backdrop-blur-xs p-0.5 shadow-2xs divide-x divide-slate-200 dark:divide-[#40285e] shrink-0">
+                    {/* Scope Capsule: Sleek icon buttons with rich tooltips */}
+                    <div className="inline-flex items-center rounded-full border border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xs p-0.5 shadow-2xs divide-x divide-slate-200/60 dark:divide-slate-800/60 shrink-0">
+                        {/* Automated Prompts Toggle */}
                         <button
                             type="button"
                             onClick={handleToggleAutomated}
                             className={cn(
-                                "flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-l-md transition-colors whitespace-nowrap cursor-pointer",
+                                "p-1 text-[10px] font-medium rounded-l-full transition-all duration-300 whitespace-nowrap cursor-pointer active:scale-[0.985] flex items-center justify-center",
                                 effectiveAutomatedHidden
                                     ? "bg-purple-500/15 text-purple-700 dark:text-purple-300 font-semibold"
-                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-[#1f1730]"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/60"
                             )}
                             aria-label="Toggle automated prompts"
-                            title={effectiveAutomatedHidden ? "Automated prompts hidden (Click to show)" : "Automated prompts visible (Click to hide)"}
+                            title={effectiveAutomatedHidden ? "Automated subagent prompts hidden (Click to show)" : "Automated subagent prompts visible (Click to hide)"}
                         >
                             {effectiveAutomatedHidden ? (
                                 <EyeOff className="w-3 h-3 text-purple-500" />
                             ) : (
                                 <Eye className="w-3 h-3 text-slate-400" />
                             )}
-                            <span>{effectiveAutomatedHidden ? 'Hide Auto' : 'Show Auto'}</span>
                         </button>
 
-                        <div className="relative flex items-center px-1.5 py-0.5">
-                            <select
-                                value={activeFilter === 'archived' ? 'archived' : 'all'}
-                                onChange={(e) => setActiveFilter(e.target.value as ActiveFilter)}
-                                className="appearance-none bg-transparent border-0 focus:ring-0 focus:outline-none text-[10px] font-medium text-slate-700 dark:text-slate-300 cursor-pointer pr-3 py-0"
-                            >
-                                <option value="all" className="bg-white dark:bg-[#171025]">All ({treeData.length})</option>
-                                <option value="archived" className="bg-white dark:bg-[#171025]">Archived ({archivedCount})</option>
-                            </select>
-                            <ChevronDown className="w-2.5 h-2.5 text-slate-400 pointer-events-none absolute right-1 top-1/2 -translate-y-1/2" />
-                        </div>
+                        {/* Archive Toggle Button */}
+                        <button
+                            type="button"
+                            onClick={() => setActiveFilter(activeFilter === 'archived' ? 'all' : 'archived')}
+                            className={cn(
+                                "p-1 text-[10px] font-medium rounded-r-full transition-all duration-300 whitespace-nowrap cursor-pointer active:scale-[0.985] flex items-center gap-0.5",
+                                activeFilter === 'archived'
+                                    ? "bg-slate-700 dark:bg-slate-600 text-white shadow-2xs font-semibold"
+                                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100/60 dark:hover:bg-slate-800/60"
+                            )}
+                            aria-label="Toggle archived projects"
+                            title={activeFilter === 'archived' ? `Viewing archived projects (${archivedCount}) · Click to show all` : `Filter archived projects (${archivedCount})`}
+                        >
+                            <Archive className="w-3 h-3 shrink-0" />
+                            {archivedCount > 0 && (
+                                <span className="text-[9px] font-mono font-bold leading-none px-0.5">
+                                    {archivedCount}
+                                </span>
+                            )}
+                        </button>
                     </div>
                 </div>
 

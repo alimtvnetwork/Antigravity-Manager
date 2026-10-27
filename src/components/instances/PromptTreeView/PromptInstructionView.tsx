@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Check, Copy, RotateCcw, ChevronUp, ChevronDown, Clock, Image as LucideImage, ExternalLink, Send, ListPlus, Repeat } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { cn } from '../../../utils/cn';
-import { PromptViewMode, type AgmConversationNode, type AgmProjectTreeNode, type ViewMode } from './types';
+import { PromptViewMode, type AgmConversationNode, type AgmProjectTreeNode, type ViewMode, type AgmPromptTurnNode } from './types';
 import { RichMarkdownRenderer, openFileInIde } from './markdown';
 import { countWords, formatPromptForMarkdown } from './formatters';
 import { PromptImagePreviewModal } from './PromptImagePreviewModal';
@@ -495,10 +495,12 @@ export interface PromptInstructionViewProps {
     setConfirmationSuffix?: (suffix: string) => void;
     onResend?: () => Promise<void> | void;
     onEnqueue?: () => Promise<void> | void;
-    onRerun?: () => Promise<void> | void;
+    onRerun?: ((prompt?: string, convId?: string) => Promise<any> | any) | ((options?: any) => Promise<any> | any) | (() => Promise<void> | void);
     isResending?: boolean;
     isEnqueueing?: boolean;
     isRerunning?: boolean;
+    loadTree?: (isInitialLoad?: boolean, isForce?: boolean) => Promise<void>;
+    repoPath?: string;
 }
 
 export function PromptInstructionView(props: PromptInstructionViewProps) {
@@ -524,6 +526,8 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         isResending: propIsResending,
         isEnqueueing: propIsEnqueueing,
         isRerunning: propIsRerunning,
+        loadTree: propLoadTree,
+        repoPath: propRepoPath,
     } = props;
 
     const [localDispatchMode, setLocalDispatchMode] = useState<'send' | 'enqueue' | 'rerun'>(propPrimaryDispatchAction || 'send');
@@ -575,7 +579,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         setActionMsg('Cancelling active task & dispatching prompt now...');
         try {
             const targetInstId = selectedConversation.instance_id || 'default';
-            const repoPath = selectedProject?.repo_path || '';
+            const repoPath = propRepoPath || selectedProject?.repo_path || '';
             let content = editedPromptText.trim() || activePromptText;
             if (conversationTargetMode === 'new' && newConversationTitle.trim()) {
                 content = `# ${newConversationTitle.trim()}\n\n${content}`;
@@ -589,6 +593,9 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
             const mediaList = extractImagesFromPrompt(content, selectedConversation).map((img) => img.src).filter(Boolean);
             await sendPromptNow(targetInstId, repoPath, content, targetConvId, mediaList.length > 0 ? mediaList : undefined);
             setActionMsg('Prompt dispatched successfully to active IDE session!');
+            if (propLoadTree) {
+                void propLoadTree(false, true);
+            }
             setTimeout(() => setActionMsg(null), 3000);
         } catch (err) {
             const errorObj = err instanceof Error ? err : new Error(String(err));
@@ -608,7 +615,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         setActionMsg('Enqueuing prompt to IDE FIFO queue...');
         try {
             const targetInstId = selectedConversation.instance_id || 'default';
-            const repoPath = selectedProject?.repo_path || '';
+            const repoPath = propRepoPath || selectedProject?.repo_path || '';
             let content = editedPromptText.trim() || activePromptText;
             if (conversationTargetMode === 'new' && newConversationTitle.trim()) {
                 content = `# ${newConversationTitle.trim()}\n\n${content}`;
@@ -621,7 +628,34 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
 
             const mediaList = extractImagesFromPrompt(content, selectedConversation).map((img) => img.src).filter(Boolean);
             await enqueuePrompt(targetInstId, repoPath, content, targetConvId, undefined, mediaList.length > 0 ? mediaList : undefined);
+
+            // 0ms Optimistic turn injection into selectedConversation
+            if (selectedConversation) {
+                const existingTurns = selectedConversation.prompts || [];
+                const nextTurnNumber = existingTurns.length > 0
+                    ? Math.max(...existingTurns.map((t) => t.turn_number)) + 1
+                    : 1;
+                const syntheticTurn: AgmPromptTurnNode = {
+                    turn_number: nextTurnNumber,
+                    step_index: nextTurnNumber - 1,
+                    prompt_text: content,
+                    preview_200w: content.slice(0, 200),
+                    status: 'QUEUED',
+                    is_running: false,
+                    is_queued: true,
+                    timestamp: new Date().toISOString(),
+                    created_at: Date.now(),
+                    media_paths: mediaList,
+                    media_thumbnails: mediaList,
+                };
+                selectedConversation.is_queued = true;
+                selectedConversation.prompts = [...existingTurns, syntheticTurn];
+            }
+
             setActionMsg('Prompt enqueued successfully into FIFO queue!');
+            if (propLoadTree) {
+                void propLoadTree(false, true);
+            }
             setTimeout(() => setActionMsg(null), 3000);
         } catch (err) {
             const errorObj = err instanceof Error ? err : new Error(String(err));
@@ -641,19 +675,21 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         setActionMsg(`Enqueuing rerun (${rerunCount} round(s))...`);
         try {
             const targetInstId = selectedConversation.instance_id || 'default';
-            const repoPath = selectedProject?.repo_path || '';
-            const targetConvId = dispatchConversationId(
-                conversationTargetMode,
-                selectedConversation.conversation_id,
-                Boolean(selectedConversation.is_running)
-            ) || (conversationTargetMode === 'current' ? 'current' : undefined);
+            const repoPath = propRepoPath || selectedProject?.repo_path || '';
+            
+            // Target UUID Invariant: Must be authoritative conversation UUID, NEVER literal 'current'
+            const authoritativeConvId = selectedConversation.conversation_id?.trim();
+            if (!authoritativeConvId || authoritativeConvId === 'current') {
+                throw new Error('Cannot execute rerun: Authoritative conversation UUID is missing or invalid.');
+            }
+
             const content = editedPromptText.trim() || activePromptText;
             const mediaList = extractImagesFromPrompt(content, selectedConversation).map((img) => img.src).filter(Boolean);
 
             const result = await dispatchRerunMessages({
                 targetInstId,
                 repoPath,
-                convId: targetConvId,
+                convId: authoritativeConvId,
                 count: rerunCount,
                 messageOption: rerunMessageOption || 'randomized',
                 originalPrompt: content,
@@ -663,6 +699,9 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
 
             if (result.dispatched > 0) {
                 setActionMsg(`Enqueued ${result.dispatched} rerun round(s) into FIFO queue!`);
+                if (propLoadTree) {
+                    void propLoadTree(false, true);
+                }
             } else if (result.failed > 0) {
                 setActionMsg(`Failed to enqueue rerun (${result.failed} error(s))`);
             }
@@ -673,10 +712,33 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                 source: 'PromptInstructionView.executeDirectRerun',
                 triggerAction: 'rerun_prompt',
             });
-            setActionMsg('Failed to enqueue rerun');
+            setActionMsg(`Rerun failed: ${errorObj.message}`);
             setTimeout(() => setActionMsg(null), 3500);
         } finally {
             setLocalIsRerunning(false);
+        }
+    };
+
+    const handleRerun = async () => {
+        const authoritativeConvId = selectedConversation.conversation_id?.trim();
+        if (!authoritativeConvId || authoritativeConvId === 'current') {
+            const errorObj = new Error('Cannot execute rerun: Authoritative conversation UUID is missing or invalid.');
+            useErrorStore.getState().captureException(errorObj, {
+                source: 'PromptInstructionView.handleRerun',
+                triggerAction: 'rerun_prompt',
+            });
+            setActionMsg('Cannot execute rerun: Authoritative conversation UUID is missing or invalid.');
+            return;
+        }
+
+        const content = editedPromptText.trim() || activePromptText;
+        if (propOnRerun) {
+            await (propOnRerun as any)(content, authoritativeConvId);
+            if (propLoadTree) {
+                void propLoadTree(false, true);
+            }
+        } else {
+            await executeDirectRerun();
         }
     };
 
@@ -685,21 +747,23 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
         if (primaryDispatchAction === 'enqueue') {
             if (propOnEnqueue) {
                 await propOnEnqueue();
+                if (propLoadTree) {
+                    void propLoadTree(false, true);
+                }
             } else {
                 await executeDirectEnqueue();
             }
             return;
         }
         if (primaryDispatchAction === 'rerun') {
-            if (propOnRerun) {
-                await propOnRerun();
-            } else {
-                await executeDirectRerun();
-            }
+            await handleRerun();
             return;
         }
         if (propOnResend) {
             await propOnResend();
+            if (propLoadTree) {
+                void propLoadTree(false, true);
+            }
         } else {
             await executeDirectSend();
         }
@@ -1267,7 +1331,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                             <PromptThumbnailCard
                                 key={`img-strip-${idx}`}
                                 img={img}
-                                repoPath={selectedProject?.repo_path}
+                                repoPath={propRepoPath || selectedProject?.repo_path}
                                 onPreview={handleOpenPreview}
                                 onContextMenu={handleImageContextMenu}
                             />
@@ -1280,7 +1344,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
             {viewMode === PromptViewMode.Preview && (
                 <div className="space-y-3">
                     <div
-                        onDoubleClick={() => openInspector(selectedConversation, selectedProject?.repo_path || '')}
+                        onDoubleClick={() => openInspector(selectedConversation, propRepoPath || selectedProject?.repo_path || '')}
                         className="rounded-xl border border-slate-200 dark:border-purple-500/25 bg-slate-50 dark:bg-[#19191c] p-5 text-xs text-slate-800 dark:text-slate-100 leading-relaxed max-h-[460px] overflow-y-auto cursor-pointer hover:border-purple-400 dark:hover:border-purple-500/50 transition-colors shadow-inner"
                     >
                         <RichMarkdownRenderer
@@ -1365,10 +1429,10 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                             <button
                                 type="button"
                                 onClick={() => setEditedPromptText(activePromptText)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800/80 text-xs font-semibold transition-colors cursor-pointer"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-800 hover:bg-slate-200 dark:hover:bg-slate-800/80 text-xs font-semibold leading-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Reset to original text"
                             >
-                                <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+                                <RotateCcw className="w-3.5 h-3.5 text-slate-400 translate-y-[1px]" />
                                 <span>Reset</span>
                             </button>
                             <button
@@ -1378,10 +1442,10 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                     setActionMsg('Prompt changes saved to current session!');
                                     setTimeout(() => setActionMsg(null), 2500);
                                 }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-50 dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-slate-800 hover:bg-emerald-100 dark:hover:bg-slate-800/80 text-xs font-semibold transition-colors cursor-pointer"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-50 dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 border border-emerald-300/60 dark:border-slate-800 hover:bg-emerald-100 dark:hover:bg-slate-800/80 text-xs font-semibold leading-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                                 title="Save prompt changes"
                             >
-                                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                <Check className="w-3.5 h-3.5 text-emerald-500 translate-y-[1px]" />
                                 <span>Save Changes</span>
                             </button>
                         </div>
@@ -1395,7 +1459,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                 data-ui-name="prompt-instruction-dispatch-primary-btn"
                                 data-ui-id={`prompt-instruction-dispatch-primary-${selectedConversation.conversation_id}`}
                                 className={cn(
-                                    "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-all duration-150 ease-out active:translate-y-px cursor-pointer disabled:opacity-50 rounded-l-full",
+                                    "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold leading-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-l-full",
                                     primaryDispatchAction === 'enqueue'
                                         ? "text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
                                         : primaryDispatchAction === 'rerun'
@@ -1404,25 +1468,25 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                 )}
                                 title={
                                     primaryDispatchAction === 'enqueue'
-                                        ? "Enqueue (FIFO): Stages prompt into FIFO queue (Hotkey: Alt+Q)"
+                                        ? "Enqueue (FIFO): Stages prompt into FIFO queue behind active tasks (Hotkey: Alt+Q)"
                                         : primaryDispatchAction === 'rerun'
-                                          ? `Rerun Turn (×${rerunCount}): Enqueues previous turn into FIFO queue (Hotkey: Alt+R)`
+                                          ? "Rerun: Enqueues rerun nudge into FIFO queue (Hotkey: Alt+R)"
                                           : "Send (Preempt): Cancels active task and executes immediately (Hotkey: Alt+N)"
                                 }
                                 aria-label="Run selected dispatch mode"
                             >
                                 {primaryDispatchAction === 'enqueue' ? (
-                                    <ListPlus className={cn('w-3.5 h-3.5 shrink-0', isEnqueueingActive && 'animate-pulse')} />
+                                    <ListPlus className={cn('w-3.5 h-3.5 shrink-0 translate-y-[1px]', isEnqueueingActive && 'animate-pulse')} />
                                 ) : primaryDispatchAction === 'rerun' ? (
-                                    <Repeat className={cn('w-3.5 h-3.5 shrink-0', isRerunningActive && 'animate-spin')} />
+                                    <Repeat className={cn('w-3.5 h-3.5 shrink-0 translate-y-[1px]', isRerunningActive && 'animate-spin')} />
                                 ) : (
-                                    <Send className={cn('w-3.5 h-3.5 shrink-0', isResendingActive && 'animate-pulse')} />
+                                    <Send className={cn('w-3.5 h-3.5 shrink-0 translate-y-[1px]', isResendingActive && 'animate-pulse')} />
                                 )}
                                 <span>
                                     {primaryDispatchAction === 'enqueue'
                                         ? (isEnqueueingActive ? 'Queueing…' : 'Enqueue')
                                         : primaryDispatchAction === 'rerun'
-                                          ? (isRerunningActive ? 'Rerunning…' : `Rerun ×${rerunCount}`)
+                                          ? (isRerunningActive ? 'Rerunning…' : (rerunCount > 1 ? `Rerun ×${rerunCount}` : 'Rerun'))
                                           : (isResendingActive ? 'Sending…' : 'Send')}
                                 </span>
                             </button>
@@ -1433,11 +1497,11 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                 onClick={() => setIsDispatchMenuOpen((prev) => !prev)}
                                 data-ui-name="prompt-instruction-dispatch-options-btn"
                                 data-ui-id={`prompt-instruction-dispatch-options-${selectedConversation.conversation_id}`}
-                                className="flex items-center justify-center px-2 py-1.5 text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-xs transition-all duration-150 ease-out active:translate-y-px cursor-pointer rounded-r-full"
+                                className="flex items-center justify-center px-2 py-1.5 text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-xs leading-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer rounded-r-full"
                                 aria-label="Dispatch options & settings"
                                 title="Dispatch options & destination settings"
                             >
-                                <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isDispatchMenuOpen && "rotate-180")} />
+                                <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 translate-y-[1px] transition-transform duration-150", isDispatchMenuOpen && "rotate-180")} />
                             </button>
 
                             {/* Flyout: Unified Dispatch Configuration Popover */}
@@ -1462,7 +1526,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                                 onClick={() => setPrimaryDispatchAction('send')}
                                                 title="Send (Preempt): Cancels active task and executes immediately (Hotkey: Alt+N)"
                                                 className={cn(
-                                                    "px-2.5 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                    "px-2.5 py-0.5 rounded-md font-medium leading-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
                                                     primaryDispatchAction === 'send'
                                                         ? "bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-2xs font-semibold"
                                                         : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -1473,9 +1537,9 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                             <button
                                                 type="button"
                                                 onClick={() => setPrimaryDispatchAction('enqueue')}
-                                                title="Enqueue (FIFO): Queues prompt behind active task in IDE (Hotkey: Alt+Q)"
+                                                title="Enqueue (FIFO): Stages prompt into FIFO queue behind active tasks (Hotkey: Alt+Q)"
                                                 className={cn(
-                                                    "px-2.5 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                    "px-2.5 py-0.5 rounded-md font-medium leading-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
                                                     primaryDispatchAction === 'enqueue'
                                                         ? "bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-2xs font-semibold"
                                                         : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -1486,9 +1550,9 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                             <button
                                                 type="button"
                                                 onClick={() => setPrimaryDispatchAction('rerun')}
-                                                title="Rerun Turn: Enqueues turn N times into FIFO queue (Hotkey: Alt+R)"
+                                                title="Rerun: Enqueues rerun nudge into FIFO queue (Hotkey: Alt+R)"
                                                 className={cn(
-                                                    "px-2.5 py-0.5 rounded-md font-medium transition-colors cursor-pointer",
+                                                    "px-2.5 py-0.5 rounded-md font-medium leading-none transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
                                                     primaryDispatchAction === 'rerun'
                                                         ? "bg-white dark:bg-slate-800 text-sky-600 dark:text-sky-400 shadow-2xs font-semibold"
                                                         : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -1724,7 +1788,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                 imageSrc={contextMenu.imageSrc}
                 altText={contextMenu.altText}
                 rawPath={contextMenu.rawPath}
-                allImages={attachedImages.map((img) => resolveImageSrc(img.src, selectedProject?.repo_path))}
+                allImages={attachedImages.map((img) => resolveImageSrc(img.src, propRepoPath || selectedProject?.repo_path))}
                 onClose={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
                 onOpenPreview={handleOpenPreview}
             />

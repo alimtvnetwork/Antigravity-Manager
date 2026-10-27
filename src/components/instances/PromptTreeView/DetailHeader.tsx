@@ -5,10 +5,10 @@ import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { isTauri } from '../../../utils/env';
 import { formatRelativeRecency } from './formatters';
-import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat, Send } from 'lucide-react';
+import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat, Send, Shield } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { CopyFormat, type AgmConversationNode } from './types';
-import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, dispatchConversationId, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, extractUsedNudgesFromConversation, RERUN_MESSAGE_OPTIONS, RERUN_RANDOM_MESSAGE_SET, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
+import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, dispatchConversationId, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, extractUsedNudgesFromConversation, RERUN_RANDOM_MESSAGE_SET, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
 import { isGhostConversation } from './conversationGuards';
 import { persistClientCrash } from '../../../lib/error-listener';
 import { useErrorStore } from '../../../stores/error-store';
@@ -422,8 +422,32 @@ export function DetailHeader(props: DetailHeaderProps) {
                     }
                 }
 
+                if (selectedConversation) {
+                    selectedConversation.is_queued = true;
+                    if (result.messages && result.messages.length > 0) {
+                        const existingTurns = selectedConversation.prompts || [];
+                        const baseTurnNumber = existingTurns.length > 0
+                            ? Math.max(...existingTurns.map((t) => t.turn_number)) + 1
+                            : 1;
+                        const newTurns = result.messages.map((msg, idx) => ({
+                            turn_number: baseTurnNumber + idx,
+                            step_index: baseTurnNumber + idx - 1,
+                            prompt_text: msg,
+                            preview_200w: msg.slice(0, 200),
+                            status: 'QUEUED' as const,
+                            is_running: false,
+                            is_queued: true,
+                            timestamp: new Date().toISOString(),
+                            created_at: Date.now() + idx,
+                            media_paths: allMedia,
+                            media_thumbnails: allMedia,
+                        }));
+                        selectedConversation.prompts = [...existingTurns, ...newTurns];
+                    }
+                }
+
                 if (loadTree) {
-                    void loadTree(true, true);
+                    void loadTree(false, true);
                 }
             }
         } catch (err) {
@@ -1067,7 +1091,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                         {/* Flyout 2: Unified Dispatch Configuration Popover */}
                         {isMenuOpen && (
                             <div
-                                className="absolute right-0 top-full mt-1.5 z-50 w-[26rem] rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl p-2.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-2"
+                                className="absolute right-0 top-full mt-1.5 z-50 w-[28rem] sm:w-[30rem] max-w-[95vw] rounded-xl bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 shadow-2xl p-2.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-2"
                                 onMouseLeave={handleCloseDispatchMenu}
                             >
                                 {/* Menu Header */}
@@ -1305,15 +1329,45 @@ export function DetailHeader(props: DetailHeaderProps) {
                                             <select
                                                 value={rerunMessageOption}
                                                 onChange={(e) => setRerunMessageOption(e.target.value as RerunMessageOption)}
-                                                className="flex-1 min-w-0 px-2 py-1 rounded-lg text-xs bg-slate-100 dark:bg-purple-950/40 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-purple-500/20 focus:outline-none cursor-pointer truncate"
+                                                className="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg text-xs bg-slate-100 dark:bg-purple-950/40 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-purple-500/20 focus:outline-none focus:ring-1 focus:ring-sky-500/40 cursor-pointer truncate"
                                             >
-                                                {RERUN_MESSAGE_OPTIONS.map((opt) => (
-                                                    <option key={opt.value} value={opt.value}>
-                                                        {opt.value === 'randomized' ? '🎲 Random from set (skips used)' : opt.label}
-                                                    </option>
-                                                ))}
+                                                <optgroup label="Automated Variations" className="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">
+                                                    <option value="randomized">🎲 Random from set (skips used)</option>
+                                                </optgroup>
+                                                <optgroup label="Strict Quality & E2E Verification" className="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">
+                                                    <option value="tested-e2e">🛡️ Have you tested these below instructions with end-to-end testing?</option>
+                                                    <option value="tested-e2e-and-released">🚀 Have you tested the below instructions with end-to-end testing and released it?</option>
+                                                </optgroup>
+                                                <optgroup label="Status Check Nudges" className="bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">
+                                                    <option value="is-it-completed">Is it completed?</option>
+                                                    <option value="is-it-finished">Is it finished?</option>
+                                                    <option value="is-it-released">Is it released?</option>
+                                                    <option value="is-it-done">Is it done?</option>
+                                                    <option value="is-it-published">Is it published?</option>
+                                                    <option value="verify-and-finish">Verify and finish remaining items</option>
+                                                    <option value="check-pending-tasks">Check pending tasks and continue</option>
+                                                    <option value="run-verification">Run comprehensive verification</option>
+                                                    <option value="confirm-pushed">Confirm committed and pushed</option>
+                                                    <option value="fully-implemented-verified">Fully implemented and verified?</option>
+                                                    <option value="all-tests-passed">Did all tests pass and is everything green?</option>
+                                                    <option value="double-check-completion">Double check completion and finalize</option>
+                                                    <option value="pending-work-left">Is there any pending work left?</option>
+                                                    <option value="confirm-status-next-steps">Confirm completion status and next steps</option>
+                                                    <option value="check-pending-proceed">Check pending tasks and proceed with next</option>
+                                                    <option value="verify-build-cleanliness">Verify build cleanliness and finalize</option>
+                                                </optgroup>
                                             </select>
                                         </div>
+
+                                        {/* Quality Protocol Mode Banner when strict E2E templates are selected */}
+                                        {(rerunMessageOption === 'tested-e2e' || rerunMessageOption === 'tested-e2e-and-released') && (
+                                            <div className="mx-2 px-2.5 py-1.5 rounded-lg bg-sky-500/10 dark:bg-sky-950/30 border border-sky-500/25 flex items-center gap-2 text-[11px] text-sky-700 dark:text-sky-300">
+                                                <Shield className="w-3.5 h-3.5 text-sky-500 shrink-0" />
+                                                <span className="font-medium">
+                                                    Strict Quality Protocol Mode: AI agent will be instructed to perform rigorous end-to-end testing verification.
+                                                </span>
+                                            </div>
+                                        )}
 
                                         {/* Compact status pill for randomized mode */}
                                         {rerunMessageOption === 'randomized' && (() => {

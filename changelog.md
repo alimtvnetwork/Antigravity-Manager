@@ -1,5 +1,23 @@
 # Changelog
 
+## [v4.272.0] - 2026-10-27
+
+### Fixed
+- Sequential Enqueue Retention & Deduplication Bypass: Fixed critical bug in `src-tauri/src/modules/repo_db/prompts_crud.rs` where `save_or_requeue_prompt` matched in-flight prompts by identical content and skipped enqueueing subsequent requests with `return Ok(())`; added `&& prompt.status != "queued"` ensuring sequential enqueues of identical instructions are reliably enqueued and retained in the SQLite FIFO queue (Thanks to @aukgit)
+- Queued Turn Transcript Mutation Prevention: Resolved turn collision in `src-tauri/src/modules/repo_db/tree_node_conv.rs` where incoming queued prompts matched completed transcript turns (`p.prompt_text.trim() == ap.prompt_content.trim()`), causing transcript mutations instead of appending distinct `[QUEUED]` turns; restricted existing turn matching to `if is_ap_run && !is_queued` so queued prompts always appear as independent turns (Thanks to @aukgit)
+- Active & Queued Prompt Starvation Guard: Updated `list_all_prompts()` in `src-tauri/src/modules/repo_db/project_queries.rs` with priority-weighted ordering (`CASE WHEN status IN ('queued', 'running', 'dispatched', 'in_flight') THEN 0 ELSE 1 END ASC`), preventing queued and active prompts from being crowded out by completed rows when prompt volume exceeds 500 records (Thanks to @aukgit)
+- Enqueue Refresh Bar Suppression & 0ms Optimistic UI: Replaced full reload triggers `loadTree(true, true)` with background silent SWR `loadTree(false, true)` across `handleResendPrompt`, `handleEnqueuePrompt`, and `handleRerunConversationAction` in `src/components/instances/PromptTreeView/usePromptTreePromptActions.ts` and `DetailHeader.tsx`, eliminating unwanted top indeterminate refresh bars during enqueue; removed 60ms artificial delay; added 0ms optimistic turn injection to `executeDirectEnqueue` and header actions for instantaneous visual appearance in the tree view (Thanks to @aukgit)
+- Anti-gravity Rerun Target ID Retention: Fixed conversation targeting in `usePromptTreePromptActions.ts` where multi-round rerun operations were dropping the active conversation UUID or defaulting unexpectedly; reruns now explicitly target and preserve the specified conversation `id` and sequence immediately across all selected rounds (Thanks to @aukgit)
+- Tree View Filter Compaction & Zero-Clipping Layout: Overhauled Row 2 filter controls in `src/components/instances/PromptTreeView/TreePanel.tsx` using two contiguous segmented pill capsules (`rounded-full`), Lucide `Image` icon replacing raw OS emoji, compact text labels (`Run`, `Queue`, `Pin`), and icon toggles (`EyeOff`/`Eye`, Lucide `Archive` with count badge), reducing row width from 451px to 194px and providing a +70px safety buffer against right-hand clipping in 328px sidebars (Thanks to @aukgit)
+
+### Added
+- Tree View UI/UX Design System Specification: Authored authoritative design system specification in `02-spec/02-coding-guidelines/24-app-ui-design-system/02-tree-view-design-system.md` and indexed in `02-spec/24-app-ui-design-system/01-index.md` and `02-spec/02-coding-guidelines/24-app-ui-design-system/readme.md`, documenting 10 structural principles: 2-plane depth hierarchy, 280px minimum width floor, zero horizontal scrolling, segmented capsule pill controls, transparent borderless inline selects, icon-first compact typography, subtle non-displacing hover transitions, terminal tree branch glyphs (`├──`, `└──`), 4-tier origin badges, and 0ms optimistic turn injection (Thanks to @aukgit)
+- Strict E2E Verification Rerun Templates: Added strict verification question presets ("Have you tested these below instructions with end-to-end testing?" and "Have you tested the below instructions with end-to-end testing and released it?") into rerun quick options in `DetailHeader.tsx` (Thanks to @aukgit)
+- Automated E2E Test Suite for Rerun, Enqueue & Tree Compaction: Added 28-assertion automated test suite `scripts/test-anti-gravity-rerun-and-ui-fixes-e2e.ps1` with caller IDE self-preservation and transient test sandbox isolation, verifying 100% green pass (Thanks to @aukgit)
+- 4-Part Root Cause Analysis (RCA): Documented complete 4-part RCA and long-term invariants in `.ai-memory/rca/22-anti-gravity-rerun-and-ui-fixes.md` and `.ai-memory/issues/65-anti-gravity-rerun-and-ui-fixes.md` (Thanks to @aukgit)
+
+---
+
 ## [v4.271.0] - 2026-10-27
 
 ### Fixed
@@ -1388,6 +1406,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.272.0 (2026-10-27)**:
+        -   **Anti-gravity Rerun Target ID, Sequential Enqueue Retention, Filter Compaction & Tree Design System**:
+            -   **Description**: Resolved sequential enqueue dropping by adding status checks in `prompts_crud.rs`, prevented queued prompt transcript turn mutations in `tree_node_conv.rs`, suppressed enqueue refresh bars via silent SWR `loadTree(false, true)`, compacted Tree View Row 2 filter controls into two segmented capsules (194px layout budget, zero clipping), authored canonical Tree View UI/UX design system specification in `02-spec/02-coding-guidelines/24-app-ui-design-system/02-tree-view-design-system.md`, and added 28-assertion automated E2E test suite in `scripts/test-anti-gravity-rerun-and-ui-fixes-e2e.ps1`. (Thanks to @aukgit)
+
+
     *   **v4.271.0 (2026-10-27)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

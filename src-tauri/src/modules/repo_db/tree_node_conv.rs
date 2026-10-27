@@ -434,7 +434,7 @@ pub(crate) fn build_active_prompt_conv_nodes(
                 if is_relevant_status {
                     let is_fresh = (now - ap.updated_at) <= 600;
                     let is_alive_and_fresh = is_inst_alive && is_fresh;
-                    let is_queued = is_alive_and_fresh && is_pending_stage;
+                    let is_queued = is_pending_stage;
                     let is_ap_run = is_alive_and_fresh && is_active_stage;
 
                     let (ap_media_paths, ap_media_thumbnails) =
@@ -450,11 +450,16 @@ pub(crate) fn build_active_prompt_conv_nodes(
                             (Vec::new(), Vec::new())
                         };
 
-                    // Check if an existing turn already matches this prompt content
-                    let existing_turn = target_conv
-                        .prompts
-                        .iter_mut()
-                        .find(|p| p.prompt_text.trim() == ap.prompt_content.trim());
+                    // For active running prompts, attach to existing transcript turn if found.
+                    // For queued prompts, NEVER merge into past completed turns — each queued prompt is an independent queued action!
+                    let existing_turn = if is_ap_run && !is_queued {
+                        target_conv
+                            .prompts
+                            .iter_mut()
+                            .find(|p| p.prompt_text.trim() == ap.prompt_content.trim())
+                    } else {
+                        None
+                    };
 
                     if let Some(turn) = existing_turn {
                         if !ap_media_paths.is_empty() {
@@ -633,9 +638,7 @@ pub(crate) fn build_active_prompt_conv_nodes(
 
             const QUEUED_STATUSES: &[&str] = &["queued", "pending"];
             const RUNNING_STATUSES: &[&str] = &["running", "in_flight", "dispatched"];
-            let is_ap_queued = is_inst_alive
-                && (now - ap.updated_at <= 600)
-                && ap.status.equals_any(QUEUED_STATUSES);
+            let is_ap_queued = ap.status.equals_any(QUEUED_STATUSES);
             let max_allowed_ttl = if has_active_worker { 300 } else { 45 };
             let is_running_status = ap.status.equals_any(RUNNING_STATUSES);
             let is_within_ttl = (now - ap.updated_at) <= max_allowed_ttl;
