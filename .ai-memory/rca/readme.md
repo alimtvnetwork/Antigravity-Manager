@@ -33,6 +33,7 @@ function signature, or re-running a failed pipeline.
 | [18-telegram-project-listing-and-node-cache.md](./18-telegram-project-listing-and-node-cache.md) | `/send` step 3 showed `Node-*` and `project · conv-id`, oldest eight, numbers did nothing | picker printed `session_id` from FIFO `list_all_prompts` and stuffed the id into `callback_data`; no title lookup and no node-name cache |
 | [19-fleet-switch-audit-ssh-and-prompt-tree.md](./19-fleet-switch-audit-ssh-and-prompt-tree.md) | Fleet table stays empty after SSH works; switch dialog, audit, prompt tree, and rename get mixed together | fleet rows come from Supabase heartbeats, not `ssh_nodes.json`; Test Connection is not `send_remote_ssh_prompt`; there is no IDE conversation rename |
 | [20-dispatch-menu-hover-clipped.md](./20-dispatch-menu-hover-clipped.md) | Destination hover reads `Destination conversation mo` and runs off the window | the Send menu is `absolute right-0` and the browser `title` tooltip opens to the right of the cursor |
+| [21-switch-restore-gate-parameter-mismatch-and-in-progress-status.md](./21-switch-restore-gate-parameter-mismatch-and-in-progress-status.md) | Running prompts not restored after account switch across 50+ iterations | `switch.rs:676` passed `target_inst_id` into `list_prompt_backups` expecting `batch_id`, always returning 0 rows; `'in_progress'` status omitted in queue queries |
 
 ## Standing notes
 

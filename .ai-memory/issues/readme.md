@@ -2,6 +2,9 @@
 
 This directory contains active issue tracking and bug reports.
 
+## Fixed in v4.271.0
+- [64-switch-restore-gate-parameter-mismatch-and-status-disconnect-rca.md](./64-switch-restore-gate-parameter-mismatch-and-status-disconnect-rca.md) (solved in `c36538824`: `switch.rs:676` passed `target_inst_id` into `list_prompt_backups` expecting `batch_id`; `'in_progress'` status omitted in queue dispatch; FIFO `pick_first_queued_prompt` enforced; reactive `notify_prompt_queue()` signal wired; unit test suites added)
+
 ## Fixed in v4.209.0
 - [../rca/17-instance-pid-stop-switch-and-audit-trail.md](../rca/17-instance-pid-stop-switch-and-audit-trail.md) (solved in `52aaf4cb`: the bare number is the PID; stop returned success after dropping that PID; the audit dialog read `recent_switches` while the query returned `records`)
 
