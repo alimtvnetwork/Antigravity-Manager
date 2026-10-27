@@ -157,13 +157,32 @@ export function rewritePromptForIpcDispatch(promptText: string): PromptRewriteRe
  * Extracts embedded image URLs/data URIs and referenced file paths from prompt text.
  * Fixed regex ensures match[2] (the actual URL or data URI) is captured rather than match[1] (alt text).
  */
+export const IMAGE_EXTENSIONS_PATTERN = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif|jfif|tiff?)$/i;
+
+/**
+ * Checks if a URI or path is likely an image attachment.
+ * Accepts:
+ *  - Inline data URIs (data:image/...)
+ *  - Blob URIs (blob:...)
+ *  - Files with recognized image extensions (.png, .jpg, .webp, .svg, .gif, .bmp, .ico, .avif, .jfif, .tiff)
+ *  - Gemini uploaded media files (.user_uploaded)
+ */
+export function isLikelyImageUri(uri: string): boolean {
+    if (!uri || !uri.trim()) return false;
+    const clean = uri.trim();
+    if (clean.startsWith('data:image/')) return true;
+    if (clean.startsWith('blob:')) return true;
+    const withoutQuery = clean.split(/[?#]/)[0];
+    return IMAGE_EXTENSIONS_PATTERN.test(withoutQuery) || withoutQuery.includes('.user_uploaded');
+}
+
 export function extractAssets(text: string): { images: string[]; files: string[] } {
     const images: string[] = [];
     const files: string[] = [];
     const seenImages = new Set<string>();
     const seenFiles = new Set<string>();
 
-    const imgRegex = /!\[(.*?)\]\((https?:\/\/.*?|data:image\/[^;]+;base64,[A-Za-z0-9+/=]+|[^\s)]+?\.(?:png|jpe?g|gif|webp|svg))\)/gi;
+    const imgRegex = /!\[(.*?)\]\((https?:\/\/.*?|data:image\/[^;]+;base64,[A-Za-z0-9+/=]+|[^\s)]+?\.(?:png|jpe?g|gif|webp|svg|bmp|ico|avif|jfif|tiff?))\)/gi;
     let match: RegExpExecArray | null;
     while ((match = imgRegex.exec(text)) !== null) {
         if (match[2]) {
@@ -184,7 +203,7 @@ export function extractAssets(text: string): { images: string[]; files: string[]
             if (/^file;\s*/i.test(raw)) {
                 raw = raw.replace(/^file;\s*/i, '');
             }
-            const isImg = Boolean(raw.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i));
+            const isImg = isLikelyImageUri(raw);
             const key = (extractLocalPathFromUri(raw) || raw).replace(/\\/g, '/').toLowerCase();
             if (isImg) {
                 if (!seenImages.has(key)) {
@@ -202,7 +221,7 @@ export function extractAssets(text: string): { images: string[]; files: string[]
     let fileMatch: RegExpExecArray | null;
     while ((fileMatch = fileRegex.exec(text)) !== null) {
         const raw = fileMatch[0].trim();
-        const isImg = Boolean(raw.match(/\.(png|jpg|jpeg|gif|webp|svg)$/i));
+        const isImg = isLikelyImageUri(raw);
         const key = (extractLocalPathFromUri(raw) || raw).replace(/\\/g, '/').toLowerCase();
 
         if (isImg) {

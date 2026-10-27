@@ -350,28 +350,70 @@ pub async fn read_image_as_base64(path: String) -> Result<String, String> {
     if is_sensitive_path(&resolved) || is_os_protected_path(&resolved) {
         return Err("security_denied: sensitive path".to_string());
     }
-    let ext = resolved
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase();
-    let mime = match ext.as_str() {
-        "png" => "image/png",
-        "jpg" | "jpeg" => "image/jpeg",
-        "webp" => "image/webp",
-        "gif" => "image/gif",
-        "svg" => "image/svg+xml",
-        _ => return Err(format!("unsupported_image_extension: .{}", ext)),
-    };
     let metadata =
         std::fs::metadata(&resolved).map_err(|e| format!("failed_to_read_metadata: {}", e))?;
     if !metadata.is_file() {
-        return Err("invalid_path: expected a regular file".to_string());
+        return Err(format!(
+            "invalid_path: expected a regular file, found non-file at {}",
+            resolved.display()
+        ));
     }
     if metadata.len() > 100 * 1024 * 1024 {
         return Err("file_too_large: image exceeds 100MB limit".to_string());
     }
     let bytes = std::fs::read(&resolved).map_err(|e| format!("failed_to_read_file: {}", e))?;
+    let ext = resolved
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let mime: &str = match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" | "jfif" => "image/jpeg",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        "bmp" => "image/bmp",
+        "ico" => "image/x-icon",
+        "avif" => "image/avif",
+        "tiff" | "tif" => "image/tiff",
+        _ => {
+            // Sniff magic bytes if extension is missing, unknown, or generic
+            if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+                "image/png"
+            } else if bytes.len() >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF {
+                "image/jpeg"
+            } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+                "image/gif"
+            } else if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+                "image/webp"
+            } else if bytes.starts_with(b"BM") {
+                "image/bmp"
+            } else if bytes.len() >= 4
+                && bytes[0] == 0x00
+                && bytes[1] == 0x00
+                && bytes[2] == 0x01
+                && bytes[3] == 0x00
+            {
+                "image/x-icon"
+            } else if bytes.len() >= 12
+                && (&bytes[4..12] == b"ftypavif" || &bytes[4..12] == b"ftypavis")
+            {
+                "image/avif"
+            } else if let Ok(s) = std::str::from_utf8(&bytes[..bytes.len().min(512)]) {
+                let trimmed = s.trim_start();
+                if trimmed.starts_with("<svg")
+                    || (trimmed.starts_with("<?xml") && trimmed.contains("<svg"))
+                {
+                    "image/svg+xml"
+                } else {
+                    return Err(format!("unsupported_image_extension: .{}", ext));
+                }
+            } else {
+                return Err(format!("unsupported_image_extension: .{}", ext));
+            }
+        }
+    };
     use base64::Engine;
     let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
     Ok(format!("data:{};base64,{}", mime, b64))
@@ -574,6 +616,49 @@ mod prompt_backup_path_tests {
         assert!(res.is_ok());
         let uri = res.unwrap();
         assert!(uri.starts_with("data:image/png;base64,"));
+    }
+
+    #[tokio::test]
+    async fn read_image_as_base64_rejects_directory_with_clear_error() {
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let res = super::read_image_as_base64(manifest_dir.to_string_lossy().to_string()).await;
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert!(
+            err.contains("expected a regular file"),
+            "Expected regular file error, got: {}",
+            err
+        );
+    }
+
+    #[tokio::test]
+    async fn read_image_as_base64_sniffs_extensionless_png() {
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let target_dir = manifest_dir.join("target");
+        let _ = std::fs::create_dir_all(&target_dir); // Justification: best-effort test setup
+        let test_no_ext = target_dir.join("test_magic_sniff_no_ext");
+        let png_bytes = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        std::fs::write(&test_no_ext, &png_bytes).expect("write test png no ext");
+        let res = super::read_image_as_base64(test_no_ext.to_string_lossy().to_string()).await;
+        let _ = std::fs::remove_file(&test_no_ext); // Justification: best-effort test cleanup
+        assert!(res.is_ok());
+        let uri = res.unwrap();
+        assert!(uri.starts_with("data:image/png;base64,"));
+    }
+
+    #[tokio::test]
+    async fn read_image_as_base64_rejects_extensionless_text_file() {
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let target_dir = manifest_dir.join("target");
+        let _ = std::fs::create_dir_all(&target_dir); // Justification: best-effort test setup
+        let test_no_ext = target_dir.join("test_plain_text_no_ext");
+        let txt_bytes = b"Hello plain text file without image header";
+        std::fs::write(&test_no_ext, txt_bytes).expect("write test txt no ext");
+        let res = super::read_image_as_base64(test_no_ext.to_string_lossy().to_string()).await;
+        let _ = std::fs::remove_file(&test_no_ext); // Justification: best-effort test cleanup
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert!(err.contains("unsupported_image_extension: ."));
     }
 
     #[test]
