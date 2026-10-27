@@ -7,7 +7,8 @@ export type PromptOriginTier =
   | 'USER_PROMPT'
   | 'SUBAGENT_INSTRUCTION'
   | 'SYSTEM_MESSAGE'
-  | 'TOOL_OUTPUT';
+  | 'TOOL_OUTPUT'
+  | 'WARMUP_PROBE';
 
 export interface TierStyleTokens {
   badgeBg: string;
@@ -53,6 +54,14 @@ export function getPromptOriginTokens(origin: PromptOriginTier | string): TierSt
         textColor: 'text-amber-300 dark:text-amber-200',
         dotColor: 'bg-amber-400',
         displayName: 'Tool Output',
+      };
+    case 'WARMUP_PROBE':
+      return {
+        badgeBg: 'bg-orange-500/15 dark:bg-orange-950/40',
+        borderColor: 'border-orange-500/30 dark:border-orange-800/60',
+        textColor: 'text-orange-400 dark:text-orange-300',
+        dotColor: 'bg-orange-400',
+        displayName: 'Warmup Probe',
       };
     default:
       return {

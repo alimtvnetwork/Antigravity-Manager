@@ -2,7 +2,7 @@
 
 **Subtask ID:** `232-01`  
 **Parent Task:** `232-warm-up-ui-and-emailing-ui-improvements`  
-**Status:** `PENDING`  
+**Status:** `IN_PROGRESS` (Cluster 1: Improvements 01–10 IMPLEMENTED; Cluster 2: Improvements 11–20 PENDING)  
 **Improvements Covered:** Improvements 01–20 (Clusters 1 & 2)  
 **Target Specs:**  
 - `02-spec/21-app/232-warm-up-ui-and-emailing-ui-improvements/01-architecture-spec.md`  

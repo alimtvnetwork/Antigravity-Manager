@@ -1,11 +1,12 @@
 import React from 'react';
-import { User, Bot, Terminal, Wrench } from 'lucide-react';
+import { User, Bot, Terminal, Wrench, Flame } from 'lucide-react';
 
 export type PromptOriginTier =
   | 'USER_PROMPT'
   | 'SUBAGENT_INSTRUCTION'
   | 'SYSTEM_MESSAGE'
-  | 'TOOL_OUTPUT';
+  | 'TOOL_OUTPUT'
+  | 'WARMUP_PROBE';
 
 interface OriginTierBadgePillProps {
   origin: PromptOriginTier | string;
@@ -41,6 +42,11 @@ export const OriginTierBadgePill: React.FC<OriginTierBadgePillProps> = ({
       label = 'Tool';
       badgeStyle = 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/70 dark:text-amber-300 dark:border-amber-600/50 shadow-xs shadow-amber-900/20';
       icon = <Wrench className="w-3 h-3 text-amber-600 dark:text-amber-400" />;
+      break;
+    case 'WARMUP_PROBE':
+      label = 'Warmup';
+      badgeStyle = 'bg-orange-500/15 text-orange-400 border border-orange-500/30 shadow-[0_0_8px_rgba(249,115,22,0.15)] dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-800/60';
+      icon = <Flame className="w-3 h-3 text-orange-500 dark:text-orange-400" />;
       break;
     case 'SYSTEM_MESSAGE':
     default:
