@@ -24,8 +24,14 @@ export interface InstancePageApi {
     projectTreeNodes: AgmProjectTreeNode[];
     daemonStatus: AutoSwitcherDaemonStatus | null;
     daemonCountdown: number;
-    // Post-switch prompt resume indicator (set on `prompts://restored`, auto-clears).
-    resumeIndicator: { instanceId: string; restoredCount: number; at: number } | null;
+    // Post-switch prompt resume indicator (set on `prompts://restored` or `prompts://resume-scheduled`, auto-clears).
+    resumeIndicator: {
+        instanceId: string;
+        restoredCount: number;
+        at: number;
+        status?: 'scheduled' | 'restoring' | 'restored';
+        secondsLeft?: number;
+    } | null;
     actionError: string | null;
     setActionError: (v: string | null) => void;
     actionState: Record<string, InstanceActionType>;

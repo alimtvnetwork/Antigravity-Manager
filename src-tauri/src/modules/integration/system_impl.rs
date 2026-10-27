@@ -93,17 +93,27 @@ impl SystemIntegration for DesktopIntegration {
             crate::modules::repo_db::backup_running_prompts("default"),
             "back up running prompts before account switch",
         );
-        // Justification: prompt backup is best-effort; the switch proceeds and the reinject decision below is recomputed from the actual backed-up count
-        crate::error::record_ignored(
+        let backup_prompts_res =
             crate::modules::backup_prompts_db::backup_active_running_prompts_for_instance(
                 Some("default"),
                 None,
-            ),
+            );
+        let backed_up_prompts_count = match &backup_prompts_res {
+            Ok((_info, recs)) => recs.len(),
+            Err(_) => 0,
+        };
+        // Justification: prompt backup is best-effort; the switch proceeds and the reinject decision below is recomputed from the actual backed-up count
+        crate::error::record_ignored(
+            backup_prompts_res.map(|_| ()),
             "back up active running prompts before account switch",
         );
-        let needs_reinject = crate::modules::repo_db::needs_prompt_channel_wait(
-            crate::modules::repo_db::count_backed_up_prompts("default"),
-        );
+        let needs_reinject = crate::modules::repo_db::count_backed_up_prompts("default") > 0
+            || backed_up_prompts_count > 0
+            || crate::modules::backup_prompts_db::count_unrestored_prompts_for_instance(Some(
+                "default",
+            ))
+            .unwrap_or(0)
+                > 0;
 
         // =========================================================================
         // STEP 2: Close the Antigravity IDE
@@ -274,11 +284,20 @@ impl SystemIntegration for DesktopIntegration {
         }
 
         // =========================================================================
-        // STEP 5: Re-Inject the Backed-Up Running Prompts (Asynchronous 5-Second Post-Launch Restoration)
+        // STEP 5: Re-Inject the Backed-Up Running Prompts (Asynchronous Post-Launch Restoration)
         // =========================================================================
+        let needs_reinject = needs_reinject
+            || crate::modules::repo_db::count_backed_up_prompts("default") > 0
+            || backed_up_prompts_count > 0
+            || crate::modules::backup_prompts_db::count_unrestored_prompts_for_instance(Some(
+                "default",
+            ))
+            .unwrap_or(0)
+                > 0;
+
         if needs_reinject {
             crate::modules::logger::log_info(
-                "[Desktop] [Step 5/5] Scheduling 5s post-launch prompt restore for instance default",
+                "[Desktop] [Step 5/5] Scheduling post-launch prompt restore for instance default",
             );
             crate::modules::instance::schedule_prompt_restore_after_launch("default".to_string());
             note_prompt_reinjected(true);

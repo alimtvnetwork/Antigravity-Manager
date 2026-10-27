@@ -187,4 +187,131 @@ pub(crate) mod tests {
             "remove scratch db",
         );
     }
+
+    #[test]
+    pub(crate) fn test_has_unrestored_backups_for_target_instance() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "agm_test_unrestored_backups_{}",
+            Uuid::new_v4().simple()
+        ));
+        let db_path = temp_dir.join("test-unrestored.db");
+        let custom_file = db_path.to_str().unwrap();
+
+        let conn = connect_backup_db(Some(custom_file)).unwrap();
+        let now = Utc::now().timestamp();
+
+        conn.execute(
+            "INSERT INTO backup_batches (id, created_at, prompts_count, file_path, retention_days, is_fully_restored)
+             VALUES ('b-unrestored', ?1, 2, ?2, 1, 0)",
+            params![now, custom_file],
+        )
+        .unwrap();
+
+        // Target instance backup
+        conn.execute(
+            "INSERT INTO prompt_backups (id, backup_batch_id, prompt_id, project_name, project_path, project_id, conversation_id, sequence_id, prompt_text, created_at, is_restored, instance_id)
+             VALUES ('p-target', 'b-unrestored', 'prompt_target', 'target-proj', '/path/target', 'proj-target', 'conv-1', 1, 'Target task', ?1, 0, 'target_inst')",
+            params![now],
+        )
+        .unwrap();
+
+        // Other instance backup
+        conn.execute(
+            "INSERT INTO prompt_backups (id, backup_batch_id, prompt_id, project_name, project_path, project_id, conversation_id, sequence_id, prompt_text, created_at, is_restored, instance_id)
+             VALUES ('p-other', 'b-unrestored', 'prompt_other', 'other-proj', '/path/other', 'proj-other', 'conv-2', 1, 'Other task', ?1, 0, 'other_inst')",
+            params![now],
+        )
+        .unwrap();
+
+        // 1. Target instance has 1 unrestored prompt
+        let target_count =
+            count_unrestored_prompts_for_instance_with_file(Some("target_inst"), Some(custom_file))
+                .unwrap();
+        assert_eq!(
+            target_count, 1,
+            "target instance should have exactly 1 unrestored prompt"
+        );
+
+        // 2. Unmatched instance has 0 unrestored prompts
+        let unmatched_count = count_unrestored_prompts_for_instance_with_file(
+            Some("nonexistent_inst"),
+            Some(custom_file),
+        )
+        .unwrap();
+        assert_eq!(
+            unmatched_count, 0,
+            "nonexistent instance should have 0 unrestored prompts"
+        );
+
+        // 3. Unscoped (None) sees all 2 unrestored prompts
+        let total_count =
+            count_unrestored_prompts_for_instance_with_file(None, Some(custom_file)).unwrap();
+        assert_eq!(
+            total_count, 2,
+            "unscoped probe should see all unrestored prompts"
+        );
+
+        // 4. Mark target prompt as restored
+        conn.execute(
+            "UPDATE prompt_backups SET is_restored = 1, restored_at = ?1 WHERE id = 'p-target'",
+            params![now],
+        )
+        .unwrap();
+
+        let target_count_after =
+            count_unrestored_prompts_for_instance_with_file(Some("target_inst"), Some(custom_file))
+                .unwrap();
+        assert_eq!(
+            target_count_after, 0,
+            "target instance should have 0 unrestored prompts after restore"
+        );
+
+        // Justification: best-effort cleanup; a leftover directory is harmless
+        crate::error::record_ignored(fs::remove_dir_all(temp_dir), "remove_dir_all");
+    }
+
+    #[test]
+    pub(crate) fn test_prompt_status_after_restore_discoverability() {
+        let status_matrix = [
+            ("running", "in_progress"),
+            ("in_progress", "in_progress"),
+            ("queued", "queued"),
+            ("dispatched", "pending"),
+            ("backed_up", "pending"),
+            ("interrupted", "pending"),
+            ("failed", "pending"),
+            ("pending", "pending"),
+            ("", "pending"),
+            ("unknown_custom_state", "pending"),
+        ];
+
+        let valid_discoverable_statuses = ["in_progress", "queued", "pending"];
+
+        for (input_status, expected_restored_status) in status_matrix {
+            let output_status = prompt_status_after_restore(input_status);
+
+            // Assert exact expected status
+            assert_eq!(
+                output_status, expected_restored_status,
+                "input status '{}' must map to '{}'",
+                input_status, expected_restored_status
+            );
+
+            // Assert output is non-empty
+            assert!(
+                !output_status.is_empty(),
+                "restored status for input '{}' must not be empty",
+                input_status
+            );
+
+            // Assert output is always in the discoverable set recognized by resend/scheduler
+            assert!(
+                valid_discoverable_statuses.contains(&output_status),
+                "restored status '{}' for input '{}' must be one of {:?}",
+                output_status,
+                input_status,
+                valid_discoverable_statuses
+            );
+        }
+    }
 }

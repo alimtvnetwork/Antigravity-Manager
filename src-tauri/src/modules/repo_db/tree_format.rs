@@ -113,7 +113,7 @@ pub fn list_running_prompts_for_instance(instance_id: &str) -> Result<Vec<Active
          FROM active_prompts
          WHERE (instance_id = ?1 OR (instance_id = '__default__' AND ?1 = 'default'))
            AND status IN ('running', 'in_flight', 'dispatched')
-         ORDER BY updated_at DESC"
+         ORDER BY created_at ASC, id ASC"
     ).map_err(|e| e.to_string())?;
 
     let rows = stmt

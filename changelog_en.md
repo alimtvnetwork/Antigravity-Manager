@@ -3,6 +3,20 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.271.0 (2026-10-27)**:
+        -   **[Post-Switch Prompt Restore Integrity] Fix switch restore gate parameter mismatch & dual-store count scoping (Thanks to @aukgit)**:
+            -   **Description**: Resolved critical parameter mismatch in `src-tauri/src/modules/instance/switch.rs` where `list_prompt_backups` queried `WHERE backup_batch_id = ?` with an instance ID, always returning 0 rows and bypassing restore; replaced with direct scoped count queries via `count_unrestored_prompts_for_instance`. (Thanks to @aukgit)
+        -   **[Status Alignment & Dispatch Queue Integration] Rehydrated 'in_progress' status discoverability & reactive wakeup (Thanks to @aukgit)**:
+            -   **Description**: Added `'in_progress'` to `resend_single_pass` SQL query, deduplication bypass, and queue dispatch filters in `src-tauri/src/modules/repo_db/resend.rs` and `queue.rs`; wired reactive `notify_prompt_queue()` signals and dispatch probes in `workspace.rs` and `post_switch_resume.rs`, eliminating 30-second idle delays. (Thanks to @aukgit)
+        -   **[Strict FIFO Ordering Enforcement] Elimination of LIFO inversion in candidate dispatch (Thanks to @aukgit)**:
+            -   **Description**: Refactored candidate prompt selection in `src-tauri/src/modules/repo_db/dispatch.rs` from LIFO `max_by(updated_at)` to strict FIFO `pick_first_queued_prompt` (`min_by` on `created_at ASC, id ASC`), and updated `tree_format.rs` to enforce `ORDER BY created_at ASC, id ASC`. (Thanks to @aukgit)
+        -   **[Default Instance Backup Count & Manual Switch Preservation] Empty string & NULL instance matching (Thanks to @aukgit)**:
+            -   **Description**: Updated `count_backed_up_prompts` in `src-tauri/src/modules/repo_db/backup.rs` to include empty string `''` and `NULL` instance IDs for default profile, and updated `DesktopIntegration::on_account_switch` in `system_impl.rs` to capture backup return counts so manual switches never skip restore. (Thanks to @aukgit)
+        -   **[Subagent Filter Cleanse & Telegram Sub-2s Response Latency] Elimination of false positives & reactive polling wakeup (Thanks to @aukgit)**:
+            -   **Description**: Removed `lower.starts_with("you are ")` in `discovery.rs` to prevent dropping legitimate user instructions; replaced Telegram 60s/30s polling sleep traps with `tokio::sync::Notify`, introduced pooled `TELEGRAM_HTTP_CLIENT`, and added `delete_telegram_webhook` auto-healing. (Thanks to @aukgit)
+        -   **[E2E Automated Unit Tests & Frontend Countdown Visibility] Comprehensive test suites & interactive UI badge (Thanks to @aukgit)**:
+            -   **Description**: Added 4 automated unit test suites in `backup_prompts_db/tests.rs` and `repo_db/tests.rs` covering dual-store count scoping, status discoverability, and FIFO queue ordering; added interactive settling countdown badge in `InstanceCardHeader.tsx` and `useInstancePage.ts`. (Thanks to @aukgit)
+
     *   **v4.270.0 (2026-10-27)**:
         -   **[Strict E2E & Pre-Deployment Prompts] Mandatory testing and release verification questions (Thanks to @aukgit)**:
             -   **Description**: Injected mandatory verification questions ("Have you tested these below instructions with end-to-end testing?" and "Have you tested the below instructions with end-to-end testing and released it?") into verification templates, suffix presets, and rerun message sets so dispatched AI agents cannot skip testing and release validation. (Thanks to @aukgit)

@@ -386,17 +386,14 @@ fn prompt_matches_target(
     is_match
 }
 
-/// Pick the single most recently active prompt: greatest `updated_at`, ties
-/// broken by greatest `created_at`, then greatest `id`. Candidates arrive in
-/// FIFO order; this is a one-row selection, not a queue reordering — the FIFO
-/// dispatch invariant for the backlog is unchanged.
-fn pick_latest_prompt(prompts: &[ActivePrompt]) -> Option<ActivePrompt> {
+/// Pick the earliest enqueued prompt in strict FIFO order: smallest `created_at`,
+/// ties broken deterministically by smallest `id`.
+fn pick_first_queued_prompt(prompts: &[ActivePrompt]) -> Option<ActivePrompt> {
     prompts
         .iter()
-        .max_by(|a, b| {
-            a.updated_at
-                .cmp(&b.updated_at)
-                .then_with(|| a.created_at.cmp(&b.created_at))
+        .min_by(|a, b| {
+            a.created_at
+                .cmp(&b.created_at)
                 .then_with(|| a.id.cmp(&b.id))
         })
         .cloned()
@@ -582,7 +579,7 @@ pub fn dispatch_single_latest_prompt(instance_id: &str) -> Result<usize, String>
         })
         .collect();
 
-    let Some(prompt) = pick_latest_prompt(&candidates) else {
+    let Some(prompt) = pick_first_queued_prompt(&candidates) else {
         crate::modules::logger::log_info(&format!(
             "[RepoDB] Single-prompt resume: no backed-up prompt for instance '{}'; nothing to dispatch",
             target_inst
@@ -795,25 +792,25 @@ mod tests {
     }
 
     #[test]
-    fn pick_latest_prompt_returns_none_for_empty() {
-        assert!(pick_latest_prompt(&[]).is_none());
+    fn pick_first_queued_prompt_returns_none_for_empty() {
+        assert!(pick_first_queued_prompt(&[]).is_none());
     }
 
     #[test]
-    fn pick_latest_prompt_selects_most_recently_active() {
+    fn pick_first_queued_prompt_selects_earliest_created() {
         let prompts = vec![
             make_prompt("old-active", 100, 500),
             make_prompt("newest", 50, 900),
             make_prompt("mid", 300, 700),
         ];
-        let picked = pick_latest_prompt(&prompts).expect("candidate");
+        let picked = pick_first_queued_prompt(&prompts).expect("candidate");
         assert_eq!(picked.id, "newest");
     }
 
     #[test]
-    fn pick_latest_prompt_breaks_ties_by_creation_then_id() {
-        let prompts = vec![make_prompt("a", 100, 900), make_prompt("b", 200, 900)];
-        let picked = pick_latest_prompt(&prompts).expect("candidate");
-        assert_eq!(picked.id, "b");
+    fn pick_first_queued_prompt_breaks_ties_by_creation_then_id() {
+        let prompts = vec![make_prompt("a", 100, 900), make_prompt("b", 100, 700)];
+        let picked = pick_first_queued_prompt(&prompts).expect("candidate");
+        assert_eq!(picked.id, "a");
     }
 }

@@ -40,7 +40,7 @@ pub fn count_enqueued_prompts(target_instance: Option<&str>) -> usize {
         let count: usize = conn
             .query_row(
                 "SELECT COUNT(*) FROM active_prompts 
-                 WHERE status IN ('backed_up', 'queued', 'pending')
+                 WHERE status IN ('backed_up', 'queued', 'pending', 'in_progress')
                    AND (?1 = 'all' OR instance_id = ?1 OR (?1 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))",
                 rusqlite::params![norm_target],
                 |r| r.get(0),
@@ -50,7 +50,7 @@ pub fn count_enqueued_prompts(target_instance: Option<&str>) -> usize {
     } else {
         let count: usize = conn
             .query_row(
-                "SELECT COUNT(*) FROM active_prompts WHERE status IN ('backed_up', 'queued', 'pending')",
+                "SELECT COUNT(*) FROM active_prompts WHERE status IN ('backed_up', 'queued', 'pending', 'in_progress')",
                 [],
                 |r| r.get(0),
             )
@@ -71,7 +71,7 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
     let mut stmt = conn
         .prepare(
             "SELECT DISTINCT project_id, instance_id, repo_path FROM active_prompts 
-             WHERE status IN ('backed_up', 'queued', 'pending')
+             WHERE status IN ('backed_up', 'queued', 'pending', 'in_progress')
              ORDER BY created_at ASC, id ASC",
         )
         .map_err(|e| format!("Failed to query candidate enqueued projects: {}", e))?;
@@ -151,7 +151,7 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
                  FROM active_prompts
                  WHERE (project_id = ?1 OR repo_path = ?2)
                    AND (instance_id = ?3 OR (?3 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))
-                   AND status IN ('queued', 'pending')
+                   AND status IN ('queued', 'pending', 'in_progress')
                  ORDER BY created_at ASC, id ASC
                  LIMIT 1",
                 params![&project_id, &repo_path, &inst_id],
@@ -458,7 +458,7 @@ mod tests {
         let mut stmt = conn
             .prepare(
                 "SELECT id FROM active_prompts 
-                 WHERE status IN ('backed_up', 'queued', 'pending')
+                 WHERE status IN ('backed_up', 'queued', 'pending', 'in_progress')
                  ORDER BY created_at ASC, id ASC",
             )
             .unwrap();

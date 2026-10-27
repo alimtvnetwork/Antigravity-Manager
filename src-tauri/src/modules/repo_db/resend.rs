@@ -74,7 +74,7 @@ fn resend_single_pass(
         .prepare(
             "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
              FROM active_prompts 
-             WHERE status IN ('backed_up', 'queued', 'pending', 'running')
+             WHERE status IN ('backed_up', 'queued', 'pending', 'running', 'in_progress')
              ORDER BY created_at ASC, id ASC LIMIT ?",
         )
         .map_err(|e| format!("Failed to prepare resend query: {}", e))?;
@@ -177,7 +177,7 @@ fn resend_single_pass(
 
         let sig = format!("{}:{}", prompt.repo_path, prompt.prompt_content.trim());
         let already_dispatched = match prompt.status.as_str() {
-            "backed_up" | "running" | "pending" | "queued" => false,
+            "backed_up" | "running" | "pending" | "queued" | "in_progress" => false,
             _ => {
                 let mut cache = match get_dispatched_prompts_cache().lock() {
                     Ok(guard) => guard,

@@ -2,6 +2,7 @@ import { copyToClipboard } from '../../utils/clipboard';
 import { useState } from 'react';
 import { Search, Plus, Play, RotateCw, Laptop, AlertCircle, Terminal, ChevronDown, ChevronRight, Copy, Check, X } from 'lucide-react';
 import type { InstancePageApi } from './instancePageTypes';
+import { forceDispatchPendingResume } from '../../services/instanceService';
 
 export function InstancesFilterBar({ api }: { api: InstancePageApi }) {
     const { t, searchQuery, setSearchQuery, setNewInstanceName, setIsCreateOpen } = api;
@@ -50,10 +51,41 @@ export function InstancesFilterBar({ api }: { api: InstancePageApi }) {
 }
 
 export function InstancesAlerts({ api }: { api: InstancePageApi }) {
-    const { t, storeError, actionError, setActionError, fetchInstances } = api;
+    const { t, storeError, actionError, setActionError, fetchInstances, resumeIndicator } = api;
+
+    const isSettling =
+        resumeIndicator &&
+        (resumeIndicator.status === 'scheduled' ||
+            (resumeIndicator.secondsLeft !== undefined && resumeIndicator.secondsLeft > 0));
+
+    const handleForceDispatch = async () => {
+        if (!resumeIndicator?.instanceId) return;
+        await forceDispatchPendingResume(resumeIndicator.instanceId);
+    };
 
     return (
         <>
+            {isSettling ? (
+                <div className="p-3.5 rounded-[5px] bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs flex items-center justify-between shadow-xs">
+                    <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.6)] animate-ping shrink-0" />
+                        <span className="font-medium">
+                            {t(
+                                'instances.settling_banner',
+                                `Post-switch settling delay active: Restoring prompts in ${resumeIndicator.secondsLeft ?? 10}s for instance '${resumeIndicator.instanceId}'...`
+                            )}
+                        </span>
+                    </div>
+                    <button
+                        onClick={handleForceDispatch}
+                        className="btn btn-xs rounded-full bg-amber-600 hover:bg-amber-700 text-white border-none gap-1 font-semibold px-3 shadow-xs transition-colors cursor-pointer"
+                        title="Bypass 10s settling delay and restore prompts immediately"
+                    >
+                        <Play className="w-3 h-3 fill-current" />
+                        <span>{t('instances.force_restore', 'Force Dispatch Now')}</span>
+                    </button>
+                </div>
+            ) : null}
             {storeError ? (
                 <div className="p-3.5 rounded-[5px] bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
                     <div className="flex items-center gap-2">

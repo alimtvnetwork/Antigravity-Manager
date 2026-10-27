@@ -25,6 +25,7 @@ import { useInstanceCardData } from './instanceCardData';
 import type { InstancePageApi } from './instancePageTypes';
 import { InstanceCardProjects } from './InstanceCardProjects';
 import { InstanceCardActions } from './InstanceCardActions';
+import { ResumeIndicatorBadge } from '../../components/instances/InstanceCard/InstanceCardHeader';
 
 interface InstanceCardQuotaSectionProps {
     geminiModel: any;
@@ -131,6 +132,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
         openPromptTree,
         handleDelete,
         refreshQuota,
+        resumeIndicator,
     } = api;
 
     const [isEmailRevealed, setIsEmailRevealed] = useState(false);
@@ -201,6 +203,11 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                             >
                                 {inst.config.name}
                             </h3>
+                            <ResumeIndicatorBadge
+                                instanceId={inst.config.id}
+                                resumeIndicator={resumeIndicator}
+                                className="shrink-0"
+                            />
                             {hasActiveTask && (
                                 <button
                                     type="button"

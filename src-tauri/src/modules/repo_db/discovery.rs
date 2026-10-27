@@ -53,7 +53,7 @@ pub(crate) fn read_conversation_summary_rows(conn: &Connection) -> Vec<Conversat
         Ok(ConversationSummaryRow {
             cid: row.get(0)?,
             preview: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
-            status: String::new(),
+            status: "RUNNING".to_string(),
             not_fully_idle: 1,
             workspace_uris: row.get(2)?,
             last_modified_time: None,
@@ -76,9 +76,7 @@ fn is_subagent_or_system_content(content: &str) -> bool {
         return true;
     }
     let lower = trimmed.to_lowercase();
-    lower.contains("subagent")
-        || lower.contains("invoked by a caller agent")
-        || lower.starts_with("you are ")
+    lower.contains("subagent") || lower.contains("invoked by a caller agent")
 }
 
 fn read_step_from_full_transcript(path: &Path, target_step_index: usize) -> Option<String> {
@@ -355,6 +353,7 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].cid, "cid-1");
         assert_eq!(rows[0].preview, "running work");
+        assert_eq!(rows[0].status, "RUNNING");
         assert_eq!(rows[0].not_fully_idle, 1);
     }
 }

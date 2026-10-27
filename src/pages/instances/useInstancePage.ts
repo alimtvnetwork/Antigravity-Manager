@@ -93,12 +93,31 @@ export function useInstancePage(): InstancePageApi {
     const [daemonStatus, setDaemonStatus] = useState<AutoSwitcherDaemonStatus | null>(null);
     const [daemonCountdown, setDaemonCountdown] = useState<number>(0);
     // Post-switch prompt resume indicator: set when the backend emits
-    // `prompts://restored`, auto-clears after a few seconds.
+    // `prompts://resume-scheduled` (with countdown) or `prompts://restored`, auto-clears after a few seconds.
     const [resumeIndicator, setResumeIndicator] = useState<{
         instanceId: string;
         restoredCount: number;
         at: number;
+        status?: 'scheduled' | 'restoring' | 'restored';
+        secondsLeft?: number;
     } | null>(null);
+
+    useEffect(() => {
+        if (!resumeIndicator || resumeIndicator.status !== 'scheduled' || !resumeIndicator.secondsLeft) {
+            return;
+        }
+        const ticker = setInterval(() => {
+            setResumeIndicator((prev) => {
+                if (!prev || prev.status !== 'scheduled') return null;
+                const currentSeconds = prev.secondsLeft ?? 1;
+                if (currentSeconds <= 1) {
+                    return { ...prev, status: 'restoring', secondsLeft: 0 };
+                }
+                return { ...prev, secondsLeft: currentSeconds - 1 };
+            });
+        }, 1000);
+        return () => clearInterval(ticker);
+    }, [resumeIndicator?.status, resumeIndicator?.instanceId]);
 
     useEffect(() => {
         if (activeInstanceId) {
@@ -256,6 +275,29 @@ export function useInstancePage(): InstancePageApi {
                         }
                     }
                 }),
+                listen<{
+                    instance_id: string;
+                    prompt_count: number;
+                    total_delay_seconds: number;
+                    remaining_seconds: number;
+                    scheduled_at_ms: number;
+                    fire_at_ms: number;
+                }>('prompts://resume-scheduled', (event) => {
+                    const delay =
+                        event.payload.remaining_seconds > 0
+                            ? event.payload.remaining_seconds
+                            : (event.payload.total_delay_seconds || 10);
+                    setResumeIndicator({
+                        instanceId: event.payload.instance_id,
+                        restoredCount: event.payload.prompt_count,
+                        at: Date.now(),
+                        status: 'scheduled',
+                        secondsLeft: delay,
+                    });
+                }),
+                listen('prompts://resume-cancelled', () => {
+                    setResumeIndicator(null);
+                }),
                 // Post-switch resume indicator: backend emits `prompts://restored`
                 // when the delayed resume fires (see post_switch_resume.rs).
                 listen<{ instance_id: string; restored_count: number }>('prompts://restored', (event) => {
@@ -263,6 +305,8 @@ export function useInstancePage(): InstancePageApi {
                         instanceId: event.payload.instance_id,
                         restoredCount: event.payload.restored_count,
                         at: Date.now(),
+                        status: 'restored',
+                        secondsLeft: 0,
                     });
                     // Justification: transient indicator; auto-clears so a stale "resumed" pill never lingers
                     window.setTimeout(() => setResumeIndicator(null), 6000);

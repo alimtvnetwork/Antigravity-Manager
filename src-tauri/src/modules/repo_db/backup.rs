@@ -397,7 +397,7 @@ pub fn count_backed_up_prompts(instance_id: &str) -> usize {
     conn.query_row(
         "SELECT COUNT(*) FROM active_prompts
          WHERE status = 'backed_up'
-           AND (instance_id = ?1 OR (?1 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))",
+           AND (instance_id = ?1 OR (?1 = 'default' AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL)))",
         [instance_id],
         |row| row.get::<_, i64>(0),
     )

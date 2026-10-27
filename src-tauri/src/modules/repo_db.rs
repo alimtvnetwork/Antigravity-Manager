@@ -32,6 +32,8 @@ pub mod schema;
 pub mod sequences;
 pub mod sqlite_export;
 pub mod state;
+#[cfg(test)]
+pub mod tests;
 pub mod text_utils;
 pub mod transcript;
 pub mod tree;

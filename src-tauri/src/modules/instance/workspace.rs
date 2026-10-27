@@ -227,6 +227,15 @@ pub(crate) fn push_backed_up_prompts_after_channel(instance_id: &str) -> usize {
     crate::modules::logger::log_info(&format!(
         "[INSTANCE_SWITCH:STAGE_5_RESTORE] Re-pushed {pushed} prompt(s) for instance '{instance_id}' ({before} backed up before, {after} still backed up)"
     ));
+    crate::modules::scheduler::notify_prompt_queue();
+    let inst_clone = instance_id.to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::error::record_ignored(
+            crate::modules::repo_db::check_and_dispatch_enqueued_prompts(Some(&inst_clone)),
+            "post-switch restore immediate queue dispatch probe",
+        );
+        // Justification: Best-effort immediate dispatch probe; background scheduler will retry if probe fails.
+    });
     pushed
 }
 

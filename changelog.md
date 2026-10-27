@@ -1,5 +1,23 @@
 # Changelog
 
+## [v4.271.0] - 2026-10-27
+
+### Fixed
+- Post-Switch Prompt Restore Gate Fix: Resolved critical parameter mismatch in `src-tauri/src/modules/instance/switch.rs` where `list_prompt_backups` was passed an instance ID into `batch_id` (`WHERE backup_batch_id = ?`), always returning 0 rows and prematurely bypassing prompt restoration; replaced with scoped `count_unrestored_prompts_for_instance` (Thanks to @aukgit)
+- Restored Status & Queue Dispatch Alignment: Added `'in_progress'` to `resend_single_pass` SQL query, `already_dispatched` deduplication bypass, and queue dispatch filters in `src-tauri/src/modules/repo_db/resend.rs` and `queue.rs`, ensuring prompts restored from backups are immediately discoverable and scheduled (Thanks to @aukgit)
+- Strict FIFO Ordering Invariant: Refactored prompt selection in `src-tauri/src/modules/repo_db/dispatch.rs` from LIFO `max_by(updated_at)` to strict FIFO `pick_first_queued_prompt` (`min_by` on `created_at ASC, id ASC`), and replaced `ORDER BY updated_at DESC` with `ORDER BY created_at ASC, id ASC` in `tree_format.rs` (Thanks to @aukgit)
+- Reactive Post-Switch Scheduler Wakeup: Added immediate `notify_prompt_queue()` signal and asynchronous dispatch probe in `src-tauri/src/modules/instance/workspace.rs` and `post_switch_resume.rs`, eliminating 30-second idle backoff delays and dispatching restored prompts instantly (Thanks to @aukgit)
+- Default Instance Backup Count Fix: Corrected `count_backed_up_prompts` in `src-tauri/src/modules/repo_db/backup.rs` to include empty string `''` and `NULL` for default instance, preventing backed-up prompts from being counted as zero (Thanks to @aukgit)
+- Manual Switch Backup Preservation: Updated `DesktopIntegration::on_account_switch` in `src-tauri/src/modules/integration/system_impl.rs` to capture backup return counts and evaluate both `repo_db` and `backup_prompts_db` before scheduling post-launch restore (Thanks to @aukgit)
+- Subagent Filter False Positive Cleanse: Removed `lower.starts_with("you are ")` in `src-tauri/src/modules/repo_db/discovery.rs` to prevent dropping legitimate user instructions that begin with role framing (Thanks to @aukgit)
+- Telegram Sub-2s Response Latency & Reactive Wakeup: Replaced 60s/30s polling sleep traps with `tokio::sync::Notify` (`TELEGRAM_DAEMON_NOTIFIER`), introduced persistent pooled `TELEGRAM_HTTP_CLIENT` to eliminate per-request TCP/TLS handshake penalties, decoupled inbound command processing to non-blocking background tasks, and implemented `delete_telegram_webhook` auto-healing on HTTP 409 Conflict (Thanks to @aukgit)
+- Frontend Settling Countdown & Restore Visibility: Added interactive settling countdown badge (`⏳ Restoring Prompts in {N}s...`) and restore indicator in `src/components/instances/InstanceCard/InstanceCardHeader.tsx` driven by `useInstancePage.ts` (Thanks to @aukgit)
+
+### Added
+- E2E Unit Test Suites for Restore Integrity: Added comprehensive test suites in `src-tauri/src/modules/backup_prompts_db/tests.rs` and `src-tauri/src/modules/repo_db/tests.rs` covering dual-store prompt count scoping, discoverability of restored statuses, and strict FIFO queue ordering (Thanks to @aukgit)
+
+---
+
 ## [v4.270.0] - 2026-10-27
 
 ### Added
@@ -1370,6 +1388,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.271.0 (2026-10-27)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.270.0 (2026-10-27)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

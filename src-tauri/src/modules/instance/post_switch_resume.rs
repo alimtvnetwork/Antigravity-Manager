@@ -361,6 +361,7 @@ pub async fn run_post_switch_resume_after_delay(instance_id: &str) -> usize {
     tokio::time::sleep(Duration::from_secs(delay)).await;
     let restored = run_resume_with_retry(instance_id).await;
     clear_persisted_resume_task(instance_id);
+    crate::modules::scheduler::notify_prompt_queue();
     audit_resume_lifecycle(
         "fired",
         instance_id,
@@ -384,6 +385,7 @@ fn arm_resume_timer(entry: ScheduledResumeEntry) {
         // The resume ran to completion; its persisted record must not re-arm it.
         clear_persisted_resume_task(&timer_instance_id);
         emit_prompts_restored(&timer_instance_id, restored);
+        crate::modules::scheduler::notify_prompt_queue();
         audit_resume_lifecycle(
             "fired",
             &timer_instance_id,
@@ -521,6 +523,7 @@ pub async fn force_dispatch_resume(
     let restored = run_resume_with_retry(instance_id).await;
     remove_timer_entry(instance_id);
     emit_prompts_restored(instance_id, restored);
+    crate::modules::scheduler::notify_prompt_queue();
     audit_resume_lifecycle(
         "force_dispatched",
         instance_id,

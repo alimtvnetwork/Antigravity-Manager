@@ -671,17 +671,19 @@ pub async fn switch_account_to_instance(
 
     let target_inst_id = instance.id.clone();
     let target_backed_up = crate::modules::repo_db::count_backed_up_prompts(&target_inst_id);
-    let total_pending_restore = backed_up_count.max(target_backed_up);
-    let has_unrestored_backups =
-        crate::modules::backup_prompts_db::list_prompt_backups(Some(&target_inst_id), None)
-            .map(|list| list.iter().any(|r| !r.is_restored))
-            .unwrap_or(false)
-            || crate::modules::backup_prompts_db::count_unrestored_prompts_for_other_instances(
-                &target_inst_id,
-                None,
-            )
-            .map(|c| c > 0)
-            .unwrap_or(false);
+    let target_unrestored =
+        crate::modules::backup_prompts_db::count_unrestored_prompts_for_instance(Some(
+            &target_inst_id,
+        ))
+        .unwrap_or(0);
+    let total_pending_restore = backed_up_count.max(target_backed_up).max(target_unrestored);
+    let has_unrestored_backups = target_unrestored > 0
+        || crate::modules::backup_prompts_db::count_unrestored_prompts_for_other_instances(
+            &target_inst_id,
+            None,
+        )
+        .map(|c| c > 0)
+        .unwrap_or(false);
     let channel_wait = crate::modules::repo_db::needs_prompt_channel_wait(total_pending_restore)
         || has_unrestored_backups;
     let mut restored_count = 0usize;
