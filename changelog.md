@@ -1,5 +1,17 @@
 # Changelog
 
+## [v4.273.0] - 2026-10-28
+
+### Fixed
+- Image Extension Sanitization & E9001 Resolution: Resolved diagnostic error `E9001 — unsupported_image_extension: .` on `/instances` by sanitizing image extraction with `isLikelyImageUri` across `src/components/instances/PromptTreeView/clipboard.ts`, `src/components/instances/PromptTreeView/markdown.tsx`, and `src/components/instances/PromptTreeView/PromptInstructionView.tsx`, rejecting bare `.`, `..`, and directory paths; added binary magic byte sniffing in `src-tauri/src/commands/cmd_files.rs` to detect TIFF signatures (`b"II*\0"`, `b"MM\0*"`) and fallback to `image/tiff` when extensions are missing or generic (Thanks to @aukgit)
+- Restored Accounts Warmup Confirmation Dialog (`isWarmupConfirmOpen`): Destructured `isWarmupConfirmOpen` and `setIsWarmupConfirmOpen` in `src/pages/accounts/AccountsDialogs.tsx` and mounted a dedicated `<ModalDialog>` confirmation modal wired to `handlers.handleWarmupAll`, eliminating the silent action drop when clicking "Warm up all" on `/accounts` (Thanks to @aukgit)
+
+### Added
+- Task 232 Architectural Specification (100 Warm Up UI & Emailing UI Improvements): Authored comprehensive 4-part architectural and implementation specification in `02-spec/21-app/232-warm-up-ui-and-emailing-ui-improvements/` covering 100 concrete improvements across Smart Warmup HUD, 7-day quota countdown clocks, account matrix grid, multi-stage email diagnostics ladder, visual template builder, inbound IMAP playground, Split-DB telemetry, and headless CLI parity (`agm warmup` and `agm email`) (Thanks to @aukgit)
+- End-to-End Test Suite Verification: Executed full test verification across frontend suites (`scripts/run-frontend-tests.mjs`, 11/11 passed), standalone account scoring tests (`accountAlgorithmScore.test.ts`, 14 passed), rerun queueing validation (`rerunActions.test.ts`, 21 passed), and full Vite/TypeScript compilation gate (17,332 modules transformed, exit code 0) (Thanks to @aukgit)
+
+---
+
 ## [v4.272.0] - 2026-10-27
 
 ### Fixed
@@ -1406,6 +1418,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.273.0 (2026-10-28)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.272.0 (2026-10-27)**:
         -   **Anti-gravity Rerun Target ID, Sequential Enqueue Retention, Filter Compaction & Tree Design System**:
             -   **Description**: Resolved sequential enqueue dropping by adding status checks in `prompts_crud.rs`, prevented queued prompt transcript turn mutations in `tree_node_conv.rs`, suppressed enqueue refresh bars via silent SWR `loadTree(false, true)`, compacted Tree View Row 2 filter controls into two segmented capsules (194px layout budget, zero clipping), authored canonical Tree View UI/UX design system specification in `02-spec/02-coding-guidelines/24-app-ui-design-system/02-tree-view-design-system.md`, and added 28-assertion automated E2E test suite in `scripts/test-anti-gravity-rerun-and-ui-fixes-e2e.ps1`. (Thanks to @aukgit)

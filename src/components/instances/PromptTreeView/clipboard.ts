@@ -170,10 +170,15 @@ export const IMAGE_EXTENSIONS_PATTERN = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif|
 export function isLikelyImageUri(uri: string): boolean {
     if (!uri || !uri.trim()) return false;
     const clean = uri.trim();
-    if (clean.startsWith('data:image/')) return true;
-    if (clean.startsWith('blob:')) return true;
-    const withoutQuery = clean.split(/[?#]/)[0];
-    return IMAGE_EXTENSIONS_PATTERN.test(withoutQuery) || withoutQuery.includes('.user_uploaded');
+    if (clean.startsWith('data:image/') || clean.startsWith('blob:')) return true;
+    const withoutQuery = clean.split(/[?#]/)[0].replace(/[/\\]+$/, '');
+    const basename = withoutQuery.split(/[/\\]/).pop() || '';
+    if (!basename || basename === '.user_uploaded' || basename === '.' || basename === '..') return false;
+    if (IMAGE_EXTENSIONS_PATTERN.test(basename)) return true;
+    if (withoutQuery.includes('.user_uploaded') && (IMAGE_EXTENSIONS_PATTERN.test(basename) || /^media_|^screenshot_|^img_/i.test(basename))) {
+        return true;
+    }
+    return false;
 }
 
 export function extractAssets(text: string): { images: string[]; files: string[] } {
@@ -647,7 +652,7 @@ async function loadImageElement(uri: string, repoPath?: string): Promise<HTMLIma
 
     let loadSrc = cleanUri;
     const localPath = resolveToAbsolutePath(cleanUri, repoPath) || extractLocalPathFromUri(cleanUri);
-    if (localPath && isTauriEnvironment()) {
+    if (localPath && isTauriEnvironment() && isLikelyImageUri(localPath)) {
         try {
             const b64 = await invoke<string>('read_image_as_base64', { path: localPath });
             if (b64 && b64.startsWith('data:image/')) {

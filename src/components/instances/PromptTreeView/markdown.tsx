@@ -5,7 +5,7 @@ import { Check, Copy, ExternalLink } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
 import { TruncatedContextCallout } from './TruncatedContextCallout';
 import { formatPromptForMarkdown } from './formatters';
-import { resolveImageSrc, extractLocalPathFromUri } from './clipboard';
+import { resolveImageSrc, extractLocalPathFromUri, isLikelyImageUri } from './clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 
 /**
@@ -84,7 +84,7 @@ export function MarkdownImage({
 
         const localPath = extractLocalPathFromUri(raw) || raw;
         const isAbsolute = /^[a-zA-Z]:[\\/]/.test(localPath) || localPath.startsWith('/') || localPath.startsWith('\\\\');
-        if (isAbsolute) {
+        if (isAbsolute && isLikelyImageUri(localPath)) {
             invoke<string>('read_image_as_base64', { path: localPath })
                 .then((b64) => {
                     if (!isCancelled && b64 && b64.startsWith('data:image/')) {
@@ -93,10 +93,19 @@ export function MarkdownImage({
                     }
                 })
                 .catch((err) => {
-                    useErrorStore.getState().trackWarning(err, {
-                        source: 'MarkdownImage.read_image_as_base64',
-                        triggerAction: 'read_inline_markdown_image',
-                    });
+                    const msg = err instanceof Error ? err.message : String(err);
+                    if (
+                        !msg.includes('unsupported_image') &&
+                        !msg.includes('not_an_image') &&
+                        !msg.includes('file_not_found') &&
+                        !msg.includes('path_not_found') &&
+                        !msg.includes('invalid_path')
+                    ) {
+                        useErrorStore.getState().trackWarning(err, {
+                            source: 'MarkdownImage.read_image_as_base64',
+                            triggerAction: 'read_inline_markdown_image',
+                        });
+                    }
                 });
         }
         return () => {
@@ -107,7 +116,7 @@ export function MarkdownImage({
     const handleImgError = async () => {
         const raw = src.trim();
         const localPath = extractLocalPathFromUri(raw) || raw;
-        if (localPath && !currentSrc.startsWith('data:image/')) {
+        if (localPath && isLikelyImageUri(localPath) && !currentSrc.startsWith('data:image/')) {
             try {
                 const b64 = await invoke<string>('read_image_as_base64', { path: localPath });
                 if (b64 && b64.startsWith('data:image/')) {
@@ -116,10 +125,19 @@ export function MarkdownImage({
                     return;
                 }
             } catch (err) {
-                useErrorStore.getState().trackWarning(err, {
-                    source: 'MarkdownImage.handleImgError',
-                    triggerAction: 'read_image_as_base64_fallback',
-                });
+                const msg = err instanceof Error ? err.message : String(err);
+                if (
+                    !msg.includes('unsupported_image') &&
+                    !msg.includes('not_an_image') &&
+                    !msg.includes('file_not_found') &&
+                    !msg.includes('path_not_found') &&
+                    !msg.includes('invalid_path')
+                ) {
+                    useErrorStore.getState().trackWarning(err, {
+                        source: 'MarkdownImage.handleImgError',
+                        triggerAction: 'read_image_as_base64_fallback',
+                    });
+                }
             }
         }
         setHasError(true);

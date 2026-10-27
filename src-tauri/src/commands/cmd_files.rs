@@ -400,15 +400,27 @@ pub async fn read_image_as_base64(path: String) -> Result<String, String> {
                 && (&bytes[4..12] == b"ftypavif" || &bytes[4..12] == b"ftypavis")
             {
                 "image/avif"
+            } else if bytes.starts_with(b"II*\0") || bytes.starts_with(b"MM\0*") {
+                "image/tiff"
             } else if let Ok(s) = std::str::from_utf8(&bytes[..bytes.len().min(512)]) {
                 let trimmed = s.trim_start();
                 if trimmed.starts_with("<svg")
                     || (trimmed.starts_with("<?xml") && trimmed.contains("<svg"))
                 {
                     "image/svg+xml"
+                } else if ext.is_empty() {
+                    return Err(
+                        "unsupported_image_extension: no extension and unrecognized image format"
+                            .to_string(),
+                    );
                 } else {
                     return Err(format!("unsupported_image_extension: .{}", ext));
                 }
+            } else if ext.is_empty() {
+                return Err(
+                    "unsupported_image_extension: no extension and unrecognized image format"
+                        .to_string(),
+                );
             } else {
                 return Err(format!("unsupported_image_extension: .{}", ext));
             }
@@ -658,7 +670,7 @@ mod prompt_backup_path_tests {
         let _ = std::fs::remove_file(&test_no_ext); // Justification: best-effort test cleanup
         assert!(res.is_err());
         let err = res.unwrap_err();
-        assert!(err.contains("unsupported_image_extension: ."));
+        assert!(err.contains("unsupported_image_extension"));
     }
 
     #[test]

@@ -7,7 +7,7 @@ import { RichMarkdownRenderer, openFileInIde } from './markdown';
 import { countWords, formatPromptForMarkdown } from './formatters';
 import { PromptImagePreviewModal } from './PromptImagePreviewModal';
 import { PromptImageContextMenu } from './PromptImageContextMenu';
-import { resolveImageSrc, extractLocalPathFromUri, writePureImageToClipboard, copyAllImagesToClipboard } from './clipboard';
+import { resolveImageSrc, extractLocalPathFromUri, writePureImageToClipboard, copyAllImagesToClipboard, isLikelyImageUri } from './clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 import { useConfigStore } from '../../../stores/useConfigStore';
 import { formatDateTime, formatDateOnly } from '../../../utils/date';
@@ -109,7 +109,7 @@ function extractImagesFromPrompt(
         for (const t of turns) {
             if (t.media_paths) {
                 for (const p of t.media_paths) {
-                    if (p) {
+                    if (p && isLikelyImageUri(p)) {
                         const key = normalizeMediaUri(p) || p;
                         if (!seen.has(key)) {
                             seen.add(key);
@@ -124,7 +124,7 @@ function extractImagesFromPrompt(
     // 1.5 From conversation-level media_paths (only for whole conversation or initial turn)
     if ((conv.selected_turn_number == null || conv.selected_turn_number === 1) && conv.media_paths && conv.media_paths.length > 0) {
         for (const p of conv.media_paths) {
-            if (p) {
+            if (p && isLikelyImageUri(p)) {
                 const key = normalizeMediaUri(p) || p;
                 if (!seen.has(key)) {
                     seen.add(key);
@@ -140,7 +140,7 @@ function extractImagesFromPrompt(
     while ((match = imgRegex.exec(text)) !== null) {
         const alt = match[1] || 'Embedded Image';
         const src = match[2];
-        if (src) {
+        if (src && isLikelyImageUri(src)) {
             const key = normalizeMediaUri(src) || src;
             if (!seen.has(key)) {
                 seen.add(key);
@@ -159,11 +159,7 @@ function extractImagesFromPrompt(
         }
         if (!rawPath) continue;
 
-        const isImage = /\.(png|jpe?g|webp|gif|svg|bmp|ico)$/i.test(rawPath) ||
-            rawPath.includes('.user_uploaded') ||
-            rawPath.startsWith('data:image/');
-
-        if (isImage) {
+        if (isLikelyImageUri(rawPath)) {
             const key = normalizeMediaUri(rawPath) || rawPath;
             if (!seen.has(key)) {
                 seen.add(key);
@@ -177,7 +173,7 @@ function extractImagesFromPrompt(
     const htmlImgRegex = /<img\s+[^>]*?src=["'](.*?)["'][^>]*?>/gi;
     while ((match = htmlImgRegex.exec(text)) !== null) {
         const src = match[1];
-        if (src) {
+        if (src && isLikelyImageUri(src)) {
             const key = normalizeMediaUri(src) || src;
             if (!seen.has(key)) {
                 seen.add(key);
@@ -204,7 +200,7 @@ function extractImagesFromPrompt(
         for (const sub of conv.sub_runs) {
             if (sub.media_paths) {
                 for (const p of sub.media_paths) {
-                    if (p) {
+                    if (p && isLikelyImageUri(p)) {
                         const key = normalizeMediaUri(p) || p;
                         if (!seen.has(key)) {
                             seen.add(key);
@@ -261,6 +257,12 @@ class BoundedImageLoaderPool {
         const task = this.queue.shift();
         if (!task) return;
 
+        if (!isLikelyImageUri(task.path)) {
+            task.reject(new Error(`not_an_image: ${task.path}`));
+            this.processNext();
+            return;
+        }
+
         this.running++;
         try {
             const data = await invoke<string>('read_image_as_base64', { path: task.path });
@@ -271,10 +273,19 @@ class BoundedImageLoaderPool {
             this.cache.set(task.path, data);
             task.resolve(data);
         } catch (err: unknown) {
-            useErrorStore.getState().trackWarning(err, {
-                source: 'BoundedImageLoaderPool.loadBase64',
-                triggerAction: 'read_image_as_base64_throttled',
-            });
+            const msg = err instanceof Error ? err.message : String(err);
+            if (
+                !msg.includes('unsupported_image') &&
+                !msg.includes('not_an_image') &&
+                !msg.includes('file_not_found') &&
+                !msg.includes('path_not_found') &&
+                !msg.includes('invalid_path')
+            ) {
+                useErrorStore.getState().trackWarning(err, {
+                    source: 'BoundedImageLoaderPool.loadBase64',
+                    triggerAction: 'read_image_as_base64_throttled',
+                });
+            }
             task.reject(err);
         } finally {
             this.running--;
@@ -313,6 +324,13 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
                 localPath = `${repoPath.replace(/[/\\]+$/, '')}${sep}${localPath.replace(/^(\.[/\\]|[/\\])+/, '')}`;
             }
 
+            if (!isLikelyImageUri(localPath)) {
+                if (!isCancelled) {
+                    setResolvedSrc(resolveImageSrc(img.src, repoPath));
+                }
+                return;
+            }
+
             try {
                 const base64Data = await imageLoaderPool.loadBase64(localPath);
                 if (!isCancelled && base64Data && base64Data.startsWith('data:image/')) {
@@ -322,7 +340,13 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
                 }
             } catch (err: unknown) {
                 const msg = err instanceof Error ? err.message : String(err);
-                if (!msg.includes('file_not_found') && !msg.includes('path_not_found')) {
+                if (
+                    !msg.includes('unsupported_image') &&
+                    !msg.includes('not_an_image') &&
+                    !msg.includes('file_not_found') &&
+                    !msg.includes('path_not_found') &&
+                    !msg.includes('invalid_path')
+                ) {
                     useErrorStore.getState().trackWarning(err, {
                         source: 'PromptThumbnailCard.load_base64',
                         triggerAction: 'read_image_as_base64_proactive',
@@ -346,7 +370,7 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
             localPath = raw;
         }
 
-        if (localPath) {
+        if (localPath && isLikelyImageUri(localPath)) {
             const isAbsolute = /^[a-zA-Z]:[\\/]/.test(localPath) || localPath.startsWith('/') || localPath.startsWith('\\\\');
             if (!isAbsolute && repoPath && repoPath.trim().length > 0) {
                 const sep = repoPath.includes('/') ? '/' : '\\';
@@ -362,7 +386,13 @@ function PromptThumbnailCard({ img, repoPath, onPreview, onContextMenu }: Prompt
                 }
             } catch (err: unknown) {
                 const msg = err instanceof Error ? err.message : String(err);
-                if (!msg.includes('file_not_found') && !msg.includes('path_not_found')) {
+                if (
+                    !msg.includes('unsupported_image') &&
+                    !msg.includes('not_an_image') &&
+                    !msg.includes('file_not_found') &&
+                    !msg.includes('path_not_found') &&
+                    !msg.includes('invalid_path')
+                ) {
                     useErrorStore.getState().trackWarning(err, {
                         source: 'PromptThumbnailCard.handleImgError',
                         triggerAction: 'read_image_as_base64_fallback',
