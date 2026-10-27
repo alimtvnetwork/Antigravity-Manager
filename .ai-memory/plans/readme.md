@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [232-warm-up-ui-and-emailing-ui-improvements.md](./pending/232-warm-up-ui-and-emailing-ui-improvements.md) | `PENDING` | Comprehensive architecture and 100 concrete improvements spanning Warm Up UI (live telemetry HUD, 7-day countdown clocks, account matrix controls, AccountsDialogs modal restoration, agm warmup CLI) and Emailing UI (unified command center, visual template designer with dual-theme preview, inbound command playground with SPF/DKIM shields, 5-stage diagnostic ladder, agm email CLI). |
 | [50-instant-rerun-enqueue-and-minor-release.md](./pending/50-instant-rerun-enqueue-and-minor-release.md) | `COMPLETED` | Root cause elimination of rerun dispatch latency: eliminates 30s idle backoff via notify wakeup, triggers immediate idle queue dispatch on enqueue, removes 300ms pacing sleeps, and executes v4.268.0 release ceremony. |
 | [49-image-attachment-format-and-rerun-enqueue.md](./pending/49-image-attachment-format-and-rerun-enqueue.md) | `COMPLETED` | Standardize prompt image attachment formatting to bracketed list (`Attachments:\n1. @[<path>]`) across copy, send, enqueue, and rerun; enforce rerun enqueue invariant. |
 | [221-gitmap-and-antigravity-tools-manager-updates-and-testing.md](./completed/221-gitmap-and-antigravity-tools-manager-updates-and-testing.md) | `COMPLETED` | Execution of 5 tasks: GitMap PA updates, prompt restore & reconnect sweep, rerun randomizer anti-repeat UX, GitMap cmdpull CG execute, and master deferred E2E testing (Steps 316–320). |
