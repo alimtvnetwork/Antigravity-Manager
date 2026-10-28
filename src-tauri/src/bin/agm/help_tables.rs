@@ -48,6 +48,18 @@ pub(crate) fn print_prompts_reference_table() {
         "Incremental targeted test runs without regressing",
         "Body: smart-test-runner"
     );
+    println!(
+        "  {:<26} {:<44} {:<30}",
+        "improvements-plan-100",
+        "Plan 100 improvements as 10 batches of 10",
+        "agm improvements plan"
+    );
+    println!(
+        "  {:<26} {:<44} {:<30}",
+        "implement-next-10",
+        "Dispatch 07-implement-next-10-improvements.md",
+        "agm improvements next"
+    );
     println!();
 }
 

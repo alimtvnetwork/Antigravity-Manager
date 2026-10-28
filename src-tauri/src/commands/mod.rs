@@ -31,6 +31,9 @@ pub use supabase::*;
 // Export telegram command
 pub mod telegram;
 pub use telegram::*;
+// Export 100-improvements flywheel
+pub mod improvements;
+pub use improvements::*;
 // Export toolchain command (Toolchain Installer UI backend)
 pub mod toolchain;
 pub use toolchain::*;

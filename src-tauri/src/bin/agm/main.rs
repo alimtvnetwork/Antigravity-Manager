@@ -25,6 +25,7 @@ mod fleet_cmds;
 mod green_cmds;
 mod help_tables;
 mod help_text;
+mod improvements_cmds;
 mod install_cmds;
 mod instance_cmds;
 mod instance_dispatch;
@@ -369,6 +370,14 @@ fn main() {
         }
         "errors" | "error" | "err" => {
             crate::error_cmds::dispatch_errors_domain(&cmd_args);
+        }
+        "improvements" | "improvement" | "improve" => {
+            crate::improvements_cmds::dispatch_improvements_domain(&cmd_args);
+        }
+        "next10" | "next-10" => {
+            let mut forward = vec!["next".to_string()];
+            forward.extend(cmd_args);
+            crate::improvements_cmds::dispatch_improvements_domain(&forward);
         }
         "clear" => {
             if cmd_args

@@ -20,6 +20,24 @@ The continuum spans 7 foundational stages:
 
 All improvements adhere to structured specification schemas, enforce the **Zero Harm / Regression Safety Matrix**, provide backward compatibility guarantees, and include concrete, copy-paste ready implementation blueprints.
 
+## How to run (CLI, UI, Telegram)
+
+The same flywheel is a first-class option on all three surfaces. It plans 100 improvements as **10 batches of 10**, then each `next` step implements one batch via `07-implement-next-10-improvements.md`. Ledger: `.ai-memory/improvements/flywheel.json`.
+
+```text
+agm improvements help
+agm improvements plan ui --dry-run --json
+agm improvements status --json
+agm improvements next --dry-run --json
+agm next10 --dry-run
+```
+
+`--dry-run` writes or previews the ledger without enqueueing a prompt (safe on Default / v2). Omit it to dispatch into the instance queue.
+
+- **UI:** Telegram page → 100 Improvements Flywheel (Plan 100 / Next 10 / Status capsule).
+- **Telegram:** `/improvements`, `/improvements plan [ui|code|system|ideas]`, `/improvements next`, `/next10`. Buttons: Plan 100, Next 10, Status, Check (`im:pl`, `im:n10`, `im:st`, `im:ck`).
+
+
 > [!NOTE]
 > **Continuous Improvement Flywheel Invariant:**  
 > Running discovery prompts in this category persists the identified 100 improvement items into `.ai-memory/plans/pending/XX-<slug>.md` along with subtasks in `.ai-memory/plans/subtasks/XX-<slug>/`. Detailing prompts expand these candidates into exhaustive multi-step execution roadmaps, inspection prompts aggregate real-time triage dashboards, and batch execution prompts chew through backlogs 10 items at a time on command `"next"`.

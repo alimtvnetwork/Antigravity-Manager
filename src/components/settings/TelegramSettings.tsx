@@ -20,7 +20,7 @@ export interface TelegramCommandItem {
     description: string;
     usage: string;
     example: string;
-    category: 'seeking' | 'prompting' | 'quota' | 'export' | 'cluster';
+    category: 'seeking' | 'prompting' | 'quota' | 'export' | 'cluster' | 'improvements';
     features?: string[];
 }
 
@@ -132,6 +132,21 @@ const TELEGRAM_COMMAND_REFERENCE: TelegramCommandItem[] = [
         example: '/nodes',
         category: 'cluster',
         features: ['Inspect multi-node status, GitMap clusters, and remote execution nodes'],
+    },
+    {
+        command: '/improvements',
+        aliases: ['/improve', '/next10'],
+        description:
+            'Plan 100 improvements as 10 batches of 10, then implement the next batch. Shares the ledger .ai-memory/improvements/flywheel.json with agm improvements and the Telegram page flywheel.',
+        usage: '/improvements [plan|next|status|check] [ui|code|system|ideas]',
+        example: '/improvements plan ui',
+        category: 'improvements',
+        features: [
+            'Plan 100 materializes 10 pending batches and enqueues 01-prompts/30-improvements discovery',
+            'Next 10 claims the first pending batch and enqueues 07-implement-next-10-improvements.md',
+            'Inline buttons im:pl im:n10 im:st im:ck stay inside the 60-byte callback budget',
+            'CLI parity: agm improvements plan|next|status|check [--dry-run] [--json]',
+        ],
     },
 ];
 
@@ -251,6 +266,7 @@ export default function TelegramSettings() {
                         { id: 'quota', label: 'Quota & Balance' },
                         { id: 'export', label: 'Export' },
                         { id: 'cluster', label: 'Cluster' },
+                        { id: 'improvements', label: 'Improvements' },
                     ].map((cat) => (
                         <button
                             key={cat.id}

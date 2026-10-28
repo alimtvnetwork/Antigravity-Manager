@@ -25,6 +25,7 @@ pub mod failed_commands;
 pub mod fleet_sync;
 pub mod git_info;
 pub mod ide_installer;
+pub mod improvements;
 pub mod instance;
 pub mod json_envelope;
 pub mod release_gate;

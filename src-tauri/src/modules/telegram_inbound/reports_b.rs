@@ -736,6 +736,12 @@ pub fn format_help_manual() -> String {
         • <code>/fleet</code> · <code>/whoami</code> · <code>/ping</code> — Machine, instance &amp; bound account identity\n\
         • <code>/instances</code> · <code>/accounts</code> · <code>/status</code> · <code>/observe</code> · <code>/tree</code> · <code>/active</code>\n\
         • <code>/seek</code> · <code>/conversations</code> · <code>/queues</code> · <code>/query &lt;term&gt;</code> · <code>/expand &lt;id&gt;</code> · <code>/projects</code> · <code>/snapshot</code>\n\n\
+        🛠 <b>100 Improvements Flywheel</b>\n\
+        • <code>/improvements</code> — Status card: Plan 100, Next 10, Status, Check\n\
+        • <code>/improvements plan</code> · <code>/improvements plan ui</code> — Start a 100-item wave\n\
+        • <code>/improvements next</code> · <code>/next10</code> — Implement the next batch of 10\n\
+        • CLI: <code>agm improvements plan --dry-run</code> · <code>agm next10 --dry-run</code>\n\
+        • Ledger: <code>.ai-memory/improvements/flywheel.json</code>\n\n\
         🟡 <b>Backup, Cleanup, Updates &amp; Email</b>\n\
         • <code>/backup</code> · <code>/restore</code> · <code>/prune [N]</code> · <code>/clean</code>\n\
         • <code>/update</code> · <code>/update gitmap</code> · <code>/update all</code> · <code>/gitmap ssh update agm</code>\n\
@@ -785,6 +791,15 @@ mod tests {
         assert!(help.contains("/ui ls"));
         assert!(help.contains("/ui scroll"));
         assert!(help.contains("Drive the UI remotely"));
+    }
+
+    #[test]
+    fn help_manual_documents_improvements_flywheel() {
+        let help = format_help_manual();
+        assert!(help.contains("/improvements"));
+        assert!(help.contains("/improvements plan"));
+        assert!(help.contains("/next10"));
+        assert!(help.contains(".ai-memory/improvements/flywheel.json"));
     }
 
     #[test]

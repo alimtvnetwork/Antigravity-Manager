@@ -186,6 +186,7 @@ pub async fn register_telegram_bot_commands(bot_token: &str) -> Result<(), AppEr
             { "command": "ff", "description": "Fast-forward switch to highest-quota account" },
             { "command": "snapshot", "description": "View multi-node cluster status snapshot" },
             { "command": "theme", "description": "Card palette: riseup, obsidian, gold, indigo" },
+            { "command": "improvements", "description": "Plan 100 improvements, then implement 10 at a time" },
             { "command": "help", "description": "Show full Telegram remote command reference" }
         ]
     });

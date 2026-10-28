@@ -28,6 +28,7 @@ import { useErrorStore } from '../stores/error-store';
 import { copyToClipboard } from '../utils/clipboard';
 import TelegramSettings from '../components/settings/TelegramSettings';
 import { TelegramGuideModal } from '../components/telegram/TelegramGuideModal';
+import ImprovementsFlywheel from '../components/telegram/ImprovementsFlywheel';
 
 export default function Telegram() {
     const { t } = useTranslation();
@@ -479,6 +480,9 @@ export default function Telegram() {
                                     'agm telegram status',
                                     'agm telegram listen',
                                     'agm telegram setup',
+                                    'agm improvements help',
+                                    'agm improvements plan ui --dry-run --json',
+                                    'agm next10 --dry-run',
                                 ].map((cmd) => (
                                     <button
                                         key={cmd}
@@ -498,6 +502,8 @@ export default function Telegram() {
                         </div>
                     </div>
                 </div>
+
+                <ImprovementsFlywheel />
 
                 {/* Bottom Section: Full Telegram Remote Command Reference */}
                     <div className="agm-hover-shade rounded-2xl border border-slate-200/80 dark:border-[#40285e] bg-white dark:bg-[#171025] p-6 shadow-xs">

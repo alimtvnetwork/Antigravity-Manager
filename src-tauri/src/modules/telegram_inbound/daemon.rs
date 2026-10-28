@@ -8,6 +8,27 @@ use std::path::PathBuf;
 
 use super::*;
 
+async fn handle_improvements_callback(token: &str, chat_id: i64, data: &str) -> bool {
+    let Some(action) = crate::modules::improvements::parse_improvements_callback(data) else {
+        return false;
+    };
+    let rest = match action {
+        "plan" => "plan",
+        "next" => "next",
+        "check" => "check",
+        _ => "status",
+    };
+    let reply = super::processing::format_improvements_command_reply("improvements", rest);
+    let markup = crate::modules::improvements::telegram_markup();
+    // Justification: callback action already applied to the ledger; a Telegram
+    // send failure is logged and does not roll back Plan/Next/Status.
+    crate::error::record_ignored(
+        send_telegram_message_with_markup(token, chat_id, &reply, Some(markup), false).await,
+        "send improvements callback reply",
+    );
+    true
+}
+
 /// Normalize a `cmd:` inline-keyboard payload into the `/command …` text the
 /// command pipeline expects. Both spellings exist in the wild (`cmd:/send`
 /// from the report markups, `cmd:fleet` from the ping markup), so every
@@ -192,6 +213,12 @@ async fn deliver_ui_or_command(
     }
 
     let trimmed_raw = text_raw.trim();
+    if trimmed_raw.starts_with("im:") {
+        if handle_improvements_callback(token, chat_id, trimmed_raw).await {
+            return Some("ok".to_string());
+        }
+        return None;
+    }
     if trimmed_raw.starts_with("i:") {
         if super::instance_cards::handle_instance_callback(token, chat_id, trimmed_raw).await {
             return Some("ok".to_string());
@@ -520,6 +547,9 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
             ]
         })),
         "help" | "start" => Some(super::ui_remote::help_copy_markup()),
+        "improvements" | "improve" | "next10" | "next-10" => {
+            Some(crate::modules::improvements::telegram_markup())
+        }
         "send" => {
             if rest.trim().eq_ignore_ascii_case("cancel") {
                 None

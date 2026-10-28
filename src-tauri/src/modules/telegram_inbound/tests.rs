@@ -139,6 +139,10 @@ pub(crate) mod tests {
             "<code>/ssh balance</code>",
             "<code>/ssh exec vm-1 agm status</code>",
             "<code>/gitmap cluster status</code>",
+            "<code>/improvements</code>",
+            "<code>/improvements plan</code>",
+            "<code>/improvements next</code>",
+            "<code>/next10</code>",
         ] {
             assert!(
                 help.contains(required),
@@ -146,6 +150,45 @@ pub(crate) mod tests {
                 required
             );
         }
+    }
+
+    #[test]
+    pub(crate) fn test_improvements_callbacks_and_markup() {
+        assert_eq!(
+            crate::modules::improvements::parse_improvements_callback("im:pl"),
+            Some("plan")
+        );
+        assert_eq!(
+            crate::modules::improvements::parse_improvements_callback("im:n10"),
+            Some("next")
+        );
+        let markup = crate::modules::improvements::telegram_markup().to_string();
+        assert!(markup.contains("im:pl"));
+        assert!(markup.contains("im:n10"));
+        assert!(markup.contains("im:st"));
+        assert!(markup.contains("im:ck"));
+        assert!(crate::modules::improvements::is_improvements_command(
+            "/improvements"
+        ));
+        assert!(crate::modules::improvements::is_improvements_command(
+            "/next10"
+        ));
+        let html = crate::modules::improvements::format_telegram_html(
+            &crate::modules::improvements::FlywheelState {
+                wave: 1,
+                kind: "ui".to_string(),
+                total: 100,
+                batch_size: 10,
+                next_batch: 1,
+                completed_batches: 0,
+                last_action: "unplanned".to_string(),
+                updated_at: 0,
+                ledger_rel: crate::modules::improvements::LEDGER_REL.to_string(),
+                dispatched_prompt_id: None,
+                batches: Vec::new(),
+            },
+        );
+        assert!(html.contains("100 Improvements"));
     }
 
     #[test]

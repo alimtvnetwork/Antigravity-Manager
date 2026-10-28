@@ -114,6 +114,9 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
             }
         }
         "status" | "observe" => Some(format_observe_report()),
+        "improvements" | "improve" | "next10" | "next-10" => {
+            Some(format_improvements_command_reply(&cmd_base, rest))
+        }
         "tree" => {
             let only_running = !rest.eq_ignore_ascii_case("all");
             Some(repo_db::format_tree_view_telegram_html(200, only_running))
@@ -474,5 +477,22 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
             }
             None
         }
+    }
+}
+
+pub fn format_improvements_command_reply(cmd_base: &str, rest: &str) -> String {
+    let effective = if matches!(cmd_base, "next10" | "next-10") && rest.trim().is_empty() {
+        "next".to_string()
+    } else if rest.trim().is_empty() {
+        "status".to_string()
+    } else {
+        rest.trim().to_string()
+    };
+    match crate::modules::improvements::handle_rest(&effective) {
+        Ok(state) => crate::modules::improvements::format_telegram_html(&state),
+        Err(e) => format!(
+            "❌ <b>Improvements:</b> <code>{}</code>",
+            clean_for_telegram_html(&e.to_string(), 200)
+        ),
     }
 }

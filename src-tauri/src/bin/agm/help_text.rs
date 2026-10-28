@@ -112,7 +112,8 @@ pub(crate) fn print_help_json() {
                 "items": [
                     { "name": "email", "aliases": [], "flags": ["status", "help", "ls", "add", "rm", "mv", "export", "--json"], "description": "Manage email alerts, sender accounts, and recipients" },
                     { "name": "telegram", "aliases": [], "flags": ["ls", "set", "ping", "cmds", "chat", "setup", "help"], "description": "Manage Telegram bot token, chat ID, automated setup, and alerts" },
-                    { "name": "broadcast-email", "aliases": [], "flags": ["ls", "add", "rm", "send-to-all", "send", "test"], "description": "Broadcast status cards to all configured recipients" }
+                    { "name": "broadcast-email", "aliases": [], "flags": ["ls", "add", "rm", "send-to-all", "send", "test"], "description": "Broadcast status cards to all configured recipients" },
+                    { "name": "improvements", "aliases": ["improve", "next10"], "flags": ["plan", "next", "status", "check", "--dry-run", "--json"], "description": "Plan 100 improvements as 10 batches of 10, then implement next-10 via 01-prompts/30-improvements" }
                 ]
             },
             {
@@ -340,6 +341,15 @@ pub(crate) fn print_help() {
     println!("        Manage Telegram bot token, chat ID, automated setup, and alerts");
     println!("    broadcast-email [ls|add|rm|send-to-all|send|send-help|test]");
     println!("        Manage multi-recipient email broadcasts");
+    println!("    improvements, improve [plan|next|status|check|detail|help] [ui|code|system|ideas] [--dry-run] [--json]");
+    println!("        Plan 100 improvements as 10 batches of 10, then implement next-10");
+    println!("        Ledger: .ai-memory/improvements/flywheel.json");
+    println!("        Examples:");
+    println!("          agm improvements help");
+    println!("          agm improvements plan ui --dry-run --json");
+    println!("          agm improvements next --dry-run --json");
+    println!("          agm next10 --dry-run");
+    println!("          Telegram: /improvements  /improvements plan  /next10");
     println!();
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("  SUPABASE FLEET SYNC & LEASE ARCHITECTURE");
@@ -597,6 +607,18 @@ pub(crate) fn print_commands_table() {
     println!(
         "  {:<26} {:<36} {:<32}",
         "Inbound Commands Manual", "Subject: help", "agm help"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Plan 100 Improvements",
+        format!("cmd: {} | agm improvements plan", node_alias),
+        "agm improvements plan [--dry-run]"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Implement Next 10",
+        format!("cmd: {} | agm improvements next", node_alias),
+        "agm improvements next [--dry-run]"
     );
     println!();
 }

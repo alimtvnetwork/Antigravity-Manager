@@ -419,6 +419,10 @@ pub fn run() {
             commands::detect_telegram_chat_id,
             commands::get_telegram_status,
             commands::send_telegram_test_message,
+            commands::improvements_plan,
+            commands::improvements_next,
+            commands::improvements_status,
+            commands::improvements_check,
             // Window Management commands
             commands::minimize_window,
             commands::maximize_window,
