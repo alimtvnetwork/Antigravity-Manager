@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowRightLeft, Search, RotateCw, X, Check, Eye, EyeOff } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { maskEmail } from '../../utils/maskEmail';
@@ -97,6 +97,7 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
     const [switchingAccountId, setSwitchingAccountId] = useState<string | null>(null);
     const [showAllEmails, setShowAllEmails] = useState(false);
     const [revealedEmails, setRevealedEmails] = useState<Record<string, boolean>>({});
+    const searchInputRef = useRef<HTMLInputElement | null>(null);
 
     const targetId = switchTargetInstance?.config?.id;
     const isSwitching = Boolean(targetId && actionState[targetId] === 'switch') || switchingAccountId !== null;
@@ -116,12 +117,17 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                 return;
             }
             if (e.key === 'Escape') {
+                if (accountSearchQuery) {
+                    setAccountSearchQuery('');
+                    searchInputRef.current?.focus();
+                    return;
+                }
                 close();
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [close, isAnySwitching, switchTargetInstance]);
+    }, [close, isAnySwitching, switchTargetInstance, accountSearchQuery, setAccountSearchQuery]);
 
     if (!switchTargetInstance || !targetId) return null;
 
@@ -184,11 +190,11 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
             }}
         >
             <div
-                className="backdrop-blur-md bg-white/95 dark:bg-[var(--ui-surface-1)]/95 border border-slate-200/90 dark:border-[var(--ui-border-subtle)] shadow-2xl rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col"
+                className="backdrop-blur-md bg-white/95 dark:bg-[#171025]/95 border border-slate-200/90 dark:border-[#40285e] shadow-2xl rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between pb-3.5 border-b border-slate-200/90 dark:border-[var(--ui-border-subtle)]">
+                <div className="flex items-center justify-between pb-3.5 border-b border-slate-200/90 dark:border-[#40285e]">
                     <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 dark:text-[var(--ui-interactive)] border border-purple-500/20 shadow-2xs">
                             <ArrowRightLeft className="w-5 h-5" />
@@ -209,17 +215,17 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                     </span>
                                 </p>
                                 {boundQuota && (boundQuota.fourH !== null || boundQuota.weekly !== null) && (
-                                    <div className="inline-flex items-center rounded-full border border-slate-200/90 dark:border-[var(--ui-border-subtle)] bg-slate-100/80 dark:bg-[var(--ui-canvas)]/80 backdrop-blur-xs px-2 py-0.5 text-[9px] font-mono shadow-2xs text-slate-600 dark:text-[var(--ui-text-secondary)]">
+                                    <div className="inline-flex items-center rounded-full border border-slate-200/90 dark:border-[#40285e] bg-slate-100/80 dark:bg-[#090611]/80 backdrop-blur-xs px-2 py-0.5 text-[9px] font-mono shadow-2xs text-slate-600 dark:text-[var(--ui-text-secondary)]">
                                         <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-[var(--ui-text-primary)]">
                                             <span className="text-slate-400 dark:text-[var(--ui-text-muted)] font-normal">4H:</span>
                                             <span>{boundQuota.fourH !== null ? `${Math.round(boundQuota.fourH)}%` : '—'}</span>
                                         </span>
-                                        <span className="w-px h-2 bg-slate-200 dark:bg-[var(--ui-border-subtle)] mx-1 shrink-0" />
+                                        <span className="w-px h-2 bg-slate-200 dark:bg-[#40285e] mx-1 shrink-0" />
                                         <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-[var(--ui-text-primary)]">
                                             <span className="text-slate-400 dark:text-[var(--ui-text-muted)] font-normal">Weekly:</span>
                                             <span>{boundQuota.weekly !== null ? `${Math.round(boundQuota.weekly)}%` : '—'}</span>
                                         </span>
-                                        <span className="w-px h-2 bg-slate-200 dark:bg-[var(--ui-border-subtle)] mx-1 shrink-0" />
+                                        <span className="w-px h-2 bg-slate-200 dark:bg-[#40285e] mx-1 shrink-0" />
                                         <span className="flex items-center gap-1 font-semibold text-purple-700 dark:text-[var(--ui-interactive)]">
                                             <span className="text-slate-400 dark:text-[var(--ui-text-muted)] font-normal">Total:</span>
                                             <span className="font-bold">
@@ -235,7 +241,7 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                     </div>
 
                     {/* Header Action Segmented Capsule */}
-                    <div className="inline-flex items-center rounded-full border border-slate-200/90 dark:border-[var(--ui-border-subtle)] bg-slate-100/80 dark:bg-[var(--ui-canvas)] p-0.5 backdrop-blur-xs shadow-2xs">
+                    <div className="inline-flex items-center rounded-full border border-slate-200/90 dark:border-[#40285e] bg-slate-100/80 dark:bg-[#090611]/80 p-0.5 backdrop-blur-xs shadow-2xs">
                         <button
                             type="button"
                             onClick={() => setShowAllEmails((prev) => !prev)}
@@ -245,7 +251,7 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                         >
                             {showAllEmails ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
-                        <span className="w-px h-3.5 bg-slate-200 dark:bg-[var(--ui-border-subtle)] shrink-0" />
+                        <span className="w-px h-3.5 bg-slate-200 dark:bg-[#40285e] shrink-0" />
                         <button
                             type="button"
                             onClick={close}
@@ -259,34 +265,69 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                     </div>
                 </div>
 
-                {/* Filter Search Input & Counter */}
-                <div className="pt-3.5 pb-1 flex items-center justify-between gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                {/* Filter Search Input & Counter (Contiguous Segmented Capsule) */}
+                <div className="pt-3.5 pb-1">
+                    <div className="relative flex items-center w-full rounded-full border border-slate-200/90 dark:border-[#40285e] bg-slate-50/80 dark:bg-[#090611]/80 shadow-2xs backdrop-blur-xs transition-all duration-150 focus-within:border-purple-400 dark:focus-within:border-[var(--ui-focus-ring)] focus-within:ring-2 focus-within:ring-purple-500/20 dark:focus-within:ring-[var(--ui-focus-ring)]/30">
+                        {/* Search Icon */}
+                        <Search className="w-3.5 h-3.5 ml-3 mr-2 text-slate-400 dark:text-[var(--ui-text-muted)] shrink-0 pointer-events-none transition-colors" />
+
+                        {/* Search Input */}
                         <input
+                            ref={searchInputRef}
                             type="text"
                             value={accountSearchQuery}
                             onChange={(e) => setAccountSearchQuery(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Escape' && accountSearchQuery) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setAccountSearchQuery('');
+                                }
+                            }}
                             disabled={isAnySwitching}
                             placeholder="Filter accounts by email or ID..."
-                            className="w-full pl-9 pr-8 py-1.5 text-xs bg-slate-50/80 dark:bg-[var(--ui-canvas)] border border-slate-200/90 dark:border-[var(--ui-border-subtle)] rounded-full focus:outline-none focus:ring-1 focus:ring-[var(--ui-focus-ring)] text-slate-900 dark:text-slate-100 disabled:opacity-50 transition-colors"
+                            aria-label="Filter accounts"
+                            className="w-full bg-transparent border-0 p-0 py-1.5 text-xs text-slate-900 dark:text-[var(--ui-text-primary)] placeholder:text-slate-400 dark:placeholder:text-[var(--ui-text-muted)] focus:outline-none focus:ring-0 disabled:opacity-50"
                         />
+
+                        {/* Clear Button */}
                         {accountSearchQuery && (
                             <button
                                 type="button"
-                                onClick={() => setAccountSearchQuery('')}
+                                onClick={() => {
+                                    setAccountSearchQuery('');
+                                    searchInputRef.current?.focus();
+                                }}
                                 disabled={isAnySwitching}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5 rounded-full cursor-pointer"
-                                title="Clear filter"
+                                className="p-1 mr-1 text-slate-400 hover:text-slate-700 dark:text-[var(--ui-text-muted)] dark:hover:text-[var(--ui-text-primary)] rounded-full hover:bg-slate-200/60 dark:hover:bg-[var(--ui-surface-hover)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ui-focus-ring)] transition-colors cursor-pointer shrink-0"
+                                title="Clear filter (Esc)"
                                 aria-label="Clear filter"
                             >
                                 <X className="w-3.5 h-3.5" />
                             </button>
                         )}
+
+                        {/* Segment Divider */}
+                        <span className="w-px h-4 bg-slate-200 dark:bg-[#40285e] shrink-0" />
+
+                        {/* Segmented Counter Capsule */}
+                        <div className="flex items-center gap-1 pl-2.5 pr-3 py-1 text-[11px] font-mono shrink-0 select-none">
+                            <span className="font-semibold text-purple-700 dark:text-[var(--ui-interactive)]">
+                                {filtered.length}
+                            </span>
+                            {accountSearchQuery.trim() && filtered.length !== accounts.length && (
+                                <>
+                                    <span className="text-slate-300 dark:text-[#40285e] font-sans">/</span>
+                                    <span className="text-slate-400 dark:text-[var(--ui-text-muted)]">
+                                        {accounts.length}
+                                    </span>
+                                </>
+                            )}
+                            <span className="text-slate-500 dark:text-[var(--ui-text-muted)] font-sans ml-0.5">
+                                {filtered.length === 1 ? 'account' : 'accounts'}
+                            </span>
+                        </div>
                     </div>
-                    <span className="text-[11px] text-slate-400 shrink-0 font-medium px-1 select-none">
-                        {filtered.length} {filtered.length === 1 ? 'account' : 'accounts'}
-                    </span>
                 </div>
 
                 {/* Account List */}
@@ -330,8 +371,8 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                         isCurrent
                                             ? 'bg-emerald-500/10 dark:bg-emerald-950/20 border-emerald-400/50 dark:border-emerald-600/40 shadow-2xs cursor-default'
                                             : isAnySwitching
-                                              ? 'opacity-60 cursor-not-allowed bg-white/80 dark:bg-[var(--ui-surface-1)]/80 border-slate-200/90 dark:border-[var(--ui-border-subtle)]'
-                                              : 'bg-white/80 dark:bg-[var(--ui-surface-1)]/80 border-slate-200/90 dark:border-[var(--ui-border-subtle)] hover:bg-slate-50/90 dark:hover:bg-[var(--ui-surface-hover)] hover:border-purple-400/50 dark:hover:border-[var(--ui-border-emphasis)] hover:shadow-2xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-[var(--ui-focus-ring)]'
+                                              ? 'opacity-60 cursor-not-allowed bg-white/80 dark:bg-[#171025]/80 border-slate-200/90 dark:border-[#40285e]'
+                                              : 'bg-white/80 dark:bg-[#171025]/80 border-slate-200/90 dark:border-[#40285e] hover:bg-slate-50/90 dark:hover:bg-[var(--ui-surface-hover)] hover:border-purple-400/50 dark:hover:border-[var(--ui-border-emphasis)] hover:shadow-2xs cursor-pointer focus:outline-none focus:ring-1 focus:ring-[var(--ui-focus-ring)]'
                                     )}
                                 >
                                     <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -341,7 +382,7 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                                 'w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5 transition-all',
                                                 isCurrent
                                                     ? 'border-emerald-500 bg-emerald-500/20 text-[#1af18d]'
-                                                    : 'border-slate-300 dark:border-[var(--ui-border-subtle)] group-hover:border-purple-400 dark:group-hover:border-[var(--ui-interactive)]'
+                                                    : 'border-slate-300 dark:border-[#40285e] group-hover:border-purple-400 dark:group-hover:border-[var(--ui-interactive)]'
                                             )}
                                         >
                                             {isCurrent && <div className="w-1.5 h-1.5 rounded-full bg-[#1af18d]" />}
@@ -358,12 +399,12 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                                 </span>
                                                 <span
                                                     className={cn(
-                                                        'text-[9px] font-bold px-1.5 py-0.5 rounded shadow-2xs',
+                                                        'inline-flex items-center text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded-md border shadow-2xs uppercase select-none',
                                                         tier.includes('ULTRA')
-                                                            ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
+                                                            ? 'bg-purple-500/10 text-purple-700 border-purple-300/80 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-500/40'
                                                             : tier.includes('PRO')
-                                                              ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300'
-                                                              : 'bg-gray-100 text-gray-600 dark:bg-[var(--ui-border-subtle)] dark:text-slate-300'
+                                                              ? 'bg-sky-500/10 text-sky-700 border-sky-300/80 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-500/40'
+                                                              : 'bg-slate-500/10 text-slate-600 border-slate-300/80 dark:bg-[#090611]/80 dark:text-slate-300 dark:border-[#40285e]'
                                                     )}
                                                 >
                                                     {tier}
@@ -380,17 +421,17 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                             {(fourH !== null || weekly !== null) ? (
                                                 <div className="space-y-2 w-full mt-2">
                                                     {/* Contiguous segmented pill capsule header displaying quota metrics */}
-                                                    <div className="inline-flex items-center rounded-full border border-slate-200/90 dark:border-[var(--ui-border-subtle)] bg-slate-100/80 dark:bg-[var(--ui-canvas)]/80 backdrop-blur-xs px-2.5 py-0.5 text-[10px] font-mono shadow-2xs text-slate-600 dark:text-[var(--ui-text-secondary)]">
+                                                    <div className="inline-flex items-center rounded-full border border-slate-200/90 dark:border-[#40285e] bg-slate-100/80 dark:bg-[#090611]/80 backdrop-blur-xs px-2.5 py-0.5 text-[10px] font-mono shadow-2xs text-slate-600 dark:text-[var(--ui-text-secondary)]">
                                                         <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-[var(--ui-text-primary)]">
                                                             <span className="text-slate-400 dark:text-[var(--ui-text-muted)] font-normal">4H:</span>
                                                             <span>{fourHVal}</span>
                                                         </span>
-                                                        <span className="w-px h-2.5 bg-slate-200 dark:bg-[var(--ui-border-subtle)] mx-1.5 shrink-0" />
+                                                        <span className="w-px h-2.5 bg-slate-200 dark:bg-[#40285e] mx-1.5 shrink-0" />
                                                         <span className="flex items-center gap-1 font-semibold text-slate-700 dark:text-[var(--ui-text-primary)]">
                                                             <span className="text-slate-400 dark:text-[var(--ui-text-muted)] font-normal">Weekly:</span>
                                                             <span>{weeklyVal}</span>
                                                         </span>
-                                                        <span className="w-px h-2.5 bg-slate-200 dark:bg-[var(--ui-border-subtle)] mx-1.5 shrink-0" />
+                                                        <span className="w-px h-2.5 bg-slate-200 dark:bg-[#40285e] mx-1.5 shrink-0" />
                                                         <span className="flex items-center gap-1 font-semibold text-purple-700 dark:text-[var(--ui-interactive)]">
                                                             <span className="text-slate-400 dark:text-[var(--ui-text-muted)] font-normal">Total:</span>
                                                             <span className="font-bold">{totalVal}</span>
@@ -413,7 +454,7 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                                         </div>
                                                     )}
                                                     {weekly !== null && (
-                                                        <div className={cn('space-y-0.5 w-full', fourH !== null && 'pt-1 border-t border-slate-200/50 dark:border-[var(--ui-border-subtle)]/50')}>
+                                                        <div className={cn('space-y-0.5 w-full', fourH !== null && 'pt-1 border-t border-slate-200/50 dark:border-[#40285e]/50')}>
                                                             <div className="flex items-center justify-between text-[10px] font-mono">
                                                                 <span className="truncate text-slate-500 dark:text-slate-400">
                                                                     Weekly Quota
@@ -439,7 +480,7 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
 
                                     {/* Action button: rendered only for non-current accounts */}
                                     {!isCurrent && (
-                                        <div className="inline-flex items-center rounded-full border border-slate-200/90 dark:border-[var(--ui-border-subtle)] bg-slate-100/80 dark:bg-[var(--ui-canvas)] p-0.5 backdrop-blur-xs shadow-2xs shrink-0">
+                                        <div className="inline-flex items-center rounded-full border border-slate-200/90 dark:border-[#40285e] bg-slate-100/80 dark:bg-[#090611]/80 p-0.5 backdrop-blur-xs shadow-2xs shrink-0">
                                             <button
                                                 type="button"
                                                 disabled={isAnySwitching}
@@ -448,10 +489,10 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                                     handleSelect(acc);
                                                 }}
                                                 className={cn(
-                                                    'px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer',
+                                                    'px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ease-out cursor-pointer',
                                                     isAnySwitching
-                                                        ? 'opacity-60 cursor-not-allowed bg-[var(--ui-interactive)] text-white'
-                                                        : 'bg-[var(--ui-interactive)] hover:bg-purple-600 text-white shadow-2xs hover:shadow-xs active:scale-95'
+                                                        ? 'opacity-60 cursor-not-allowed bg-purple-600/60 text-white shadow-none'
+                                                        : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border border-purple-400/30 dark:border-purple-300/20 shadow-xs hover:shadow-md hover:shadow-purple-500/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]'
                                                 )}
                                             >
                                                 {isThisSwitching ? (
