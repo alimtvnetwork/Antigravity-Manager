@@ -1,6 +1,6 @@
 # Plan 86: Update Integrity: Verify Release Assets Before Announcing, Installer Pre-Check, Release Gates
 
-Status: pending
+Status: COMPLETED
 Raised: 2026-09-30
 Problem class (one PR scope): Update and release integrity
 Spec: [02-spec/21-app/85-instance-switch-update-integrity-ui-fixes-and-supabase-vault.md](../../../02-spec/21-app/85-instance-switch-update-integrity-ui-fixes-and-supabase-vault.md)

@@ -1,6 +1,6 @@
 # Plan 91: CI Workflow Deadlines and Release CI Gate
 
-> **Status:** PENDING
+> **Status:** COMPLETED
 > **Raised:** 2026-10-01
 > **Suggestion:** [suggestions/04-cicd-release-and-workflow-hardening.md](../../suggestions/04-cicd-release-and-workflow-hardening.md)
 > **Related:** RCA 40, RCA 42, issue 56 (resolved), plan 86

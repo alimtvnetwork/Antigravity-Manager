@@ -1,6 +1,6 @@
 # Plan 88: Email Recipient Dedupe and Supabase push-settings One-Liner
 
-Status: pending
+Status: COMPLETED
 Raised: 2026-09-30
 Problem class (one PR scope): Data hygiene (email) and Supabase/vault tooling
 Spec: [02-spec/21-app/85-instance-switch-update-integrity-ui-fixes-and-supabase-vault.md](../../../02-spec/21-app/85-instance-switch-update-integrity-ui-fixes-and-supabase-vault.md)

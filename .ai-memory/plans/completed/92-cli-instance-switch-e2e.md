@@ -1,6 +1,6 @@
 # Plan 92: CLI instance switch on a copy
 
-> **Status:** IN PROGRESS
+> **Status:** COMPLETED
 > **Spec:** [02-spec/21-app/92-cli-instance-switch-e2e.md](../../../02-spec/21-app/92-cli-instance-switch-e2e.md)
 
 ## Done this pass

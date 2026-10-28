@@ -1,6 +1,6 @@
 # Plan: Guideline Prompt and Installer Upgrade
 
-**Status:** PENDING
+**Status:** COMPLETED
 
 ## Acceptance Criteria
 

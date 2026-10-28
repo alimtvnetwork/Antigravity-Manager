@@ -1,6 +1,6 @@
 # 139 - Switch Follow-ups: PID Refresh Parity, agy Session Resume, Live E2E
 
-Status: pending
+Status: COMPLETED
 Created: 2026-10-06
 Source: session of 2026-10-02 (v4.124.0, v4.125.0, `366d84e5`); memory `.ai-memory/memory/learned/23-switch-audit-default-key-and-wrapper-pid-recovery.md`
 Task register: `.ai-memory/plans/readme.md` "Recent Completed Tasks Register"

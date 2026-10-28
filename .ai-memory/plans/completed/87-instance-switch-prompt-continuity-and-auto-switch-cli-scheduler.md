@@ -1,6 +1,6 @@
 # Plan 87: Instance Switch Prompt Continuity and Auto-Switch CLI with Scheduler
 
-Status: pending
+Status: COMPLETED
 Raised: 2026-09-30
 Problem class (one PR scope): Multi-instance switching and auto-switch
 Spec: [02-spec/21-app/85-instance-switch-update-integrity-ui-fixes-and-supabase-vault.md](../../../02-spec/21-app/85-instance-switch-update-integrity-ui-fixes-and-supabase-vault.md)

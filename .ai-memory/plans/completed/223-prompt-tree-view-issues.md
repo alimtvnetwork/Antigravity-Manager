@@ -1,6 +1,6 @@
 # Plan 223: Prompt Tree View Issues
 
-**Status:** DONE
+**Status:** COMPLETED
 
 ## Steps
 
