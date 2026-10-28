@@ -1,12 +1,10 @@
 import type { useAccountsState } from "./useAccountsState";
 import type { useAccountsHandlers } from "./useAccountsHandlers";
 import type { Account } from "../../types/account";
-import { useAccountStore } from "../../stores/useAccountStore";
 import AccountDetailsDialog from "../../components/accounts/AccountDetailsDialog";
 import AccountErrorDialog from "../../components/accounts/AccountErrorDialog";
 import { UnifiedBackupModal } from "../../components/modals/UnifiedBackupModal";
 import ModalDialog from "../../components/common/ModalDialog";
-import { WarmupConfirmModal } from "../../components/accounts/WarmupConfirmModal";
 
 type AccountsState = ReturnType<typeof useAccountsState>;
 type AccountsHandlers = ReturnType<typeof useAccountsHandlers>;
@@ -25,23 +23,7 @@ export function AccountsDialogs({ state, handlers }: AccountsDialogsProps) {
     isBatchDelete, setIsBatchDelete,
     isDeleting,
     selectedIds,
-    isWarmupConfirmOpen, setIsWarmupConfirmOpen,
-    isWarmuping,
   } = state;
-
-  const handleWarmupConfirm = async (): Promise<void> => {
-    setIsWarmupConfirmOpen(false);
-    const customWarmup = (handlers as { handleWarmupAccounts?: () => Promise<void> }).handleWarmupAccounts;
-    if (typeof customWarmup === 'function') {
-      await customWarmup();
-      return;
-    }
-    if (typeof handlers.handleWarmupAll === 'function') {
-      await handlers.handleWarmupAll();
-      return;
-    }
-    await useAccountStore.getState().warmUpAccounts();
-  };
   return (
     <>
       <AccountDetailsDialog
@@ -95,15 +77,6 @@ export function AccountsDialogs({ state, handlers }: AccountsDialogsProps) {
         onConfirm={handlers.executeBatchDelete}
         onCancel={() => setIsBatchDelete(false)}
         onClose={() => setIsBatchDelete(false)}
-      />
-
-      {/* Account Warmup Confirmation Modal */}
-      <WarmupConfirmModal
-        isOpen={isWarmupConfirmOpen}
-        onClose={() => setIsWarmupConfirmOpen(false)}
-        onConfirm={handleWarmupConfirm}
-        selectedCount={selectedIds.size}
-        isWarmuping={isWarmuping}
       />
     </>
   );

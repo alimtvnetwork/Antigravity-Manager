@@ -3,15 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { Sparkles, Check } from 'lucide-react';
 import { ScheduledWarmupConfig } from '../../types/config';
 import { MODEL_CONFIG } from '../../config/modelConfig';
-import {
-    TokenShieldCallout,
-    WarmupStatusCapsule,
-    WarmupInFlightTracker,
-    WarmupDiagnosticBanner,
-    TokenExpenditureHUD,
-    WarmupHeartbeatWaveform,
-    ModelLatencySparklines,
-} from './warmup';
 
 interface SmartWarmupProps {
     config: ScheduledWarmupConfig;
@@ -61,10 +52,7 @@ const SmartWarmup: React.FC<SmartWarmupProps> = ({ config, onChange }) => {
 
     return (
         <div className="space-y-4">
-            {/* Diagnostic Alert Banner for Warmup Anomalies */}
-            <WarmupDiagnosticBanner />
-
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 ${config.enabled
                         ? 'bg-orange-500 text-white'
@@ -73,19 +61,15 @@ const SmartWarmup: React.FC<SmartWarmupProps> = ({ config, onChange }) => {
                         <Sparkles size={20} />
                     </div>
                     <div>
-                        <div className="flex flex-wrap items-center gap-2.5">
-                            <span className="font-bold text-gray-900 dark:text-gray-100">
-                                {t('settings.warmup.title', '7-Day Weekly Quota Smart Warmup')}
-                            </span>
-                            {/* Dark-Glass Status Capsule */}
-                            <WarmupStatusCapsule status={config.enabled ? 'Active' : 'Paused'} />
+                        <div className="font-bold text-gray-900 dark:text-gray-100">
+                            {t('settings.warmup.title', '7-Day Weekly Quota Smart Warmup')}
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                             {t('settings.warmup.desc', 'Automatically wakes once when the 7-day weekly quota reset time is reached to start the weekly timer, with zero excess usage.')}
                         </p>
                     </div>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <label className="relative inline-flex items-center cursor-pointer">
                     <input
                         type="checkbox"
                         className="sr-only peer"
@@ -97,26 +81,13 @@ const SmartWarmup: React.FC<SmartWarmupProps> = ({ config, onChange }) => {
             </div>
 
             {config.enabled && (
-                <div className="mt-4 pt-4 border-t border-gray-50 dark:border-base-300 animate-in slide-in-from-top-2 duration-300 space-y-4">
-                    {/* Live In-Flight Request Pulse Waves & Progress Tracker */}
-                    <WarmupInFlightTracker />
-
-                    {/* Live Token Expenditure HUD & Micro-Counter */}
-                    <TokenExpenditureHUD />
-
-                    {/* Telemetry Visualizers: Heartbeat Waveform & Model Latency */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <WarmupHeartbeatWaveform />
-                        <ModelLatencySparklines />
-                    </div>
-
-                    {/* Model Scope Selection */}
+                <div className="mt-4 pt-4 border-t border-gray-50 dark:border-base-300 animate-in slide-in-from-top-2 duration-300">
                     <div className="space-y-3">
                         <div>
                             <label className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest block mb-2">
                                 {t('settings.warmup.monitored_models_label', 'Warmup Model Scope')}
                             </label>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div className="grid grid-cols-4 gap-2">
                                 {warmupModelsOptions.map((model) => {
                                     const isSelected = config.monitored_models?.includes(model.id);
                                     return (
@@ -148,9 +119,6 @@ const SmartWarmup: React.FC<SmartWarmupProps> = ({ config, onChange }) => {
                             </p>
                         </div>
                     </div>
-
-                    {/* Zero-Usage Verification Callout & Token Shield */}
-                    <TokenShieldCallout />
                 </div>
             )}
         </div>

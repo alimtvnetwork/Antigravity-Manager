@@ -10,8 +10,6 @@ import { useAccountCardModels } from './AccountCard/useAccountCardModels';
 import { AccountCardHeader } from './AccountCard/AccountCardHeader';
 import { AccountCardQuota } from './AccountCard/AccountCardQuota';
 import { AccountCardActions } from './AccountCard/AccountCardActions';
-import { WarmupImminenceGlow, isImminentWindow } from './WarmupImminenceGlow';
-import { getRemainingSeconds } from '../../utils/timeFormat';
 
 export type { AccountCardProps } from './AccountCard/types';
 
@@ -62,72 +60,68 @@ function AccountCard({ account, selected, onSelect, isCurrent: propIsCurrent, is
     });
 
     const cardRef = useRef<HTMLDivElement>(null);
-    const primaryWeeklyReset = weeklyItems[0]?.resetTime;
-    const isResetImminent = isImminentWindow(getRemainingSeconds(primaryWeeklyReset));
 
     return (
-        <WarmupImminenceGlow isImminent={isResetImminent} showBadge={false}>
-            <div
-                id={`account-card-${account.id}`}
-                ref={cardRef}
-                className={cn(
-                "flex flex-col p-2 sm:p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800/80 border-l-2 transition-all duration-200 bg-white dark:bg-[#171025]",
-                isFocused
-                    ? "bg-teal-50/90 dark:bg-[#171025] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/80 dark:border-slate-800/80 shadow-md ring-1 ring-cyan-500/30"
-                    : isCurrent
-                    ? cn(SELECTED_CARD_CLASSES, "hover:bg-slate-200/60 dark:hover:bg-[#171025]")
-                    : selected
-                    ? "bg-blue-50/90 dark:bg-[#171025] text-blue-950 dark:text-blue-100 border-l-blue-500 dark:border-l-blue-500 font-semibold shadow-xs ring-1 ring-blue-500/30"
-                    : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50/80 dark:hover:bg-[#171025]/60 hover:text-slate-900 dark:hover:text-white hover:border-l-blue-500/70",
-                (isRefreshing || isDisabled) && "opacity-70"
-            )}>
+        <div
+            id={`account-card-${account.id}`}
+            ref={cardRef}
+            className={cn(
+            "flex flex-col p-2 sm:p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800/80 border-l-2 transition-all duration-200 bg-white dark:bg-[#171025]",
+            isFocused
+                ? "bg-teal-50/90 dark:bg-[#171025] text-slate-900 dark:text-cyan-300 font-bold border-l-cyan-500 dark:border-l-cyan-400 border-slate-200/80 dark:border-slate-800/80 shadow-md ring-1 ring-cyan-500/30"
+                : isCurrent
+                ? cn(SELECTED_CARD_CLASSES, "hover:bg-slate-200/60 dark:hover:bg-[#171025]")
+                : selected
+                ? "bg-blue-50/90 dark:bg-[#171025] text-blue-950 dark:text-blue-100 border-l-blue-500 dark:border-l-blue-500 font-semibold shadow-xs ring-1 ring-blue-500/30"
+                : "border-l-transparent text-gray-800 dark:text-gray-200 hover:bg-slate-50/80 dark:hover:bg-[#171025]/60 hover:text-slate-900 dark:hover:text-white hover:border-l-blue-500/70",
+            (isRefreshing || isDisabled) && "opacity-70"
+        )}>
 
-                <AccountCardHeader
-                    account={account}
-                    selected={selected}
-                    isCurrent={isCurrent}
-                    isFocused={isFocused}
-                    isDisabled={isDisabled}
-                    validationBlockedLabel={validationBlockedLabel}
-                    boundInstance={boundInstance}
-                    onSelect={onSelect}
-                    onUpdatePriority={onUpdatePriority}
-                />
+            <AccountCardHeader
+                account={account}
+                selected={selected}
+                isCurrent={isCurrent}
+                isFocused={isFocused}
+                isDisabled={isDisabled}
+                validationBlockedLabel={validationBlockedLabel}
+                boundInstance={boundInstance}
+                onSelect={onSelect}
+                onUpdatePriority={onUpdatePriority}
+            />
 
-                <AccountCardQuota
-                    account={account}
-                    isDisabled={isDisabled}
-                    validationBlockedLabel={validationBlockedLabel}
-                    displayModels={displayModels}
-                    weeklyItems={weeklyItems}
-                    isModelProtected={isModelProtected}
-                    onViewError={onViewError}
-                />
+            <AccountCardQuota
+                account={account}
+                isDisabled={isDisabled}
+                validationBlockedLabel={validationBlockedLabel}
+                displayModels={displayModels}
+                weeklyItems={weeklyItems}
+                isModelProtected={isModelProtected}
+                onViewError={onViewError}
+            />
 
-                <AccountCardActions
-                    account={account}
-                    isRefreshing={isRefreshing}
-                    isSwitching={isSwitching}
-                    isDisabled={isDisabled}
-                    isEditingLabel={isEditingLabel}
-                    labelInput={labelInput}
-                    onSwitch={onSwitch}
-                    onRefresh={onRefresh}
-                    onViewDetails={onViewDetails}
-                    onViewDevice={onViewDevice}
-                    onExport={onExport}
-                    onDelete={onDelete}
-                    onToggleProxy={onToggleProxy}
-                    onWarmup={onWarmup}
-                    onUpdateLabel={onUpdateLabel}
-                    setIsEditingLabel={setIsEditingLabel}
-                    setLabelInput={setLabelInput}
-                    handleSaveLabel={handleSaveLabel}
-                    handleCancelLabel={handleCancelLabel}
-                    handleKeyDown={handleKeyDown}
-                />
-            </div>
-        </WarmupImminenceGlow>
+            <AccountCardActions
+                account={account}
+                isRefreshing={isRefreshing}
+                isSwitching={isSwitching}
+                isDisabled={isDisabled}
+                isEditingLabel={isEditingLabel}
+                labelInput={labelInput}
+                onSwitch={onSwitch}
+                onRefresh={onRefresh}
+                onViewDetails={onViewDetails}
+                onViewDevice={onViewDevice}
+                onExport={onExport}
+                onDelete={onDelete}
+                onToggleProxy={onToggleProxy}
+                onWarmup={onWarmup}
+                onUpdateLabel={onUpdateLabel}
+                setIsEditingLabel={setIsEditingLabel}
+                setLabelInput={setLabelInput}
+                handleSaveLabel={handleSaveLabel}
+                handleCancelLabel={handleCancelLabel}
+                handleKeyDown={handleKeyDown}
+            />
+        </div >
     );
 }
 
