@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.275.1] - 2026-10-28
+
+### Improved
+- Telegram Screenshot Mosaic Completeness: `/shot`, `/screenshot`, and per-instance `i:sc:` now send the AGM window, virtual desktop, AGM Instances page, AGM Accounts page, and each running Antigravity IDE window (capped at 8, PID-filtered for `i:sc:`) from `src-tauri/src/modules/telegram_inbound/open_shot.rs` instead of photographing only the current manager window (Thanks to @aukgit)
+
+### Fixed
+- Local `/screenshot` Bypass: `ui_remote` Shot now routes through `execute_screenshot_command` so typed `/screenshot` and All shots use the same mosaic pipeline as the instance card Shot button (Thanks to @aukgit)
+- Telegram Image Copy Keyboard: inbound image CDN copy buttons now clamp `copy_text` to `TELEGRAM_COPY_TEXT_MAX` (256) in `src-tauri/src/modules/telegram_inbound/daemon.rs` so a long URL cannot reject the whole keyboard (Thanks to @aukgit)
+
+---
+
 ## [v4.275.0] - 2026-10-28
 
 ### Added
@@ -1457,6 +1468,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.275.1 (2026-10-28)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.275.0 (2026-10-28)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

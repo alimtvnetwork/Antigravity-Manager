@@ -694,7 +694,10 @@ pub async fn handle_instance_callback(token: &str, chat_id: i64, data: &str) -> 
             );
         }
         "sc" => {
-            let reply = open_shot::execute_screenshot_command("").await;
+            let reply = match resolve_instance_prefix(id) {
+                Some(inst) => open_shot::execute_instance_screenshot(&inst).await,
+                None => open_shot::execute_screenshot_command("").await,
+            };
             crate::error::record_ignored(
                 send_telegram_message_with_markup(token, chat_id, &reply, None, false).await,
                 "send screenshot ack",

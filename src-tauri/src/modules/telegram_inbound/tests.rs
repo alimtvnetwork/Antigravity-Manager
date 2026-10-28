@@ -367,4 +367,16 @@ pub(crate) mod tests {
             "/export instances csv"
         ));
     }
+
+    #[test]
+    fn test_empty_screenshot_target_is_local() {
+        assert_eq!(
+            resolve_machine_target("").expect("empty screenshot"),
+            OpenShotTarget::Local
+        );
+        assert_eq!(
+            resolve_machine_target("all").expect("all screenshot"),
+            OpenShotTarget::All
+        );
+    }
 }

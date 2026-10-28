@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.275.0)
+> Professional AI Account Management & Protocol Proxy System (v4.275.1)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.275.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.275.1-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.275.1**: Telegram Screenshot Mosaic — IDE Windows, AGM Instances, AGM Accounts & Shot Pipeline Unify — `/shot`, `/screenshot`, and per-instance `i:sc:` now send the AGM window, virtual desktop, AGM Instances page, AGM Accounts page, and each running Antigravity IDE window (capped at 8, PID-filtered for `i:sc:`) from `src-tauri/src/modules/telegram_inbound/open_shot.rs`; local Shot in `ui_remote.rs` routes through `execute_screenshot_command` instead of photographing only the current manager window; inbound image copy buttons clamp `copy_text` to 256 characters. (Thanks to @aukgit)
 
 > Latest version **v4.275.0**: Telegram Feature Enhancement — Per-Instance Status Cards, Copy/Rerun/FF/Screenshot, Downloadable CSV & Hover Shade — `/status` and `/observe` now fan out one compact HTML card per registered instance from `src-tauri/src/modules/telegram_inbound/instance_cards.rs` with running/queued prompts and projects, a 100-word expandable preview, Copy (`copy_text` clamped to Telegram's 256-character Bot API cap so the keyboard is no longer rejected), Full prompt as a `.txt` document, Rerun, Done?, Released?, Auto, Fast-Forward (`trigger_manual_rotation_for_instance`), Screenshot (AGM window + VirtualScreen desktop mosaic), and Refresh; instances CSV is sent as `application/octet-stream` with timestamped filenames and prompt/project count columns so Telegram actually downloads the file; hover on instance/Telegram cards uses `.agm-hover-shade` color/shadow animation without translating position; isolated `agm instances test-create` switch+restore E2E restored the same prompt id after account switch while Default and v2-3127 stayed running. Spec: `02-spec/21-app/234-telegram-feature-enhancement/`. (Thanks to @aukgit)
 

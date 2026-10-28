@@ -280,7 +280,7 @@ pub fn ui_service_goto(actor: InteractionActor, route_raw: &str) -> Result<Strin
 /// record; this POST triggers the live Tauri-event navigation so the UI
 /// responds immediately instead of waiting for a poll. Best-effort: any
 /// failure is tracked and the queued intent remains.
-async fn post_ui_navigate_event(route: &str) {
+pub(crate) async fn post_ui_navigate_event(route: &str) {
     let token: String = crate::modules::config::load_app_config()
         .ok()
         .and_then(|c| {
@@ -512,7 +512,7 @@ pub fn help_copy_markup() -> Value {
 pub fn window_command_section() -> &'static str {
     "\n\
     🎨 <b>Window, screenshot, and where the next prompt goes</b>\n\
-    🔵 <b>This machine.</b> <code>/ui</code> opens Antigravity Manager when it is closed. <code>/shot</code> opens it only if needed, then sends a picture of the current manager window back to this chat. Each machine that runs the manager answers for its own screen.\n\
+    🔵 <b>This machine.</b> <code>/ui</code> opens Antigravity Manager when it is closed. <code>/shot</code> and <code>/screenshot</code> send the desktop mosaic, AGM Instances, AGM Accounts, and each running Antigravity IDE window. Each machine that runs the manager answers for its own screen.\n\
     <pre>/ui\n/shot\n/target default C001</pre>\n\
     🟢 Send <code>/target &lt;instance&gt; &lt;C001&gt;</code> first — your next plain message becomes the prompt for that conversation. <code>/target clear</code> cancels. For a guided picker with delivery proof, use <code>/send</code>.\n\
     🟡 <code>/open &lt;machine&gt;</code> opens AGM on a fleet machine; <code>/screenshot &lt;machine&gt;</code> photographs it. Bare <code>/open</code> / <code>/screenshot</code> stay local.\n\
@@ -629,8 +629,8 @@ fn open_target_verb(rest: &str) -> Option<UiVerb> {
 
 fn shot_target_verb(rest: &str) -> Option<UiVerb> {
     match super::open_shot::resolve_machine_target(rest) {
-        Ok(super::open_shot::OpenShotTarget::Remote(_)) => None,
-        _ => Some(UiVerb::Shot),
+        Ok(super::open_shot::OpenShotTarget::Local) if rest.trim().is_empty() => Some(UiVerb::Shot),
+        _ => None,
     }
 }
 
@@ -688,23 +688,15 @@ async fn run_ui_verb(verb: UiVerb) -> LocalUiAction {
                 caption: String::new(),
             }
         }
-        UiVerb::Shot => match capture_manager_png() {
-            Ok(png) => LocalUiAction {
-                reply: format!(
-                    "📸 <b>Screenshot sent</b> from <code>{}</code>.\nThe picture is the Antigravity Manager window on this machine.",
-                    clean_machine()
-                ),
+        UiVerb::Shot => {
+            let reply = super::open_shot::execute_screenshot_command("").await;
+            LocalUiAction {
+                reply,
                 markup: Some(help_copy_markup()),
-                caption: format!("AGM window on {}", clean_machine()),
-                png: Some(png),
-            },
-            Err(err) => LocalUiAction {
-                reply: format!("❌ <b>Screenshot failed:</b> <code>{}</code>", escape_html(&err)),
-                markup: None,
                 png: None,
                 caption: String::new(),
-            },
-        },
+            }
+        }
         UiVerb::ShowAim => LocalUiAction {
             reply: aim_status_html(),
             markup: Some(help_copy_markup()),
@@ -815,10 +807,7 @@ async fn run_ui_verb(verb: UiVerb) -> LocalUiAction {
                     injected
                 ),
                 markup: None,
-                caption: format!(
-                    "AGM after prompt to {} on {}",
-                    conversation, instance
-                ),
+                caption: format!("AGM after prompt to {} on {}", conversation, instance),
                 png,
             }
         }

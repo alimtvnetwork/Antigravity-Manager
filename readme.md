@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.275.0-3B82F6?style=flat-square" alt="Version v4.275.0">
+    <img src="https://img.shields.io/badge/Version-v4.275.1-3B82F6?style=flat-square" alt="Version v4.275.1">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,7 +116,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.275.0)**
+**Bar 2: Version-Based Installation (v4.275.1)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.258.0/install.ps1))) -Version "v4.258.0"
 ```
@@ -645,6 +645,8 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
 ## 📝 Changelog
+
+> Latest version **v4.275.1**: Telegram Screenshot Mosaic — IDE Windows, AGM Instances, AGM Accounts & Shot Pipeline Unify — `/shot`, `/screenshot`, and per-instance `i:sc:` now send the AGM window, virtual desktop, AGM Instances page, AGM Accounts page, and each running Antigravity IDE window (capped at 8, PID-filtered for `i:sc:`) from `src-tauri/src/modules/telegram_inbound/open_shot.rs`; local Shot in `ui_remote.rs` routes through `execute_screenshot_command` instead of photographing only the current manager window; inbound image copy buttons clamp `copy_text` to 256 characters. (Thanks to @aukgit)
 
 > Latest version **v4.275.0**: Telegram Feature Enhancement — Per-Instance Status Cards, Copy/Rerun/FF/Screenshot, Downloadable CSV & Hover Shade — `/status` and `/observe` now fan out one compact HTML card per registered instance from `src-tauri/src/modules/telegram_inbound/instance_cards.rs` with running/queued prompts and projects, a 100-word expandable preview, Copy (`copy_text` clamped to Telegram's 256-character Bot API cap so the keyboard is no longer rejected), Full prompt as a `.txt` document, Rerun, Done?, Released?, Auto, Fast-Forward (`trigger_manual_rotation_for_instance`), Screenshot (AGM window + VirtualScreen desktop mosaic), and Refresh; instances CSV is sent as `application/octet-stream` with timestamped filenames and prompt/project count columns so Telegram actually downloads the file; hover on instance/Telegram cards uses `.agm-hover-shade` color/shadow animation without translating position; isolated `agm instances test-create` switch+restore E2E restored the same prompt id after account switch while Default and v2-3127 stayed running. Spec: `02-spec/21-app/234-telegram-feature-enhancement/`. (Thanks to @aukgit)
 

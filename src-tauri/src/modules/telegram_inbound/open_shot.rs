@@ -421,6 +421,120 @@ fn capture_desktop_png() -> Result<Vec<u8>, String> {
     Err("desktop capture is implemented for Windows".to_string())
 }
 
+const MAX_IDE_SHOTS: usize = 8;
+
+fn pids_for_instance(instance_id: &str) -> Vec<u32> {
+    let reg = crate::modules::instance::load_registry().unwrap_or_default();
+    let Some(inst) = reg.instances.iter().find(|i| i.id == instance_id) else {
+        return Vec::new();
+    };
+    crate::modules::instance::find_pids_for_data_dir(&inst.data_dir, inst.is_default)
+}
+
+/// Photograph each visible Antigravity IDE window (not the AGM manager).
+#[cfg(target_os = "windows")]
+fn capture_ide_windows(filter_pids: Option<&[u32]>) -> Result<Vec<(String, Vec<u8>)>, String> {
+    let dir = std::env::temp_dir().join("agm-ui-shot");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("create ide shot folder: {e}"))?;
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let out_dir = dir.join(format!("ides-{stamp}"));
+    std::fs::create_dir_all(&out_dir).map_err(|e| format!("create ide shot dir: {e}"))?;
+    let script = dir.join(format!("ides-{stamp}.ps1"));
+    {
+        let mut file =
+            std::fs::File::create(&script).map_err(|e| format!("write ide shot script: {e}"))?;
+        file.write_all(IDE_WINDOWS_CAPTURE_PS1.as_bytes())
+            .map_err(|e| format!("write ide shot script bytes: {e}"))?;
+    }
+    let pids_arg = filter_pids
+        .filter(|p| !p.is_empty())
+        .map(|p| {
+            p.iter()
+                .map(|id| id.to_string())
+                .collect::<Vec<_>>()
+                .join(",")
+        })
+        .unwrap_or_default();
+    let mut ps_cmd = Command::new("powershell.exe");
+    {
+        use std::os::windows::process::CommandExt;
+        ps_cmd.creation_flags(0x08000000);
+    }
+    let output = ps_cmd
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            &script.to_string_lossy(),
+            "-OutDir",
+            &out_dir.to_string_lossy(),
+            "-Pids",
+            &pids_arg,
+            "-Max",
+            &MAX_IDE_SHOTS.to_string(),
+        ])
+        .output()
+        .map_err(|e| format!("start ide screenshot helper: {e}"))?;
+    crate::error::record_ignored(std::fs::remove_file(&script), "remove temp ide script");
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!(
+            "ide capture helper exited {}: {}",
+            output.status,
+            stderr.trim()
+        ));
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut shots = Vec::new();
+    for line in stdout.lines() {
+        let line = line.trim();
+        let Some(rest) = line.strip_prefix("FILE|") else {
+            continue;
+        };
+        let mut parts = rest.splitn(3, '|');
+        let Some(name) = parts.next() else {
+            continue;
+        };
+        let _pid = parts.next();
+        let title = parts.next().unwrap_or("Antigravity IDE");
+        let png_path = out_dir.join(name);
+        match std::fs::read(&png_path) {
+            Ok(bytes) if is_valid_png(&bytes) => {
+                shots.push((title.to_string(), bytes));
+            }
+            Ok(_) => {
+                tracing::warn!(path = %png_path.display(), "ide capture produced invalid PNG");
+            }
+            Err(e) => {
+                tracing::warn!(path = %png_path.display(), error = %e, "read ide capture png");
+            }
+        }
+        crate::error::record_ignored(std::fs::remove_file(&png_path), "remove temp ide png");
+    }
+    crate::error::record_ignored(std::fs::remove_dir(&out_dir), "remove temp ide shot dir");
+    Ok(shots)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn capture_ide_windows(_filter_pids: Option<&[u32]>) -> Result<Vec<(String, Vec<u8>)>, String> {
+    Err("IDE window capture is implemented for Windows".to_string())
+}
+
+async fn capture_agm_route(route: &str) -> Result<Vec<u8>, String> {
+    crate::error::record_ignored(
+        super::ui_remote::ui_service_goto(crate::modules::audit::InteractionActor::Telegram, route),
+        "telegram screenshot ui goto",
+    );
+    super::ui_remote::post_ui_navigate_event(route).await;
+    tokio::time::sleep(std::time::Duration::from_millis(700)).await;
+    capture_local_once()
+}
+
 /// Capture this machine's AGM window once (Windows only).
 #[cfg(target_os = "windows")]
 fn capture_local_once() -> Result<Vec<u8>, String> {
@@ -644,13 +758,18 @@ fn capture_for_machine(machine: &ShotMachine) -> Result<Vec<u8>, String> {
     }
 }
 
-/// Handle `/screenshot [machine]` — capture the target machine's screen and
-/// send the image(s) back to the Telegram chat.
-///
-/// No argument captures every known machine; AGM is opened first when needed.
-/// Photos are sent to the chat directly; the returned text is the bot reply.
-/// Failures surface their real messages — never silent success.
+/// Handle `/screenshot [machine]` — capture AGM, desktop, Instances, Accounts,
+/// and each running Antigravity IDE window, then send the photos to Telegram.
 pub async fn execute_screenshot_command(args_str: &str) -> String {
+    screenshot_fanout(args_str, None).await
+}
+
+/// Per-instance `i:sc:` — local AGM + desktop + Instances + Accounts + this instance's IDE windows.
+pub async fn execute_instance_screenshot(instance_id: &str) -> String {
+    screenshot_fanout("", Some(instance_id)).await
+}
+
+async fn screenshot_fanout(args_str: &str, instance_id: Option<&str>) -> String {
     let target = match resolve_machine_target(args_str) {
         Ok(t) => t,
         Err(e) => {
@@ -729,6 +848,60 @@ pub async fn execute_screenshot_command(args_str: &str) -> String {
                 }
                 Err(e) => err_lines.push(format!(
                     "• <code>{label_esc}</code> desktop — <code>{}</code>",
+                    clean_for_telegram_html(&e, 200)
+                )),
+            }
+            for (route, caption_name) in
+                [("instances", "AGM Instances"), ("accounts", "AGM Accounts")]
+            {
+                match capture_agm_route(route).await {
+                    Ok(png) => {
+                        let caption = format!("{caption_name} — {label}");
+                        match send_telegram_photo(&token, chat_id, &png, &caption, None).await {
+                            Ok(_) => ok_lines.push(format!(
+                                "📸 {caption_name} from <code>{label_esc}</code> attached"
+                            )),
+                            Err(e) => err_lines.push(format!(
+                                "• <code>{label_esc}</code> {caption_name} — Telegram rejected the photo: <code>{}</code>",
+                                clean_for_telegram_html(&e.to_string(), 200)
+                            )),
+                        }
+                    }
+                    Err(e) => err_lines.push(format!(
+                        "• <code>{label_esc}</code> {caption_name} — <code>{}</code>",
+                        clean_for_telegram_html(&e, 200)
+                    )),
+                }
+            }
+            let owned_pids = instance_id.map(pids_for_instance).unwrap_or_default();
+            let pid_filter = if owned_pids.is_empty() {
+                None
+            } else {
+                Some(owned_pids.as_slice())
+            };
+            match capture_ide_windows(pid_filter) {
+                Ok(shots) => {
+                    if shots.is_empty() {
+                        err_lines.push(format!(
+                            "• <code>{label_esc}</code> IDE — no Antigravity IDE windows were found"
+                        ));
+                    }
+                    for (title, png) in shots {
+                        let caption = format!("IDE — {title} — {label}");
+                        match send_telegram_photo(&token, chat_id, &png, &caption, None).await {
+                            Ok(_) => ok_lines.push(format!(
+                                "📸 IDE <code>{}</code> from <code>{label_esc}</code> attached",
+                                clean_for_telegram_html(&title, 48)
+                            )),
+                            Err(e) => err_lines.push(format!(
+                                "• <code>{label_esc}</code> IDE — Telegram rejected the photo: <code>{}</code>",
+                                clean_for_telegram_html(&e.to_string(), 200)
+                            )),
+                        }
+                    }
+                }
+                Err(e) => err_lines.push(format!(
+                    "• <code>{label_esc}</code> IDE — <code>{}</code>",
                     clean_for_telegram_html(&e, 200)
                 )),
             }
@@ -837,6 +1010,72 @@ $bmp.Save($OutPath, [System.Drawing.Imaging.ImageFormat]::Png)
 $g.Dispose()
 $bmp.Dispose()
 Write-Output "OK $($bounds.Width)x$($bounds.Height)"
+"#;
+
+/// PowerShell: photograph each visible Antigravity IDE window (excluding AGM).
+const IDE_WINDOWS_CAPTURE_PS1: &str = r#"
+param(
+  [Parameter(Mandatory = $true)][string]$OutDir,
+  [string]$Pids = '',
+  [int]$Max = 8
+)
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class AgmIdeShot {
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+  public struct RECT { public int L; public int T; public int R; public int B; }
+}
+"@
+[void][AgmIdeShot]::SetProcessDPIAware()
+$agmNames = @('agm-alim', 'agm-ui', 'antigravity-tools', 'agm', 'antigravity_manager')
+$pidFilter = @()
+if (-not [string]::IsNullOrWhiteSpace($Pids)) {
+  $pidFilter = $Pids.Split(',') | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^\d+$' } | ForEach-Object { [int]$_ }
+}
+$procs = Get-Process -ErrorAction SilentlyContinue | Where-Object {
+  $_.MainWindowHandle -ne [IntPtr]::Zero -and
+  $agmNames -notcontains $_.ProcessName -and
+  (
+    $_.ProcessName -like 'Antigravity*' -or
+    $_.MainWindowTitle -like '*Antigravity*'
+  )
+}
+if ($pidFilter.Count -gt 0) {
+  $procs = $procs | Where-Object { $pidFilter -contains $_.Id }
+}
+$i = 0
+foreach ($p in $procs) {
+  if ($i -ge $Max) { break }
+  $h = $p.MainWindowHandle
+  [void][AgmIdeShot]::ShowWindow($h, 9)
+  [void][AgmIdeShot]::SetForegroundWindow($h)
+  Start-Sleep -Milliseconds 250
+  $rect = New-Object AgmIdeShot+RECT
+  if (-not [AgmIdeShot]::GetWindowRect($h, [ref]$rect)) { continue }
+  $w = $rect.R - $rect.L
+  $ht = $rect.B - $rect.T
+  if ($w -lt 40 -or $ht -lt 40) { continue }
+  $name = ('ide-{0:d2}.png' -f $i)
+  $out = Join-Path $OutDir $name
+  $bmp = New-Object System.Drawing.Bitmap $w, $ht
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  $g.CopyFromScreen($rect.L, $rect.T, 0, 0, (New-Object System.Drawing.Size($w, $ht)))
+  $bmp.Save($out, [System.Drawing.Imaging.ImageFormat]::Png)
+  $g.Dispose()
+  $bmp.Dispose()
+  $title = $p.MainWindowTitle
+  if ([string]::IsNullOrWhiteSpace($title)) { $title = $p.ProcessName }
+  Write-Output ("FILE|{0}|{1}|{2}" -f $name, $p.Id, $title)
+  $i++
+}
+Write-Output ("OK {0}" -f $i)
 "#;
 
 /// PowerShell: bring the AGM window to the foreground.

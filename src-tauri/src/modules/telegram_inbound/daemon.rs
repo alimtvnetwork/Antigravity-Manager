@@ -338,13 +338,16 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
                             {
                                 "text": "📋 Copy Markdown",
                                 "copy_text": {
-                                    "text": format!("![image]({})", url)
+                                    "text": clamp_telegram_copy_text(
+                                        &format!("![image]({})", url),
+                                        TELEGRAM_COPY_TEXT_MAX,
+                                    )
                                 }
                             },
                             {
                                 "text": "🔗 Copy URL",
                                 "copy_text": {
-                                    "text": url
+                                    "text": clamp_telegram_copy_text(url, TELEGRAM_COPY_TEXT_MAX)
                                 }
                             }
                         ]
@@ -581,13 +584,16 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
                             {
                                 "text": "📋 Copy Markdown",
                                 "copy_text": {
-                                    "text": format!("![image]({})", url)
+                                    "text": clamp_telegram_copy_text(
+                                        &format!("![image]({})", url),
+                                        TELEGRAM_COPY_TEXT_MAX,
+                                    )
                                 }
                             },
                             {
                                 "text": "🔗 Copy URL",
                                 "copy_text": {
-                                    "text": url.clone()
+                                    "text": clamp_telegram_copy_text(url, TELEGRAM_COPY_TEXT_MAX)
                                 }
                             }
                         ]
