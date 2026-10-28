@@ -339,7 +339,8 @@ pub fn run() {
             commands::update_auto_switcher_config,
             commands::toggle_auto_switcher,
             commands::trigger_manual_profile_rotation,
-            // UI interaction audit recorder
+            // UI interaction audit recorder & telemetry
+            commands::record_ui_trace,
             modules::audit::start_ui_audit_recording,
             modules::audit::stop_ui_audit_recording,
             modules::audit::is_ui_audit_recording,

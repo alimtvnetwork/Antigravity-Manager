@@ -171,7 +171,7 @@ pub(crate) async fn check_quota_drop_sensor(
 }
 
 /// Check idle running projects sensor
-pub(crate) async fn check_idle_projects_sensor(m_name: &str, m_ip: &str, last_alert: &mut i64) {
+pub(crate) async fn check_idle_projects_sensor(_m_name: &str, _m_ip: &str, last_alert: &mut i64) {
     // 1. If ANY prompt or conversation is actively running in Antigravity or repo_db, we are NOT idle!
     if crate::modules::repo_db::is_any_prompt_actively_running() {
         return;
@@ -195,26 +195,58 @@ pub(crate) async fn check_idle_projects_sensor(m_name: &str, m_ip: &str, last_al
         return;
     }
 
-    let recipients = match email_vault_db::list_notify_recipients() {
-        Ok(r) => r,
-        Err(_) => return,
+    // 5. Resolve instance id and name for notification hub
+    let (inst_id, inst_name) = {
+        let mut resolved_id = "default".to_string();
+        let mut resolved_name = "Default".to_string();
+        if let Ok(running_projs) = crate::modules::repo_db::list_running_projects() {
+            if let Some(first_p) = idle_projects.first() {
+                if let Some(rp) = running_projs
+                    .iter()
+                    .find(|rp| rp.id == first_p.project_id || rp.repo_path == first_p.repo_path)
+                {
+                    resolved_id = rp.instance_id.clone();
+                } else if let Some((_, inst)) = first_p.project_id.split_once("__") {
+                    resolved_id = inst.to_string();
+                }
+            }
+        }
+        if let Ok(reg) = crate::modules::instance::load_registry() {
+            if let Some(inst) = reg
+                .instances
+                .iter()
+                .find(|i| i.id.eq_ignore_ascii_case(&resolved_id))
+            {
+                resolved_name = inst.name.clone();
+            } else {
+                resolved_name = resolved_id.clone();
+            }
+        }
+        (resolved_id, resolved_name)
     };
 
-    let active_recipients: Vec<String> = recipients
-        .into_iter()
-        .filter(|r| r.is_active)
-        .map(|r| r.email)
-        .collect();
+    let now = Utc::now().timestamp();
+    let idle_duration_secs = idle_projects
+        .iter()
+        .map(|p| now.saturating_sub(p.last_detected_at) as u64)
+        .max()
+        .unwrap_or(180)
+        .max(180);
 
-    if !active_recipients.is_empty() {
-        let (subj, html) = email_sender::render_idle_projects_email(&idle_projects, m_name, m_ip);
-        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-        crate::error::record_ignored(
-            email_sender::dispatch_email_with_failover(&subj, &html, &active_recipients),
-            "dispatch_email_with_failover",
-        );
-        *last_alert = Utc::now().timestamp();
-    }
+    // 6. Dispatch multi-channel idle alert via notification hub (Telegram & Email)
+    let alert_res = crate::modules::notification_hub::dispatch_idle_mode_alert(
+        &inst_id,
+        &inst_name,
+        idle_duration_secs,
+    )
+    .await;
+
+    // Justification: best-effort idle alert notification for Telegram and Email; failure logged and does not affect sensor loop
+    crate::error::record_ignored(
+        alert_res.map(|_| ()),
+        "check_idle_projects_sensor: dispatch_idle_mode_alert",
+    );
+    *last_alert = now;
 }
 
 /// Send workspace switched notification immediately

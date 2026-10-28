@@ -9,20 +9,20 @@ export function InstancesFilterBar({ api }: { api: InstancePageApi }) {
 
     return (
         <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 flex-1 max-w-md bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 rounded-[5px] px-3 py-2 shadow-xs">
-                <Search className="w-4 h-4 text-gray-400 shrink-0" />
+            <div className="flex items-center gap-2 flex-1 max-w-md rounded-full bg-white/90 dark:bg-[#171025]/90 border border-slate-200/90 dark:border-[#40285e]/80 shadow-2xs backdrop-blur-xs px-3.5 py-1.5 transition-all duration-150 focus-within:border-amber-500/60 dark:focus-within:border-amber-500/60 focus-within:ring-2 focus-within:ring-amber-500/20">
+                <Search className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0 pointer-events-none transition-colors" />
                 <input
                     type="text"
                     placeholder={t('instances.search_placeholder', 'Search by profile name, ID, or bound email...')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-transparent border-none outline-hidden text-xs text-gray-900 dark:text-base-content"
+                    className="w-full bg-transparent border-none outline-hidden text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-0"
                 />
                 {Boolean(searchQuery) && (
                     <button
                         type="button"
                         onClick={() => setSearchQuery('')}
-                        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-0.5 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700/60 transition-colors cursor-pointer"
+                        className="text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 p-0.5 rounded-full hover:bg-slate-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer shrink-0 focus:outline-none focus-visible:ring-1 focus-visible:ring-amber-500/50"
                         title={t('common.clear', 'Clear search')}
                         aria-label={t('common.clear', 'Clear search')}
                     >
@@ -41,7 +41,7 @@ export function InstancesFilterBar({ api }: { api: InstancePageApi }) {
                         setIsCreateOpen(true);
                     }
                 }}
-                className="btn btn-primary btn-sm gap-1.5 shadow-sm rounded-[4px] group hover:shadow-md hover:shadow-primary/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 ease-out"
+                className="btn btn-primary btn-sm gap-1.5 px-4 rounded-full font-semibold shadow-2xs group hover:shadow-md hover:shadow-primary/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 ease-out cursor-pointer"
             >
                 <Plus className="w-4 h-4 transition-transform duration-300 group-hover:rotate-90 group-hover:scale-110" />
                 <span>{t('instances.create_btn', 'New Instance')}</span>

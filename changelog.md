@@ -1,5 +1,18 @@
 # Changelog
 
+## [v4.274.0] - 2026-10-28
+
+### Added
+- Idle Mode Auto-Notification Hub: Implemented `dispatch_idle_mode_alert` in `src-tauri/src/modules/notification_hub/idle_alerts.rs` and integrated into `src-tauri/src/modules/email_watcher/sensors.rs`, automatically detecting when IDE instances enter idle mode (`not_fully_idle == 0` and prompt queue empty) and dispatching alerts to Telegram and Email with 600-second per-instance anti-spam deduplication (Thanks to @aukgit)
+- UI Step & Button Click Trace Logging: Created `src/utils/uiLogger.ts` and `src-tauri/src/commands/cmd_ui_trace.rs` (`record_ui_trace`), logging structured `[UI_STEP]` tracing logs and appending records to `task_history_db` audit trail on step transitions and button interactions (Thanks to @aukgit)
+- CLI UI Remote Control Expansion: Expanded `agm ui click` in `src-tauri/src/bin/agm/ui_cmds.rs` to dynamically route instance targets to `/instances` and added `agm instances click <instance_id> <action>` with action alias normalization (`start` -> `launch`, `kill` -> `stop`, `ff` -> `fastforward`) (Thanks to @aukgit)
+- Feature and Instance Management Specification (Task 233): Authored comprehensive architectural, component, and verification specifications under `02-spec/21-app/233-feature-and-instance-management/` and executed multi-agent plan under `.ai-memory/plans/completed/233-feature-and-instance-management.md` and `.ai-memory/plans/subtasks/233-feature-and-instance-management/` (Thanks to @aukgit)
+
+### Improved
+- Instance Section UI Contrast & Switch Button Elevation: Redesigned instance cards in `src/pages/instances/InstanceCard.tsx` with Royal Violet dark glass (`#171025`/90 background, `#40285e`/80 borders, `#120b1e` quota panels) eliminating Chromium opacity washouts; elevated the Switch Account action button in `src/pages/instances/InstanceCardActions.tsx` and `src/components/instances/table/InstanceRowActions.tsx` to an illuminated amber pill badge with 3D yellow tactile hover gradient (`#FDE047` to `#EAB308`, depth shadow `#A16207`); added unambiguous DOM IDs and semantic attributes (`id`, `data-ui-name`, `data-ui-id`) across all instance card action buttons (Thanks to @aukgit)
+
+---
+
 ## [v4.273.1] - 2026-10-28
 
 ### Added
@@ -1425,6 +1438,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.274.0 (2026-10-28)**:
+        -   **[Feature and Instance Management] Instance Card Contrast, 3D Switch Button, Idle Notification Hub, UI Step Logging & CLI Remote Control (Thanks to @aukgit)**:
+            -   **Description**: Redesigned `/instances` cards with Royal Violet dark glass (`#171025`) and solid quota panels (`#120b1e`), elevated Switch Account buttons with illuminated amber styling and 3D yellow tactile hover gradients, implemented automated idle-mode dual-channel notification alerts across Telegram and Email in `idle_alerts.rs`, added structured `[UI_STEP]` step and button click trace logging in `uiLogger.ts` and `cmd_ui_trace.rs`, expanded CLI remote control (`agm ui click` and `agm instances click`), verified instance switching and prompt restoration integrity with zero errors in `errors.db`, and authored comprehensive specifications under `02-spec/21-app/233-feature-and-instance-management/`. (Thanks to @aukgit)
+
+
     *   **v4.273.0 (2026-10-28)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

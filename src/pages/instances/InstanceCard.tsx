@@ -42,7 +42,7 @@ function InstanceCardQuotaSection({
 }: InstanceCardQuotaSectionProps) {
     if (geminiModel || weeklyQuota) {
         return (
-            <div className="p-2 rounded-md bg-gray-50/90 dark:bg-[var(--ui-surface-2)] border border-gray-200/70 dark:border-[var(--ui-border-subtle)] space-y-1.5">
+            <div className="p-2 rounded-md bg-slate-50 dark:bg-[#120b1e] border border-slate-200/80 dark:border-[#40285e]/60 space-y-1.5">
                 {geminiModel && (
                     <div className="space-y-0.5">
                         <div className="flex items-center justify-between text-xs">
@@ -60,7 +60,7 @@ function InstanceCardQuotaSection({
                     </div>
                 )}
                 {weeklyQuota && (
-                    <div className={cn('space-y-0.5', geminiModel && 'pt-1 border-t border-gray-200/60 dark:border-[#40285e]/60')}>
+                    <div className={cn('space-y-0.5', geminiModel && 'pt-1 border-t border-slate-200/80 dark:border-[#40285e]/60')}>
                         <div className="flex items-center justify-between text-xs">
                             <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">
                                 Weekly Quota
@@ -79,7 +79,7 @@ function InstanceCardQuotaSection({
 
     if (boundAccount) {
         return (
-            <div className="p-2 rounded-md bg-gray-50/60 dark:bg-[#171025]/90 border border-gray-100 dark:border-[#40285e] flex items-center justify-between text-xs text-gray-500">
+            <div className="p-2 rounded-md bg-slate-50 dark:bg-[#120b1e] border border-slate-200/80 dark:border-[#40285e]/60 flex items-center justify-between text-xs text-gray-500">
                 <div className="flex items-center gap-1.5">
                     <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-70" />
                     <span className="text-[11px] text-gray-500 dark:text-gray-400">Quota not synced</span>
@@ -96,7 +96,7 @@ function InstanceCardQuotaSection({
     }
 
     return (
-        <div className="p-2 rounded-md bg-gray-50/40 dark:bg-[#171025]/60 border border-dashed border-gray-200 dark:border-[#40285e] flex items-center justify-between text-xs text-gray-400">
+        <div className="p-2 rounded-md bg-slate-50/60 dark:bg-[#120b1e]/60 border border-dashed border-slate-200/80 dark:border-[#40285e]/60 flex items-center justify-between text-xs text-gray-400">
             <div className="flex items-center gap-1.5">
                 <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-40 grayscale" />
                 <span className="text-[10px] italic">No profile bound</span>
@@ -162,12 +162,13 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
     return (
         <div
             key={inst.config.id}
+            id={`instance-card-${inst.config.id}`}
             ref={isActive ? activeCardRef : undefined}
             className={cn(
                 'group relative rounded-[5px] border transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-md flex flex-col justify-between overflow-hidden backdrop-blur-xs',
                 isActive
                     ? SELECTED_CARD_CLASSES
-                    : 'bg-white dark:bg-[var(--ui-surface-1)] border-gray-200/50 dark:border-[var(--ui-border-subtle)] hover:border-gray-300/80 dark:hover:border-[var(--ui-interactive-40)] hover:bg-slate-50/90 dark:hover:bg-[var(--ui-surface-hover)] shadow-xs'
+                    : 'bg-white dark:bg-[#171025]/90 border-slate-200/80 dark:border-[#40285e]/80 hover:border-gray-300/80 hover:dark:border-[#7c3aed]/60 hover:bg-slate-50/90 hover:dark:bg-[#1f1533] shadow-xs'
             )}
         >
             {isBusy && (
@@ -288,8 +289,8 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
 
                     <div
                         className={cn(
-                            'ui-interactive-row py-1 px-2.5 rounded-md bg-gray-50/80 dark:bg-[var(--ui-surface-2)] border border-gray-100 dark:border-[var(--ui-border-subtle)] mb-2.5 flex items-center justify-between gap-1.5',
-                            'group-hover:border-gray-300 dark:group-hover:bg-[var(--ui-surface-hover)] dark:group-hover:border-[var(--ui-interactive-40)]'
+                            'ui-interactive-row py-1 px-2.5 rounded-md bg-slate-50/80 dark:bg-[#120b1e] border border-slate-200/80 dark:border-[#40285e]/60 mb-2.5 flex items-center justify-between gap-1.5',
+                            'group-hover:border-gray-300 dark:group-hover:bg-[#171025] dark:group-hover:border-[#7c3aed]/40'
                         )}
                     >
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">

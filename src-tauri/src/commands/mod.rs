@@ -63,6 +63,7 @@ mod cmd_running_up_next;
 mod cmd_task_history;
 mod cmd_token_stats;
 mod cmd_training;
+mod cmd_ui_trace;
 mod cmd_updates;
 mod cmd_window;
 
@@ -84,5 +85,6 @@ pub use cmd_running_up_next::*;
 pub use cmd_task_history::*;
 pub use cmd_token_stats::*;
 pub use cmd_training::*;
+pub use cmd_ui_trace::*;
 pub use cmd_updates::*;
 pub use cmd_window::*;

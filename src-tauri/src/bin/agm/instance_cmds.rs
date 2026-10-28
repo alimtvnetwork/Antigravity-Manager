@@ -100,6 +100,9 @@ pub(crate) fn dispatch_instance_domain(subcommand: &str, args: &[String]) {
         "ide" => {
             antigravity_tools_lib::modules::cli::handle_ide_subcommand(args);
         }
+        "click" => {
+            crate::ui_cmds::cmd_instances_click(args);
+        }
         _ => crate::common::handle_unknown_domain_command("instances", subcommand, args),
     }
 }

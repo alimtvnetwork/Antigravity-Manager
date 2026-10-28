@@ -1,9 +1,10 @@
-# AI Memory Plans Index (`.ai-memory/plans/`)
+﻿# AI Memory Plans Index (`.ai-memory/plans/`)
 
 ## Active
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [233-feature-and-instance-management.md](./completed/233-feature-and-instance-management.md) | `COMPLETED` | Feature and Instance Management: elevated instance card visual contrast with Royal Violet dark glass, tactile amber Switch Account button with 3D yellow hover gradient, multi-channel idle mode auto-notification hub for Telegram and Email, centralized UI step and click trace logging (`record_ui_trace`), and AGM CLI click bridge expansion (`agm ui click` & `agm instances click`). |
 | [232-account-switching-color-search-and-ui-ux-enhancements.md](./completed/232-account-switching-color-search-and-ui-ux-enhancements.md) | `COMPLETED` | Resolve dark mode contrast breakdown (white-on-white text) in the Switch Account modal (`SwitchAccountDialog.tsx`), caused by Invalid At Computed-Value Time (IACVT) Tailwind CSS variable opacity modifiers, polish search filter bar and counter into a contiguous segmented pill capsule, refine subscription badges, and implement tactile action buttons. |
 | [50-instant-rerun-enqueue-and-minor-release.md](./completed/50-instant-rerun-enqueue-and-minor-release.md) | `COMPLETED` | Root cause elimination of rerun dispatch latency: eliminates 30s idle backoff via notify wakeup, triggers immediate idle queue dispatch on enqueue, removes 300ms pacing sleeps, and executes v4.268.0 release ceremony. |
 | [49-image-attachment-format-and-rerun-enqueue.md](./completed/49-image-attachment-format-and-rerun-enqueue.md) | `COMPLETED` | Standardize prompt image attachment formatting to bracketed list (`Attachments:\n1. @[<path>]`) across copy, send, enqueue, and rerun; enforce rerun enqueue invariant. |

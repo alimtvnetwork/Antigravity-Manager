@@ -148,7 +148,8 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
         .filter((a) => {
             const q = accountSearchQuery.toLowerCase().trim();
             if (!q) return true;
-            return a.email.toLowerCase().includes(q) || a.id.toLowerCase().includes(q);
+            const tier = a.quota?.subscription_tier?.toLowerCase() || '';
+            return a.email.toLowerCase().includes(q) || a.id.toLowerCase().includes(q) || tier.includes(q);
         })
         .sort((a, b) => {
             const aQuota = accountQuotaScores(a);
@@ -190,13 +191,13 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
             }}
         >
             <div
-                className="backdrop-blur-md bg-white/95 dark:bg-[#171025]/95 border border-slate-200/90 dark:border-[#40285e] shadow-2xl rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col"
+                className="backdrop-blur-md bg-white/95 dark:bg-[#171025] border border-slate-200/90 dark:border-[#40285e] shadow-2xl rounded-2xl p-6 w-full max-w-lg max-h-[85vh] flex flex-col"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
                 <div className="flex items-center justify-between pb-3.5 border-b border-slate-200/90 dark:border-[#40285e]">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-600 dark:text-[var(--ui-interactive)] border border-purple-500/20 shadow-2xs">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 dark:text-amber-400 border border-amber-500/30 shadow-2xs">
                             <ArrowRightLeft className="w-5 h-5" />
                         </div>
                         <div>
@@ -267,9 +268,9 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
 
                 {/* Filter Search Input & Counter (Contiguous Segmented Capsule) */}
                 <div className="pt-3.5 pb-1">
-                    <div className="relative flex items-center w-full rounded-full border border-slate-200/90 dark:border-[#40285e] bg-slate-50/80 dark:bg-[#090611]/80 shadow-2xs backdrop-blur-xs transition-all duration-150 focus-within:border-purple-400 dark:focus-within:border-[var(--ui-focus-ring)] focus-within:ring-2 focus-within:ring-purple-500/20 dark:focus-within:ring-[var(--ui-focus-ring)]/30">
+                    <div className="relative flex items-center w-full rounded-full border border-slate-200/90 dark:border-[#40285e] bg-slate-50/80 dark:bg-[#090611]/80 shadow-2xs backdrop-blur-xs transition-all duration-150 focus-within:border-amber-500/60 dark:focus-within:border-amber-500/60 focus-within:ring-2 focus-within:ring-amber-500/20">
                         {/* Search Icon */}
-                        <Search className="w-3.5 h-3.5 ml-3 mr-2 text-slate-400 dark:text-[var(--ui-text-muted)] shrink-0 pointer-events-none transition-colors" />
+                        <Search className="w-3.5 h-3.5 ml-3 mr-2 text-amber-500 dark:text-amber-400 shrink-0 pointer-events-none transition-colors" />
 
                         {/* Search Input */}
                         <input
@@ -285,7 +286,7 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                 }
                             }}
                             disabled={isAnySwitching}
-                            placeholder="Filter accounts by email or ID..."
+                            placeholder="Filter accounts by email, ID, or tier..."
                             aria-label="Filter accounts"
                             className="w-full bg-transparent border-0 p-0 py-1.5 text-xs text-slate-900 dark:text-[var(--ui-text-primary)] placeholder:text-slate-400 dark:placeholder:text-[var(--ui-text-muted)] focus:outline-none focus:ring-0 disabled:opacity-50"
                         />
@@ -299,7 +300,7 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                     searchInputRef.current?.focus();
                                 }}
                                 disabled={isAnySwitching}
-                                className="p-1 mr-1 text-slate-400 hover:text-slate-700 dark:text-[var(--ui-text-muted)] dark:hover:text-[var(--ui-text-primary)] rounded-full hover:bg-slate-200/60 dark:hover:bg-[var(--ui-surface-hover)] focus:outline-none focus-visible:ring-1 focus-visible:ring-[var(--ui-focus-ring)] transition-colors cursor-pointer shrink-0"
+                                className="p-1 mr-1 text-slate-400 hover:text-slate-700 dark:text-[var(--ui-text-muted)] dark:hover:text-[var(--ui-text-primary)] rounded-full hover:bg-slate-200/60 dark:hover:bg-[var(--ui-surface-hover)] focus:outline-none focus-visible:ring-1 focus-visible:ring-amber-500/50 transition-colors cursor-pointer shrink-0"
                                 title="Clear filter (Esc)"
                                 aria-label="Clear filter"
                             >
@@ -379,10 +380,10 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                         {/* Circular Radio Indicator */}
                                         <div
                                             className={cn(
-                                                'w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5 transition-all',
+                                                'w-4 h-4 rounded-full border flex items-center justify-center shrink-0 mt-0.5 transition-all duration-200',
                                                 isCurrent
                                                     ? 'border-emerald-500 bg-emerald-500/20 text-[#1af18d]'
-                                                    : 'border-slate-300 dark:border-[#40285e] group-hover:border-purple-400 dark:group-hover:border-[var(--ui-interactive)]'
+                                                    : 'border-slate-300 dark:border-[#40285e] group-hover:border-amber-400 dark:group-hover:border-purple-400 group-hover:bg-amber-500/10 dark:group-hover:bg-purple-500/20'
                                             )}
                                         >
                                             {isCurrent && <div className="w-1.5 h-1.5 rounded-full bg-[#1af18d]" />}
@@ -489,10 +490,9 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                                     handleSelect(acc);
                                                 }}
                                                 className={cn(
-                                                    'px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-150 ease-out cursor-pointer',
-                                                    isAnySwitching
-                                                        ? 'opacity-60 cursor-not-allowed bg-purple-600/60 text-white shadow-none'
-                                                        : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border border-purple-400/30 dark:border-purple-300/20 shadow-xs hover:shadow-md hover:shadow-purple-500/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]'
+                                                    'px-3.5 py-1.5 rounded-full text-xs cursor-pointer',
+                                                    'bg-gradient-to-r from-[#FDE047] via-[#FACC15] to-[#EAB308] hover:from-[#FEF08A] hover:via-[#FDE047] hover:to-[#FACC15] text-amber-950 font-bold border border-[#CA8A04] shadow-[0_2px_0_0_#A16207] hover:shadow-[0_3px_0_0_#A16207] active:shadow-[0_1px_0_0_#A16207] active:translate-y-0.5 transition-all',
+                                                    isAnySwitching && 'opacity-60 cursor-not-allowed shadow-none active:translate-y-0 hover:shadow-none'
                                                 )}
                                             >
                                                 {isThisSwitching ? (
@@ -501,7 +501,10 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                                         <span>Switching...</span>
                                                     </span>
                                                 ) : (
-                                                    'Select'
+                                                    <span className="flex items-center gap-1.5">
+                                                        <ArrowRightLeft className="w-3.5 h-3.5" />
+                                                        <span>Switch</span>
+                                                    </span>
                                                 )}
                                             </button>
                                         </div>

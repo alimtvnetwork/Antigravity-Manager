@@ -53,6 +53,7 @@ export function ActionsCell({
                 {inst.is_running ? (
                     <>
                         <button
+                            id={`instance-stop-${inst.config.id}`}
                             type="button"
                             disabled={isBusy}
                             onClick={onStop}
@@ -68,6 +69,7 @@ export function ActionsCell({
                             )}
                         </button>
                         <button
+                            id={`instance-restart-${inst.config.id}`}
                             type="button"
                             disabled={isBusy}
                             onClick={onRestart}
@@ -85,6 +87,7 @@ export function ActionsCell({
                     </>
                 ) : (
                     <button
+                        id={`instance-launch-${inst.config.id}`}
                         type="button"
                         disabled={isBusy}
                         onClick={onLaunch}
@@ -102,22 +105,24 @@ export function ActionsCell({
                 )}
 
                 <button
+                    id={`instance-switch-${inst.config.id}`}
                     type="button"
                     disabled={isBusy}
                     onClick={onSwitch}
                     data-ui-name="instance-switch-btn"
                     data-ui-id={`instance-switch-${inst.config.id}`}
-                    className="flex items-center justify-center h-7 px-2.5 text-sky-600 dark:text-sky-400 hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-zinc-950 hover:font-bold hover:shadow-[0_2px_0_0_#a16207] active:translate-y-0.5 active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50"
+                    className="flex items-center justify-center h-7 px-2.5 text-amber-500 dark:text-amber-400 bg-amber-500/10 dark:bg-amber-500/15 border-x border-amber-500/30 hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-black hover:font-bold hover:shadow-[0_2px_0_0_#a16207] active:translate-y-0.5 active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50"
                     title="Switch Account"
                 >
                     {currentAction === 'switch' ? (
-                        <RotateCw className="w-3.5 h-3.5 animate-spin text-sky-500" />
+                        <RotateCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
                     ) : (
                         <ArrowLeftRight className="w-3.5 h-3.5" />
                     )}
                 </button>
 
                 <button
+                    id={`instance-fastforward-${inst.config.id}`}
                     type="button"
                     disabled={isBusy}
                     onClick={onFastForward}
@@ -135,11 +140,12 @@ export function ActionsCell({
 
                 {/* Primary Prompts Button */}
                 <button
+                    id={`instance-tree-${inst.config.id}`}
                     type="button"
                     disabled={isBusy}
                     onClick={onOpenPromptTree}
-                    data-ui-name="instance-prompts-btn"
-                    data-ui-id={`instance-prompts-${inst.config.id}`}
+                    data-ui-name="instance-tree-btn"
+                    data-ui-id={`instance-tree-${inst.config.id}`}
                     className="flex items-center justify-center h-7 px-2.5 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-600 hover:text-white active:translate-y-0.5 transition-all duration-150 ease-out cursor-pointer disabled:opacity-50"
                     title="Prompts & History"
                 >
@@ -149,6 +155,7 @@ export function ActionsCell({
                 {/* Explicit Audit Trail Button */}
                 {onAudit && (
                     <button
+                        id={`instance-audit-${inst.config.id}`}
                         type="button"
                         disabled={isBusy}
                         onClick={onAudit}
@@ -162,6 +169,7 @@ export function ActionsCell({
                 )}
 
                 <button
+                    id={`instance-more-${inst.config.id}`}
                     type="button"
                     disabled={isBusy}
                     onClick={(e) => {

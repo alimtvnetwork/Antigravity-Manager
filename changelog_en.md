@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.274.0 (2026-10-28)**:
+        -   **[Feature and Instance Management] Instance Card Contrast, 3D Switch Button, Idle Notification Hub, UI Step Logging & CLI Remote Control (Thanks to @aukgit)**:
+            -   **Description**: Redesigned `/instances` cards with Royal Violet dark glass (`#171025`) and solid quota panels (`#120b1e`), elevated Switch Account buttons with illuminated amber styling and 3D yellow tactile hover gradients, implemented automated idle-mode dual-channel notification alerts across Telegram and Email in `idle_alerts.rs`, added structured `[UI_STEP]` step and button click trace logging in `uiLogger.ts` and `cmd_ui_trace.rs`, expanded CLI remote control (`agm ui click` and `agm instances click`), verified instance switching and prompt restoration integrity with zero errors in `errors.db`, and authored comprehensive specifications under `02-spec/21-app/233-feature-and-instance-management/`. (Thanks to @aukgit)
+
     *   **v4.273.0 (2026-10-28)**:
         -   **[Image Extension Sanitization & E9001 Resolution] Eliminate E9001 unsupported_image_extension on /instances via isLikelyImageUri & TIFF magic bytes (Thanks to @aukgit)**:
             -   **Description**: Resolved diagnostic error `E9001 — unsupported_image_extension: .` on `/instances` by sanitizing image extraction in `src/components/instances/PromptTreeView/clipboard.ts`, `src/components/instances/PromptTreeView/markdown.tsx`, and `src/components/instances/PromptTreeView/PromptInstructionView.tsx` with `isLikelyImageUri`, rejecting bare `.`, `..`, and directory paths; added binary magic byte sniffing in `src-tauri/src/commands/cmd_files.rs` to detect TIFF signatures (`b"II*\0"`, `b"MM\0*"`) and fallback to `image/tiff` when extensions are missing or generic. (Thanks to @aukgit)

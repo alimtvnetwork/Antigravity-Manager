@@ -66,6 +66,9 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                 {inst.is_running ? (
                     <div className="flex-1 flex items-center divide-x divide-slate-200 dark:divide-[#40285e]">
                         <button
+                            id={`instance-stop-${inst.config.id}`}
+                            data-ui-name="instance-stop-btn"
+                            data-ui-id={`instance-stop-${inst.config.id}`}
                             type="button"
                             disabled={isBusy}
                             onClick={() => handleStop(inst.config.id, inst.pid ?? undefined)}
@@ -79,6 +82,9 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                             )}
                         </button>
                         <button
+                            id={`instance-restart-${inst.config.id}`}
+                            data-ui-name="instance-restart-btn"
+                            data-ui-id={`instance-restart-${inst.config.id}`}
                             type="button"
                             disabled={isBusy}
                             onClick={() => handleRestart(inst.config.id)}
@@ -94,6 +100,9 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                     </div>
                 ) : (
                     <button
+                        id={`instance-launch-${inst.config.id}`}
+                        data-ui-name="instance-launch-btn"
+                        data-ui-id={`instance-launch-${inst.config.id}`}
                         type="button"
                         disabled={isBusy}
                         onClick={() => handleLaunch(inst.config.id)}
@@ -110,12 +119,15 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
 
                 {/* Slot 2: Switch Account (3D Yellow Hover) */}
                 <button
+                    id={`instance-switch-${inst.config.id}`}
+                    data-ui-name="instance-switch-btn"
+                    data-ui-id={`instance-switch-${inst.config.id}`}
                     type="button"
                     disabled={isBusy}
                     onClick={() => onSwitchAccount()}
                     className={cn(
                         "flex-1 flex items-center justify-center py-1 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
-                        "bg-transparent text-slate-600 dark:text-slate-400",
+                        "text-amber-500 dark:text-amber-400 bg-amber-500/10 dark:bg-amber-500/15 border-x border-amber-500/30",
                         "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:!text-black hover:[&_svg]:!text-black hover:font-bold hover:shadow-[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.25)]",
                         "active:translate-y-0.5 active:shadow-[0_0_0_0_#A16207]"
                     )}
@@ -130,6 +142,9 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
 
                 {/* Slot 3: Fast Forward (3D Yellow Hover) */}
                 <button
+                    id={`instance-fastforward-${inst.config.id}`}
+                    data-ui-name="instance-fastforward-btn"
+                    data-ui-id={`instance-fastforward-${inst.config.id}`}
                     type="button"
                     disabled={isBusy}
                     onClick={() => handleFastForward(inst.config.id)}
@@ -150,6 +165,9 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
 
                 {/* Slot 4: Audit Trail */}
                 <button
+                    id={`instance-audit-${inst.config.id}`}
+                    data-ui-name="instance-audit-btn"
+                    data-ui-id={`instance-audit-${inst.config.id}`}
                     type="button"
                     disabled={isBusy}
                     onClick={() => openAuditDialog(inst.config.id, inst.config.name)}
@@ -161,6 +179,9 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
 
                 {/* Slot 5: Sync PID & Quota */}
                 <button
+                    id={`instance-sync-${inst.config.id}`}
+                    data-ui-name="instance-sync-btn"
+                    data-ui-id={`instance-sync-${inst.config.id}`}
                     type="button"
                     disabled={isBusy || Boolean(syncingInstanceIds[inst.config.id])}
                     onClick={() => handleSync(inst.config.id)}
@@ -175,7 +196,9 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
             <div className="relative flex w-full items-stretch overflow-hidden rounded-full border border-slate-200/80 bg-slate-100 shadow-2xs divide-x divide-slate-200 dark:border-[#40285e] dark:bg-[#090611] dark:divide-[#40285e]">
                 {/* Slot 1: Prompt Tree (Active task cyan dot) */}
                 <button
-                    id={`prompt-tree-btn-${inst.config.id}`}
+                    id={`instance-tree-${inst.config.id}`}
+                    data-ui-name="instance-tree-btn"
+                    data-ui-id={`instance-tree-${inst.config.id}`}
                     type="button"
                     disabled={isBusy}
                     onClick={() => openPromptTree(inst.config.id)}
@@ -195,6 +218,9 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
 
                 {/* Slot 2: Settings & Sync */}
                 <button
+                    id={`instance-settings-${inst.config.id}`}
+                    data-ui-name="instance-settings-btn"
+                    data-ui-id={`instance-settings-${inst.config.id}`}
                     type="button"
                     disabled={isBusy}
                     onClick={() => openSettingsDialog(inst.config.id)}
@@ -206,6 +232,9 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
 
                 {/* Slot 3: Clone Profile */}
                 <button
+                    id={`instance-clone-${inst.config.id}`}
+                    data-ui-name="instance-clone-btn"
+                    data-ui-id={`instance-clone-${inst.config.id}`}
                     type="button"
                     disabled={isBusy}
                     onClick={() => openCopyDialog(inst.config.id, inst.config.name)}
@@ -217,6 +246,9 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
 
                 {/* Slot 4: Clone Executable */}
                 <button
+                    id={`instance-clone-exe-${inst.config.id}`}
+                    data-ui-name="instance-clone-exe-btn"
+                    data-ui-id={`instance-clone-exe-${inst.config.id}`}
                     type="button"
                     disabled={isBusy}
                     onClick={() => handleCloneExecutable(inst.config.id)}
@@ -228,6 +260,9 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
 
                 {/* Slot 5: Wipe Session / Reset */}
                 <button
+                    id={`instance-wipe-${inst.config.id}`}
+                    data-ui-name="instance-wipe-btn"
+                    data-ui-id={`instance-wipe-${inst.config.id}`}
                     type="button"
                     disabled={inst.is_running || isBusy}
                     onClick={() => handleWipeSession(inst.config.id)}
@@ -240,6 +275,9 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
                 {/* Slot 6: Delete Profile / More Actions Popover */}
                 <div className="flex-1 relative">
                     <button
+                        id={`instance-more-${inst.config.id}`}
+                        data-ui-name="instance-more-btn"
+                        data-ui-id={`instance-more-${inst.config.id}`}
                         type="button"
                         disabled={isBusy}
                         onClick={(e) => {
