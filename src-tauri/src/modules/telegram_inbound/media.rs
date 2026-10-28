@@ -178,6 +178,29 @@ pub async fn send_telegram_photo(
     Ok(file_id.to_string())
 }
 
+/// MIME used on the Telegram sendDocument path.
+/// CSV/txt (and unknown extensions) use `application/octet-stream` so Telegram
+/// offers a download instead of an inline copy button. JSON stays `application/json`.
+/// Generator mime (`text/csv` from `generate_export_dataset`) is not used here.
+pub fn mime_for_document(filename: &str) -> &'static str {
+    let lower = filename.trim().to_lowercase();
+    if lower.ends_with(".json") {
+        "application/json"
+    } else {
+        "application/octet-stream"
+    }
+}
+
+/// Empty captions omit the multipart caption field; they never block sendDocument.
+pub fn optional_document_caption(caption: &str) -> Option<String> {
+    let trimmed = caption.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let sanitized = super::formatting::sanitize_telegram_html_entities(trimmed);
+    Some(super::formatting::clamp_telegram_copy_text(&sanitized, 950))
+}
+
 /// Send a document (.csv, .json, .txt) to Telegram chat via multipart POST /sendDocument
 pub async fn send_telegram_document(
     bot_token: &str,
@@ -202,18 +225,9 @@ pub async fn send_telegram_document(
     } else {
         filename.trim()
     };
-    let lower = safe_name.to_lowercase();
-    // Telegram clients often inline `text/csv` instead of offering a download.
-    // `application/octet-stream` forces a real file attachment.
-    let mime = if lower.ends_with(".json") {
-        "application/json"
-    } else if lower.ends_with(".txt") {
-        "text/plain"
-    } else {
-        "application/octet-stream"
-    };
+    let mime = mime_for_document(safe_name);
 
-    let send_once = |attach_markup: bool, use_html_caption: bool| {
+    let send_once = |attach_markup: bool, use_html_caption: bool, include_caption: bool| {
         let part = reqwest::multipart::Part::bytes(content_bytes.to_vec())
             .file_name(safe_name.to_string())
             .mime_str(mime)
@@ -223,14 +237,13 @@ pub async fn send_telegram_document(
             .text("chat_id", chat_id.to_string())
             .part("document", part);
 
-        if !caption_html.trim().is_empty() {
-            let sanitized_caption =
-                super::formatting::sanitize_telegram_html_entities(caption_html.trim());
-            let clamped_caption =
-                super::formatting::clamp_telegram_copy_text(&sanitized_caption, 950);
-            form = form.text("caption", clamped_caption);
-            if use_html_caption {
-                form = form.text("parse_mode", "HTML");
+        // Empty caption is allowed: omit the field, still send the file.
+        if include_caption {
+            if let Some(clamped_caption) = optional_document_caption(caption_html) {
+                form = form.text("caption", clamped_caption);
+                if use_html_caption {
+                    form = form.text("parse_mode", "HTML");
+                }
             }
         }
 
@@ -245,14 +258,17 @@ pub async fn send_telegram_document(
     };
 
     let send_doc_url = format!("https://api.telegram.org/bot{}/sendDocument", clean_token);
-    let attempts: [(bool, bool); 3] = [
-        (false, true),
-        (false, false),
-        (reply_markup.is_some(), false),
+    // Empty caption first: HTML captions are the usual 400 that leaves the user
+    // with buttons and no file.
+    let attempts: [(bool, bool, bool); 4] = [
+        (false, false, false),
+        (false, false, true),
+        (false, true, true),
+        (reply_markup.is_some(), false, false),
     ];
     let mut last_err = String::from("sendDocument failed");
-    for (attach_markup, use_html) in attempts {
-        let form = match send_once(attach_markup, use_html) {
+    for (attach_markup, use_html, include_caption) in attempts {
+        let form = match send_once(attach_markup, use_html, include_caption) {
             Ok(f) => f,
             Err(e) => {
                 last_err = e;
@@ -544,4 +560,35 @@ pub async fn download_telegram_photo(bot_token: &str, msg: &Value) -> Option<Pat
     download_and_store_telegram_photo(bot_token, msg)
         .await
         .map(|(p, _)| p)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{mime_for_document, optional_document_caption};
+
+    #[test]
+    fn mime_for_document_forces_download_for_csv_and_txt() {
+        assert_eq!(
+            mime_for_document("agm-export.csv"),
+            "application/octet-stream"
+        );
+        assert_eq!(
+            mime_for_document("AGM-EXPORT.CSV"),
+            "application/octet-stream"
+        );
+        assert_eq!(
+            mime_for_document("agm-prompt-abc.txt"),
+            "application/octet-stream"
+        );
+        assert_eq!(mime_for_document("notes.TXT"), "application/octet-stream");
+        assert_eq!(mime_for_document("agm-export.json"), "application/json");
+        assert_eq!(mime_for_document(""), "application/octet-stream");
+    }
+
+    #[test]
+    fn empty_document_caption_is_omitted_not_blocking() {
+        assert!(optional_document_caption("").is_none());
+        assert!(optional_document_caption("   ").is_none());
+        assert!(optional_document_caption("hello").is_some());
+    }
 }

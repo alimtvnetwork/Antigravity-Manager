@@ -4,7 +4,8 @@
 //!   when it is not running, otherwise bring its window to the foreground.
 //! - `/screenshot [machine]` — capture the target machine's screen (AGM is
 //!   opened first when needed) and send the image(s) back to the Telegram
-//!   chat. With no argument, every known machine is captured.
+//!   chat. With no argument, this machine is captured (IDEs + Instances +
+//!   Accounts). Pass `all` for fleet fan-out.
 //!
 //! Machine targeting reuses the existing fleet model: this machine's node
 //! alias plus the GitMap cluster node aliases from `query_gitmap_cluster_nodes()`.
@@ -19,9 +20,9 @@ use crate::modules::supabase_sync;
 use base64::Engine as _;
 use chrono::Utc;
 use serde_json::json;
-use std::io::Write;
-use std::process::Command;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::io::{Read, Write};
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use super::*;
 
@@ -463,8 +464,8 @@ fn capture_ide_windows(filter_pids: Option<&[u32]>) -> Result<Vec<(String, Vec<u
         use std::os::windows::process::CommandExt;
         ps_cmd.creation_flags(0x08000000);
     }
-    let output = ps_cmd
-        .args([
+    let output = output_with_timeout(
+        &mut ps_cmd.args([
             "-NoProfile",
             "-NonInteractive",
             "-ExecutionPolicy",
@@ -477,9 +478,10 @@ fn capture_ide_windows(filter_pids: Option<&[u32]>) -> Result<Vec<(String, Vec<u
             &pids_arg,
             "-Max",
             &MAX_IDE_SHOTS.to_string(),
-        ])
-        .output()
-        .map_err(|e| format!("start ide screenshot helper: {e}"))?;
+        ]),
+        Duration::from_secs(8),
+    )
+    .map_err(|e| format!("start ide screenshot helper: {e}"))?;
     crate::error::record_ignored(std::fs::remove_file(&script), "remove temp ide script");
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -525,14 +527,63 @@ fn capture_ide_windows(_filter_pids: Option<&[u32]>) -> Result<Vec<(String, Vec<
     Err("IDE window capture is implemented for Windows".to_string())
 }
 
+fn output_with_timeout(cmd: &mut Command, limit: Duration) -> Result<std::process::Output, String> {
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::piped());
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("spawn capture helper: {e}"))?;
+    let start = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let mut stdout = Vec::new();
+                let mut stderr = Vec::new();
+                if let Some(mut s) = child.stdout.take() {
+                    // Justification: helper already exited; PNG is on disk even if stdout is empty.
+                    crate::error::record_ignored(
+                        s.read_to_end(&mut stdout).map(|_| ()),
+                        "read capture stdout",
+                    );
+                }
+                if let Some(mut e) = child.stderr.take() {
+                    // Justification: helper already exited; stderr is diagnostics only.
+                    crate::error::record_ignored(
+                        e.read_to_end(&mut stderr).map(|_| ()),
+                        "read capture stderr",
+                    );
+                }
+                return Ok(std::process::Output {
+                    status,
+                    stdout,
+                    stderr,
+                });
+            }
+            Ok(None) if start.elapsed() >= limit => {
+                crate::error::record_ignored(child.kill(), "kill timed-out screenshot helper");
+                // Justification: process already killed; reaping avoids a zombie, timeout is the error.
+                crate::error::record_ignored(child.wait(), "reap killed screenshot helper");
+                return Err(format!(
+                    "screenshot helper timed out after {}s (manager was not frozen)",
+                    limit.as_secs()
+                ));
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(50)),
+            Err(e) => return Err(format!("poll capture helper: {e}")),
+        }
+    }
+}
+
 async fn capture_agm_route(route: &str) -> Result<Vec<u8>, String> {
     crate::error::record_ignored(
         super::ui_remote::ui_service_goto(crate::modules::audit::InteractionActor::Telegram, route),
         "telegram screenshot ui goto",
     );
     super::ui_remote::post_ui_navigate_event(route).await;
-    tokio::time::sleep(std::time::Duration::from_millis(700)).await;
-    capture_local_once()
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    tokio::task::spawn_blocking(capture_local_once)
+        .await
+        .map_err(|e| format!("screenshot join: {e}"))?
 }
 
 /// Capture this machine's AGM window once (Windows only).
@@ -558,8 +609,8 @@ fn capture_local_once() -> Result<Vec<u8>, String> {
         use std::os::windows::process::CommandExt;
         ps_cmd.creation_flags(0x08000000);
     }
-    let output = ps_cmd
-        .args([
+    let output = output_with_timeout(
+        &mut ps_cmd.args([
             "-NoProfile",
             "-NonInteractive",
             "-ExecutionPolicy",
@@ -568,9 +619,10 @@ fn capture_local_once() -> Result<Vec<u8>, String> {
             &script.to_string_lossy(),
             "-OutPath",
             &png.to_string_lossy(),
-        ])
-        .output()
-        .map_err(|e| format!("start screenshot helper: {e}"))?;
+        ]),
+        Duration::from_secs(8),
+    )
+    .map_err(|e| format!("start screenshot helper: {e}"))?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -580,9 +632,6 @@ fn capture_local_once() -> Result<Vec<u8>, String> {
             stderr.trim(),
             stdout.trim()
         ));
-    }
-    fn is_valid_png(bytes: &[u8]) -> bool {
-        bytes.len() >= 8 && &bytes[0..8] == b"\x89PNG\r\n\x1a\n"
     }
 
     let bytes = std::fs::read(&png).map_err(|e| format!("read screenshot: {e}"))?;
@@ -1114,8 +1163,6 @@ using System;
 using System.Runtime.InteropServices;
 public class AgmWinShot {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
-  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
-  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
   public struct RECT { public int L; public int T; public int R; public int B; }
@@ -1129,10 +1176,9 @@ $proc = Get-Process -Name $procNames -ErrorAction SilentlyContinue |
   Select-Object -First 1
 $h = [IntPtr]::Zero
 if ($proc) {
+  # Never ShowWindow/SetForegroundWindow the live AGM process — that hangs
+  # WebView2 when Telegram capture runs inside the same manager.
   $h = $proc.MainWindowHandle
-  [void][AgmWinShot]::ShowWindow($h, 9)
-  [void][AgmWinShot]::SetForegroundWindow($h)
-  Start-Sleep -Milliseconds 350
 }
 if ($h -eq [IntPtr]::Zero) {
   $h = [AgmWinShot]::GetForegroundWindow()
@@ -1282,6 +1328,18 @@ mod tests {
         assert_eq!(
             resolve_machine_target(&local).unwrap(),
             OpenShotTarget::Local
+        );
+    }
+
+    #[test]
+    fn local_capture_script_does_not_steal_focus() {
+        assert!(
+            !WINDOW_CAPTURE_PS1.contains("[AgmWinShot]::SetForegroundWindow"),
+            "capturing AGM from inside AGM must not steal focus"
+        );
+        assert!(
+            !WINDOW_CAPTURE_PS1.contains("[AgmWinShot]::ShowWindow"),
+            "capturing AGM from inside AGM must not restore/show the window"
         );
     }
 

@@ -234,50 +234,71 @@ async fn deliver_ui_or_command(
     if let Some((export_target, export_fmt)) = detect_telegram_export_request(text_raw) {
         match reports_a::generate_export_document(&export_target, &export_fmt) {
             Ok(doc) => {
-                if let Err(err) = send_telegram_document(
+                let uploaded = match send_telegram_document(
                     token,
                     chat_id,
                     &doc.file_name,
                     &doc.bytes,
-                    &doc.caption,
+                    "",
                     None,
                 )
                 .await
                 {
-                    let fallback = format!(
-                        "{}\n⚠️ <i>Document upload fallback:</i> <code>{}</code>",
-                        doc.caption,
-                        crate::modules::notification_hub::escape_telegram_html(&err)
-                    );
-                    // Justification: fallback message when document upload fails; logged via record_ignored
-                    crate::error::record_ignored(
-                        send_telegram_message_with_markup(
-                            token,
-                            chat_id,
-                            &fallback,
-                            doc.markup.clone(),
-                            false,
-                        )
-                        .await,
-                        "send export fallback message",
-                    );
-                } else if let Some(markup) = doc.markup.clone() {
-                    let follow = format!(
-                        "✅ <b>Download attached:</b> <code>{}</code> ({} bytes)",
-                        crate::modules::notification_hub::escape_telegram_html(&doc.file_name),
-                        doc.bytes.len()
-                    );
-                    crate::error::record_ignored(
-                        send_telegram_message_with_markup(
-                            token,
-                            chat_id,
-                            &follow,
-                            Some(markup),
-                            false,
-                        )
-                        .await,
-                        "send export follow-up buttons",
-                    );
+                    Ok(()) => Ok(()),
+                    Err(err) => send_telegram_document(
+                        token,
+                        chat_id,
+                        &doc.file_name,
+                        &doc.bytes,
+                        &doc.caption,
+                        None,
+                    )
+                    .await
+                    .map_err(|err2| format!("{err}; retry: {err2}")),
+                };
+                match uploaded {
+                    Ok(()) => {
+                        if let Some(markup) = doc.markup.clone() {
+                            let follow = format!(
+                                "✅ <b>Download attached:</b> <code>{}</code> ({} bytes)",
+                                crate::modules::notification_hub::escape_telegram_html(
+                                    &doc.file_name
+                                ),
+                                doc.bytes.len()
+                            );
+                            crate::error::record_ignored(
+                                send_telegram_message_with_markup(
+                                    token,
+                                    chat_id,
+                                    &follow,
+                                    Some(markup),
+                                    false,
+                                )
+                                .await,
+                                "send export follow-up buttons",
+                            );
+                        }
+                    }
+                    Err(err) => {
+                        let preview: String = String::from_utf8_lossy(&doc.bytes)
+                            .chars()
+                            .take(800)
+                            .collect();
+                        let fallback = format!(
+                            "{}\n⚠️ <i>Document upload failed:</i> <code>{}</code>\n<code>{}</code>",
+                            doc.caption,
+                            crate::modules::notification_hub::escape_telegram_html(&err),
+                            crate::modules::notification_hub::escape_telegram_html(&preview)
+                        );
+                        // Justification: both document attempts failed; surface CSV text so the operator still has the data.
+                        crate::error::record_ignored(
+                            send_telegram_message_with_markup(
+                                token, chat_id, &fallback, None, false,
+                            )
+                            .await,
+                            "send export fallback message",
+                        );
+                    }
                 }
                 return Some(doc.caption);
             }

@@ -1,10 +1,10 @@
 //! Per-instance Telegram status cards: compact running/queued prompts and
-//! projects, native copy (256-char Bot API cap), full-prompt documents, rerun,
-//! automation enqueue, fast-forward, and screenshot callbacks.
+//! projects, full-prompt documents (Copy and Full both send a `.txt` file),
+//! rerun, automation enqueue, fast-forward, and screenshot callbacks.
 //!
 //! Callback payloads stay inside the 60-byte AGM budget (`i:<op>:<id8>`).
-//! Full prompt text is never embedded in `callback_data` or in `copy_text`
-//! beyond `TELEGRAM_COPY_TEXT_MAX`.
+//! Full prompt text is never embedded in `callback_data` or `copy_text`
+//! (Telegram rejects the whole keyboard when `copy_text` exceeds 256 chars).
 
 use serde_json::{json, Value};
 
@@ -13,9 +13,7 @@ use crate::modules::instance;
 use crate::modules::repo_db::{self, ActivePrompt};
 use crate::modules::supabase_sync;
 
-use super::formatting::{
-    clamp_telegram_copy_text, clean_for_telegram_html, TELEGRAM_COPY_TEXT_MAX,
-};
+use super::formatting::clean_for_telegram_html;
 use super::media::send_telegram_document;
 use super::open_shot;
 use super::send_telegram_message_with_markup;
@@ -56,7 +54,7 @@ fn shorten_project_name(name: &str) -> String {
 
 const MAX_CALLBACK_BYTES: usize = 60;
 const PREVIEW_WORDS: usize = 100;
-const MAX_PROMPTS_SHOWN: usize = 3;
+const MAX_PROMPTS_SHOWN: usize = 2;
 const AUTOMATION_DONE: &str = "Is it done?";
 const AUTOMATION_RELEASED: &str = "Is it released?";
 const AUTOMATION_RANDOM: &[&str] = &[
@@ -290,7 +288,7 @@ fn format_prompt_block(snips: &[PromptSnippet], empty: &str) -> String {
             clean_for_telegram_html(&s.project, 28),
             s.word_count,
             clean_for_telegram_html(dur_clean, 24),
-            clean_for_telegram_html(&s.preview, 700)
+            clean_for_telegram_html(&s.preview, 420)
         ));
     }
     out
@@ -347,35 +345,14 @@ fn copy_source_prompt(card: &InstanceCard) -> Option<&PromptSnippet> {
         .or_else(|| card.queued_prompts.first())
 }
 
-/// Lookup the full prompt text for a card (running first, else queued).
-fn full_prompt_text(card: &InstanceCard) -> String {
-    let Some(snip) = copy_source_prompt(card) else {
-        return String::new();
-    };
-    if let Ok(all) = repo_db::list_all_prompts() {
-        if let Some(p) = all
-            .iter()
-            .find(|p| p.id == snip.id || p.id.starts_with(&snip.id))
-        {
-            return p.prompt_content.clone();
-        }
-    }
-    snip.preview.clone()
-}
-
 pub fn build_instance_card_markup(card: &InstanceCard) -> Value {
     let mut rows: Vec<Vec<Value>> = Vec::new();
-    let full = full_prompt_text(card);
-    let copy_preview = clamp_telegram_copy_text(&full, TELEGRAM_COPY_TEXT_MAX);
+    // Telegram copy_text is capped at 256 chars and rejects the whole keyboard
+    // when exceeded. Copy/Full both send the complete prompt as a .txt file.
     let mut copy_row = Vec::new();
-    if !copy_preview.trim().is_empty() {
-        copy_row.push(json!({
-            "text": "📋 Copy",
-            "copy_text": { "text": copy_preview }
-        }));
-    }
     if let Some(snip) = copy_source_prompt(card) {
         if let Some(payload) = cb("cp", &snip.id) {
+            copy_row.push(json!({ "text": "📋 Copy", "callback_data": payload }));
             copy_row.push(json!({ "text": "📄 Full", "callback_data": payload }));
         }
     }
@@ -812,6 +789,7 @@ pub fn instance_prompt_counts(instance_id: &str, is_default: bool) -> (usize, us
 
 #[cfg(test)]
 mod tests {
+    use super::super::formatting::{clamp_telegram_copy_text, TELEGRAM_COPY_TEXT_MAX};
     use super::*;
 
     #[test]
@@ -840,6 +818,37 @@ mod tests {
         let long = "word ".repeat(400);
         let clamped = clamp_telegram_copy_text(&long, TELEGRAM_COPY_TEXT_MAX);
         assert!(clamped.chars().count() <= TELEGRAM_COPY_TEXT_MAX);
+    }
+
+    #[test]
+    fn instance_card_copy_sends_document_not_copy_text() {
+        let card = InstanceCard {
+            instance_id: "default".to_string(),
+            instance_name: "Default".to_string(),
+            running: true,
+            bound_email: "a@b.c".to_string(),
+            pid: "1".to_string(),
+            is_active: true,
+            running_prompts: vec![PromptSnippet {
+                id: "p-239ec5ab".to_string(),
+                preview: "hello world".to_string(),
+                word_count: 2,
+                status: "running".to_string(),
+                project: "AGM".to_string(),
+                created_at: 1,
+            }],
+            queued_prompts: Vec::new(),
+            running_projects: vec!["AGM".to_string()],
+            queued_projects: Vec::new(),
+        };
+        let markup = build_instance_card_markup(&card).to_string();
+        assert!(
+            !markup.contains("copy_text"),
+            "copy_text rejects the whole keyboard over 256 chars"
+        );
+        assert!(markup.contains("i:cp:p-239ec"));
+        assert!(markup.contains("📋 Copy"));
+        assert!(markup.contains("📄 Full"));
     }
 
     #[test]
