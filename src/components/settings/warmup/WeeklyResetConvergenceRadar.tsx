@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Clock, Info, ShieldCheck, Flame, RefreshCw, Sparkles, AlertCircle } from 'lucide-react';
+import { Clock, Flame, Sparkles } from 'lucide-react';
 import { Account } from '../../../types/account';
 import { useAccountStore } from '../../../stores/useAccountStore';
 

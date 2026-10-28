@@ -54,6 +54,23 @@ export interface ProbeOutcomePayload {
   httpStatus?: number;
 }
 
+export interface QuietHoursConfig {
+  enabled: boolean;
+  startHour: number; // 0-23, default 23 (11 PM)
+  endHour: number; // 0-23, default 7 (7 AM)
+  allowCriticalReset: boolean; // default true
+}
+
+export interface WarmupTuningConfig {
+  jitterRangeSecs: number; // default: 60
+  batchSize: number; // default: 3
+  staggerDelaySecs: number; // default: 2
+  scanIntervalSecs: number; // default: 300
+  quotaReserveFloorPct: number; // default: 5
+  quietHours: QuietHoursConfig;
+  excludedPatterns: string[]; // default ["*-thinking-*", "*-exp-*", "*-preview"]
+}
+
 export interface WarmupStoreState {
   telemetry: WarmupTelemetryState;
   latencyHistory: LatencyTelemetryRecord[];
@@ -62,6 +79,7 @@ export interface WarmupStoreState {
   nextScanSeconds: number;
   eligibleCount: number;
   inFlightProbes: Record<string, InFlightProbeInfo>;
+  config: WarmupTuningConfig;
 
   // Actions
   recordProbeOutcome: (payload: ProbeOutcomePayload) => void;
@@ -73,6 +91,16 @@ export interface WarmupStoreState {
   resetAllMetrics: () => void;
   addInFlightProbe: (id: string, info: InFlightProbeInfo) => void;
   removeInFlightProbe: (id: string) => void;
+
+  // Tuning actions
+  setJitterRangeSecs: (secs: number) => void;
+  setStaggerBatchConfig: (batchSize: number, staggerDelaySecs: number) => void;
+  setScanIntervalSecs: (secs: number) => void;
+  setQuotaReserveFloorPct: (pct: number) => void;
+  setQuietHoursConfig: (config: Partial<QuietHoursConfig>) => void;
+  setExcludedPatterns: (patterns: string[]) => void;
+  addExcludedPattern: (pattern: string) => void;
+  removeExcludedPattern: (pattern: string) => void;
 }
 
 const DEFAULT_HEARTBEAT_POINT_COUNT = 32;
@@ -103,12 +131,27 @@ const INITIAL_TELEMETRY: WarmupTelemetryState = {
   lastResetEpochMs: Date.now(),
 };
 
+const INITIAL_CONFIG: WarmupTuningConfig = {
+  jitterRangeSecs: 60,
+  batchSize: 3,
+  staggerDelaySecs: 2,
+  scanIntervalSecs: 300,
+  quotaReserveFloorPct: 5,
+  quietHours: {
+    enabled: false,
+    startHour: 23,
+    endHour: 7,
+    allowCriticalReset: true,
+  },
+  excludedPatterns: ['*-thinking-*', '*-exp-*', '*-preview'],
+};
+
 /**
  * Zustand store for Smart Warmup HUD, telemetry ring buffers, and heartbeat status.
  */
 export const useWarmupStore = create<WarmupStoreState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       telemetry: INITIAL_TELEMETRY,
       latencyHistory: [],
       heartbeatPoints: createInitialHeartbeatPoints(),
@@ -116,6 +159,7 @@ export const useWarmupStore = create<WarmupStoreState>()(
       nextScanSeconds: 300,
       eligibleCount: 0,
       inFlightProbes: {},
+      config: INITIAL_CONFIG,
 
       recordProbeOutcome: ({
         modelId,
@@ -236,6 +280,87 @@ export const useWarmupStore = create<WarmupStoreState>()(
           return { inFlightProbes: next };
         });
       },
+
+      setJitterRangeSecs: (secs: number) => {
+        set((state) => ({
+          config: {
+            ...state.config,
+            jitterRangeSecs: Math.max(0, Math.min(180, Math.round(secs))),
+          },
+        }));
+      },
+
+      setStaggerBatchConfig: (batchSize: number, staggerDelaySecs: number) => {
+        set((state) => ({
+          config: {
+            ...state.config,
+            batchSize: Math.max(1, Math.min(10, Math.round(batchSize))),
+            staggerDelaySecs: Math.max(1, Math.min(10, Math.round(staggerDelaySecs))),
+          },
+        }));
+      },
+
+      setScanIntervalSecs: (secs: number) => {
+        set((state) => ({
+          config: {
+            ...state.config,
+            scanIntervalSecs: Math.max(60, Math.min(900, Math.round(secs))),
+          },
+        }));
+      },
+
+      setQuotaReserveFloorPct: (pct: number) => {
+        set((state) => ({
+          config: {
+            ...state.config,
+            quotaReserveFloorPct: Math.max(0, Math.min(20, Math.round(pct))),
+          },
+        }));
+      },
+
+      setQuietHoursConfig: (partial: Partial<QuietHoursConfig>) => {
+        set((state) => ({
+          config: {
+            ...state.config,
+            quietHours: {
+              ...state.config.quietHours,
+              ...partial,
+            },
+          },
+        }));
+      },
+
+      setExcludedPatterns: (patterns: string[]) => {
+        set((state) => ({
+          config: {
+            ...state.config,
+            excludedPatterns: [...patterns],
+          },
+        }));
+      },
+
+      addExcludedPattern: (pattern: string) => {
+        const trimmed = pattern.trim();
+        if (!trimmed) return;
+        set((state) => {
+          if (state.config.excludedPatterns.includes(trimmed)) return state;
+          return {
+            config: {
+              ...state.config,
+              excludedPatterns: [...state.config.excludedPatterns, trimmed],
+            },
+          };
+        });
+      },
+
+      removeExcludedPattern: (pattern: string) => {
+        set((state) => ({
+          config: {
+            ...state.config,
+            excludedPatterns: state.config.excludedPatterns.filter((p) => p !== pattern),
+          },
+        }));
+      },
     }),
     {
       name: 'agm_warmup_telemetry_store',
@@ -246,6 +371,7 @@ export const useWarmupStore = create<WarmupStoreState>()(
           sessionTokensConsumed: 0,
         },
         latencyHistory: state.latencyHistory.slice(-50),
+        config: state.config,
       }),
     }
   )

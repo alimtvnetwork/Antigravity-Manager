@@ -59,7 +59,7 @@ export const WarmupInFlightTracker: React.FC<WarmupInFlightTrackerProps> = ({
 
   // 100ms duration timer
   useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
+    let timer: ReturnType<typeof setInterval> | null = null;
     if (isInFlight) {
       if (!startTimeRef.current) {
         startTimeRef.current = Date.now();

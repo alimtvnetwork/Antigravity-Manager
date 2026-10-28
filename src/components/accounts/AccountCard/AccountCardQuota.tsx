@@ -5,6 +5,7 @@ import { cn } from '../../../utils/cn';
 import { QuotaItem } from '../QuotaItem';
 import { getModelQuotaDisplay } from '../../../utils/quotaDisplay';
 import { getLiveLimitForModel } from '../../../utils/liveLimit';
+import { StaleQuotaWarning } from '../StaleQuotaWarning';
 import type { DisplayModel, WeeklyItem } from './types';
 
 interface AccountCardQuotaProps {
@@ -87,6 +88,7 @@ export function AccountCardQuota({
                             />
                         ))
                     )}
+                    <StaleQuotaWarning fetchedAt={account.quota?.last_updated} />
                 </div>
             )}
         </div>

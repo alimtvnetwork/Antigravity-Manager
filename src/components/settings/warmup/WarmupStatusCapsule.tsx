@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Activity, Clock, Users, RefreshCw } from 'lucide-react';
+import { Clock, Users, RefreshCw } from 'lucide-react';
 import { useAccountStore } from '../../../stores/useAccountStore';
 import { useWarmupStore } from '../../../stores/useWarmupStore';
 import { useErrorStore } from '../../../stores/error-store';

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Sparkles, Gauge, Layers } from 'lucide-react';
+import { Gauge } from 'lucide-react';
 import { useWarmupStore, LatencyTelemetryRecord } from '../../../stores/useWarmupStore';
 
 interface LatencyStats {

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Activity, Radio } from 'lucide-react';
-import { useWarmupStore, HeartbeatPoint } from '../../../stores/useWarmupStore';
+import { useWarmupStore } from '../../../stores/useWarmupStore';
 import { isTauri } from '../../../utils/env';
 import { useErrorStore } from '../../../stores/error-store';
 
