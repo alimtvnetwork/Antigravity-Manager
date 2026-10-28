@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.275.1)
+> Professional AI Account Management & Protocol Proxy System (v4.275.2)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.275.1-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.275.2-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.275.2**: Telegram Live Cards — CLI Observe Fan-Out & Non-Blocking macOS CI — `agm telegram observe` / `status` now call `deliver_instance_status_fanout` from `src-tauri/src/modules/telegram_inbound/instance_cards.rs` so CLI and inbound `/status` send the same per-instance cards instead of the quota-only `format_observe_report()`; CI macOS jobs use `continue-on-error` in `.github/workflows/ci.yml` so hosted arm64 runner capacity failures cannot fail the workflow or block the Release gate. Isolated `agm instances test-create` switch+restore E2E backed up and restored prompt `p-73a4c18e` on the test instance only; Default and v2-3127 stayed running. (Thanks to @aukgit)
 
 > Latest version **v4.275.1**: Telegram Screenshot Mosaic — IDE Windows, AGM Instances, AGM Accounts & Shot Pipeline Unify — `/shot`, `/screenshot`, and per-instance `i:sc:` now send the AGM window, virtual desktop, AGM Instances page, AGM Accounts page, and each running Antigravity IDE window (capped at 8, PID-filtered for `i:sc:`) from `src-tauri/src/modules/telegram_inbound/open_shot.rs`; local Shot in `ui_remote.rs` routes through `execute_screenshot_command` instead of photographing only the current manager window; inbound image copy buttons clamp `copy_text` to 256 characters. (Thanks to @aukgit)
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.275.2] - 2026-10-28
+
+### Fixed
+- CLI Telegram Observe Fan-Out: `agm telegram observe` and `status` now call `deliver_instance_status_fanout` from `src-tauri/src/modules/telegram_inbound/instance_cards.rs` so CLI and inbound `/status` send the same per-instance cards (Thanks to @aukgit)
+- macOS CI Capacity Failures: CI macOS jobs in `.github/workflows/ci.yml` use `continue-on-error` so hosted arm64 runner acquisition failures cannot fail the workflow or block the Release gate (Thanks to @aukgit)
+
+### Tests
+- Isolated switch+restore E2E: `agm instances test-create` dispatched `p-73a4c18e`, Stage 1 backed it up from the test instance, Stage 5 restored and re-dispatched the same id; Default and v2-3127 stayed running; `agm instances test-clean` purged the sandbox (Thanks to @aukgit)
+
+---
+
 ## [v4.275.1] - 2026-10-28
 
 ### Improved
@@ -1468,6 +1479,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.275.2 (2026-10-28)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.275.1 (2026-10-28)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

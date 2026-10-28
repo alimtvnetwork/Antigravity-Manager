@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.275.2 (2026-10-28)**:
+        -   **[Telegram Live Cards] CLI Observe Fan-Out & Non-Blocking macOS CI (Thanks to @aukgit)**:
+            -   **Description**: `agm telegram observe` / `status` now call `deliver_instance_status_fanout` from `src-tauri/src/modules/telegram_inbound/instance_cards.rs` so CLI and inbound `/status` send the same per-instance cards instead of the quota-only `format_observe_report()`; CI macOS jobs use `continue-on-error` in `.github/workflows/ci.yml` so hosted arm64 runner capacity failures cannot fail the workflow or block the Release gate. Isolated `agm instances test-create` switch+restore E2E backed up and restored prompt `p-73a4c18e` on the test instance only; Default and v2-3127 stayed running. (Thanks to @aukgit)
+
     *   **v4.275.1 (2026-10-28)**:
         -   **[Telegram Screenshot Mosaic] IDE Windows, AGM Instances, AGM Accounts & Shot Pipeline Unify (Thanks to @aukgit)**:
             -   **Description**: `/shot`, `/screenshot`, and per-instance `i:sc:` now send the AGM window, virtual desktop, AGM Instances page, AGM Accounts page, and each running Antigravity IDE window (capped at 8, PID-filtered for `i:sc:`) from `src-tauri/src/modules/telegram_inbound/open_shot.rs`; local Shot in `ui_remote.rs` routes through `execute_screenshot_command` instead of photographing only the current manager window; inbound image copy buttons clamp `copy_text` to 256 characters. (Thanks to @aukgit)
