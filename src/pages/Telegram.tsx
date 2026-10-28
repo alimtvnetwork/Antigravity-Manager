@@ -203,7 +203,7 @@ export default function Telegram() {
         <div className="h-full overflow-y-auto bg-slate-50/50 dark:bg-[#090611] text-slate-900 dark:text-slate-100">
             <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-6">
                 {/* Header Banner */}
-                <div className="rounded-2xl border border-slate-200/80 dark:border-[#40285e] bg-white dark:bg-[#171025] p-5 shadow-xs transition-all">
+                <div className="agm-hover-shade rounded-2xl border border-slate-200/80 dark:border-[#40285e] bg-white dark:bg-[#171025] p-5 shadow-xs">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-3.5">
                             <div className="w-12 h-12 rounded-2xl bg-sky-500/10 dark:bg-sky-500/15 border border-sky-500/20 text-sky-500 flex items-center justify-center shadow-xs">
@@ -273,7 +273,7 @@ export default function Telegram() {
                 {/* Grid: Configuration & Fast CLI Quick Actions */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Left 2 Cols: Bot Configuration */}
-                    <div className="lg:col-span-2 rounded-2xl border border-slate-200/80 dark:border-[#40285e] bg-white dark:bg-[#171025] p-5 shadow-xs space-y-5">
+                    <div className="agm-hover-shade lg:col-span-2 rounded-2xl border border-slate-200/80 dark:border-[#40285e] bg-white dark:bg-[#171025] p-5 shadow-xs space-y-5">
                         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#40285e]">
                             <div className="flex items-center gap-2">
                                 <Bot className="w-4 h-4 text-sky-500" />
@@ -415,7 +415,7 @@ export default function Telegram() {
                     </div>
 
                     {/* Right 1 Col: Daemon Diagnostics & Status */}
-                    <div className="rounded-2xl border border-slate-200/80 dark:border-[#40285e] bg-white dark:bg-[#171025] p-5 shadow-xs space-y-4">
+                    <div className="agm-hover-shade rounded-2xl border border-slate-200/80 dark:border-[#40285e] bg-white dark:bg-[#171025] p-5 shadow-xs space-y-4">
                         <div className="flex items-center gap-2 pb-3 border-b border-slate-200 dark:border-[#40285e]">
                             <Radio className="w-4 h-4 text-emerald-500" />
                             <h2 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -500,7 +500,7 @@ export default function Telegram() {
                 </div>
 
                 {/* Bottom Section: Full Telegram Remote Command Reference */}
-                <div className="rounded-2xl border border-slate-200/80 dark:border-[#40285e] bg-white dark:bg-[#171025] p-6 shadow-xs">
+                    <div className="agm-hover-shade rounded-2xl border border-slate-200/80 dark:border-[#40285e] bg-white dark:bg-[#171025] p-6 shadow-xs">
                     <TelegramSettings />
                 </div>
             </div>

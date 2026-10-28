@@ -333,4 +333,38 @@ pub(crate) mod tests {
             "Queued (the node recorded your instruction)"
         );
     }
+
+    #[test]
+    fn test_instances_csv_includes_prompt_columns() {
+        let (name, _mime, body) =
+            crate::modules::telegram_inbound::reports_a::generate_export_dataset(
+                "instances",
+                "csv",
+            )
+            .expect("instances csv");
+        assert!(name.ends_with(".csv"));
+        let header = body.lines().next().unwrap_or("");
+        assert!(header.contains("running_prompts"));
+        assert!(header.contains("queued_prompts"));
+        assert!(header.contains("running_projects"));
+        assert!(header.contains("queued_projects"));
+    }
+
+    #[test]
+    fn test_copy_text_cap_is_256() {
+        assert_eq!(TELEGRAM_COPY_TEXT_MAX, 256);
+        let long = "α".repeat(400);
+        let clamped = clamp_telegram_copy_text(&long, TELEGRAM_COPY_TEXT_MAX);
+        assert!(clamped.chars().count() <= TELEGRAM_COPY_TEXT_MAX);
+    }
+
+    #[test]
+    fn test_status_fanout_is_status_command() {
+        assert!(super::instance_cards::should_fanout_status("/status"));
+        assert!(super::instance_cards::should_fanout_status("/observe"));
+        assert!(!super::instance_cards::should_fanout_status("/balance"));
+        assert!(!super::instance_cards::should_fanout_status(
+            "/export instances csv"
+        ));
+    }
 }

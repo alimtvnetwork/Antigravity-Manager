@@ -191,6 +191,18 @@ async fn deliver_ui_or_command(
         return Some(send.reply);
     }
 
+    let trimmed_raw = text_raw.trim();
+    if trimmed_raw.starts_with("i:") {
+        if super::instance_cards::handle_instance_callback(token, chat_id, trimmed_raw).await {
+            return Some("ok".to_string());
+        }
+        return None;
+    }
+
+    if super::instance_cards::should_fanout_status(text_raw) {
+        return super::instance_cards::deliver_instance_status_fanout(token, chat_id).await;
+    }
+
     // Check if command requests CSV/JSON document attachment upload
     if let Some((export_target, export_fmt)) = detect_telegram_export_request(text_raw) {
         match reports_a::generate_export_document(&export_target, &export_fmt) {
@@ -201,7 +213,7 @@ async fn deliver_ui_or_command(
                     &doc.file_name,
                     &doc.bytes,
                     &doc.caption,
-                    doc.markup.clone(),
+                    None,
                 )
                 .await
                 {
@@ -213,10 +225,31 @@ async fn deliver_ui_or_command(
                     // Justification: fallback message when document upload fails; logged via record_ignored
                     crate::error::record_ignored(
                         send_telegram_message_with_markup(
-                            token, chat_id, &fallback, doc.markup, false,
+                            token,
+                            chat_id,
+                            &fallback,
+                            doc.markup.clone(),
+                            false,
                         )
                         .await,
                         "send export fallback message",
+                    );
+                } else if let Some(markup) = doc.markup.clone() {
+                    let follow = format!(
+                        "✅ <b>Download attached:</b> <code>{}</code> ({} bytes)",
+                        crate::modules::notification_hub::escape_telegram_html(&doc.file_name),
+                        doc.bytes.len()
+                    );
+                    crate::error::record_ignored(
+                        send_telegram_message_with_markup(
+                            token,
+                            chat_id,
+                            &follow,
+                            Some(markup),
+                            false,
+                        )
+                        .await,
+                        "send export follow-up buttons",
                     );
                 }
                 return Some(doc.caption);
@@ -446,23 +479,15 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
         "status" | "observe" => Some(json!({
             "inline_keyboard": [
                 [
-                    { "text": "📦 Backup Prompts", "callback_data": "cmd:/backup" },
-                    { "text": "♻️ Restore Prompts", "callback_data": "cmd:/restore" }
+                    { "text": "💰 Balance", "callback_data": "cmd:/balance" },
+                    { "text": "📸 Screenshots", "callback_data": "cmd:/screenshot" }
                 ],
                 [
-                    { "text": "💰 Account Balances", "callback_data": "cmd:/balance" },
-                    { "text": "🚀 Prompt Wizard (/send)", "callback_data": "cmd:/send" }
+                    { "text": "📥 Instances CSV", "callback_data": "cmd:/export instances csv" },
+                    { "text": "📥 Prompts CSV", "callback_data": "cmd:/export prompts csv" }
                 ],
                 [
-                    { "text": "🌲 Expand Tree", "callback_data": "cmd:/tree" },
-                    { "text": "⚡ Active Prompts", "callback_data": "cmd:/active" }
-                ],
-                [
-                    { "text": "📥 Accounts CSV", "callback_data": "cmd:/export accounts csv" },
-                    { "text": "📥 Instances CSV", "callback_data": "cmd:/export instances csv" }
-                ],
-                [
-                    { "text": "🖥️ SSH Nodes", "callback_data": "cmd:/nodes" },
+                    { "text": "🚀 Send", "callback_data": "cmd:/send" },
                     { "text": "🔄 Refresh Status", "callback_data": "cmd:/status" }
                 ]
             ]
@@ -623,6 +648,29 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
                     answer_callback_query(&clean_token, cb_id).await;
 
                     if deliver_send_flow_callback(&clean_token, chat_id, cb_id, data).await {
+                        continue;
+                    }
+
+                    if data.starts_with("i:") {
+                        if config.allowed_chat_id.is_none() {
+                            config.allowed_chat_id = Some(chat_id);
+                            config.is_enabled = true;
+                            crate::error::record_ignored(save_config(&config), "save_config");
+                        }
+                        if let Some(allowed) = config.allowed_chat_id {
+                            if chat_id == allowed {
+                                send_chat_action(&clean_token, chat_id, "typing").await;
+                                if super::instance_cards::handle_instance_callback(
+                                    &clean_token,
+                                    chat_id,
+                                    data,
+                                )
+                                .await
+                                {
+                                    processed.push((chat_id, data.to_string(), "ok".to_string()));
+                                }
+                            }
+                        }
                         continue;
                     }
 

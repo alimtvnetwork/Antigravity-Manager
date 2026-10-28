@@ -844,7 +844,7 @@ pub fn resolve_balance_markup() -> serde_json::Value {
     serde_json::json!({
         "inline_keyboard": [
             [
-                { "text": "📥 Export Balance CSV", "callback_data": "cmd:/export balance csv" },
+                { "text": "📊 Instance Status", "callback_data": "cmd:/status" },
                 { "text": "🔄 Refresh Balance", "callback_data": "cmd:/balance" }
             ],
             [
@@ -854,6 +854,10 @@ pub fn resolve_balance_markup() -> serde_json::Value {
             [
                 { "text": "📥 Accounts CSV", "callback_data": "cmd:/export accounts csv" },
                 { "text": "📥 Instances CSV", "callback_data": "cmd:/export instances csv" }
+            ],
+            [
+                { "text": "📥 Prompts CSV", "callback_data": "cmd:/export prompts csv" },
+                { "text": "📸 Screenshots", "callback_data": "cmd:/screenshot" }
             ]
         ]
     })
@@ -1040,6 +1044,8 @@ pub fn generate_export_dataset(
                                 }
                             })
                             .unwrap_or_default();
+                        let (run_p, q_p, run_proj, q_proj) =
+                            super::instance_cards::instance_prompt_counts(&inst.id, inst.is_default);
                         serde_json::json!({
                             "id": inst.id,
                             "name": inst.name,
@@ -1047,6 +1053,10 @@ pub fn generate_export_dataset(
                             "running": running,
                             "pid": pids.first().copied().or(inst.pid),
                             "bound_email": bound_email,
+                            "running_prompts": run_p,
+                            "queued_prompts": q_p,
+                            "running_projects": run_proj,
+                            "queued_projects": q_proj,
                             "data_dir": inst.data_dir,
                             "machine": machine_name,
                             "ip": local_ip,
@@ -1058,7 +1068,7 @@ pub fn generate_export_dataset(
                 Ok(("agm-instances.json".to_string(), mime, content))
             } else {
                 let mut csv = String::from(
-                    "id,name,is_default,running,pid,bound_email,data_dir,machine,ip\n",
+                    "id,name,is_default,running,pid,bound_email,running_prompts,queued_prompts,running_projects,queued_projects,data_dir,machine,ip\n",
                 );
                 for inst in &reg.instances {
                     let pids = crate::modules::instance::find_pids_for_data_dir(
@@ -1091,14 +1101,20 @@ pub fn generate_export_dataset(
                             }
                         })
                         .unwrap_or_default();
+                    let (run_p, q_p, run_proj, q_proj) =
+                        super::instance_cards::instance_prompt_counts(&inst.id, inst.is_default);
                     csv.push_str(&format!(
-                        "{},{},{},{},{},{},{},{},{}\n",
+                        "{},{},{},{},{},{},{},{},{},{},{},{},{}\n",
                         escape_csv_field(&inst.id),
                         escape_csv_field(&inst.name),
                         inst.is_default,
                         running,
                         escape_csv_field(&pid_str),
                         escape_csv_field(&bound_email),
+                        run_p,
+                        q_p,
+                        run_proj,
+                        q_proj,
                         escape_csv_field(&inst.data_dir),
                         escape_csv_field(&machine_name),
                         escape_csv_field(&local_ip),
@@ -1394,7 +1410,12 @@ pub fn generate_export_document(
     kind: &str,
     format: &str,
 ) -> Result<TelegramExportDocument, String> {
-    let (file_name, mime_type, content) = generate_export_dataset(kind, format)?;
+    let (mut file_name, mime_type, content) = generate_export_dataset(kind, format)?;
+    if let Some(dot) = file_name.rfind('.') {
+        let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S");
+        let (stem, ext) = file_name.split_at(dot);
+        file_name = format!("{}-{}{}", stem, stamp, ext);
+    }
     let line_count = content.lines().count();
     let machine_name = email_watcher::detect_machine_name();
     let local_ip = email_watcher::detect_local_ip();

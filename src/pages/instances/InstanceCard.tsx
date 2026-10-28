@@ -165,7 +165,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
             id={`instance-card-${inst.config.id}`}
             ref={isActive ? activeCardRef : undefined}
             className={cn(
-                'group relative rounded-[5px] border transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-md flex flex-col justify-between overflow-hidden backdrop-blur-xs',
+                'agm-hover-shade group relative rounded-[5px] border flex flex-col justify-between overflow-hidden backdrop-blur-xs',
                 isActive
                     ? SELECTED_CARD_CLASSES
                     : 'bg-white dark:bg-[#171025]/90 border-slate-200/80 dark:border-[#40285e]/80 hover:border-gray-300/80 hover:dark:border-[#7c3aed]/60 hover:bg-slate-50/90 hover:dark:bg-[#1f1533] shadow-xs'

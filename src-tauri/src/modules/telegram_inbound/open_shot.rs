@@ -364,6 +364,63 @@ pub async fn execute_open_command(args_str: &str) -> String {
     }
 }
 
+/// Capture the virtual desktop (all monitors / all visible IDE windows).
+#[cfg(target_os = "windows")]
+fn capture_desktop_png() -> Result<Vec<u8>, String> {
+    let dir = std::env::temp_dir().join("agm-ui-shot");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("create shot folder: {e}"))?;
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let script = dir.join(format!("desktop-{stamp}.ps1"));
+    let png = dir.join(format!("desktop-{stamp}.png"));
+    {
+        let mut file =
+            std::fs::File::create(&script).map_err(|e| format!("write desktop script: {e}"))?;
+        file.write_all(DESKTOP_CAPTURE_PS1.as_bytes())
+            .map_err(|e| format!("write desktop script bytes: {e}"))?;
+    }
+    let mut ps_cmd = Command::new("powershell.exe");
+    {
+        use std::os::windows::process::CommandExt;
+        ps_cmd.creation_flags(0x08000000);
+    }
+    let output = ps_cmd
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            &script.to_string_lossy(),
+            "-OutPath",
+            &png.to_string_lossy(),
+        ])
+        .output()
+        .map_err(|e| format!("start desktop screenshot helper: {e}"))?;
+    crate::error::record_ignored(std::fs::remove_file(&script), "remove temp desktop script");
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!(
+            "desktop capture helper exited {}: {}",
+            output.status,
+            stderr.trim()
+        ));
+    }
+    let bytes = std::fs::read(&png).map_err(|e| format!("read desktop png: {e}"))?;
+    crate::error::record_ignored(std::fs::remove_file(&png), "remove temp desktop png");
+    if bytes.len() < 32 || !is_valid_png(&bytes) {
+        return Err("desktop capture produced an invalid PNG".to_string());
+    }
+    Ok(bytes)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn capture_desktop_png() -> Result<Vec<u8>, String> {
+    Err("desktop capture is implemented for Windows".to_string())
+}
+
 /// Capture this machine's AGM window once (Windows only).
 #[cfg(target_os = "windows")]
 fn capture_local_once() -> Result<Vec<u8>, String> {
@@ -640,21 +697,41 @@ pub async fn execute_screenshot_command(args_str: &str) -> String {
         let label_esc = clean_for_telegram_html(&label, 48);
         match capture_for_machine(machine) {
             Ok(png) => {
-                let caption = format!("Screenshot from {label}");
+                let caption = format!("AGM / Antigravity Tools window — {label}");
                 match send_telegram_photo(&token, chat_id, &png, &caption, None).await {
                     Ok(_) => ok_lines.push(format!(
-                        "📸 Screenshot from <code>{label_esc}</code> attached"
+                        "📸 AGM window from <code>{label_esc}</code> attached"
                     )),
                     Err(e) => err_lines.push(format!(
-                        "• <code>{label_esc}</code> — captured but Telegram rejected the photo: <code>{}</code>",
+                        "• <code>{label_esc}</code> AGM — captured but Telegram rejected the photo: <code>{}</code>",
                         clean_for_telegram_html(&e.to_string(), 200)
                     )),
                 }
             }
             Err(e) => err_lines.push(format!(
-                "• <code>{label_esc}</code> — <code>{}</code>",
+                "• <code>{label_esc}</code> AGM — <code>{}</code>",
                 clean_for_telegram_html(&e, 200)
             )),
+        }
+        if matches!(machine, ShotMachine::Local) {
+            match capture_desktop_png() {
+                Ok(png) => {
+                    let caption = format!("Desktop (all running IDEs) — {label}");
+                    match send_telegram_photo(&token, chat_id, &png, &caption, None).await {
+                        Ok(_) => ok_lines.push(format!(
+                            "📸 Desktop / IDE mosaic from <code>{label_esc}</code> attached"
+                        )),
+                        Err(e) => err_lines.push(format!(
+                            "• <code>{label_esc}</code> desktop — Telegram rejected the photo: <code>{}</code>",
+                            clean_for_telegram_html(&e.to_string(), 200)
+                        )),
+                    }
+                }
+                Err(e) => err_lines.push(format!(
+                    "• <code>{label_esc}</code> desktop — <code>{}</code>",
+                    clean_for_telegram_html(&e, 200)
+                )),
+            }
         }
     }
 
@@ -737,6 +814,30 @@ pub async fn capture_and_send_proof_shot(target: &OpenShotTarget) -> String {
         }
     }
 }
+
+/// PowerShell: capture the virtual desktop (all monitors) so every running IDE is visible.
+const DESKTOP_CAPTURE_PS1: &str = r#"
+param([Parameter(Mandatory = $true)][string]$OutPath)
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class AgmDeskShot {
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+}
+"@
+[void][AgmDeskShot]::SetProcessDPIAware()
+$bounds = [System.Windows.Forms.SystemInformation]::VirtualScreen
+$bmp = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+$g = [System.Drawing.Graphics]::FromImage($bmp)
+$g.CopyFromScreen($bounds.X, $bounds.Y, 0, 0, (New-Object System.Drawing.Size($bounds.Width, $bounds.Height)))
+$bmp.Save($OutPath, [System.Drawing.Imaging.ImageFormat]::Png)
+$g.Dispose()
+$bmp.Dispose()
+Write-Output "OK $($bounds.Width)x$($bounds.Height)"
+"#;
 
 /// PowerShell: bring the AGM window to the foreground.
 const FOCUS_PS1: &str = r#"

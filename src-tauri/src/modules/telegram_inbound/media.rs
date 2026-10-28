@@ -203,64 +203,91 @@ pub async fn send_telegram_document(
         filename.trim()
     };
     let lower = safe_name.to_lowercase();
-    let mime = if lower.ends_with(".csv") {
-        "text/csv"
-    } else if lower.ends_with(".json") {
+    // Telegram clients often inline `text/csv` instead of offering a download.
+    // `application/octet-stream` forces a real file attachment.
+    let mime = if lower.ends_with(".json") {
         "application/json"
-    } else {
+    } else if lower.ends_with(".txt") {
         "text/plain"
+    } else {
+        "application/octet-stream"
     };
 
-    let part = reqwest::multipart::Part::bytes(content_bytes.to_vec())
-        .file_name(safe_name.to_string())
-        .mime_str(mime)
-        .map_err(|e| format!("Invalid multipart document part: {}", e))?;
+    let send_once = |attach_markup: bool, use_html_caption: bool| {
+        let part = reqwest::multipart::Part::bytes(content_bytes.to_vec())
+            .file_name(safe_name.to_string())
+            .mime_str(mime)
+            .map_err(|e| format!("Invalid multipart document part: {}", e))?;
 
-    let mut form = reqwest::multipart::Form::new()
-        .text("chat_id", chat_id.to_string())
-        .part("document", part);
+        let mut form = reqwest::multipart::Form::new()
+            .text("chat_id", chat_id.to_string())
+            .part("document", part);
 
-    if !caption_html.trim().is_empty() {
-        let sanitized_caption =
-            super::formatting::sanitize_telegram_html_entities(caption_html.trim());
-        let clamped_caption = super::formatting::clamp_telegram_copy_text(&sanitized_caption, 950);
-        form = form
-            .text("caption", clamped_caption)
-            .text("parse_mode", "HTML");
-    }
+        if !caption_html.trim().is_empty() {
+            let sanitized_caption =
+                super::formatting::sanitize_telegram_html_entities(caption_html.trim());
+            let clamped_caption =
+                super::formatting::clamp_telegram_copy_text(&sanitized_caption, 950);
+            form = form.text("caption", clamped_caption);
+            if use_html_caption {
+                form = form.text("parse_mode", "HTML");
+            }
+        }
 
-    if let Some(markup) = reply_markup {
-        let markup_str = serde_json::to_string(&markup)
-            .map_err(|e| format!("Failed to serialize reply_markup: {}", e))?;
-        form = form.text("reply_markup", markup_str);
-    }
+        if attach_markup {
+            if let Some(ref markup) = reply_markup {
+                let markup_str = serde_json::to_string(markup)
+                    .map_err(|e| format!("Failed to serialize reply_markup: {}", e))?;
+                form = form.text("reply_markup", markup_str);
+            }
+        }
+        Ok::<_, String>(form)
+    };
 
     let send_doc_url = format!("https://api.telegram.org/bot{}/sendDocument", clean_token);
-    let resp = client
-        .post(&send_doc_url)
-        .multipart(form)
-        .send()
-        .await
-        .map_err(|e| format!("Telegram sendDocument request failed: {}", e))?;
-
-    let status = resp.status();
-    if !status.is_success() {
-        let err_text = resp.text().await.unwrap_or_default();
-        return Err(format!(
-            "Telegram sendDocument returned HTTP {}: {}",
-            status, err_text
-        ));
-    }
-
-    if let Ok(body) = resp.json::<Value>().await {
-        if let Some(file_id) = body["result"]["document"]["file_id"].as_str() {
-            let sha = compute_sha256(content_bytes);
-            let id = format!("doc-{}", &sha[..sha.len().min(12)]);
-            record_media_vault(&id, &sha, Some(safe_name), None, Some(file_id), Some(mime));
+    let attempts: [(bool, bool); 3] = [
+        (false, true),
+        (false, false),
+        (reply_markup.is_some(), false),
+    ];
+    let mut last_err = String::from("sendDocument failed");
+    for (attach_markup, use_html) in attempts {
+        let form = match send_once(attach_markup, use_html) {
+            Ok(f) => f,
+            Err(e) => {
+                last_err = e;
+                continue;
+            }
+        };
+        match client.post(&send_doc_url).multipart(form).send().await {
+            Ok(resp) if resp.status().is_success() => {
+                if let Ok(body) = resp.json::<Value>().await {
+                    if let Some(file_id) = body["result"]["document"]["file_id"].as_str() {
+                        let sha = compute_sha256(content_bytes);
+                        let id = format!("doc-{}", &sha[..sha.len().min(12)]);
+                        record_media_vault(
+                            &id,
+                            &sha,
+                            Some(safe_name),
+                            None,
+                            Some(file_id),
+                            Some(mime),
+                        );
+                    }
+                }
+                return Ok(());
+            }
+            Ok(resp) => {
+                let status = resp.status();
+                let err_text = resp.text().await.unwrap_or_default();
+                last_err = format!("Telegram sendDocument returned HTTP {status}: {err_text}");
+            }
+            Err(e) => {
+                last_err = format!("Telegram sendDocument request failed: {e}");
+            }
         }
     }
-
-    Ok(())
+    Err(last_err)
 }
 
 /// Upload an image to Catbox for free, permanent public hosting

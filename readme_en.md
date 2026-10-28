@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.274.0)
+> Professional AI Account Management & Protocol Proxy System (v4.275.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.274.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.275.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.275.0**: Telegram Feature Enhancement — Per-Instance Status Cards, Copy/Rerun/FF/Screenshot, Downloadable CSV & Hover Shade — `/status` and `/observe` now fan out one compact HTML card per registered instance from `src-tauri/src/modules/telegram_inbound/instance_cards.rs` with running/queued prompts and projects, a 100-word expandable preview, Copy (`copy_text` clamped to Telegram's 256-character Bot API cap so the keyboard is no longer rejected), Full prompt as a `.txt` document, Rerun, Done?, Released?, Auto, Fast-Forward (`trigger_manual_rotation_for_instance`), Screenshot (AGM window + VirtualScreen desktop mosaic), and Refresh; instances CSV is sent as `application/octet-stream` with timestamped filenames and prompt/project count columns so Telegram actually downloads the file; hover on instance/Telegram cards uses `.agm-hover-shade` color/shadow animation without translating position; isolated `agm instances test-create` switch+restore E2E restored the same prompt id after account switch while Default and v2-3127 stayed running. Spec: `02-spec/21-app/234-telegram-feature-enhancement/`. (Thanks to @aukgit)
 
 > Latest version **v4.274.0**: Feature and Instance Management, Royal Violet Card Contrast, 3D Amber Switch Button, Idle Mode Auto-Notification Hub, UI Step Trace Logging & CLI Click Expansion — Redesigned `/instances` cards in `src/pages/instances/InstanceCard.tsx` with Royal Violet dark-glass tokens (`#171025`/90 background, `#40285e`/80 border, `#120b1e` solid quota container) eliminating Chromium opacity washouts; elevated the Switch Account button in `src/pages/instances/InstanceCardActions.tsx` and `src/components/instances/table/InstanceRowActions.tsx` with illuminated amber styling and 3D tactile yellow hover gradient (`#FDE047` to `#EAB308`, depth shadow `#A16207`); attached unambiguous DOM IDs and semantic attributes (`id`, `data-ui-name`, `data-ui-id`) to all action buttons; implemented `dispatch_idle_mode_alert` in `src-tauri/src/modules/notification_hub/idle_alerts.rs` and `sensors.rs`, dispatching rich Telegram Bot messages with `/send` inline prompt launcher buttons and multi-project HTML emails when IDEs enter idle mode (`not_fully_idle == 0` and empty prompt queue) with 600s anti-spam deduplication; created structured UI step and button click trace logging in `src/utils/uiLogger.ts` and `src-tauri/src/commands/cmd_ui_trace.rs` (`[UI_STEP]` tracing logs + `task_history_db` audit logging); expanded CLI remote control in `src-tauri/src/bin/agm/ui_cmds.rs` (`agm ui click`) and `instance_cmds.rs` (`agm instances click <id> <action>`); verified instance switching and FIFO prompt restoration end-to-end with 0 errors in `errors.db`; and authored architectural specifications under `02-spec/21-app/233-feature-and-instance-management/`. (Thanks to @aukgit)
 

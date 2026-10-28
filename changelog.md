@@ -1,5 +1,24 @@
 # Changelog
 
+## [v4.275.0] - 2026-10-28
+
+### Added
+- Per-Instance Telegram Status Fan-Out: `/status` and `/observe` now send one compact HTML card per registered instance (`src-tauri/src/modules/telegram_inbound/instance_cards.rs`) covering running/queued prompts and projects with a 100-word expandable preview, instead of a single quota-only blob (Thanks to @aukgit)
+- Instance-Scoped Telegram Actions: each card exposes Copy (native `copy_text` <= 256 chars), Full prompt as `.txt` document, Rerun, Done?, Released?, Auto, Fast-Forward, Screenshot, and Refresh via `i:<op>:<id8>` callbacks inside the 60-byte budget (Thanks to @aukgit)
+- Telegram Feature Enhancement Spec (Task 234): architecture, component, and AI instruction specs under `02-spec/21-app/234-telegram-feature-enhancement/` with plan `.ai-memory/plans/completed/234-telegram-feature-enhancement.md` (Thanks to @aukgit)
+
+### Fixed
+- Telegram Copy Button Rejection: clamped native CopyTextButton payload to Telegram's 256-character cap (`TELEGRAM_COPY_TEXT_MAX`) so oversized `copy_text` no longer rejects the entire inline keyboard and leaves CSV/action buttons as a copied label (Thanks to @aukgit)
+- Instances CSV Download: `send_telegram_document` now uses `application/octet-stream` with timestamped filenames (`agm-instances-YYYYMMDD-HHMMSS.csv`) and prompt/project count columns so Telegram delivers a real download instead of inlining or copying a button (Thanks to @aukgit)
+- Fast-Forward Instance Scope: `/ff [instance]` and `ff:` now call `trigger_manual_rotation_for_instance` on the named instance instead of always rotating Default (Thanks to @aukgit)
+
+### Improved
+- Local Screenshot Mosaic: empty `/screenshot` and per-instance `i:sc:` capture the AGM window plus a VirtualScreen desktop mosaic (`src-tauri/src/modules/telegram_inbound/open_shot.rs`) (Thanks to @aukgit)
+- CSS3 Hover Shade: `.agm-hover-shade` in `src/App.css` animates color, border, shadow, and brightness only (`transform: none`) on instance and Telegram cards; amber hover keeps `#090611` text (Thanks to @aukgit)
+- Isolated Switch+Restore E2E: `agm instances test-create` sandbox received a running prompt, switched to a standby account, Stage 1 backed up from the test instance (not Default), Stage 5 restored and dispatched the same prompt id, Default and v2-3127 stayed running, then `agm instances test-clean` purged only the sandbox (Thanks to @aukgit)
+
+---
+
 ## [v4.274.0] - 2026-10-28
 
 ### Added
@@ -1438,6 +1457,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.275.0 (2026-10-28)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.274.0 (2026-10-28)**:
         -   **[Feature and Instance Management] Instance Card Contrast, 3D Switch Button, Idle Notification Hub, UI Step Logging & CLI Remote Control (Thanks to @aukgit)**:
             -   **Description**: Redesigned `/instances` cards with Royal Violet dark glass (`#171025`) and solid quota panels (`#120b1e`), elevated Switch Account buttons with illuminated amber styling and 3D yellow tactile hover gradients, implemented automated idle-mode dual-channel notification alerts across Telegram and Email in `idle_alerts.rs`, added structured `[UI_STEP]` step and button click trace logging in `uiLogger.ts` and `cmd_ui_trace.rs`, expanded CLI remote control (`agm ui click` and `agm instances click`), verified instance switching and prompt restoration integrity with zero errors in `errors.db`, and authored comprehensive specifications under `02-spec/21-app/233-feature-and-instance-management/`. (Thanks to @aukgit)

@@ -159,22 +159,27 @@ pub fn chunk_telegram_text(text: &str, max_chars: usize) -> Vec<String> {
     balanced_chunks
 }
 
-/// Helper to clamp prompt and clipboard text safely on UTF-8 char boundaries (<= 3,900 chars)
+/// Telegram Bot API `CopyTextButton.text` is 1–256 characters. Exceeding this
+/// rejects the entire inline keyboard (CSV and action buttons never attach).
+pub const TELEGRAM_COPY_TEXT_MAX: usize = 256;
+/// Soft cap for HTML message chunks (sendMessage), not copy_text.
+pub const TELEGRAM_MESSAGE_TEXT_MAX: usize = 3900;
+
+/// Clamp text on UTF-8 character boundaries. `max_chars` is a character count.
 pub fn clamp_telegram_copy_text(text: &str, max_chars: usize) -> String {
-    let limit = if max_chars == 0 || max_chars > 3900 {
-        3900
+    let limit = if max_chars == 0 {
+        TELEGRAM_MESSAGE_TEXT_MAX
     } else {
-        max_chars
+        max_chars.min(TELEGRAM_MESSAGE_TEXT_MAX)
     };
-    if text.len() <= limit {
-        text.to_string()
-    } else {
-        let mut end = limit.saturating_sub(3);
-        while end > 0 && !text.is_char_boundary(end) {
-            end -= 1;
-        }
-        format!("{}...", &text[..end])
+    let char_count = text.chars().count();
+    if char_count <= limit {
+        return text.to_string();
     }
+    let take = limit.saturating_sub(3);
+    let mut out: String = text.chars().take(take).collect();
+    out.push_str("...");
+    out
 }
 
 /// Sanitize unsupported HTML named entities (&nbsp;, &bull;) for Telegram HTML parse_mode.
@@ -215,7 +220,7 @@ pub fn build_switch_alert_reply_markup(
         }),
     ]);
 
-    let clamped_text = clamp_telegram_copy_text(prompt_text, 3900);
+    let clamped_text = clamp_telegram_copy_text(prompt_text, TELEGRAM_COPY_TEXT_MAX);
     if !clamped_text.trim().is_empty() {
         keyboard_rows.push(vec![json!({
             "text": "📋 Copy Prompt",
@@ -230,7 +235,7 @@ pub fn build_switch_alert_reply_markup(
             for url in asset_urls {
                 composite.push_str(&format!("![image]({})\n", url));
             }
-            let clamped_composite = clamp_telegram_copy_text(&composite, 3900);
+            let clamped_composite = clamp_telegram_copy_text(&composite, TELEGRAM_COPY_TEXT_MAX);
             keyboard_rows.push(vec![json!({
                 "text": "🖼️ Copy Prompt + Images",
                 "copy_text": {
@@ -287,7 +292,7 @@ pub fn build_liveness_alert_reply_markup(
         }),
     ]);
 
-    let clamped_text = clamp_telegram_copy_text(prompt_text, 3900);
+    let clamped_text = clamp_telegram_copy_text(prompt_text, TELEGRAM_COPY_TEXT_MAX);
     if !clamped_text.trim().is_empty() {
         keyboard_rows.push(vec![json!({
             "text": "📋 Copy Prompt",
@@ -302,7 +307,7 @@ pub fn build_liveness_alert_reply_markup(
             for url in asset_urls {
                 composite.push_str(&format!("![image]({})\n", url));
             }
-            let clamped_composite = clamp_telegram_copy_text(&composite, 3900);
+            let clamped_composite = clamp_telegram_copy_text(&composite, TELEGRAM_COPY_TEXT_MAX);
             keyboard_rows.push(vec![json!({
                 "text": "🖼️ Copy Prompt + Images",
                 "copy_text": {
@@ -323,7 +328,7 @@ pub fn build_copy_prompt_reply_markup(
     asset_urls: &[String],
     dashboard_url: Option<&str>,
 ) -> serde_json::Value {
-    let clamped_text = clamp_telegram_copy_text(prompt_text, 3900);
+    let clamped_text = clamp_telegram_copy_text(prompt_text, TELEGRAM_COPY_TEXT_MAX);
     let mut keyboard_rows: Vec<Vec<serde_json::Value>> = Vec::new();
 
     if !clamped_text.trim().is_empty() {
@@ -340,7 +345,7 @@ pub fn build_copy_prompt_reply_markup(
             for url in asset_urls {
                 composite.push_str(&format!("![image]({})\n", url));
             }
-            let clamped_composite = clamp_telegram_copy_text(&composite, 3900);
+            let clamped_composite = clamp_telegram_copy_text(&composite, TELEGRAM_COPY_TEXT_MAX);
             keyboard_rows.push(vec![json!({
                 "text": "🖼️ Copy Prompt + Images",
                 "copy_text": {

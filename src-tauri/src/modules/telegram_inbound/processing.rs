@@ -1,6 +1,3 @@
-use crate::modules::auto_switcher;
-use crate::modules::backup_prompts_db;
-use crate::modules::email_watcher;
 use crate::modules::repo_db;
 use crate::modules::supabase_client::SupabaseClient;
 use crate::modules::supabase_sync;
@@ -325,22 +322,25 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
         "email" | "mail" => Some(execute_email_command(rest)),
         "snapshot" | "cluster" => Some(format_cluster_nodes_report().await),
         "ff" | "rotate" => {
-            let backup_count = repo_db::backup_running_prompts("default").unwrap_or(0);
-            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-            crate::error::record_ignored(
-                backup_prompts_db::backup_active_running_prompts(Some("default"), None),
-                "backup_active_running_prompts",
-            );
-            let _rotate_res = auto_switcher::check_and_rotate_if_needed().await;
-            let resent = repo_db::resend_all_running_commands(20).unwrap_or_default();
-            let disp = repo_db::dispatch_running_prompts("default").unwrap_or(0);
-
-            Some(format!(
-                "⏩ Switched to the highest-quota account. {} prompts backed up before the switch; {} re-sent ({} sent). Everything continues without interruption.",
-                backup_count,
-                resent.len(),
-                disp
-            ))
+            let inst = if rest.trim().is_empty() {
+                "default"
+            } else {
+                rest.trim()
+            };
+            match crate::modules::auto_switcher::trigger_manual_rotation_for_instance(Some(inst))
+                .await
+            {
+                Ok(msg) => Some(format!(
+                    "⏩ <b>Fast-forward</b> <code>{}</code>\n{}",
+                    clean_for_telegram_html(inst, 40),
+                    clean_for_telegram_html(&msg, 800)
+                )),
+                Err(e) => Some(format!(
+                    "❌ Fast-forward failed on <code>{}</code>: <code>{}</code>",
+                    clean_for_telegram_html(inst, 40),
+                    clean_for_telegram_html(&e, 200)
+                )),
+            }
         }
         _ => {
             let is_direct_seq_code = !rest.is_empty()
@@ -376,22 +376,27 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                 return Some(execute_backup_command(sub));
             }
             if lower_full.starts_with("ff:") {
-                let backup_count = repo_db::backup_running_prompts("default").unwrap_or(0);
-                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-                crate::error::record_ignored(
-                    backup_prompts_db::backup_active_running_prompts(Some("default"), None),
-                    "backup_active_running_prompts",
-                );
-                let _rotate_res = auto_switcher::check_and_rotate_if_needed().await;
-                let resent = repo_db::resend_all_running_commands(20).unwrap_or_default();
-                let disp = repo_db::dispatch_running_prompts("default").unwrap_or(0);
-
-                return Some(format!(
-                    "⏩ Switched to the highest-quota account. {} prompts backed up before the switch; {} re-sent ({} sent). Everything continues without interruption.",
-                    backup_count,
-                    resent.len(),
-                    disp
-                ));
+                let inst = trimmed
+                    .split_once(':')
+                    .map(|(_, r)| r.trim())
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or("default");
+                return match crate::modules::auto_switcher::trigger_manual_rotation_for_instance(
+                    Some(inst),
+                )
+                .await
+                {
+                    Ok(msg) => Some(format!(
+                        "⏩ <b>Fast-forward</b> <code>{}</code>\n{}",
+                        clean_for_telegram_html(inst, 40),
+                        clean_for_telegram_html(&msg, 800)
+                    )),
+                    Err(e) => Some(format!(
+                        "❌ Fast-forward failed on <code>{}</code>: <code>{}</code>",
+                        clean_for_telegram_html(inst, 40),
+                        clean_for_telegram_html(&e, 200)
+                    )),
+                };
             }
             let node_selector = extract_node_targeted_command(trimmed, &lower_full);
 

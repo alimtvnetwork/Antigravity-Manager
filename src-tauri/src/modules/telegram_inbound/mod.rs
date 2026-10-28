@@ -10,6 +10,7 @@ pub mod daemon;
 pub mod detection;
 pub mod formatting;
 pub mod injection;
+pub mod instance_cards;
 pub mod media;
 pub mod node_label;
 pub mod open_shot;

@@ -520,7 +520,7 @@ pub async fn format_seek_conversations_report(
         // Invariant 2: 60-Byte Callback Payload Cap (RCA 15)
         let rerun_cb = format!("send:t:{}:{}", cid8, turn_num);
         let verify_cb = format!("send:v:{}:{}", cid8, turn_num);
-        let copy_turn_text = clamp_telegram_copy_text(raw_turn_prompt, 3800);
+        let copy_turn_text = clamp_telegram_copy_text(raw_turn_prompt, TELEGRAM_COPY_TEXT_MAX);
 
         let has_turn_images = conv.prompts.iter().any(|t| !t.media_paths.is_empty());
         let img_cb = format!("send:img:{}:{}", cid8, turn_num);
@@ -640,7 +640,7 @@ pub fn resolve_seek_conversations_markup(query_str: &str) -> Option<serde_json::
 
                 let rerun_cb = format!("send:t:{}:{}", cid8, turn_num);
                 let verify_cb = format!("send:v:{}:{}", cid8, turn_num);
-                let copy_turn_text = clamp_telegram_copy_text(raw_prompt, 3800);
+                let copy_turn_text = clamp_telegram_copy_text(raw_prompt, TELEGRAM_COPY_TEXT_MAX);
 
                 let has_turn_images = conv.prompts.iter().any(|t| !t.media_paths.is_empty());
                 let img_cb = format!("send:img:{}:{}", cid8, turn_num);
