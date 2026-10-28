@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.276.0 (2026-10-29)**:
+        -   **[Telegram Crash, CSV Download & Copy Whole Prompt] Stop screenshot self-focus hang, deliver CSV as a file, copy full prompt (Thanks to @aukgit)**:
+            -   **Description**: Screenshot capture in `src-tauri/src/modules/telegram_inbound/open_shot.rs` no longer calls `ShowWindow`/`SetForegroundWindow` on the live AGM window and kills the helper after 8s so the manager stays responsive; CSV/txt `sendDocument` uses `application/octet-stream` with an empty caption first and `daemon.rs` falls back to pasted bytes instead of another copy-button keyboard; instance-card Copy and Full send the complete prompt as a `.txt` via `i:cp:` because Telegram `copy_text` is capped at 256 characters; `.agm-hover-shade` in `src/App.css` animates color/shadow/filter only (`transform: none`); isolated `agm instances test-create` / `test-clean` E2E backed up prompt `p-555265fc` while Default and v2-3127 stayed running. Spec: `02-spec/21-app/236-telegram-feature-enhancement/`. (Thanks to @aukgit)
+
     *   **v4.275.3 (2026-10-28)**:
         -   **[Release Gate] Drop macOS from Required CI (Thanks to @aukgit)**:
             -   **Description**: Removed `macos-latest` from `.github/workflows/ci.yml` so hosted arm64 runner jobs that conclude `cancelled` (never acquired) cannot fail CI or block the Release gate. Windows and Ubuntu remain required. `continue-on-error` does not cover cancelled jobs, which is why v4.275.2 CI still failed. (Thanks to @aukgit)

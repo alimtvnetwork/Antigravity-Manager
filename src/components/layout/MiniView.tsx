@@ -88,7 +88,7 @@ export default function MiniView() {
                     });
                 }
             } else {
-                setAppVersion(versionData.version || versionData.Version || '4.275.3');
+                setAppVersion(versionData.version || versionData.Version || '4.276.0');
             }
         };
         fetchVersion();

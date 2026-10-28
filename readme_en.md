@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.275.3)
+> Professional AI Account Management & Protocol Proxy System (v4.276.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.275.3-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.276.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.276.0**: Telegram Crash, CSV Download & Copy Whole Prompt — Screenshot capture in `src-tauri/src/modules/telegram_inbound/open_shot.rs` no longer calls `ShowWindow`/`SetForegroundWindow` on the live AGM window and kills the helper after 8s so the manager stays responsive; CSV/txt `sendDocument` uses `application/octet-stream` with an empty caption first and `daemon.rs` falls back to pasted bytes instead of another copy-button keyboard; instance-card Copy and Full send the complete prompt as a `.txt` via `i:cp:` because Telegram `copy_text` is capped at 256 characters; `.agm-hover-shade` in `src/App.css` animates color/shadow/filter only (`transform: none`); isolated `agm instances test-create` / `test-clean` E2E backed up prompt `p-555265fc` while Default and v2-3127 stayed running. Spec: `02-spec/21-app/236-telegram-feature-enhancement/`. (Thanks to @aukgit)
 
 > Latest version **v4.275.3**: Release Gate Unblocked — Drop macOS from Required CI — Removed `macos-latest` from `.github/workflows/ci.yml` so hosted arm64 runner jobs that conclude `cancelled` (never acquired) cannot fail CI or block the Release gate. Windows and Ubuntu remain required. `continue-on-error` does not cover cancelled jobs, which is why v4.275.2 CI still failed. (Thanks to @aukgit)
 

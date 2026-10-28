@@ -1,5 +1,20 @@
 # Changelog
 
+## [v4.276.0] - 2026-10-29
+
+### Fixed
+- Telegram Screenshot Self-Focus Hang: capture PowerShell in `src-tauri/src/modules/telegram_inbound/open_shot.rs` no longer calls `ShowWindow`/`SetForegroundWindow` on the live AGM window; helpers time out after 8s so the manager stays responsive (Thanks to @aukgit)
+- Instances CSV Download Fallback: `send_telegram_document` in `src-tauri/src/modules/telegram_inbound/media.rs` sends CSV/txt as `application/octet-stream` with an empty caption first; `src-tauri/src/modules/telegram_inbound/daemon.rs` retries then pastes bytes as text instead of another copy-button keyboard (Thanks to @aukgit)
+- Telegram Copy Whole Prompt: instance cards in `src-tauri/src/modules/telegram_inbound/instance_cards.rs` drop `copy_text` (Telegram's 256-character Bot API cap rejects the whole keyboard); Copy and Full both send the complete prompt as a `.txt` document via `i:cp:` (Thanks to @aukgit)
+
+### Improved
+- CSS3 Hover Shade: `.agm-hover-shade` in `src/App.css` animates color, border, box-shadow, and filter only (`transform: none`) (Thanks to @aukgit)
+
+### Tests
+- Isolated switch+restore E2E: `agm instances test-create` sandbox dispatched prompt `p-555265fc`; stop backed it up for restore; Default and v2-3127 stayed running; `agm instances test-clean` purged only the sandbox. Spec: `02-spec/21-app/236-telegram-feature-enhancement/` (Thanks to @aukgit)
+
+---
+
 ## [v4.275.3] - 2026-10-28
 
 ### Fixed
