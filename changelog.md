@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.273.1] - 2026-10-28
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.273.0] - 2026-10-28
 
 ### Fixed
@@ -1422,81 +1429,65 @@
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
-
     *   **v4.272.0 (2026-10-27)**:
         -   **Anti-gravity Rerun Target ID, Sequential Enqueue Retention, Filter Compaction & Tree Design System**:
             -   **Description**: Resolved sequential enqueue dropping by adding status checks in `prompts_crud.rs`, prevented queued prompt transcript turn mutations in `tree_node_conv.rs`, suppressed enqueue refresh bars via silent SWR `loadTree(false, true)`, compacted Tree View Row 2 filter controls into two segmented capsules (194px layout budget, zero clipping), authored canonical Tree View UI/UX design system specification in `02-spec/02-coding-guidelines/24-app-ui-design-system/02-tree-view-design-system.md`, and added 28-assertion automated E2E test suite in `scripts/test-anti-gravity-rerun-and-ui-fixes-e2e.ps1`. (Thanks to @aukgit)
-
 
     *   **v4.271.0 (2026-10-27)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
-
     *   **v4.270.0 (2026-10-27)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.269.0 (2026-10-25)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
-
     *   **v4.268.0 (2026-10-25)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.267.0 (2026-10-25)**:
         -   **[Routine Minor Bump] Version sync to 4.267.0 with no functional code changes (Thanks to @aukgit)**:
             -   **Description**: Routine minor version bump from 4.266.0 to 4.267.0: all 14 version locations synchronized via `scripts/bump-version.mjs` (`package.json`, `package-lock.json`, `version.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, `src-tauri/hooks.nsh`, `Casks/antigravity-tools.rb`, `readme.md`, `readme_en.md`, `src/components/layout/MiniView.tsx`, `releases-manifest.json`, `changelog.md`, `changelog_en.md`). No functional code changes in this bump; the v4.266.0 feature and fix set ships in its own release. (Thanks to @aukgit)
 
-
     *   **v4.266.0 (2026-10-25)**:
         -   **[Tree View & Rerun UX] Compact Dispatch UI, Anti-Repeat Random Nudge Selection & Recent-on-Top Hierarchy (Thanks to @aukgit)**:
             -   **Description**: Streamlined the Prompt Tree View and Rerun dispatch workflow: replaced verbose 17-item radio list and 37-variation bullet dump with a compact `<select>` dropdown and dynamic status pill (`Auto-picks random unused (N of 37 left)`); implemented `extractUsedNudgesFromConversation` in `src/components/instances/PromptTreeView/usePromptTreePromptActions.ts` to strictly exclude already used questions from multi-round rerun dispatches; inverted prompt turn and subagent hierarchy in `src/components/instances/PromptTreeView/ConversationNode.tsx` and `tierClassification.ts` to display running, queued, and newest turns on top; and added weekly quota fallback in `src/pages/instances/instanceCardData.ts` to ensure full GUI parity with CLI. (Thanks to @aukgit)
-
 
     *   **v4.265.0 (2026-10-25)**:
         -   **[CI Concurrency SHA Scoping & Release Resilience] Isolated main branch CI concurrency to commit SHA to prevent rapid sequential push cancellations (Thanks to @aukgit)**:
             -   **Description**: Scoped CI concurrency group on `main` in `.github/workflows/ci.yml` to the specific commit SHA (`group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}`), ensuring subsequent commits on `main` never cancel in-flight CI workflows. Expanded 4-part Root Cause Analysis in `.ai-memory/cicd-issues/47-release-gate-ci-race-condition-rca.md` and verified clean release gate polling and execution. (Thanks to @aukgit)
 
-
     *   **v4.264.0 (2026-10-25)**:
         -   **[Release Gate In-Progress CI Polling] Bounded polling loop awaits in-flight CI runs on tag push before validating green pass (Thanks to @aukgit)**:
             -   **Description**: Fixed race condition in `.github/workflows/release.yml` where `release.yml` immediately queried `status=completed` and aborted with `conclusion: missing`. Added 25-minute polling loop with heartbeat logging, authored RCA 47, and verified release gate pass on GitHub Actions. (Thanks to @aukgit)
-
 
     *   **v4.263.0 (2026-10-24)**:
         -   **[Account Switch Prompt Restore and CLI Inline Resume] Scoped prompt snapshots to the target instance and executed inline post-switch resume on CLI paths (Thanks to @aukgit)**:
             -   **Description**: Stage 1 snapshot source now uses the target switched instance in `src-tauri/src/modules/instance/switch.rs` instead of global active instance. Added `run_post_switch_resume_after_delay` in `src-tauri/src/modules/instance/post_switch_resume.rs` to await settle delay and restore inline for CLI/headless operations. Fast-forward leftover handling in `src-tauri/src/bin/agm/instance_fastforward.rs` avoids duplicate prompt dispatch. (Thanks to @aukgit)
 
-
     *   **v4.262.0 (2026-10-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.261.0 (2026-10-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
-
     *   **v4.260.0 (2026-10-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.259.0 (2026-10-24)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
-
     *   **v4.258.0 (2026-10-24)**:
         -   **[Prompt Tree Header Compaction, Hover Jitter Elimination, Segmented Pill Capsules, Combined Send/Enqueue/Rerun Dropdown & CLI Error Management] Comprehensive Prompt Tree View UX overhaul, compact header layout with icon actions, high-contrast 3D Reset button, hover border stabilization, strict 30s cache TTL guard, clickable RFC-8089 IDE file image links, contiguous segmented pill capsules across toolbars, current conversation routing RCA & fix, and CLI error inspection with agent skill (Thanks to @aukgit)**:
             -   **Description**: Compacted Prompt Tree View header height to `< 42px` in `src/components/instances/PromptTreeView/ModalHeader.tsx` and tightened node vertical spacing in `TreePanel.tsx`; converted Import/Export text buttons to Lucide icons (`Download`, `Upload`) with tooltips and converted Hide Tree View to `PanelLeftClose`/`PanelLeftOpen` icon button; relabeled the yellow button adjacent to Refresh to "Reset" with high-contrast amber styling (`text-zinc-950 font-bold bg-amber-400 hover:bg-amber-300 shadow-[0_2px_0_0_#b45309]`) and 3D tactile elevation; eliminated green hover outline shifts in `ConversationNode.tsx` using permanent base `border border-transparent` and subtle background tint transitions; enforced a strict 30-second TTL cooldown guard (`TREE_CACHE_TTL_MS = 30000`) in `usePromptTreeData.ts` to prevent mouseover-induced refetches; reunited Send, Enqueue, and Rerun into a contiguous segmented dropdown pill capsule in `PromptInstructionView.tsx` with borderless transparent destination selectors; resolved the Root Cause Analysis (RCA) defect in `usePromptTreePromptActions.ts` and `src-tauri/src/modules/repo_db/dispatch.rs` where "Current Conversation" mode was erroneously routing to new conversations; implemented `formatIdeClickableFileLink` in `clipboard.ts` and `markdown.tsx` formatting images and file paths into RFC-8089 `file:///` clickable links with a 1-click "Open in IDE" preview button; harmonized toolbar action clusters in `InstanceRowActions.tsx` and `AccountCardActions.tsx` into contiguous segmented pill capsules with high-contrast yellow hover states; verified CLI error inspection commands (`agm errors list`, `agm errors inspect`, `agm errors clear`, `agm errors fix`); authored canonical agent skill `.agents/skills/agm-error-inspection/skill.md`; and passed all 28/28 verification gates in `scripts/test-agm-gitmap-running-backup-e2e.ps1`. (Thanks to @aukgit)
-
 
     *   **v4.257.1 (2026-10-24)**:
         -   **[Prompt Tree Titles and File Image URIs] Placeholder conversation titles use the prompt's first line, and out-of-workspace images are `file:///` URIs (Thanks to @aukgit)**:
