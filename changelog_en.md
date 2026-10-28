@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.275.3 (2026-10-28)**:
+        -   **[Release Gate] Drop macOS from Required CI (Thanks to @aukgit)**:
+            -   **Description**: Removed `macos-latest` from `.github/workflows/ci.yml` so hosted arm64 runner jobs that conclude `cancelled` (never acquired) cannot fail CI or block the Release gate. Windows and Ubuntu remain required. `continue-on-error` does not cover cancelled jobs, which is why v4.275.2 CI still failed. (Thanks to @aukgit)
+
     *   **v4.275.2 (2026-10-28)**:
         -   **[Telegram Live Cards] CLI Observe Fan-Out & Non-Blocking macOS CI (Thanks to @aukgit)**:
             -   **Description**: `agm telegram observe` / `status` now call `deliver_instance_status_fanout` from `src-tauri/src/modules/telegram_inbound/instance_cards.rs` so CLI and inbound `/status` send the same per-instance cards instead of the quota-only `format_observe_report()`; CI macOS jobs use `continue-on-error` in `.github/workflows/ci.yml` so hosted arm64 runner capacity failures cannot fail the workflow or block the Release gate. Isolated `agm instances test-create` switch+restore E2E backed up and restored prompt `p-73a4c18e` on the test instance only; Default and v2-3127 stayed running. (Thanks to @aukgit)

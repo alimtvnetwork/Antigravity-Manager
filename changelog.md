@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.275.3] - 2026-10-28
+
+### Fixed
+- Release Gate Unblocked: `.github/workflows/ci.yml` no longer runs `macos-latest` jobs. Hosted arm64 runners that are never acquired conclude `cancelled`, and cancelled jobs fail the workflow even with `continue-on-error`, which blocked v4.275.0–v4.275.2 releases. Windows and Ubuntu remain required (Thanks to @aukgit)
+
+---
+
 ## [v4.275.2] - 2026-10-28
 
 ### Fixed
@@ -1479,6 +1486,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.275.3 (2026-10-28)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.275.2 (2026-10-28)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
