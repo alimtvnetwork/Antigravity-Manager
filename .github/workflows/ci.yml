@@ -46,12 +46,13 @@ jobs:
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 30
     # Non-blocking for the experimental Ubuntu 26.04 entry (plan 91): validates WebKitGTK package names ahead of the runner change.
-    # macOS hosted runners frequently fail to acquire (arm64 capacity); that must not fail CI or block the Release gate.
-    continue-on-error: ${{ matrix.experimental == true || startsWith(matrix.platform, 'macos') }}
+    continue-on-error: ${{ matrix.experimental == true }}
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-24.04, windows-2022, macos-latest]
+        # macOS hosted arm64 runners are often never acquired (jobs conclude cancelled).
+        # Cancelled jobs fail the workflow even with continue-on-error, which blocked the Release gate.
+        platform: [ubuntu-24.04, windows-2022]
         experimental: [false]
         include:
           - platform: ubuntu-26.04
@@ -131,12 +132,11 @@ jobs:
     name: Build Tauri App
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 45
-    # macOS hosted runners frequently fail to acquire (arm64 capacity); Windows/Linux green is enough for the Release gate.
-    continue-on-error: ${{ startsWith(matrix.platform, 'macos') }}
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-24.04, windows-2022, macos-latest]
+        # Omit macos-latest: hosted arm64 capacity cancels the job and fails CI (plan 91 Release gate).
+        platform: [ubuntu-24.04, windows-2022]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
