@@ -29,7 +29,7 @@ pub(crate) fn telegram_route_help(
         println!("  agm telegram prompts [node]             List active running prompts (optionally scoped to node)");
         println!("  agm telegram prompt <node> <proj> <txt> Inject prompt to workspace or cluster VM node");
         println!("  agm telegram ping                       Send rich telemetry ping card to Telegram chat");
-        println!("  agm telegram observe, status            Send live workspaces, quota & prompt queue report");
+        println!("  agm telegram observe, status            Send per-instance cards (prompts, queues, copy/rerun)");
         println!("  agm telegram gitmap [args...]           Run GitMap command (e.g. pe) & forward output to chat");
         println!("  agm telegram api                        Query local API proxy status & forward to chat");
         println!("  agm telegram backup, backpack [ls]      Backup running prompts to split SQLite DB & notify");
@@ -387,23 +387,29 @@ pub(crate) fn telegram_route_observe(
     rt: &tokio::runtime::Runtime,
 ) -> bool {
     if first_lower == "observe" || first_lower == "status" {
-        let report = telegram_inbound::format_observe_report();
-        println!("{}", report);
         if let Some(chat_id) = t_cfg.allowed_chat_id {
             if !t_cfg.bot_token.is_empty() {
-                match rt.block_on(telegram_inbound::send_telegram_message(
+                match rt.block_on(telegram_inbound::deliver_instance_status_fanout(
                     &t_cfg.bot_token,
                     chat_id,
-                    &report,
                 )) {
-                    Ok(_) => println!(
-                        "\n[SUCCESS] Observation report delivered to Telegram chat {}!",
-                        chat_id
-                    ),
-                    Err(e) => eprintln!("\n[ERROR] Failed to send observation report: {}", e),
+                    Some(header) => {
+                        println!("{}", header);
+                        println!(
+                            "\n[SUCCESS] Per-instance status cards delivered to Telegram chat {}!",
+                            chat_id
+                        );
+                    }
+                    None => {
+                        let report = telegram_inbound::format_observe_report();
+                        println!("{}", report);
+                    }
                 }
+                return true;
             }
         }
+        let report = telegram_inbound::format_observe_report();
+        println!("{}", report);
         return true;
     }
     false

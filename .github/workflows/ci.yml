@@ -46,7 +46,8 @@ jobs:
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 30
     # Non-blocking for the experimental Ubuntu 26.04 entry (plan 91): validates WebKitGTK package names ahead of the runner change.
-    continue-on-error: ${{ matrix.experimental == true }}
+    # macOS hosted runners frequently fail to acquire (arm64 capacity); that must not fail CI or block the Release gate.
+    continue-on-error: ${{ matrix.experimental == true || startsWith(matrix.platform, 'macos') }}
     strategy:
       fail-fast: false
       matrix:
@@ -130,6 +131,8 @@ jobs:
     name: Build Tauri App
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 45
+    # macOS hosted runners frequently fail to acquire (arm64 capacity); Windows/Linux green is enough for the Release gate.
+    continue-on-error: ${{ startsWith(matrix.platform, 'macos') }}
     strategy:
       fail-fast: false
       matrix:

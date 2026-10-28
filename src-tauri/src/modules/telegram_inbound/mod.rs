@@ -34,6 +34,7 @@ pub use daemon::*;
 pub use detection::*;
 pub use formatting::*;
 pub use injection::*;
+pub use instance_cards::deliver_instance_status_fanout;
 pub use media::*;
 pub use node_label::*;
 pub use open_shot::*;
