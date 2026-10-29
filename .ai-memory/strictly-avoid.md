@@ -649,6 +649,28 @@ Allowed work:
 
 **Why:** On 2026-10-29 HEAD was `86877cf53` while installed GUI stayed `v4.276.0`. Clicking Copy in that window would test the bug, not the fix.
 
+---
+
+## Force Tree Reset After Enqueue or Rerun Click - TOTAL BAN
+
+Added 2026-10-30. Source: `.ai-memory/issues/67-prompt-tree-enqueue-zero-after-click.md`.
+
+Forbidden:
+- Calling `loadTree(false, true)` or `reset_prompt_tree_cache` / `invalidate_prompt_tree_cache` immediately after Enqueue or Rerun.
+- Mutating `selectedConversation.prompts` in place without React `setState` / `patchPromptTreeSwrCache`.
+- Overlaying the selected completed turn's `is_queued` onto the conversation so later queued turns disappear.
+- Gating conversation `is_queued` on a 600s recency window in `tree_collect.rs`.
+- Falling back enqueue `session_id` / `conversationId` to the literal `current`.
+- Dispatching rerun rounds through `send_prompt_now`.
+
+Allowed work:
+- Optimistic inject of queued turns, then stop. 30s SWR merge via `mergeQueuedTurns` is enough.
+- `applySelectedTurnOverlay` keeps conversation QUEUED when any turn is queued.
+- Enqueue badge = `queuedPromptCount`. Rerun ×N = N `enqueue_prompt` calls.
+
+**Why:** Cursor already showed Queued Messages 2 while Prompt Tree stayed Enqueue 0 / IDLE 1h on completed turn 11. Fixed in `3f678d03a` (`v4.279.0`).
+
+---
 
 - Do not store a personal access token inside a git remote URL. Use SSH.
 - Do not commit Go coverage profiles or SQLite `-shm` and `-wal` sidecars.

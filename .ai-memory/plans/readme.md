@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [237-prompt-tree-enqueue-visibility.md](./completed/237-prompt-tree-enqueue-visibility.md) | `COMPLETED` | Prompt Tree Enqueue/Rerun show queued turns on the clicked instance immediately; selected-turn overlay keeps QUEUED; no 600s recency gate; isolated five `queued-*` ids; tagged `v4.279.0`. |
 | [236-telegram-feature-enhancement.md](./completed/236-telegram-feature-enhancement.md) | `COMPLETED` | Telegram inbound: screenshot without AGM self-focus hang, CSV as `sendDocument`, per-instance `/status` cards, Copy/Full whole-prompt `.txt` via `i:cp:`, hover shade only, isolated switch+restore E2E, tagged `v4.276.0`. |
 | [235-add-new-option-for-100-improvements.md](./completed/235-add-new-option-for-100-improvements.md) | `COMPLETED` | Shared 100-improvements flywheel on CLI (`agm improvements`), UI pills, Telegram verbs; Instances header **100 Steps**; Prompt Tree `run-100-steps`; Create Profile dark-glass (no DaisyUI magenta ring). |
 | [233-feature-and-instance-management.md](./completed/233-feature-and-instance-management.md) | `COMPLETED` | Feature and Instance Management: elevated instance card visual contrast with Royal Violet dark glass, tactile amber Switch Account button with 3D yellow hover gradient, multi-channel idle mode auto-notification hub for Telegram and Email, centralized UI step and click trace logging (`record_ui_trace`), and AGM CLI click bridge expansion (`agm ui click` & `agm instances click`). |
@@ -101,6 +102,7 @@
 ## Completed Plans (`completed/`)
 | # | Plan File | Status | Summary |
 | :--- | :--- | :--- | :--- |
+| 237 | [237-prompt-tree-enqueue-visibility.md](./completed/237-prompt-tree-enqueue-visibility.md) | `COMPLETED` | Enqueue/rerun immediate visibility; selected-turn overlay; no 600s recency; tagged `v4.279.0` (`3f678d03a`). Issue 67. |
 | 236 | [236-telegram-feature-enhancement.md](./completed/236-telegram-feature-enhancement.md) | `COMPLETED` | Telegram crash/CSV/copy/hover + isolated switch+restore; tagged `v4.276.0` (`1ce618741`, `b2cfc5596`). JSON switch honesty is issue 66. |
 | 235 | [235-add-new-option-for-100-improvements.md](./completed/235-add-new-option-for-100-improvements.md) | `COMPLETED` | Flywheel CLI/UI/Telegram (`01b7e1840`); Instances **100 Steps** + Prompt Tree suffix + Create Profile restyle (`59f65a222`). |
 | 175 | [175-test-case-implementation-and-task-management.md](./completed/175-test-case-implementation-and-task-management.md) | `COMPLETED` | Author concrete unit test suites for recent improvements 481–540 across reverse proxy, auto-switcher, Split-SQLite, and instance isolation; calculate pending step backlog (255 total steps, 245 remaining across 5 tracks); execute 10 steps per turn; enqueue master E2E test plan. |
@@ -180,30 +182,30 @@
 
 ## Recent Completed Tasks Register (last 20, newest first)
 
-Updated 2026-10-29T14:10:00Z from `git log` (HEAD `86877cf53`). Referenced by `.ai-memory/what-to-read.md`.
+Updated 2026-10-30T02:53:00Z from `git log` (HEAD `3f678d03a`). Referenced by `.ai-memory/what-to-read.md`.
 
 | # | Date | Commit | Task | Plan |
 |---|---|---|---|---|
-| 0 | 2026-10-29 | `86877cf53` | Prompt Tree Copy copies full prompt as plain text; skill refs are not rewritten into Attachments | learned-31 |
-| 1 | 2026-10-29 | `59f65a222` | Create Profile dark-glass (no DaisyUI magenta ring); Instances header 100 Steps; Prompt Tree run-100-steps | 235 |
-| 2 | 2026-10-29 | `1ce618741`, `b2cfc5596` | Telegram 236: screenshot no self-focus, CSV sendDocument, status cards, Copy/Full .txt, hover shade, tagged v4.276.0 | 236 |
-| 3 | 2026-10-29 | `01b7e1840` | Shared 100-improvements flywheel on CLI, UI, and Telegram | 235 |
-| 4 | 2026-10-23 | - | Cross-platform compat, staging protocol, published-tip rewrite, headless/CLI parity, generic-fix preference (Sequence 199) | 199 |
-| 5 | 2026-10-21 | `33ea5d83` | Send preemption, resizable tree view, live title sync, theme adaptability and scoreboard tooltip fix (v4.250.0) | ui-and-functionality-corrections |
-| 6 | 2026-10-18 | `77e6f780`, `0fe0b2bb` | Compile-time safe Diesel ORM, PascalCase Split-DB schemas, lossless single-file backup/re-import, zero account loss guard, and CLI migration suite | 163 |
-| 7 | 2026-10-05 | `b7e5744c`, `ccf336b1` | v4.158.0 two-phase 4 hour quota gate and hours-remaining weekly scoring, delimiter and rustfmt fixes | 138 |
-| 8 | 2026-10-05 | `7de81159` | v4.157.1 weekly scoring DESC sort and divide-by-100 integer score | 137 |
-| 9 | 2026-10-05 | `babb0b18` | v4.157.0 neon green progress bar, hours-elapsed weekly scoring, prompt tree modal header, empty tree fix | 136, 137 |
-| 10 | 2026-10-05 | `7952d8dd` | v4.156.0 prompt tree discovery from summaries DB | 136 |
-| 11 | 2026-10-05 | `2289730e`, `3581207d` | v4.155.0 running projects detection and restart split button | 132, 135 |
-| 12 | 2026-10-05 | `fbd5e819` | v4.154.0 accounts borders, VS Code cyan, email cooldown | 134 |
-| 13 | 2026-10-05 | `2274f100` | Seven specialized AGM skills | - |
-| 14 | 2026-10-05 | `2a5cd064` | v4.152.0 split restart button with distinct sync icons | 132 |
-| 15 | 2026-10-05 | `8ce647c7` | v4.151.0 AccountRow JSX fix and instance.rs rustfmt | - |
-| 16 | 2026-10-05 | `6d41d931` | Instance fleet deploy, default theme presets, plugins and skills parity, GitMap delegation | 131 |
-| 17 | 2026-10-05 | `b499eb5f` | v4.150.0 accounts table cyan palette and compact instances table | 130 |
-| 18 | 2026-10-05 | `24daa320` | v4.149.0 prompt tree line gaps, liveness scoping, N key dispatch | 128 |
-| 19 | 2026-10-04 | `319d2f36` to `d77ebe3b` | v4.145.0 to v4.148.0 rusqlite and compile fixes | - |
+| 0 | 2026-10-30 | `3f678d03a` | Enqueue/rerun show queued turns on click; selected-turn overlay keeps QUEUED; tagged v4.279.0 | 237 |
+| 1 | 2026-10-29 | `80478a3d1` | Isolate backed-up prompt dispatch to the target instance | - |
+| 2 | 2026-10-29 | `68622ceef` | Optimistic queued turns, JSON switch bound_email, Telegram idle/busy/queued + Send; tagged v4.278.0 | 66 |
+| 3 | 2026-10-29 | `86877cf53` | Prompt Tree Copy copies full prompt as plain text; skill refs are not rewritten into Attachments | learned-31 |
+| 4 | 2026-10-29 | `59f65a222` | Create Profile dark-glass (no DaisyUI magenta ring); Instances header 100 Steps; Prompt Tree run-100-steps | 235 |
+| 5 | 2026-10-29 | `1ce618741`, `b2cfc5596` | Telegram 236: screenshot no self-focus, CSV sendDocument, status cards, Copy/Full .txt, hover shade, tagged v4.276.0 | 236 |
+| 6 | 2026-10-29 | `01b7e1840` | Shared 100-improvements flywheel on CLI, UI, and Telegram | 235 |
+| 7 | 2026-10-23 | - | Cross-platform compat, staging protocol, published-tip rewrite, headless/CLI parity, generic-fix preference (Sequence 199) | 199 |
+| 8 | 2026-10-21 | `33ea5d83` | Send preemption, resizable tree view, live title sync, theme adaptability and scoreboard tooltip fix (v4.250.0) | ui-and-functionality-corrections |
+| 9 | 2026-10-18 | `77e6f780`, `0fe0b2bb` | Compile-time safe Diesel ORM, PascalCase Split-DB schemas, lossless single-file backup/re-import, zero account loss guard, and CLI migration suite | 163 |
+| 10 | 2026-10-05 | `b7e5744c`, `ccf336b1` | v4.158.0 two-phase 4 hour quota gate and hours-remaining weekly scoring, delimiter and rustfmt fixes | 138 |
+| 11 | 2026-10-05 | `7de81159` | v4.157.1 weekly scoring DESC sort and divide-by-100 integer score | 137 |
+| 12 | 2026-10-05 | `babb0b18` | v4.157.0 neon green progress bar, hours-elapsed weekly scoring, prompt tree modal header, empty tree fix | 136, 137 |
+| 13 | 2026-10-05 | `7952d8dd` | v4.156.0 prompt tree discovery from summaries DB | 136 |
+| 14 | 2026-10-05 | `2289730e`, `3581207d` | v4.155.0 running projects detection and restart split button | 132, 135 |
+| 15 | 2026-10-05 | `fbd5e819` | v4.154.0 accounts borders, VS Code cyan, email cooldown | 134 |
+| 16 | 2026-10-05 | `2274f100` | Seven specialized AGM skills | - |
+| 17 | 2026-10-05 | `2a5cd064` | v4.152.0 split restart button with distinct sync icons | 132 |
+| 18 | 2026-10-05 | `8ce647c7` | v4.151.0 AccountRow JSX fix and instance.rs rustfmt | - |
+| 19 | 2026-10-05 | `6d41d931` | Instance fleet deploy, default theme presets, plugins and skills parity, GitMap delegation | 131 |
 
 ## Pending Plans (`pending/`)
 | # | Plan File | Status | Summary |

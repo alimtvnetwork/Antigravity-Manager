@@ -8,6 +8,9 @@ This directory contains active issue tracking and bug reports.
 ## Fixed in v4.209.0
 - [../rca/17-instance-pid-stop-switch-and-audit-trail.md](../rca/17-instance-pid-stop-switch-and-audit-trail.md) (solved in `52aaf4cb`: the bare number is the PID; stop returned success after dropping that PID; the audit dialog read `recent_switches` while the query returned `records`)
 
+## Fixed in v4.279.0
+- [67-prompt-tree-enqueue-zero-after-click.md](./67-prompt-tree-enqueue-zero-after-click.md) (Enqueue 0 / IDLE after a successful click while Cursor already had queued messages; force tree reset, selected-turn overlay, and 600s recency gate; tagged `v4.279.0`)
+
 ## Fixed in v4.278.0
 - [66-instances-switch-json-fake-success.md](./66-instances-switch-json-fake-success.md) (`agm instances switch --json` no longer prints `"switched"` before `switch_account_to_instance`; `bound_email` must match or `success: false`)
 
