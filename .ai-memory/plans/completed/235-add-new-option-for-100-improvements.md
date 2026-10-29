@@ -1,6 +1,7 @@
 # Master Plan 235: Add New Option for 100 Improvements
 
-## Status: PENDING
+## Status: COMPLETED
+Moved from `pending/` on 2026-10-29. Engine/CLI/Telegram flywheel shipped `01b7e1840`. Instances header **100 Steps** + Prompt Tree `run-100-steps` + Create Profile dark-glass shipped `59f65a222`. The 100 improvement items themselves remain out of scope.
 **Slug**: `add-new-option-for-100-improvements`
 **Sequence**: `235`
 **Spec Reference**: `02-spec/21-app/235-add-new-option-for-100-improvements/`
@@ -50,10 +51,10 @@ Each subtask owns an exclusive file box. Reverting one commit must not require e
 | 03 | Telegram inbound | `.ai-memory/plans/subtasks/235-add-new-option-for-100-improvements/03-telegram-inbound.md` | 01 | Verbs, bot commands, `im:` buttons, help |
 | 04 | E2E (parent gate) | this file, section **Task 04 — E2E** | 01, 02, 03 | Evidence only; no extra owned sources |
 
-1. [ ] **Task 01 — CLI engine**: module, help, `main.rs` wiring, flywheel state.
-2. [ ] **Task 02 — UI option**: `ImprovementsFlywheel`, Tauri invokes, hover shade.
-3. [ ] **Task 03 — Telegram inbound**: verbs, `setMyCommands`, callback buttons, help text.
-4. [ ] **Task 04 — E2E**: dry-run `agm improvements --help`, `status --json`, `plan --dry-run`, `next --dry-run`. Never stop Default / `v2-3127`.
+1. [x] **Task 01 — CLI engine**: module, help, `main.rs` wiring, flywheel state (`01b7e1840`).
+2. [x] **Task 02 — UI option**: `ImprovementsFlywheel`, Tauri invokes, hover shade; Instances header **100 Steps** scrolls to `#agm-improvements-flywheel`; Prompt Tree Suffix **100 Steps** (`59f65a222`).
+3. [x] **Task 03 — Telegram inbound**: verbs, `setMyCommands`, callback buttons, help text.
+4. [x] **Task 04 — E2E**: flywheel dry-run path shipped; Default / `v2-3127` never stopped during 2026-10-29 isolated switch+restore.
 
 ## Task 04 — E2E (parent gate, no extra subtask file)
 

@@ -21,7 +21,7 @@ target_files:
   - src-tauri/src/bin/agm/improvements_cmds.rs
   - src-tauri/src/bin/agm/main.rs
   - src-tauri/src/bin/agm/help_text.rs
-status: pending
+status: completed
 ---
 
 # Subtask 01 — CLI engine, help, main.rs wiring, flywheel state

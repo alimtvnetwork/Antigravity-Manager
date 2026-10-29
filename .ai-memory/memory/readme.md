@@ -1,6 +1,6 @@
 # Memory Index (`.ai-memory/memory/`)
 
-- Updated: 2026-10-17T03:00:00Z
+- Updated: 2026-10-29T14:10:00Z
 - Full historical index: [01-index.md](./01-index.md). Every file listed here is also listed there.
 - Read order for the whole repo: [../what-to-read.md](../what-to-read.md). Task register: [../plans/readme.md](../plans/readme.md) "Recent Completed Tasks Register".
 
@@ -38,6 +38,7 @@
 | 28 | [learned/28-telegram-project-picker-and-node-cache.md](./learned/28-telegram-project-picker-and-node-cache.md) | Pointer to RCA 18. `/send` pages eight projects by newest conversation, title not id, This machine in green, node names cached 24 hours. Do not reorder `list_all_prompts`. |
 | 29 | [learned/29-dispatch-menu-hover-stays-inside.md](./learned/29-dispatch-menu-hover-stays-inside.md) | Pointer to RCA 20. Destination hover is clipped because a browser `title` opens past the right edge. Use `DispatchFieldHint` inside the menu. Do not put `title` back on the Send or Copy popovers. |
 | 30 | [learned/30-prompt-send-preemption-ide-title-sync-and-theme-polish.md](./learned/30-prompt-send-preemption-ide-title-sync-and-theme-polish.md) | Prompt Send preemption via CDP cancelInvocation, Antigravity Language Server protobuf raw_summary nullification on title rename, resizable tree splitter, theme adaptability (One Dark Pro), and portaled tooltip collision guards |
+| 31 | [learned/31-prompt-tree-copy-skill-refs-telegram-e2e-and-json-switch.md](./learned/31-prompt-tree-copy-skill-refs-telegram-e2e-and-json-switch.md) | Prompt Tree Copy is verbatim full text; skill refs are not attachments; Telegram 236 live ping/observe/shot/CSV; isolated switch+restore without `--json`; Create Profile dark-glass + 100 Steps UI; issue 66 JSON switch fake success |
 
 **Plan 140 execution (not learned memory):** implement via [../plans/subtasks/140-per-instance-prompt-attribution-backup-queue/06-blind-executor/00-start-here.md](../plans/subtasks/140-per-instance-prompt-attribution-backup-queue/06-blind-executor/00-start-here.md) and steps 01 to 22. Design background: [../plans/140-per-instance-prompt-attribution-backup-queue.md](../plans/140-per-instance-prompt-attribution-backup-queue.md).
 

@@ -4,6 +4,8 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [236-telegram-feature-enhancement.md](./completed/236-telegram-feature-enhancement.md) | `COMPLETED` | Telegram inbound: screenshot without AGM self-focus hang, CSV as `sendDocument`, per-instance `/status` cards, Copy/Full whole-prompt `.txt` via `i:cp:`, hover shade only, isolated switch+restore E2E, tagged `v4.276.0`. |
+| [235-add-new-option-for-100-improvements.md](./completed/235-add-new-option-for-100-improvements.md) | `COMPLETED` | Shared 100-improvements flywheel on CLI (`agm improvements`), UI pills, Telegram verbs; Instances header **100 Steps**; Prompt Tree `run-100-steps`; Create Profile dark-glass (no DaisyUI magenta ring). |
 | [233-feature-and-instance-management.md](./completed/233-feature-and-instance-management.md) | `COMPLETED` | Feature and Instance Management: elevated instance card visual contrast with Royal Violet dark glass, tactile amber Switch Account button with 3D yellow hover gradient, multi-channel idle mode auto-notification hub for Telegram and Email, centralized UI step and click trace logging (`record_ui_trace`), and AGM CLI click bridge expansion (`agm ui click` & `agm instances click`). |
 | [232-account-switching-color-search-and-ui-ux-enhancements.md](./completed/232-account-switching-color-search-and-ui-ux-enhancements.md) | `COMPLETED` | Resolve dark mode contrast breakdown (white-on-white text) in the Switch Account modal (`SwitchAccountDialog.tsx`), caused by Invalid At Computed-Value Time (IACVT) Tailwind CSS variable opacity modifiers, polish search filter bar and counter into a contiguous segmented pill capsule, refine subscription badges, and implement tactile action buttons. |
 | [50-instant-rerun-enqueue-and-minor-release.md](./completed/50-instant-rerun-enqueue-and-minor-release.md) | `COMPLETED` | Root cause elimination of rerun dispatch latency: eliminates 30s idle backoff via notify wakeup, triggers immediate idle queue dispatch on enqueue, removes 300ms pacing sleeps, and executes v4.268.0 release ceremony. |
@@ -99,6 +101,8 @@
 ## Completed Plans (`completed/`)
 | # | Plan File | Status | Summary |
 | :--- | :--- | :--- | :--- |
+| 236 | [236-telegram-feature-enhancement.md](./completed/236-telegram-feature-enhancement.md) | `COMPLETED` | Telegram crash/CSV/copy/hover + isolated switch+restore; tagged `v4.276.0` (`1ce618741`, `b2cfc5596`). JSON switch honesty is issue 66. |
+| 235 | [235-add-new-option-for-100-improvements.md](./completed/235-add-new-option-for-100-improvements.md) | `COMPLETED` | Flywheel CLI/UI/Telegram (`01b7e1840`); Instances **100 Steps** + Prompt Tree suffix + Create Profile restyle (`59f65a222`). |
 | 175 | [175-test-case-implementation-and-task-management.md](./completed/175-test-case-implementation-and-task-management.md) | `COMPLETED` | Author concrete unit test suites for recent improvements 481–540 across reverse proxy, auto-switcher, Split-SQLite, and instance isolation; calculate pending step backlog (255 total steps, 245 remaining across 5 tracks); execute 10 steps per turn; enqueue master E2E test plan. |
 | 174 | [174-improvements-planning-and-execution.md](./completed/174-improvements-planning-and-execution.md) | `COMPLETED` | Next 30 grounded improvements (511–540) across Proxy SSE Protocol, Chunk Multiplexing & Connection Keepalive (511-516), Auto-Switcher Candidate Scoring, Velocity Dampening & Quota Alignment (517-522), Split-SQLite Maintenance, WAL Checkpointing & Lock Recovery (523-528), Multi-Instance Sandboxed Profile Isolation & Process Watchdogs (529-534), and Desktop React UI Modernization (535-540). |
 | 173 | [173-improvements-planning-and-execution.md](./completed/173-improvements-planning-and-execution.md) | `COMPLETED` | Next 30 grounded improvements (481–510) across Proxy SSE Framing & Upstream Health (481-486), Auto-Switcher Adaptive Dampeners & Quota Boundary Synchronization (487-492), Split-SQLite Maintenance & WAL Checkpoint Schedulers (493-498), Multi-Instance Sandboxed Keychain & Lifecycle (499-504), and Desktop React UI Modernization (505-510). |
@@ -176,31 +180,30 @@
 
 ## Recent Completed Tasks Register (last 20, newest first)
 
-Updated 2026-10-21T16:50:00Z from `git log` (HEAD `33ea5d83`). Referenced by `.ai-memory/what-to-read.md`.
+Updated 2026-10-29T14:10:00Z from `git log` (HEAD `86877cf53`). Referenced by `.ai-memory/what-to-read.md`.
 
 | # | Date | Commit | Task | Plan |
 |---|---|---|---|---|
-| 0 | 2026-10-23 | - | Cross-platform compat, staging protocol, published-tip rewrite, headless/CLI parity, generic-fix preference (Sequence 199) | 199 |
-| 1 | 2026-10-21 | `33ea5d83` | Send preemption, resizable tree view, live title sync, theme adaptability and scoreboard tooltip fix (v4.250.0) | ui-and-functionality-corrections |
-| 2 | 2026-10-18 | `77e6f780`, `0fe0b2bb` | Compile-time safe Diesel ORM, PascalCase Split-DB schemas, lossless single-file backup/re-import, zero account loss guard, and CLI migration suite | 163 |
-| 3 | 2026-10-05 | `b7e5744c`, `ccf336b1` | v4.158.0 two-phase 4 hour quota gate and hours-remaining weekly scoring, delimiter and rustfmt fixes | 138 |
-| 4 | 2026-10-05 | `7de81159` | v4.157.1 weekly scoring DESC sort and divide-by-100 integer score | 137 |
-| 5 | 2026-10-05 | `babb0b18` | v4.157.0 neon green progress bar, hours-elapsed weekly scoring, prompt tree modal header, empty tree fix | 136, 137 |
-| 6 | 2026-10-05 | `7952d8dd` | v4.156.0 prompt tree discovery from summaries DB | 136 |
-| 7 | 2026-10-05 | `2289730e`, `3581207d` | v4.155.0 running projects detection and restart split button | 132, 135 |
-| 8 | 2026-10-05 | `fbd5e819` | v4.154.0 accounts borders, VS Code cyan, email cooldown | 134 |
-| 9 | 2026-10-05 | `2274f100` | Seven specialized AGM skills | - |
-| 10 | 2026-10-05 | `2a5cd064` | v4.152.0 split restart button with distinct sync icons | 132 |
-| 11 | 2026-10-05 | `8ce647c7` | v4.151.0 AccountRow JSX fix and instance.rs rustfmt | - |
-| 12 | 2026-10-05 | `6d41d931` | Instance fleet deploy, default theme presets, plugins and skills parity, GitMap delegation | 131 |
-| 13 | 2026-10-05 | `b499eb5f` | v4.150.0 accounts table cyan palette and compact instances table | 130 |
-| 14 | 2026-10-05 | `24daa320` | v4.149.0 prompt tree line gaps, liveness scoping, N key dispatch | 128 |
-| 15 | 2026-10-04 | `319d2f36` to `d77ebe3b` | v4.145.0 to v4.148.0 rusqlite and compile fixes | - |
-| 16 | 2026-10-04 | `a03b68f3` | v4.143.0 per-instance prompt isolation, deep cloning, card mutex UI, macOS gatekeeper | 119, 120, 123 |
-| 17 | 2026-10-04 | `2b799681`, `7194a6e8` | v4.141.0 and v4.142.0 macOS installation and IDE switching | 116, 119 |
-| 18 | 2026-10-04 | `e1045a9d` | v4.140.0 multi-instance low-quota failover and async 5s prompt restore | 111 |
-| 19 | 2026-10-04 | `92bb0296`, `f357f5dd` | v4.133.0 and v4.134.0 release artifact packaging fix | - |
-| 20 | 2026-10-04 | `2bbcba13` | v4.130.0 startup white screen crash (tauri async runtime) | - |
+| 0 | 2026-10-29 | `86877cf53` | Prompt Tree Copy copies full prompt as plain text; skill refs are not rewritten into Attachments | learned-31 |
+| 1 | 2026-10-29 | `59f65a222` | Create Profile dark-glass (no DaisyUI magenta ring); Instances header 100 Steps; Prompt Tree run-100-steps | 235 |
+| 2 | 2026-10-29 | `1ce618741`, `b2cfc5596` | Telegram 236: screenshot no self-focus, CSV sendDocument, status cards, Copy/Full .txt, hover shade, tagged v4.276.0 | 236 |
+| 3 | 2026-10-29 | `01b7e1840` | Shared 100-improvements flywheel on CLI, UI, and Telegram | 235 |
+| 4 | 2026-10-23 | - | Cross-platform compat, staging protocol, published-tip rewrite, headless/CLI parity, generic-fix preference (Sequence 199) | 199 |
+| 5 | 2026-10-21 | `33ea5d83` | Send preemption, resizable tree view, live title sync, theme adaptability and scoreboard tooltip fix (v4.250.0) | ui-and-functionality-corrections |
+| 6 | 2026-10-18 | `77e6f780`, `0fe0b2bb` | Compile-time safe Diesel ORM, PascalCase Split-DB schemas, lossless single-file backup/re-import, zero account loss guard, and CLI migration suite | 163 |
+| 7 | 2026-10-05 | `b7e5744c`, `ccf336b1` | v4.158.0 two-phase 4 hour quota gate and hours-remaining weekly scoring, delimiter and rustfmt fixes | 138 |
+| 8 | 2026-10-05 | `7de81159` | v4.157.1 weekly scoring DESC sort and divide-by-100 integer score | 137 |
+| 9 | 2026-10-05 | `babb0b18` | v4.157.0 neon green progress bar, hours-elapsed weekly scoring, prompt tree modal header, empty tree fix | 136, 137 |
+| 10 | 2026-10-05 | `7952d8dd` | v4.156.0 prompt tree discovery from summaries DB | 136 |
+| 11 | 2026-10-05 | `2289730e`, `3581207d` | v4.155.0 running projects detection and restart split button | 132, 135 |
+| 12 | 2026-10-05 | `fbd5e819` | v4.154.0 accounts borders, VS Code cyan, email cooldown | 134 |
+| 13 | 2026-10-05 | `2274f100` | Seven specialized AGM skills | - |
+| 14 | 2026-10-05 | `2a5cd064` | v4.152.0 split restart button with distinct sync icons | 132 |
+| 15 | 2026-10-05 | `8ce647c7` | v4.151.0 AccountRow JSX fix and instance.rs rustfmt | - |
+| 16 | 2026-10-05 | `6d41d931` | Instance fleet deploy, default theme presets, plugins and skills parity, GitMap delegation | 131 |
+| 17 | 2026-10-05 | `b499eb5f` | v4.150.0 accounts table cyan palette and compact instances table | 130 |
+| 18 | 2026-10-05 | `24daa320` | v4.149.0 prompt tree line gaps, liveness scoping, N key dispatch | 128 |
+| 19 | 2026-10-04 | `319d2f36` to `d77ebe3b` | v4.145.0 to v4.148.0 rusqlite and compile fixes | - |
 
 ## Pending Plans (`pending/`)
 | # | Plan File | Status | Summary |

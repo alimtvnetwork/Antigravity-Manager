@@ -18,7 +18,7 @@ target_files:
   - changelog_en.md
   - README.md
   - README_EN.md
-status: pending
+status: completed
 ---
 
 # Subtask 03 — Hover animation, isolated E2E, minor release

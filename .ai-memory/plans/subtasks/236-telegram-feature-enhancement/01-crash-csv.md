@@ -15,7 +15,7 @@ target_files:
   - src-tauri/src/modules/telegram_inbound/media.rs
   - src-tauri/src/modules/telegram_inbound/daemon.rs
   - src-tauri/src/modules/telegram_inbound/tests.rs
-status: pending
+status: completed
 ---
 
 # Subtask 01 — Crash (screenshot) + CSV download

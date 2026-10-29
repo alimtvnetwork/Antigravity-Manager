@@ -598,4 +598,55 @@ Allowed work:
 
 **Why:** Tooltips inside overflow-hidden scroll containers get clipped and become trapped behind sticky headers.
 
+---
+
+## Treating `agm instances switch --json` as Proof of a Bound-Email Change - TOTAL BAN
+
+Added 2026-10-29. Source: `.ai-memory/issues/66-instances-switch-json-fake-success.md`.
+
+Forbidden:
+- Using `"status": "switched"` from `agm instances switch … --json` as evidence the registry `bound_email` changed.
+- Exiting the JSON switch path with a hardcoded success envelope before `switch_account_to_instance` runs.
+
+Allowed work:
+- Run the non-JSON switch, then read `bound_email` from `agm instances ls`.
+- After a source fix, JSON must report the registry email or `success: false`.
+
+**Why:** The `--json` branch in `src-tauri/src/bin/agm/instance_cmds.rs` prints switched and never calls the real switch when local REST has no `data`. Live 2026-10-29 E2E reproduced the lie.
+
+---
+
+## Rewriting Skill Refs Into Attachments on Copy - TOTAL BAN
+
+Added 2026-10-29. Source: `.ai-memory/memory/learned/31-prompt-tree-copy-skill-refs-telegram-e2e-and-json-switch.md`.
+
+Forbidden:
+- Running `formatPromptWithAttachments` on `@[.agents/skills/…]` or `@[name](file;.agents/skills/…)` as if they were image files.
+- Calling `convertImageUriToBase64` on skill directory names.
+- Showing **Copied!** before `copyToClipboard` / `copyPromptWithRichImages` returns true.
+- Making the primary Prompt Tree Copy button a rich HTML + PNG write.
+
+Allowed work:
+- Primary Copy = verbatim `resolvePromptBody` via `copyToClipboard`, await, success only on true.
+- Extract attachments only when `isFileAttachmentTarget` (image/file extension, not `.agents/skills/`).
+- Rich HTML stays in the Copy dropdown.
+
+**Why:** GitMap skill-ref prompts were mutated into `Attachments:` blocks and the UI lied with Copied! while paste was empty or HTML. Fixed in `86877cf53`.
+
+---
+
+## Scoring Live GUI Against an Older Installed `agm-ui` Than HEAD - TOTAL BAN
+
+Added 2026-10-29. Source: `.ai-memory/memory/learned/31-prompt-tree-copy-skill-refs-telegram-e2e-and-json-switch.md`.
+
+Forbidden:
+- Declaring a frontend fix proven in the running window when `agm --version` / the installed `agm-ui` FileVersion is behind `git log -1`.
+- Treating `agm shot` (manager window only) as inbound `/screenshot` mosaic proof.
+
+Allowed work:
+- Prove TypeScript copy/attachment helpers with `npx tsx` against current source.
+- State clearly when Computer Use is `sidecar_unavailable` and the GUI was not clicked.
+
+**Why:** On 2026-10-29 HEAD was `86877cf53` while installed GUI stayed `v4.276.0`. Clicking Copy in that window would test the bug, not the fix.
+
 

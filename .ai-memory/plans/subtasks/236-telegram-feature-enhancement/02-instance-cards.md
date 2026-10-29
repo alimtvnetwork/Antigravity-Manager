@@ -12,7 +12,7 @@ citations:
   strictly_avoid: ../../../strictly-avoid.md
 target_files:
   - src-tauri/src/modules/telegram_inbound/instance_cards.rs
-status: pending
+status: completed
 ---
 
 # Subtask 02 — Instance cards Copy/Full document

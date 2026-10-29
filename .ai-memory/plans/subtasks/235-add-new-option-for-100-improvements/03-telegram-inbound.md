@@ -19,7 +19,7 @@ target_files:
   - src-tauri/src/modules/telegram_inbound/daemon.rs
   - src-tauri/src/modules/telegram_inbound/reports_b.rs
   - src-tauri/src/modules/telegram_inbound/tests.rs
-status: pending
+status: completed
 ---
 
 # Subtask 03 — Telegram verbs, bot commands, callback buttons, help text

@@ -18,7 +18,7 @@ target_files:
   - src-tauri/src/commands/cmd_improvements.rs
   - src-tauri/src/commands/mod.rs
   - src-tauri/src/lib/run.rs
-status: pending
+status: completed
 ---
 
 # Subtask 02 — UI ImprovementsFlywheel, Tauri invokes, hover shade
