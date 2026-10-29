@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.277.1] - 2026-10-29
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.277.0] - 2026-10-29
 
 ### Added
@@ -1516,31 +1523,25 @@
         -   **[Instance UI & Verification Templates] Restyled Create Profile Modal, 100-Step Prompt Breakdown & Release Tag Normalization (Thanks to @aukgit)**:
             -   **Description**: Restyled the Create Profile dialog in `src/pages/instances/CreateEditDialogs.tsx` with unified dark-glass styling, segmented button controls, and high-contrast form elements; added multi-step prompt breakdowns and verification templates in `src/components/instances/PromptTreeView/verificationTemplates.ts`; integrated flywheel status triggers in `src/components/telegram/ImprovementsFlywheel.tsx` and `src/pages/Instances.tsx`; and purged rogue v5 tags to restore canonical 4.x SemVer progression. (Thanks to @aukgit)
 
-
     *   **v4.275.3 (2026-10-28)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.275.2 (2026-10-28)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
-
     *   **v4.275.1 (2026-10-28)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.275.0 (2026-10-28)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
-
     *   **v4.274.0 (2026-10-28)**:
         -   **[Feature and Instance Management] Instance Card Contrast, 3D Switch Button, Idle Notification Hub, UI Step Logging & CLI Remote Control (Thanks to @aukgit)**:
             -   **Description**: Redesigned `/instances` cards with Royal Violet dark glass (`#171025`) and solid quota panels (`#120b1e`), elevated Switch Account buttons with illuminated amber styling and 3D yellow tactile hover gradients, implemented automated idle-mode dual-channel notification alerts across Telegram and Email in `idle_alerts.rs`, added structured `[UI_STEP]` step and button click trace logging in `uiLogger.ts` and `cmd_ui_trace.rs`, expanded CLI remote control (`agm ui click` and `agm instances click`), verified instance switching and prompt restoration integrity with zero errors in `errors.db`, and authored comprehensive specifications under `02-spec/21-app/233-feature-and-instance-management/`. (Thanks to @aukgit)
-
 
     *   **v4.273.0 (2026-10-28)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
