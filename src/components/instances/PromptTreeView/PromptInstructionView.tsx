@@ -618,7 +618,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                 conversationTargetMode,
                 selectedConversation.conversation_id,
                 Boolean(selectedConversation.is_running)
-            ) || (conversationTargetMode === 'current' ? 'current' : undefined);
+            ) || selectedConversation.conversation_id;
 
             const mediaList = extractImagesFromPrompt(content, selectedConversation).map((img) => img.src).filter(Boolean);
             await sendPromptNow(targetInstId, repoPath, content, targetConvId, mediaList.length > 0 ? mediaList : undefined);
@@ -654,7 +654,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                 conversationTargetMode,
                 selectedConversation.conversation_id,
                 Boolean(selectedConversation.is_running)
-            ) || (conversationTargetMode === 'current' ? 'current' : undefined);
+            ) || selectedConversation.conversation_id;
 
             const mediaList = extractImagesFromPrompt(content, selectedConversation).map((img) => img.src).filter(Boolean);
             await enqueuePrompt(targetInstId, repoPath, content, targetConvId, undefined, mediaList.length > 0 ? mediaList : undefined);
@@ -683,9 +683,6 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
             }
 
             setActionMsg('Prompt enqueued successfully into FIFO queue!');
-            if (propLoadTree) {
-                void propLoadTree(false, true);
-            }
             setTimeout(() => setActionMsg(null), 3000);
         } catch (err) {
             const errorObj = err instanceof Error ? err : new Error(String(err));
@@ -729,9 +726,6 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
 
             if (result.dispatched > 0) {
                 setActionMsg(`Enqueued ${result.dispatched} rerun round(s) into FIFO queue!`);
-                if (propLoadTree) {
-                    void propLoadTree(false, true);
-                }
             } else if (result.failed > 0) {
                 setActionMsg(`Failed to enqueue rerun (${result.failed} error(s))`);
             }

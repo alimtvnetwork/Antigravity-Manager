@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.278.0)
+> Professional AI Account Management & Protocol Proxy System (v4.279.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.278.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.279.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.279.0**: Prompt Tree Enqueue Visibility — Enqueue and rerun show queued turns on the clicked instance immediately without waiting for the 30s tree refresh; `applySelectedTurnOverlay` in `src/components/instances/PromptTreeView/usePromptTreeData.ts` keeps QUEUED while inspecting a completed turn; Enqueue shows the live count; `src-tauri/src/modules/repo_db/tree_collect.rs` marks queued prompts without a 600s recency gate. Isolated `agm instances test-create` enqueued five `queued-*` ids on sandbox `test-enqueue-ui-1793289596-9596`; Default PID 3804 and `v2-3127` were not stopped. (Thanks to @aukgit)
 
 > Latest version **v4.278.0**: Prompt Queue Visibility, Honest JSON Switch & Friendly Telegram Cards — Prompt tree force-refresh in `src/components/instances/PromptTreeView/usePromptTreeData.ts` keeps queued turns instead of wiping the 30s SWR cache first; rerun ×N keeps each identical queued turn; `default-copy-*` is not Default; `src-tauri/src/modules/repo_db/tree_node_conv.rs` attaches queued prompts by path or session id; `agm instances switch --json` in `src-tauri/src/bin/agm/instance_cmds.rs` no longer fakes `"switched"` and confirms `bound_email`; enqueue notifies the FIFO scheduler immediately; Telegram cards show idle/busy/queued and ✉️ Send. Isolated `agm instances test-create` enqueued three queued ids, copied, sent `p-0db14cf4`; Default and v2-3127 were not stopped. (Thanks to @aukgit)
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.279.0] - 2026-10-29
+
+### Fixed
+- Prompt Tree Enqueue stayed at 0 after a successful click because force `loadTree` reset the 30s cache and viewing a completed turn overwrote conversation `is_queued`. `src/components/instances/PromptTreeView/usePromptTreePromptActions.ts` and `DetailHeader.tsx` now inject queued turns immediately and skip the wipe; `applySelectedTurnOverlay` in `src/components/instances/PromptTreeView/usePromptTreeData.ts` keeps QUEUED while inspecting an older turn; Enqueue shows the live count; rerun ×N appends that many queued turns on click (Thanks to @aukgit)
+- `src-tauri/src/modules/repo_db/tree_collect.rs` no longer requires a 600s recency window to mark a conversation queued, so idle conversations still show FIFO queued prompts; `PENDING_STAGES` in `src-tauri/src/modules/repo_db/tree_node_conv.rs` includes `queued` and `in_progress` (Thanks to @aukgit)
+
+### Tests
+- Frontend `queuedTurns` and `rerunActions` passed; isolated `agm instances test-create` sandbox `test-enqueue-ui-1793289596-9596` enqueued `queued-1793289597305-0000-b68fdd`, `queued-1793289597524-0000-569e8d`, `queued-1793289597623-0000-65c281`, `queued-1793289597724-0000-187b40`, `queued-1793289597832-0000-d91ac9` immediately; `agm instances test-clean` removed only that sandbox; Default PID 3804 and `v2-3127` were not stopped (Thanks to @aukgit)
+
+---
+
 ## [v4.278.0] - 2026-10-29
 
 ### Fixed
@@ -1555,6 +1566,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.279.0 (2026-10-30)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.278.0 (2026-10-29)**:
         -   **[Prompt Queue Visibility, Honest JSON Switch & Friendly Telegram Cards] Enqueue/rerun show on click, JSON switch proves bound_email, Telegram Send (Thanks to @aukgit)**:
             -   **Description**: Prompt tree force-refresh keeps queued turns instead of wiping the 30s SWR cache first; rerun ×N keeps each identical queued turn; `agm instances switch --json` no longer fakes `"switched"`; Telegram cards show idle/busy/queued and ✉️ Send. Isolated `agm instances test-create` enqueued three queued ids, copied, sent `p-0db14cf4`; Default and v2-3127 were not stopped. (Thanks to @aukgit)

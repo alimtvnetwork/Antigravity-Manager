@@ -218,8 +218,50 @@ function queuedTurnKey(p: { status: string; prompt_text: string }): string {
     return `${String(p.status).toUpperCase()}|${p.prompt_text}`;
 }
 
-function isQueuedTurn(p: { is_queued?: boolean; status: string }): boolean {
+export function isQueuedTurn(p: { is_queued?: boolean; status: string }): boolean {
     return Boolean(p.is_queued) || String(p.status).toUpperCase() === 'QUEUED';
+}
+
+export function queuedPromptCount(conv: { is_queued?: boolean; prompts?: Array<{ is_queued?: boolean; status: string }> } | null | undefined): number {
+    if (!conv) {
+        return 0;
+    }
+    const fromTurns = (conv.prompts || []).filter(isQueuedTurn).length;
+    if (fromTurns > 0) {
+        return fromTurns;
+    }
+    return conv.is_queued ? 1 : 0;
+}
+
+/** Keep conversation QUEUED when inspecting an older completed turn. */
+export function applySelectedTurnOverlay(
+    conv: AgmConversationNode,
+    selectedTurn?: number | null
+): AgmConversationNode {
+    const hasQueuedTurns = (conv.prompts || []).some(isQueuedTurn);
+    if (typeof selectedTurn !== 'number' || !conv.prompts?.length) {
+        if (!hasQueuedTurns) {
+            return conv;
+        }
+        return { ...conv, is_queued: true, status: 'QUEUED' };
+    }
+    const matchingTurn = conv.prompts.find((t) => t.turn_number === selectedTurn);
+    if (!matchingTurn) {
+        if (!hasQueuedTurns) {
+            return conv;
+        }
+        return { ...conv, is_queued: true, status: 'QUEUED' };
+    }
+    return {
+        ...conv,
+        prompt_preview_200w: matchingTurn.preview_200w || matchingTurn.prompt_text.slice(0, 200),
+        full_prompt_text: matchingTurn.prompt_text,
+        latest_step_summary: `Turn ${matchingTurn.turn_number} · ${matchingTurn.status}`,
+        is_running: matchingTurn.is_running,
+        is_queued: Boolean(matchingTurn.is_queued) || hasQueuedTurns || Boolean(conv.is_queued),
+        status: hasQueuedTurns ? 'QUEUED' : matchingTurn.status,
+        selected_turn_number: matchingTurn.turn_number,
+    };
 }
 
 export function mergeQueuedTurns(
@@ -739,40 +781,11 @@ export function usePromptTreeData({
                             : undefined;
                         if (updatedConv) {
                             hasRetainedSelection = true;
-                            const hasSelectedTurn = typeof currentTurn === 'number';
-                            const hasPrompts = Boolean(updatedConv.prompts && updatedConv.prompts.length > 0);
-                            if (hasSelectedTurn && hasPrompts && updatedConv.prompts) {
-                                const matchingTurn = updatedConv.prompts.find(
-                                    (t) => t.turn_number === currentTurn
-                                );
-                                if (matchingTurn) {
-                                    const turnConv: AgmConversationNode = {
-                                        ...updatedConv,
-                                        prompt_preview_200w: matchingTurn.preview_200w || matchingTurn.prompt_text.slice(0, 200),
-                                        full_prompt_text: matchingTurn.prompt_text,
-                                        latest_step_summary: `Turn ${matchingTurn.turn_number} · ${matchingTurn.status}`,
-                                        is_running: matchingTurn.is_running,
-                                        is_queued: matchingTurn.is_queued,
-                                        status: matchingTurn.status,
-                                        selected_turn_number: matchingTurn.turn_number,
-                                    };
-                                    setSelectedConversation(turnConv);
-                                    const freshText = matchingTurn.prompt_text || '';
-                                    setActivePromptText(freshText);
-                                    setEditedPromptText((prev) => (prev === currentActiveText ? freshText : prev));
-                                } else {
-                                    const freshText = resolveConversationPromptText(updatedConv, null);
-                                    setSelectedConversation(updatedConv);
-                                    setActivePromptText(freshText);
-                                    setEditedPromptText((prev) => (prev === currentActiveText ? freshText : prev));
-                                }
-                            } else {
-                                const freshText = resolveConversationPromptText(updatedConv, null);
-                                setSelectedConversation(updatedConv);
-                                setActivePromptText(freshText);
-                                // Do not clobber user's dirty textarea edits
-                                setEditedPromptText((prev) => (prev === currentActiveText ? freshText : prev));
-                            }
+                            const turnConv = applySelectedTurnOverlay(updatedConv, currentTurn);
+                            const freshText = resolveConversationPromptText(turnConv, currentTurn ?? null);
+                            setSelectedConversation(turnConv);
+                            setActivePromptText(freshText);
+                            setEditedPromptText((prev) => (prev === currentActiveText ? freshText : prev));
                         }
                     }
                 }

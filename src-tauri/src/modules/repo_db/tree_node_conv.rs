@@ -470,7 +470,7 @@ pub(crate) fn build_active_prompt_conv_nodes(
 
         if let Some(idx) = target_idx {
             let target_conv = &mut conv_nodes[idx];
-            const PENDING_STAGES: &[&str] = &["queued", "queue", "pending"];
+            const PENDING_STAGES: &[&str] = &["queued", "queue", "pending", "in_progress"];
             const ACTIVE_STAGES: &[&str] = &["running", "dispatched", "in_flight"];
             let is_pending_stage = ap.status.has_any_word_ignore_case(PENDING_STAGES);
             let is_active_stage = ap.status.has_any_word_ignore_case(ACTIVE_STAGES);

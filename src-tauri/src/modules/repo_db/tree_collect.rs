@@ -251,10 +251,8 @@ pub(crate) fn collect_tree_conversation_items(
                 }
             };
 
-            const QUEUE_STATUSES: &[&str] = &["queue", "pending"];
-            let is_queued = status.has_any_word_ignore_case(QUEUE_STATUSES)
-                && is_recent
-                && is_owning_inst_alive;
+            const QUEUE_STATUSES: &[&str] = &["queued", "queue", "pending", "in_progress"];
+            let is_queued = status.has_any_word_ignore_case(QUEUE_STATUSES);
             let latest_step_summary = inspection.latest_step_summary;
 
             // Ghost conversation filter: skip untitled / empty title with empty prompt AND zero turns

@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.279.0 (2026-10-29)**:
+        -   **[Prompt Tree Enqueue Visibility] Show queued count on click, keep QUEUED on completed turns (Thanks to @aukgit)**:
+            -   **Description**: Enqueue/rerun inject queued turns immediately without force-resetting the prompt tree cache; `applySelectedTurnOverlay` keeps the conversation QUEUED while inspecting an older completed turn; Enqueue shows the live count; `tree_collect.rs` marks queued status without a 600s recency gate. Isolated `agm instances test-create` enqueued five `queued-*` ids on sandbox `test-enqueue-ui-1793289596-9596`; Default PID 3804 and `v2-3127` were not stopped. (Thanks to @aukgit)
+
     *   **v4.278.0 (2026-10-29)**:
         -   **[Prompt Queue Visibility, Honest JSON Switch & Friendly Telegram Cards] Enqueue/rerun show on click, JSON switch proves bound_email, Telegram Send (Thanks to @aukgit)**:
             -   **Description**: Prompt tree force-refresh in `src/components/instances/PromptTreeView/usePromptTreeData.ts` keeps queued turns instead of wiping the 30s SWR cache first; rerun ×N keeps each identical queued turn; `default-copy-*` is not Default; `src-tauri/src/modules/repo_db/tree_node_conv.rs` attaches queued prompts by path or session id; `agm instances switch --json` in `src-tauri/src/bin/agm/instance_cmds.rs` no longer fakes `"switched"` and confirms `bound_email`; enqueue notifies the FIFO scheduler immediately; Telegram cards show idle/busy/queued and ✉️ Send. Isolated `agm instances test-create` enqueued three queued ids, copied, sent `p-0db14cf4`; Default and v2-3127 were not stopped. (Thanks to @aukgit)

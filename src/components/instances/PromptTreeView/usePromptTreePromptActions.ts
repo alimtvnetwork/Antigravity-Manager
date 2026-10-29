@@ -777,7 +777,7 @@ ${activePromptText}
                 conversationTargetMode,
                 conv.conversation_id,
                 Boolean(conv.is_running)
-            ) || (conversationTargetMode === 'current' ? 'current' : undefined);
+            ) || conv.conversation_id;
             if (conversationTargetMode === 'new' && newConversationTitle?.trim()) {
                 promptContent = `# ${newConversationTitle.trim()}\n\n${promptContent}`;
             }
@@ -865,34 +865,11 @@ ${activePromptText}
                         ),
                     }));
                     patchPromptTreeSwrCache(targetInstId, () => next);
+                    if (instanceId && instanceId !== targetInstId) {
+                        patchPromptTreeSwrCache(instanceId, () => next);
+                    }
                     return next;
                 });
-            }
-
-            // Invalidate prompt tree cache first so tree reload fetches fresh state including enqueued turn
-            if (isTauri()) {
-                try {
-                    await invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId }).catch(async () => {
-                        await invoke('reset_prompt_tree_cache', { instanceId: targetInstId });
-                    });
-                } catch (cacheErr) {
-                    useErrorStore.getState().trackWarning(cacheErr, {
-                        source: 'usePromptTreePromptActions.handleEnqueuePrompt',
-                        triggerAction: 'invalidate_prompt_tree_cache',
-                    });
-                }
-            }
-
-            // Trigger immediate silent tree refresh so tree view reflects enqueued turn without top progress bar
-            if (loadTree) {
-                try {
-                    await loadTree(false, true);
-                } catch (loadErr) {
-                    useErrorStore.getState().trackWarning(loadErr, {
-                        source: 'usePromptTreePromptActions.handleEnqueuePrompt',
-                        triggerAction: 'loadTree',
-                    });
-                }
             }
 
             // Prime system clipboard concurrently with dual-MIME rich HTML images for immediate pasting
@@ -923,7 +900,7 @@ ${activePromptText}
         treeData, archivedProjectIds, setSelectedProject,
         editedPromptText, activePromptText, activePromptTextRef, confirmationSuffix,
         conversationTargetMode, newConversationTitle, instanceId, selectConversation,
-        loadTree, setIsEnqueueing, setActionMsg, setError, setTreeData, setSelectedConversation,
+        setIsEnqueueing, setActionMsg, setError, setTreeData, setSelectedConversation,
     ]);
 
     const handleFocusIde = useCallback(async () => {
@@ -1256,35 +1233,15 @@ ${activePromptText}
                         });
                     }
 
-                    if (isTauri()) {
-                        try {
-                            await invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId }).catch(async () => {
-                                await invoke('reset_prompt_tree_cache', { instanceId: targetInstId });
-                            });
-                        } catch (cacheErr: unknown) {
-                            useErrorStore.getState().trackWarning(cacheErr, {
-                                source: 'usePromptTreePromptActions.handleRerunConversationAction',
-                                triggerAction: 'invalidate_prompt_tree_cache',
-                            });
-                        }
-                    }
-                    if (loadTree) {
-                        try {
-                            await loadTree(false, true);
-                        } catch (loadErr: unknown) {
-                            useErrorStore.getState().trackWarning(loadErr, {
-                                source: 'usePromptTreePromptActions.handleRerunConversationAction',
-                                triggerAction: 'loadTree',
-                            });
-                        }
-                    }
+                    // Optimistic turns stay; skip force/soft reload so Enqueue
+                    // count does not wait on the 30s tree cache.
                 }
                 return res;
             } finally {
                 setIsRerunning(false);
             }
         },
-        [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, instanceId, editedPromptText, activePromptText, activePromptTextRef, loadTree, setTreeData, setSelectedConversation]
+        [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, instanceId, editedPromptText, activePromptText, activePromptTextRef, setTreeData, setSelectedConversation]
     );
 
     return {

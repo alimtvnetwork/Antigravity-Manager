@@ -3,12 +3,12 @@ import { formatPromptWithAttachments } from '../../../utils/promptAttachment';
 import { copyImageAsMarkdownText, writePureImageToClipboard, copyPromptWithRichImages, extractAssets, stripImagesFromPrompt, copyAllImagesToClipboard, copyPromptWithLocalFileLinks, copyPromptWithBase64Images } from './clipboard';
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { isTauri } from '../../../utils/env';
 import { formatRelativeRecency } from './formatters';
 import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat, Send, Shield } from 'lucide-react';
 import { cn } from '../../../utils/cn';
-import { CopyFormat, type AgmConversationNode } from './types';
+import { CopyFormat, type AgmConversationNode, type AgmPromptTurnNode } from './types';
 import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, dispatchConversationId, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, extractUsedNudgesFromConversation, RERUN_RANDOM_MESSAGE_SET, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
+import { patchPromptTreeSwrCache, queuedPromptCount } from './usePromptTreeData';
 import { isGhostConversation } from './conversationGuards';
 import { persistClientCrash } from '../../../lib/error-listener';
 import { useErrorStore } from '../../../stores/error-store';
@@ -126,7 +126,7 @@ export function DetailHeader(props: DetailHeaderProps) {
         onCopyAllWithRichImages, onCopyImageAsText,
         onCopyImageForOneNoteOrIde, onCopySingleImagePng,
         onSaveImages, onExport, onFocusIde, onResend, onEnqueue, rerunRepoPath,
-        loadTree,
+        loadTree: _loadTree,
         rerunHistory: propRerunHistory, onRerunHistoryChange,
         onOpenInspector,
         onRenameConversation,
@@ -170,6 +170,11 @@ export function DetailHeader(props: DetailHeaderProps) {
     const isCopiedTextActive = isCopiedText || localCopiedText;
     const [localCopiedAll, setLocalCopiedAll] = useState(false);
     const isCopiedAllActive = isCopiedAll || localCopiedAll;
+
+    const [optimisticQueuedTurns, setOptimisticQueuedTurns] = useState<AgmPromptTurnNode[]>([]);
+    useEffect(() => {
+        setOptimisticQueuedTurns([]);
+    }, [selectedConversation.conversation_id]);
 
     const [copiedAiKind, setCopiedAiKind] = useState<PromptAiCopyKind | null>(null);
     const [localIsCopyMenuOpen, setLocalIsCopyMenuOpen] = useState(false);
@@ -409,45 +414,39 @@ export function DetailHeader(props: DetailHeaderProps) {
                     setRerunHistory(nextHistory);
                 }
 
-                if (isTauri()) {
-                    try {
-                        await invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId }).catch(async () => {
-                            await invoke('reset_prompt_tree_cache', { instanceId: targetInstId });
-                        });
-                    } catch (cacheErr: unknown) {
-                        useErrorStore.getState().trackWarning(cacheErr, {
-                            source: 'DetailHeader.handleRerun',
-                            triggerAction: 'invalidate_prompt_tree_cache',
-                        });
-                    }
-                }
-
-                if (selectedConversation) {
-                    selectedConversation.is_queued = true;
-                    if (result.messages && result.messages.length > 0) {
-                        const existingTurns = selectedConversation.prompts || [];
-                        const baseTurnNumber = existingTurns.length > 0
-                            ? Math.max(...existingTurns.map((t) => t.turn_number)) + 1
-                            : 1;
-                        const newTurns = result.messages.map((msg, idx) => ({
-                            turn_number: baseTurnNumber + idx,
-                            step_index: baseTurnNumber + idx - 1,
-                            prompt_text: msg,
-                            preview_200w: msg.slice(0, 200),
-                            status: 'QUEUED' as const,
-                            is_running: false,
-                            is_queued: true,
-                            timestamp: new Date().toISOString(),
-                            created_at: Date.now() + idx,
-                            media_paths: allMedia,
-                            media_thumbnails: allMedia,
-                        }));
-                        selectedConversation.prompts = [...existingTurns, ...newTurns];
-                    }
-                }
-
-                if (loadTree) {
-                    void loadTree(false, true);
+                if (selectedConversation && result.messages && result.messages.length > 0) {
+                    const existingTurns = [
+                        ...(selectedConversation.prompts || []),
+                        ...optimisticQueuedTurns,
+                    ];
+                    const baseTurnNumber = existingTurns.length > 0
+                        ? Math.max(...existingTurns.map((t) => t.turn_number)) + 1
+                        : 1;
+                    const newTurns: AgmPromptTurnNode[] = result.messages.map((msg, idx) => ({
+                        turn_number: baseTurnNumber + idx,
+                        step_index: baseTurnNumber + idx - 1,
+                        prompt_text: msg,
+                        preview_200w: msg.slice(0, 200),
+                        status: 'QUEUED',
+                        is_running: false,
+                        is_queued: true,
+                        timestamp: new Date().toISOString(),
+                        created_at: Date.now() + idx,
+                        media_paths: allMedia,
+                        media_thumbnails: allMedia,
+                    }));
+                    const updatedTurns = [...existingTurns, ...newTurns];
+                    setOptimisticQueuedTurns((prev) => [...prev, ...newTurns]);
+                    patchPromptTreeSwrCache(targetInstId, (tree) =>
+                        tree.map((projNode) => ({
+                            ...projNode,
+                            conversations: projNode.conversations.map((c) =>
+                                c.conversation_id === selectedConversation.conversation_id
+                                    ? { ...c, is_queued: true, prompts: updatedTurns }
+                                    : c
+                            ),
+                        }))
+                    );
                 }
             }
         } catch (err) {
@@ -654,7 +653,19 @@ export function DetailHeader(props: DetailHeaderProps) {
         }
     };
 
-    const enqueuedCount = selectedConversation.prompts?.filter((p) => p.is_queued || p.status === 'QUEUED').length || (selectedConversation.is_queued ? 1 : 0);
+    const visiblePrompts = [
+        ...(selectedConversation.prompts || []),
+        ...optimisticQueuedTurns.filter((extra) =>
+            !(selectedConversation.prompts || []).some((p) =>
+                p.turn_number === extra.turn_number && p.prompt_text === extra.prompt_text
+            )
+        ),
+    ];
+    const enqueuedCount = queuedPromptCount({
+        ...selectedConversation,
+        is_queued: Boolean(selectedConversation.is_queued) || optimisticQueuedTurns.length > 0,
+        prompts: visiblePrompts,
+    });
 
     return (
         <div className="pb-2.5 border-b border-slate-200 dark:border-slate-800 shrink-0 relative z-30">
@@ -727,10 +738,11 @@ export function DetailHeader(props: DetailHeaderProps) {
                             {instancePid ? <span className="opacity-80">PID: {instancePid}</span> : null}
                             <span className="border-l border-emerald-400/40 pl-1">{formatDuration(elapsedSeconds)}</span>
                         </span>
-                    ) : Boolean(selectedConversation.is_queued) ? (
+                    ) : (Boolean(selectedConversation.is_queued) || enqueuedCount > 0) ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9.5px] font-bold font-mono bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-2xs shrink-0">
                             <Clock className="w-2.5 h-2.5 text-amber-500" />
                             <span>QUEUED</span>
+                            {enqueuedCount > 0 ? <span className="opacity-90">{enqueuedCount}</span> : null}
                         </span>
                     ) : (
                         (() => {
@@ -1098,6 +1110,11 @@ export function DetailHeader(props: DetailHeaderProps) {
                                       ? (isRerunning ? 'Rerunning…' : (rerunFlash ?? `Rerun ×${rerunCount}`))
                                       : (isResending ? 'Sending…' : 'Send')}
                             </span>
+                            {primaryDispatchAction === 'enqueue' && (
+                                <span className="min-w-4 h-4 px-1 rounded-full bg-amber-500/25 text-amber-800 dark:text-amber-200 text-[9px] font-bold font-mono leading-4 text-center">
+                                    {enqueuedCount}
+                                </span>
+                            )}
                             <kbd className={cn(
                                 "ml-0.5 px-1 py-0.2 border rounded text-[8.5px] font-mono font-bold",
                                 primaryDispatchAction === 'enqueue'

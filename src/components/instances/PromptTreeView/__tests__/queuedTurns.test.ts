@@ -32,6 +32,8 @@ import {
     isInstanceCompatible,
     mergeQueuedTurns,
     mergeQueuedTree,
+    applySelectedTurnOverlay,
+    queuedPromptCount,
 } from '../usePromptTreeData';
 import { resolveRepoPathForDispatch } from '../usePromptTreePromptActions';
 import type { AgmConversationNode, AgmProjectTreeNode } from '../types';
@@ -192,6 +194,64 @@ test('mergeQueuedTurns keeps each identical rerun click as its own queued turn',
     const incoming = conv('c1', { prompts: [queued(1)] });
     const merged = mergeQueuedTurns(incoming, previous);
     assert(merged.prompts?.length === 3, `expected 3 queued turns, got ${merged.prompts?.length}`);
+});
+
+test('inspecting a completed turn still reports later queued turns', () => {
+    const queuedConv = conv('c1', {
+        is_queued: false,
+        status: 'COMPLETED',
+        selected_turn_number: 11,
+        prompts: [
+            {
+                turn_number: 11,
+                step_index: 10,
+                prompt_text: 'older completed',
+                preview_200w: 'older completed',
+                status: 'COMPLETED',
+                is_running: false,
+                is_queued: false,
+                timestamp: 't11',
+                created_at: 11,
+                media_paths: [],
+                media_thumbnails: [],
+            },
+            {
+                turn_number: 12,
+                step_index: 11,
+                prompt_text: 'just enqueued',
+                preview_200w: 'just enqueued',
+                status: 'QUEUED',
+                is_running: false,
+                is_queued: true,
+                timestamp: 't12',
+                created_at: 12,
+                media_paths: [],
+                media_thumbnails: [],
+            },
+            {
+                turn_number: 13,
+                step_index: 12,
+                prompt_text: 'second enqueue',
+                preview_200w: 'second enqueue',
+                status: 'QUEUED',
+                is_running: false,
+                is_queued: true,
+                timestamp: 't13',
+                created_at: 13,
+                media_paths: [],
+                media_thumbnails: [],
+            },
+        ],
+    });
+    const overlay = applySelectedTurnOverlay(queuedConv, 11);
+    assert(overlay.is_queued === true, 'conversation stays queued while viewing turn 11');
+    assert(overlay.status === 'QUEUED', `expected QUEUED status, got ${overlay.status}`);
+    assert(queuedPromptCount(overlay) === 2, `expected 2 queued turns, got ${queuedPromptCount(overlay)}`);
+});
+
+test('queuedPromptCount is 0 for idle conversations with no queued turns', () => {
+    const idle = conv('c1', { is_queued: false, status: 'IDLE' });
+    assert(queuedPromptCount(idle) === 0, 'idle has no queued count');
 });
 
 test('resolveRepoPathForDispatch walks the tree when project path is empty', () => {
