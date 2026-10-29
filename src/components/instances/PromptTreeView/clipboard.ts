@@ -1,6 +1,6 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { copyToClipboard, ensureDocumentFocus } from '../../../utils/clipboard';
-import { formatPromptWithAttachments, stripAttachmentsFromPrompt } from '../../../utils/promptAttachment';
+import { extractAttachmentsFromPrompt, formatPromptWithAttachments, stripAttachmentsFromPrompt } from '../../../utils/promptAttachment';
 import { useErrorStore } from '../../../stores/error-store';
 import { showToast } from '../../common/ToastContainer';
 import type { ExtractedPromptImage, PromptRewriteResult } from './types';
@@ -990,11 +990,12 @@ export async function copyPromptWithRichImages(
         return false;
     }
 
-    const effectiveMarkdown = formatPromptWithAttachments(
-        markdownText,
-        mediaPaths || [],
-        { repoPath }
-    );
+    const providedMedia = (mediaPaths || []).filter((p) => typeof p === 'string' && p.trim().length > 0);
+    const extractedAttachments = extractAttachmentsFromPrompt(markdownText, repoPath);
+    const effectiveMarkdown =
+        providedMedia.length > 0 || extractedAttachments.length > 0
+            ? formatPromptWithAttachments(markdownText, providedMedia, { repoPath })
+            : markdownText;
 
     if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
         const fallbackOk = await copyToClipboard(effectiveMarkdown);
@@ -1028,7 +1029,7 @@ export async function copyPromptWithRichImages(
             if (/^file;\s*/i.test(rawSrc)) {
                 rawSrc = rawSrc.replace(/^file;\s*/i, '');
             }
-            if (rawSrc && !srcMap.has(rawSrc)) {
+            if (rawSrc && isLikelyImageUri(rawSrc) && !srcMap.has(rawSrc)) {
                 const base64Uri = await convertImageUriToBase64(rawSrc, repoPath);
                 srcMap.set(rawSrc, base64Uri || rawSrc);
             }
@@ -1075,41 +1076,15 @@ export async function copyPromptWithRichImages(
         const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
         const textBlob = new Blob([effectiveMarkdown], { type: 'text/plain' });
 
-        // Extract first image to attach true binary image/png alongside html and text
+        // Extract first image to attach true binary image/png alongside html and text.
+        // Do not write image-only via native helper first: that replaces the clipboard
+        // and would report success without the prompt text.
         const { images } = extractAssets(effectiveMarkdown);
         let pngBlob: Blob | null = null;
-        let nativeWritten = false;
         if (images.length > 0) {
             const firstImg = images[0];
             const base64First = srcMap.get(firstImg) || firstImg;
             pngBlob = await convertImageUriToPngBlob(base64First, repoPath);
-
-            if (isTauriEnvironment()) {
-                try {
-                    let pathToPass = '';
-                    if (base64First.startsWith('data:image/')) {
-                        pathToPass = base64First;
-                    } else {
-                        pathToPass = resolveToAbsolutePath(base64First, repoPath) || extractLocalPathFromUri(base64First) || base64First;
-                    }
-                    if (pathToPass) {
-                        await invoke('copy_image_to_clipboard', { path: pathToPass });
-                        nativeWritten = true;
-                    }
-                } catch (nativeErr) {
-                    useErrorStore.getState().trackWarning(nativeErr, {
-                        source: 'clipboard.copyPromptWithRichImages.native',
-                        triggerAction: 'copy_image_to_clipboard',
-                    });
-                }
-            }
-        }
-
-        if (nativeWritten) {
-            const successMsg = 'Copied full prompt with embedded rich images to clipboard!';
-            onSuccess?.(successMsg);
-            showToast({ message: successMsg, type: 'success' });
-            return true;
         }
 
         let isWritten = false;

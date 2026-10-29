@@ -82,7 +82,7 @@ export interface DetailHeaderProps {
     instanceNameDisplay: string;
     formatDuration: (secs: number) => string;
     elapsedSeconds: number;
-    onCopyAllWithRichImages?: () => void;
+    onCopyAllWithRichImages?: () => void | Promise<void | boolean>;
     onCopyCleanText?: () => void;
     onCopyImageAsText?: () => void;
     onCopyImageForOneNoteOrIde?: () => void;
@@ -123,9 +123,9 @@ export function DetailHeader(props: DetailHeaderProps) {
         dispatchMode: propDispatchMode, setDispatchMode: propSetDispatchMode,
         hasImages, instanceId: propInstanceId, instancePid,
         formatDuration, elapsedSeconds,
-        onCopyAllWithRichImages, onCopyCleanText, onCopyImageAsText,
+        onCopyAllWithRichImages, onCopyImageAsText,
         onCopyImageForOneNoteOrIde, onCopySingleImagePng,
-        onCopyWithImages, onSaveImages, onExport, onFocusIde, onResend, onEnqueue, rerunRepoPath,
+        onSaveImages, onExport, onFocusIde, onResend, onEnqueue, rerunRepoPath,
         loadTree,
         rerunHistory: propRerunHistory, onRerunHistoryChange,
         onOpenInspector,
@@ -458,42 +458,77 @@ export function DetailHeader(props: DetailHeaderProps) {
     };
     // END RERUN SECTION (Task-04)
 
-    const handleCopyAll = () => {
+    const markCopiedAll = () => {
+        setLocalCopiedAll(true);
+        setIsCopiedAll?.(true);
+        setTimeout(() => {
+            setLocalCopiedAll(false);
+            setIsCopiedAll?.(false);
+        }, 2000);
+    };
+
+    const handleCopyAll = async () => {
         try {
-            if (onCopyAllWithRichImages) {
-                onCopyAllWithRichImages();
-            } else {
-                onCopyWithImages();
+            const source = resolvePromptBody(selectedConversation, activePromptText);
+            if (!source) {
+                setActionMsg?.('No prompt content to copy');
+                setTimeout(() => setActionMsg?.(null), 2000);
+                return;
             }
-            setLocalCopiedAll(true);
-            setIsCopiedAll?.(true);
-            setTimeout(() => {
-                setLocalCopiedAll(false);
-                setIsCopiedAll?.(false);
-            }, 2000);
+            const ok = await copyToClipboard(source);
+            if (ok) {
+                markCopiedAll();
+                return;
+            }
+            reportPromptActionError(new Error('Failed to copy prompt to clipboard'), 'DetailHeader.copyAll');
         } catch (err) {
-            reportPromptActionError(err, 'DetailHeader.copyAllWithRichImages');
+            reportPromptActionError(err, 'DetailHeader.copyAll');
         }
     };
 
-    const handleCopyCleanText = () => {
+    const handleCopyRich = async () => {
         try {
-            if (onCopyCleanText) {
-                onCopyCleanText();
-            } else {
-                const cleanText = stripImagesFromPrompt(activePromptText);
-                void copyToClipboard(cleanText).catch((err) => {
-                    reportPromptActionError(err, 'DetailHeader.copyCleanText');
-                });
+            if (onCopyAllWithRichImages) {
+                const result = await Promise.resolve(onCopyAllWithRichImages());
+                if (result !== false) {
+                    markCopiedAll();
+                }
+                return;
             }
-            setLocalCopiedText(true);
-            setIsCopiedText(true);
-            setTimeout(() => {
-                setLocalCopiedText(false);
-                setIsCopiedText(false);
-            }, 2000);
+            const source = resolvePromptBody(selectedConversation, activePromptText);
+            if (!source) {
+                setActionMsg?.('No prompt content to copy');
+                setTimeout(() => setActionMsg?.(null), 2000);
+                return;
+            }
+            const ok = await copyPromptWithRichImages(source);
+            if (ok) {
+                markCopiedAll();
+                return;
+            }
+            reportPromptActionError(new Error('Failed to copy prompt to clipboard'), 'DetailHeader.copyRich');
         } catch (err) {
-            reportPromptActionError(err, 'DetailHeader.onCopyCleanText');
+            reportPromptActionError(err, 'DetailHeader.copyRich');
+        }
+    };
+
+    const handleCopyCleanText = async () => {
+        try {
+            const source = resolvePromptBody(selectedConversation, activePromptText);
+            const cleanText = stripImagesFromPrompt(source);
+            const ok = await copyToClipboard(cleanText);
+            if (ok) {
+                setLocalCopiedText(true);
+                setIsCopiedText(true);
+                setTimeout(() => {
+                    setLocalCopiedText(false);
+                    setIsCopiedText(false);
+                }, 2000);
+                return;
+            }
+            reportPromptActionError(new Error('Failed to copy prompt text'), 'DetailHeader.copyCleanText');
+        } catch (err) {
+            reportPromptActionError(err, 'DetailHeader.copyCleanText');
         }
     };
 
@@ -605,10 +640,10 @@ export function DetailHeader(props: DetailHeaderProps) {
     const handleCopyByFormat = (format: CopyFormat) => {
         switch (format) {
             case CopyFormat.RichMedia:
-                handleCopyAll();
+                void handleCopyRich();
                 break;
             case CopyFormat.CleanText:
-                handleCopyCleanText();
+                void handleCopyCleanText();
                 break;
             case CopyFormat.ImageAsText:
                 void handleCopyImageAsText();
@@ -718,14 +753,14 @@ export function DetailHeader(props: DetailHeaderProps) {
                 <div className="flex items-center shrink-0 ml-auto gap-2">
                     {/* Capsule A: Copy Split Button [ Copy | v ] */}
                     <div className="relative flex items-center rounded-lg bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
-                        {/* Primary Button: Copy with images (Rich HTML + binary PNG) */}
+                        {/* Primary Button: Copy full prompt as plain text */}
                         <button
                             type="button"
-                            onClick={handleCopyAll}
+                            onClick={() => { void handleCopyAll(); }}
                             data-ui-name="prompt-copy-all-btn"
                             data-ui-id={`prompt-copy-all-${selectedConversation.conversation_id}`}
                             className="flex items-center gap-1.5 px-3 py-1 rounded-l-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                            aria-label="Copy prompt text and all embedded images (rich HTML + binary PNG)"
+                            aria-label="Copy full prompt text"
                         >
                             {isCopiedAllActive ? (
                                 <Check className="w-3 h-3 text-emerald-500 shrink-0" />

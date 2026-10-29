@@ -3,6 +3,7 @@ import {
     extractAttachmentsFromPrompt,
     stripAttachmentsFromPrompt,
     normalizeAttachmentPath,
+    isFileAttachmentTarget,
 } from '../promptAttachment';
 
 let passed = 0;
@@ -135,6 +136,34 @@ test('formatPromptWithAttachments is idempotent on re-formatting', () => {
     const secondPass = formatPromptWithAttachments(firstPass, [], { isWindowsPlatformOverride: false });
 
     assertEqual(firstPass, secondPass);
+});
+
+const SKILL_COPY_PROMPT = `instead of @[.agents/skills/execute-parent-task-with-n-steps-v7]
+
+Write as
+
+@[execute-parent-task-with-n-steps-v7](file;.agents/skills/execute-parent-task-with-n-steps-v7)`;
+
+test('isFileAttachmentTarget rejects skill refs and accepts image files', () => {
+    assert(!isFileAttachmentTarget('.agents/skills/execute-parent-task-with-n-steps-v7'), 'skill dir is not a file attachment');
+    assert(!isFileAttachmentTarget('execute-parent-task-with-n-steps-v7'), 'skill name is not a file attachment');
+    assert(isFileAttachmentTarget('assets/screenshot.png'), 'png is a file attachment');
+    assert(isFileAttachmentTarget('file;assets/screenshot.png'), 'canonical file; png is a file attachment');
+});
+
+test('extractAttachmentsFromPrompt ignores inline skill refs', () => {
+    const extracted = extractAttachmentsFromPrompt(SKILL_COPY_PROMPT, undefined, false);
+    assertEqual(extracted.length, 0);
+});
+
+test('formatPromptWithAttachments does not rewrite skill refs into an Attachments block', () => {
+    const result = formatPromptWithAttachments(SKILL_COPY_PROMPT, [], { isWindowsPlatformOverride: false });
+    assert(!result.includes('Attachments:'), 'Skill refs must not become an Attachments block');
+    assert(result.includes('@[.agents/skills/execute-parent-task-with-n-steps-v7]'), 'Legacy skill ref must be preserved');
+    assert(
+        result.includes('@[execute-parent-task-with-n-steps-v7](file;.agents/skills/execute-parent-task-with-n-steps-v7)'),
+        'Canonical skill ref must be preserved'
+    );
 });
 
 console.log(`\npromptAttachment tests: ${passed} passed, ${failed} failed`);

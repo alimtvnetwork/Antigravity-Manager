@@ -97,9 +97,15 @@ export function rewritePromptImageTargets(prompt: string, repoPath: string): str
 export type PromptAiCopyKind = 'json' | 'text' | 'md';
 
 export function resolvePromptBody(conv: AgmConversationNode, preferred?: string): string {
-    const preferredBody = preferred?.trim();
-    if (preferredBody) return preferredBody;
-    return (conv.full_prompt_text || conv.prompt_preview_200w || '').trim();
+    const preferredBody = preferred?.trim() ?? '';
+    const full = (conv.full_prompt_text || '').trim();
+    const preview = (conv.prompt_preview_200w || '').trim();
+    // Truncated tree previews must not win over the untruncated prompt body.
+    if (preferredBody && preferredBody !== preview) {
+        return preferredBody;
+    }
+    if (full) return full;
+    return preferredBody || preview;
 }
 
 /** JSON copy is only the AI fields already stored on the conversation. */
@@ -187,8 +193,8 @@ export async function copyPromptAiPayload(
 }
 
 export interface PromptTreePromptActions {
-    handleCopyAllWithRichImages: () => Promise<void>;
-    handleCopyWithImagesRich: () => Promise<void>;
+    handleCopyAllWithRichImages: () => Promise<boolean>;
+    handleCopyWithImagesRich: () => Promise<boolean>;
     handleCopyAiResultsJson: () => Promise<void>;
     handleCopyPromptAndAiText: () => Promise<void>;
     handleCopyPromptAndAiMarkdown: () => Promise<void>;
@@ -299,15 +305,16 @@ export function usePromptTreePromptActions({
         [activePromptText, extractAssets, setShowAllWords, setInspectorPrompt]
     );
 
-    const handleCopyAllWithRichImages = useCallback(async () => {
-        const text = editedPromptText.trim() || activePromptTextRef.current || activePromptText || selectedConversation?.full_prompt_text || selectedConversation?.prompt_preview_200w || '';
+    const handleCopyAllWithRichImages = useCallback(async (): Promise<boolean> => {
+        const conv = selectedConversationRef.current || selectedConversation;
+        const preferred = editedPromptText.trim() || activePromptTextRef.current || activePromptText;
+        const text = conv ? resolvePromptBody(conv, preferred) : (preferred || '');
         if (!text) {
             setActionMsg('No prompt content to copy');
             setTimeout(() => setActionMsg(null), 2000);
-            return;
+            return false;
         }
 
-        const conv = selectedConversationRef.current || selectedConversation;
         const mediaPaths = conv?.media_paths;
         const ok = await copyPromptWithRichImages(
             text,
@@ -334,11 +341,14 @@ export function usePromptTreePromptActions({
         if (ok) {
             setIsCopiedAll(true);
             setTimeout(() => setIsCopiedAll(false), 2000);
+            return true;
         }
+        setError('Failed to copy prompt to clipboard');
+        return false;
     }, [editedPromptText, activePromptText, selectedConversation, activePromptTextRef, selectedConversationRef, setIsCopiedAll, setActionMsg, setError]);
 
-    const handleCopyWithImagesRich = useCallback(async () => {
-        await handleCopyAllWithRichImages();
+    const handleCopyWithImagesRich = useCallback(async (): Promise<boolean> => {
+        return handleCopyAllWithRichImages();
     }, [handleCopyAllWithRichImages]);
 
     const copySelectedPromptAi = useCallback(async (kind: PromptAiCopyKind) => {

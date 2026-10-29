@@ -154,8 +154,48 @@ export function stripAttachmentsFromPrompt(prompt: string): string {
     return cleanPromptWhitespace(collapsed);
 }
 
+const SKILL_DIR_PATTERN = /(^|[\\/])\.agents[\\/]skills([\\/]|$)/i;
+const FILE_BASENAME_EXT_PATTERN = /\.[a-zA-Z0-9]{1,8}$/;
+const IMAGE_BASENAME_PATTERN = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif|jfif|tiff?)$/i;
+
+/**
+ * True for real file/image attachment targets. False for skill refs such as
+ * `@[.agents/skills/foo]` or `@[foo](file;.agents/skills/foo)` so copy/send
+ * does not rewrite them into an Attachments block.
+ */
+export function isFileAttachmentTarget(raw: string): boolean {
+    if (!raw || !raw.trim()) {
+        return false;
+    }
+    let clean = raw.trim();
+    if (/^file;\s*/i.test(clean)) {
+        clean = clean.replace(/^file;\s*/i, '').trim();
+    }
+    if (!clean) {
+        return false;
+    }
+    if (clean.startsWith('data:image/') || clean.startsWith('blob:')) {
+        return true;
+    }
+    if (SKILL_DIR_PATTERN.test(clean)) {
+        return false;
+    }
+    const withoutQuery = clean.split(/[?#]/)[0].replace(/[/\\]+$/, '');
+    const basename = withoutQuery.split(/[/\\]/).pop() || '';
+    if (!basename || basename === '.' || basename === '..') {
+        return false;
+    }
+    if (IMAGE_BASENAME_PATTERN.test(basename)) {
+        return true;
+    }
+    if (withoutQuery.includes('.user_uploaded') && /^media_|^screenshot_|^img_/i.test(basename)) {
+        return true;
+    }
+    return FILE_BASENAME_EXT_PATTERN.test(basename);
+}
+
 function isEligibleAttachmentTarget(raw: string): boolean {
-    if (!raw || raw.trim().length === 0) {
+    if (!raw || !raw.trim()) {
         return false;
     }
     const clean = raw.trim();
@@ -165,7 +205,7 @@ function isEligibleAttachmentTarget(raw: string): boolean {
     const isExternalWeb =
         (clean.startsWith('http://') || clean.startsWith('https://')) &&
         !clean.includes('asset.localhost');
-    return !isExternalWeb;
+    return !isExternalWeb && isFileAttachmentTarget(clean);
 }
 
 function deduplicatePaths(paths: string[], isWindows: boolean): string[] {
