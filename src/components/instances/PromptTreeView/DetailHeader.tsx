@@ -1080,7 +1080,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             data-ui-name="prompt-dispatch-primary-btn"
                             data-ui-id={`prompt-dispatch-primary-${selectedConversation.conversation_id}`}
                             className={cn(
-                                "flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold transition-all duration-150 ease-out active:translate-y-px cursor-pointer disabled:opacity-50 rounded-l-full",
+                                "flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold transition-all duration-300 ease-out cursor-pointer disabled:opacity-50 rounded-l-full",
                                 primaryDispatchAction === 'enqueue'
                                     ? "text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
                                     : primaryDispatchAction === 'rerun'

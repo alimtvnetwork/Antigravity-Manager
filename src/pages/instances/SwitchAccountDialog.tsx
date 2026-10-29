@@ -491,8 +491,8 @@ export function SwitchAccountDialog({ api }: { api: InstancePageApi }) {
                                                 }}
                                                 className={cn(
                                                     'px-3.5 py-1.5 rounded-full text-xs cursor-pointer',
-                                                    'bg-gradient-to-r from-[#FDE047] via-[#FACC15] to-[#EAB308] hover:from-[#FEF08A] hover:via-[#FDE047] hover:to-[#FACC15] text-amber-950 font-bold border border-[#CA8A04] shadow-[0_2px_0_0_#A16207] hover:shadow-[0_3px_0_0_#A16207] active:shadow-[0_1px_0_0_#A16207] active:translate-y-0.5 transition-all',
-                                                    isAnySwitching && 'opacity-60 cursor-not-allowed shadow-none active:translate-y-0 hover:shadow-none'
+                                                    'bg-gradient-to-r from-[#FDE047] via-[#FACC15] to-[#EAB308] hover:from-[#FEF08A] hover:via-[#FDE047] hover:to-[#FACC15] text-amber-950 font-bold border border-[#CA8A04] transition-all duration-300 ease-out shadow-xs',
+                                                    isAnySwitching && 'opacity-60 cursor-not-allowed shadow-none hover:shadow-none'
                                                 )}
                                             >
                                                 {isThisSwitching ? (

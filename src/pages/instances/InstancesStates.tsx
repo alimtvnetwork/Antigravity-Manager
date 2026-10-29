@@ -41,7 +41,7 @@ export function InstancesFilterBar({ api }: { api: InstancePageApi }) {
                         setIsCreateOpen(true);
                     }
                 }}
-                className="btn btn-primary btn-sm gap-1.5 px-4 rounded-full font-semibold shadow-2xs group hover:shadow-md hover:shadow-primary/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 ease-out cursor-pointer"
+                className="btn btn-primary btn-sm gap-1.5 px-4 rounded-full font-semibold shadow-2xs group hover:shadow-md hover:shadow-primary/25 transition-all duration-300 ease-out cursor-pointer"
             >
                 <Plus className="w-4 h-4 transition-transform duration-300 group-hover:rotate-90 group-hover:scale-110" />
                 <span>{t('instances.create_btn', 'New Instance')}</span>
@@ -164,7 +164,7 @@ export function InstancesEmptyState({ api }: { api: InstancePageApi }) {
                             setIsCreateOpen(true);
                         }
                     }}
-                    className="btn btn-outline btn-sm gap-1.5 rounded-[5px] group hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all duration-200 ease-out"
+                    className="btn btn-outline btn-sm gap-1.5 rounded-[5px] group hover:shadow-md transition-all duration-300 ease-out font-semibold cursor-pointer"
                 >
                     <Plus className="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-90 group-hover:scale-110" />
                     <span>{t('instances.create_custom', 'Create Custom Profile')}</span>
