@@ -22,6 +22,7 @@ export type VerificationTemplateType =
     | 'pr-review-ready'
     | 'test-and-coverage'
     | 'refactor-dry'
+    | 'run-100-steps'
     | 'edge-cases'
     | 'verify-tests'
     | 'rerun-nudge'
@@ -218,6 +219,15 @@ export const VERIFICATION_OPTIONS: ReadonlyArray<VerificationOptionMeta> = [
         category: 'architecture',
         iconName: 'sparkles',
     },
+    {
+        value: 'run-100-steps',
+        label: '100 Steps (V6 execute parent task)',
+        dropdownLabel: '100 Steps',
+        badgeLabel: '100 Steps',
+        description: 'Wrap this prompt in execute-parent-task-with-n-steps-v6 and run it as 100+ sequential steps',
+        category: 'architecture',
+        iconName: 'sparkles',
+    },
 ];
 
 /**
@@ -333,6 +343,16 @@ export function parseVerificationTypeFromSuffix(rawSuffix: string): Verification
         normalized.includes('refactor-dry')
     ) {
         return 'refactor-dry';
+    }
+
+    if (
+        normalized === 'run-100-steps' ||
+        normalized === '100 steps' ||
+        normalized === '100-step execute' ||
+        normalized.includes('n-steps') ||
+        normalized.includes('100 steps')
+    ) {
+        return 'run-100-steps';
     }
 
     return 'none';
@@ -476,6 +496,18 @@ export const BUILTIN_SUFFIX_TEMPLATES: ReadonlyArray<SuffixTemplate> = [
             '- Eliminate redundant slice wrappers using variadic / spread patterns.',
             '- Preserve original business logic, comments, and docstrings.',
             '- Verify zero functional regression after extraction.',
+        ].join('\n'),
+    },
+    {
+        id: 'run-100-steps',
+        name: '100 Steps (V6 parent task)',
+        description: 'Break the prompt into 100+ sequential steps via execute-parent-task-with-n-steps-v6',
+        category: 'architecture',
+        template: [
+            'Must follow and spawn agent using',
+            '[execute-parent-task-with-n-steps-v6](file;.agents/skills/execute-parent-task-with-n-steps-v6)',
+            '',
+            'Break the user request into 100+ sequential steps, execute them continuously, and do not stop until the task is done, tested, and released.',
         ].join('\n'),
     },
 ];
@@ -742,6 +774,21 @@ function buildChapter2Checklist(type: VerificationTemplateType, customTemplateTe
                 '- [ ] **2. Parameter Spread & Variadics:** Artificial array wrappers eliminated in favor of spread/variadic arguments.',
                 '- [ ] **3. Zero Semantic Drift:** Pure refactoring with 100% preservation of existing business logic and behavior.',
                 '- [ ] **4. Documentation Integrity:** Preserved all existing comments, invariants, and docstrings.',
+            ].join('\n');
+
+        case 'run-100-steps':
+            return [
+                '# 📊 CHAPTER 2: GROUNDED VERIFICATION MATRIX & ACTIONABLE CHECKLIST',
+                '',
+                '### Chapter 2.10: 100-Step Parent Task Execution',
+                'Must follow and spawn agent using',
+                '[execute-parent-task-with-n-steps-v6](file;.agents/skills/execute-parent-task-with-n-steps-v6)',
+                '',
+                '- [ ] **1. Skill Load:** Load `.agents/skills/execute-parent-task-with-n-steps-v6` before executing the original prompt.',
+                '- [ ] **2. Breakdown:** Split the original request into 100+ sequential, independently revertable steps.',
+                '- [ ] **3. Continuous Loop:** Execute without pausing for permission except on true blockers; keep A=3 workers saturated.',
+                '- [ ] **4. FIFO Restore:** Enqueue, restore, and dispatch with `ORDER BY created_at ASC, id ASC`.',
+                '- [ ] **5. Done & Released:** Finish only after end-to-end proof and a relative-path changelog attributed to `@aukgit`.',
             ].join('\n');
 
         default:

@@ -663,6 +663,20 @@ export function InstancesHeader({ api }: { api: InstancePageApi }) {
                     <button
                         type="button"
                         onClick={() => {
+                            document.getElementById('agm-improvements-flywheel')?.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'start',
+                            });
+                        }}
+                        className="agm-hover-shade agm-hover-amber flex items-center gap-1.5 px-3 py-1.5 rounded-[4px] border border-amber-300/70 dark:border-amber-700/60 bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 text-xs font-semibold cursor-pointer"
+                        title="Plan 100 improvements or wrap a prompt to run in 100+ sequential steps"
+                    >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        <span>100 Steps</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => {
                             if (api.openCreateDialog) {
                                 api.openCreateDialog();
                             } else {
@@ -672,9 +686,9 @@ export function InstancesHeader({ api }: { api: InstancePageApi }) {
                                 setIsCreateOpen(true);
                             }
                         }}
-                        className="group relative flex items-center gap-1.5 px-3.5 py-1.5 rounded-[4px] bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xs hover:shadow-md hover:shadow-blue-500/25 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer transition-all duration-200 ease-out"
+                        className="agm-hover-shade group relative flex items-center gap-1.5 px-3.5 py-1.5 rounded-[4px] bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xs cursor-pointer"
                     >
-                        <Plus className="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-90 group-hover:scale-110" />
+                        <Plus className="w-3.5 h-3.5" />
                         <span>{t('instances.create_btn', 'New Instance')}</span>
                     </button>
                 </div>

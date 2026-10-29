@@ -77,7 +77,10 @@ export default function ImprovementsFlywheel() {
     const done = state?.completed_batches ?? 0;
 
     return (
-        <div className="agm-hover-shade rounded-2xl border border-slate-200/80 dark:border-[#40285e] bg-white dark:bg-[#171025] p-5 shadow-xs space-y-4">
+        <div
+            id="agm-improvements-flywheel"
+            className="agm-hover-shade rounded-2xl border border-slate-200/80 dark:border-[#40285e] bg-white dark:bg-[#171025] p-5 shadow-xs space-y-4"
+        >
             <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-200 dark:border-[#40285e]">
                 <div>
                     <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">

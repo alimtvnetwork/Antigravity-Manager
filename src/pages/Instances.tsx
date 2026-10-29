@@ -17,6 +17,7 @@ import { SwitchAccountDialog } from './instances/SwitchAccountDialog';
 import { CopyInstanceDialog } from './instances/CopyInstanceDialog';
 import { InstanceConfirmDialogs, InstanceAttachedModals } from './instances/InstanceModals';
 import { ErrorBoundary } from '../components/common/ErrorBoundary';
+import ImprovementsFlywheel from '../components/telegram/ImprovementsFlywheel';
 
 export { isNodeOwnedByInstance } from './instances/instancePageUtils';
 
@@ -51,6 +52,10 @@ export default function Instances() {
         <div className="h-full w-full overflow-y-auto">
             <div className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-4 space-y-3">
                 <InstancesHeader api={api} />
+
+                <ErrorBoundary variant="card">
+                    <ImprovementsFlywheel />
+                </ErrorBoundary>
 
                 <InstancesAlerts api={api} />
 
