@@ -54,9 +54,19 @@ export function isDefaultInstanceAlias(instanceId?: string | null): boolean {
         return true;
     }
     const normalized = instanceId.trim().toLowerCase();
-    const isDefaultExact = normalized === 'default' || normalized === '__default__';
-    const hasDefaultSubstring = normalized.includes('default');
-    return isDefaultExact || hasDefaultSubstring;
+    if (
+        normalized === 'default' ||
+        normalized === '__default__' ||
+        normalized === '' ||
+        normalized === '#1 default' ||
+        normalized === '1 default' ||
+        normalized === '#1 (default)' ||
+        normalized === 'default (active)' ||
+        normalized === '#1 default (active)'
+    ) {
+        return true;
+    }
+    return normalized.startsWith('#1') && /\bdefault\b/.test(normalized);
 }
 
 /**
@@ -204,6 +214,113 @@ export function isAllInstancesFilter(instanceId?: string | null): boolean {
  * Determines whether a node's instance identifier matches the active instance target.
  * Resolves exact matches and cross-alias default compatibility.
  */
+function queuedTurnKey(p: { status: string; prompt_text: string }): string {
+    return `${String(p.status).toUpperCase()}|${p.prompt_text}`;
+}
+
+function isQueuedTurn(p: { is_queued?: boolean; status: string }): boolean {
+    return Boolean(p.is_queued) || String(p.status).toUpperCase() === 'QUEUED';
+}
+
+export function mergeQueuedTurns(
+    incoming: AgmConversationNode,
+    previous: AgmConversationNode | null | undefined
+): AgmConversationNode {
+    if (!previous || previous.conversation_id !== incoming.conversation_id) {
+        return incoming;
+    }
+    const prevQueued = (previous.prompts || []).filter(isQueuedTurn);
+    if (prevQueued.length === 0) {
+        return incoming;
+    }
+    const incomingPrompts = incoming.prompts || [];
+    const used = incomingPrompts.map(() => false);
+    const missing: typeof prevQueued = [];
+    for (const pq of prevQueued) {
+        const key = queuedTurnKey(pq);
+        const idx = incomingPrompts.findIndex((p, i) => !used[i] && queuedTurnKey(p) === key);
+        if (idx >= 0) {
+            used[idx] = true;
+        } else {
+            missing.push(pq);
+        }
+    }
+    if (missing.length === 0) {
+        const hasQueued = incomingPrompts.some(isQueuedTurn);
+        return hasQueued ? incoming : { ...incoming, is_queued: true };
+    }
+    return {
+        ...incoming,
+        is_queued: true,
+        prompts: [...incomingPrompts, ...missing],
+    };
+}
+
+/** Keep in-memory SWR aligned with optimistic enqueue/rerun so instance click shows queued turns immediately. */
+export function patchPromptTreeSwrCache(
+    instanceId: string | undefined,
+    updater: (tree: AgmProjectTreeNode[]) => AgmProjectTreeNode[]
+): void {
+    const cacheKey = instanceId || 'default';
+    const entry = promptTreeSwrCache.get(cacheKey);
+    promptTreeSwrCache.set(cacheKey, {
+        data: updater(entry?.data || []),
+        timestamp: Date.now(),
+    });
+}
+
+function overlaySelectedQueued(
+    tree: AgmProjectTreeNode[],
+    selectedConv: AgmConversationNode | null | undefined,
+    selectedProj: AgmProjectTreeNode | null | undefined
+): AgmProjectTreeNode[] {
+    if (!selectedConv || !(selectedConv.prompts || []).some(isQueuedTurn)) {
+        return tree;
+    }
+    if (tree.length > 0) {
+        return tree.map((proj) => ({
+            ...proj,
+            conversations: (proj.conversations || []).map((conv) =>
+                conv.conversation_id === selectedConv.conversation_id
+                    ? mergeQueuedTurns(conv, selectedConv)
+                    : conv
+            ),
+        }));
+    }
+    if (!selectedProj) {
+        return tree;
+    }
+    return [
+        {
+            ...selectedProj,
+            conversations: (selectedProj.conversations || []).map((conv) =>
+                conv.conversation_id === selectedConv.conversation_id ? selectedConv : conv
+            ),
+        },
+    ];
+}
+
+export function mergeQueuedTree(
+    incoming: AgmProjectTreeNode[],
+    previous: AgmProjectTreeNode[]
+): AgmProjectTreeNode[] {
+    if (previous.length === 0) {
+        return incoming;
+    }
+    const prevByConv = new Map<string, AgmConversationNode>();
+    for (const proj of previous) {
+        for (const conv of proj.conversations || []) {
+            prevByConv.set(conv.conversation_id, conv);
+        }
+    }
+    return incoming.map((proj) => ({
+        ...proj,
+        conversations: (proj.conversations || []).map((conv) =>
+            mergeQueuedTurns(conv, prevByConv.get(conv.conversation_id))
+        ),
+    }));
+}
+
 export function isInstanceCompatible(
     nodeInstanceId?: string | null,
     targetInstanceId?: string | null
@@ -557,6 +674,12 @@ export function usePromptTreeData({
             }
             setError(null);
             try {
+                const cacheKey = instanceId || 'default';
+                const previousTree = overlaySelectedQueued(
+                    promptTreeSwrCache.get(cacheKey)?.data || [],
+                    selectedConversationRef.current,
+                    selectedProjectRef.current
+                );
                 if (isForce) {
                     invalidatePromptTreeCache(instanceId);
                     try {
@@ -587,14 +710,10 @@ export function usePromptTreeData({
                           }));
                 const finalData = relevant;
 
-                // Cache in memory for immediate SWR retrieval on subsequent opens
-                const cacheKey = instanceId || 'default';
-                if (isForce) {
-                    promptTreeSwrCache.delete(cacheKey);
-                }
-                promptTreeSwrCache.set(cacheKey, { data: finalData, timestamp: Date.now() });
+                const withQueued = mergeQueuedTree(finalData, previousTree);
+                promptTreeSwrCache.set(cacheKey, { data: withQueued, timestamp: Date.now() });
 
-                setTreeData(finalData);
+                setTreeData(withQueued);
 
                 // Retain active selection across loads and background sync cycles
                 const currentConv = selectedConversationRef.current;
@@ -605,16 +724,19 @@ export function usePromptTreeData({
                 if (currentConv) {
                     const currentId = currentConv.conversation_id;
                     const currentTurn = currentConv.selected_turn_number;
-                    const updatedProj = finalData.find((p) => {
+                    const updatedProj = withQueued.find((p) => {
                         const isSameProject = Boolean(currentProj && p.project_id === currentProj.project_id);
                         const hasMatchingConversation = p.conversations.some((c) => c.conversation_id === currentId);
                         return isSameProject || hasMatchingConversation;
                     });
                     if (updatedProj) {
                         setSelectedProject(updatedProj);
-                        const updatedConv = updatedProj.conversations.find(
+                        const rawUpdatedConv = updatedProj.conversations.find(
                             (c) => c.conversation_id === currentId
                         );
+                        const updatedConv = rawUpdatedConv
+                            ? mergeQueuedTurns(rawUpdatedConv, currentConv)
+                            : undefined;
                         if (updatedConv) {
                             hasRetainedSelection = true;
                             const hasSelectedTurn = typeof currentTurn === 'number';
@@ -719,12 +841,13 @@ export function usePromptTreeData({
         if (!hasInitializedRef.current) {
             hasInitializedRef.current = true;
             if (cached && cached.data.length > 0) {
-                // Immediate SWR render
+                // Immediate SWR render, then force-refresh so enqueue/rerun
+                // from this instance is visible on click (no 30s wait).
                 setTreeData(cached.data);
                 performAutoSelection(cached.data, latestArchived, latestPinned);
+                void loadTree(false, true, latestArchived, latestPinned);
             } else {
-                // Initial load using force: false to leverage backend SQLite cache
-                loadTree(true, false, latestArchived, latestPinned);
+                loadTree(true, true, latestArchived, latestPinned);
             }
         }
     }, [isOpen, instanceId, initialSelectedProjectId, loadTree, performAutoSelection, setArchivedProjectIds, setPinnedProjectIds, setTreeData]);

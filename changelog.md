@@ -1,5 +1,20 @@
 # Changelog
 
+## [v4.278.0] - 2026-10-29
+
+### Fixed
+- Prompt tree enqueue and rerun now show on the clicked instance immediately: `src/components/instances/PromptTreeView/usePromptTreeData.ts` keeps queued turns across force-refresh instead of dropping the 30s SWR cache first; `mergeQueuedTurns` counts each identical rerun click; `isDefaultInstanceAlias` no longer treats `default-copy-*` as Default; `src-tauri/src/modules/repo_db/tree_node_conv.rs` attaches queued prompts by repo path or session id (Thanks to @aukgit)
+- `agm instances switch --json` no longer prints `"status": "switched"` before `switch_account_to_instance`; `src-tauri/src/bin/agm/instance_cmds.rs` and `src-tauri/src/bin/agm/instance_routes_b.rs` emit `bound_email` only after the registry matches, otherwise `success: false` (Thanks to @aukgit)
+- Enqueue wakes the FIFO scheduler immediately via `notify_prompt_queue` in `src-tauri/src/modules/repo_db/agy.rs` and Telegram instance-card rerun/send in `src-tauri/src/modules/telegram_inbound/instance_cards.rs` (Thanks to @aukgit)
+
+### Improved
+- Telegram `/status` cards show idle / busy / N queued and an ✉️ Send button that starts `/send` for that instance (`src-tauri/src/modules/telegram_inbound/instance_cards.rs`, `src-tauri/src/modules/telegram_inbound/send_flow.rs`) (Thanks to @aukgit)
+
+### Tests
+- Isolated `agm instances test-create` sandbox enqueued `queued-1793284251719-0000-913d6b`, `queued-1793284543149-0000-d43cf3`, `queued-1793284543288-0000-fd5c09`, copied, sent `p-0db14cf4`; JSON switch to a missing account returned `success: false`; Default PID stayed 3804 and `v2-3127` was not stopped; `agm instances test-clean` removed only the sandbox (Thanks to @aukgit)
+
+---
+
 ## [v4.277.4] - 2026-10-29
 
 ### Added
@@ -1540,6 +1555,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.278.0 (2026-10-29)**:
+        -   **[Prompt Queue Visibility, Honest JSON Switch & Friendly Telegram Cards] Enqueue/rerun show on click, JSON switch proves bound_email, Telegram Send (Thanks to @aukgit)**:
+            -   **Description**: Prompt tree force-refresh keeps queued turns instead of wiping the 30s SWR cache first; rerun ×N keeps each identical queued turn; `agm instances switch --json` no longer fakes `"switched"`; Telegram cards show idle/busy/queued and ✉️ Send. Isolated `agm instances test-create` enqueued three queued ids, copied, sent `p-0db14cf4`; Default and v2-3127 were not stopped. (Thanks to @aukgit)
+
+
     *   **v4.277.0 (2026-10-29)**:
         -   **[Instance UI & Verification Templates] Restyled Create Profile Modal, 100-Step Prompt Breakdown & Release Tag Normalization (Thanks to @aukgit)**:
             -   **Description**: Restyled the Create Profile dialog in `src/pages/instances/CreateEditDialogs.tsx` with unified dark-glass styling, segmented button controls, and high-contrast form elements; added multi-step prompt breakdowns and verification templates in `src/components/instances/PromptTreeView/verificationTemplates.ts`; integrated flywheel status triggers in `src/components/telegram/ImprovementsFlywheel.tsx` and `src/pages/Instances.tsx`; and purged rogue v5 tags to restore canonical 4.x SemVer progression. (Thanks to @aukgit)

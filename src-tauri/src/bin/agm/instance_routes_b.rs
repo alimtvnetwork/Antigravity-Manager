@@ -183,6 +183,37 @@ pub(crate) fn route_instances_rm(args: &[String], non_flag_args: &[String], is_j
     false
 }
 
+fn registry_bound_email(instance_id: &str) -> Result<String, String> {
+    let reg = instance::load_registry()?;
+    let found = reg.instances.into_iter().find(|i| i.id == instance_id);
+    Ok(found.and_then(|i| i.bound_email).unwrap_or_default())
+}
+
+fn confirm_switch_bound_email(instance_id: &str, requested_email: &str) -> Result<String, String> {
+    let bound = registry_bound_email(instance_id)?;
+    if bound.eq_ignore_ascii_case(requested_email) {
+        return Ok(bound);
+    }
+    Err(format!(
+        "switch reported ok but bound_email is '{bound}', not '{requested_email}'"
+    ))
+}
+
+fn exit_unproven_switch(is_json: bool, error: String, instance_id: &str, requested: &str) -> ! {
+    if is_json {
+        let err = serde_json::json!({
+            "success": false,
+            "error": error,
+            "instance": instance_id,
+            "requested": requested
+        });
+        println!("{}", serde_json::to_string(&err).unwrap_or_default());
+    } else {
+        eprintln!("[ERROR] {error}");
+    }
+    std::process::exit(1);
+}
+
 pub(crate) fn route_instances_switch(
     args: &[String],
     non_flag_args: &[String],
@@ -285,19 +316,31 @@ pub(crate) fn route_instances_switch(
                     Some(&active_id),
                 )) {
                     Ok(_) => {
-                        let _ = instance::set_active_instance_id(&active_id);
+                        // Justification: credential write is the switch; active-id is bookkeeping
+                        antigravity_tools_lib::error::record_ignored(
+                            instance::set_active_instance_id(&active_id),
+                            "set active instance after switch",
+                        );
+                        let bound_email =
+                            match confirm_switch_bound_email(&active_id, &target_acc.email) {
+                                Ok(email) => email,
+                                Err(e) => {
+                                    exit_unproven_switch(is_json, e, &active_id, &target_acc.email)
+                                }
+                            };
                         if is_json {
                             let res = serde_json::json!({
                                 "success": true,
                                 "instance": active_id,
-                                "email": target_acc.email,
+                                "email": bound_email,
+                                "bound_email": bound_email,
                                 "account_id": target_acc.id
                             });
                             println!("{}", serde_json::to_string(&res).unwrap_or_default());
                         } else {
                             println!(
                                 "[SUCCESS] Active instance '{}' successfully switched to '{}'.",
-                                active_id, target_acc.email
+                                active_id, bound_email
                             );
                         }
                     }
@@ -431,11 +474,7 @@ pub(crate) fn route_instances_switch(
             std::process::exit(1);
         };
 
-        let previous_email = instance::load_registry()
-            .ok()
-            .and_then(|r| r.instances.into_iter().find(|i| i.id == resolved_id))
-            .and_then(|i| i.bound_email)
-            .unwrap_or_default();
+        let previous_email = registry_bound_email(&resolved_id).unwrap_or_default();
 
         if !is_json {
             println!(
@@ -449,7 +488,16 @@ pub(crate) fn route_instances_switch(
             Some(&resolved_id),
         )) {
             Ok(_) => {
-                let _ = instance::set_active_instance_id(&resolved_id);
+                // Justification: credential write is the switch; active-id is bookkeeping
+                antigravity_tools_lib::error::record_ignored(
+                    instance::set_active_instance_id(&resolved_id),
+                    "set active instance after switch",
+                );
+                let bound_email = match confirm_switch_bound_email(&resolved_id, &target_acc.email)
+                {
+                    Ok(email) => email,
+                    Err(e) => exit_unproven_switch(is_json, e, &resolved_id, &target_acc.email),
+                };
                 antigravity_tools_lib::modules::audit::record_if_active(
                     "cli",
                     "cli",
@@ -458,22 +506,24 @@ pub(crate) fn route_instances_switch(
                     serde_json::json!({
                         "instanceId": resolved_id,
                         "accountId": target_acc.id,
-                        "email": target_acc.email,
+                        "email": bound_email,
                         "previousEmail": previous_email,
                     }),
                     "ok",
-                    &format!("Switched instance {resolved_id} to {}", target_acc.email),
+                    &format!("Switched instance {resolved_id} to {bound_email}"),
                 );
                 if is_json {
                     let res = serde_json::json!({
                         "success": true,
                         "instance": resolved_id,
-                        "email": target_acc.email,
+                        "email": bound_email,
+                        "bound_email": bound_email,
                         "previous_email": previous_email,
                         "account_id": target_acc.id,
                         "data": {
                             "instance_id": resolved_id,
-                            "email": target_acc.email,
+                            "email": bound_email,
+                            "bound_email": bound_email,
                             "previous_email": previous_email,
                             "account_id": target_acc.id,
                             "status": "switched"
@@ -483,7 +533,7 @@ pub(crate) fn route_instances_switch(
                 } else {
                     println!(
                         "[SUCCESS] Instance '{}' successfully switched to '{}'.",
-                        resolved_id, target_acc.email
+                        resolved_id, bound_email
                     );
                 }
             }

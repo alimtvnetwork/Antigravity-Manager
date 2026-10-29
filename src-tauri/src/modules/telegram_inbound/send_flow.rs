@@ -728,6 +728,11 @@ fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
     (out, Some(instance_picker_markup(&canonical, &instances)))
 }
 
+/// Jump `/send` to conversation pick for a local instance (status-card Send).
+pub fn start_send_for_instance(chat_id: i64, instance: &str) -> (String, Option<Value>) {
+    on_instance_picked(chat_id, &local_machine_label(), instance)
+}
+
 fn on_instance_picked(chat_id: i64, machine: &str, instance: &str) -> (String, Option<Value>) {
     let canonical_machine = match machine_entries()
         .into_iter()

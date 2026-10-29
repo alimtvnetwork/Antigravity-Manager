@@ -440,9 +440,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                         triggerAction: 'invalidate_prompt_tree_cache',
                     });
                 });
-                if (!isAutoSyncing) {
-                    void loadTree(true, true);
-                }
+                void loadTree(false, true);
             } else if (res.failed > 0) {
                 setActionMsg(`Rerun failed: ${res.failed} of ${res.requested} dispatch(es) failed`);
                 useErrorStore.getState().captureError(

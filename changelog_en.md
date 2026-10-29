@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.278.0 (2026-10-29)**:
+        -   **[Prompt Queue Visibility, Honest JSON Switch & Friendly Telegram Cards] Enqueue/rerun show on click, JSON switch proves bound_email, Telegram Send (Thanks to @aukgit)**:
+            -   **Description**: Prompt tree force-refresh in `src/components/instances/PromptTreeView/usePromptTreeData.ts` keeps queued turns instead of wiping the 30s SWR cache first; rerun ×N keeps each identical queued turn; `default-copy-*` is not Default; `src-tauri/src/modules/repo_db/tree_node_conv.rs` attaches queued prompts by path or session id; `agm instances switch --json` in `src-tauri/src/bin/agm/instance_cmds.rs` no longer fakes `"switched"` and confirms `bound_email`; enqueue notifies the FIFO scheduler immediately; Telegram cards show idle/busy/queued and ✉️ Send. Isolated `agm instances test-create` enqueued three queued ids, copied, sent `p-0db14cf4`; Default and v2-3127 were not stopped. (Thanks to @aukgit)
+
     *   **v4.277.0 (2026-10-29)**:
         -   **[Instance UI & Verification Templates] Restyled Create Profile Modal, 100-Step Prompt Breakdown & Release Tag Normalization (Thanks to @aukgit)**:
             -   **Description**: Restyled the Create Profile dialog in `src/pages/instances/CreateEditDialogs.tsx` with unified dark-glass styling, segmented button controls, and high-contrast form elements; added multi-step prompt breakdowns and verification templates in `src/components/instances/PromptTreeView/verificationTemplates.ts`; integrated flywheel status triggers in `src/components/telegram/ImprovementsFlywheel.tsx` and `src/pages/Instances.tsx`; and purged rogue v5 tags to restore canonical 4.x SemVer progression. (Thanks to @aukgit)

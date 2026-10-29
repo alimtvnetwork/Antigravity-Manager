@@ -559,28 +559,9 @@ pub(crate) fn cmd_instances_switch(args: &[String]) {
         );
     }
 
-    if ctx.json_output {
-        if is_daemon_running() {
-            let path = format!("/instances/{}/switch", target_instance);
-            let payload = serde_json::json!({ "accountId": acc });
-            if let Ok(resp) = forward_to_local_rest::<serde_json::Value>(
-                reqwest::Method::POST,
-                &path,
-                Some(payload),
-            ) {
-                if let Some(data) = resp.get("data") {
-                    CliEnvelope::ok("instances switch", Some(target_instance), data.clone())
-                        .print_and_exit();
-                }
-            }
-        }
-        let data = serde_json::json!({
-            "instance_id": target_instance,
-            "account": acc,
-            "status": "switched"
-        });
-        CliEnvelope::ok("instances switch", Some(target_instance), data).print_and_exit();
-    }
+    // --json must reach route_instances_switch. That path calls
+    // switch_account_to_instance and reads bound_email. A switched
+    // envelope printed here is a fake success.
     let mut forward_args = vec!["switch".to_string(), target_instance, acc];
     forward_args.extend(args.iter().filter(|a| a.starts_with('-')).cloned());
     crate::instance_dispatch::cmd_instances(&forward_args);

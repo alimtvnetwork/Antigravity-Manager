@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.277.4-3B82F6?style=flat-square" alt="Version v4.277.4">
+    <img src="https://img.shields.io/badge/Version-v4.278.0-3B82F6?style=flat-square" alt="Version v4.278.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,7 +116,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.277.4)**
+**Bar 2: Version-Based Installation (v4.278.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.258.0/install.ps1))) -Version "v4.258.0"
 ```
@@ -645,6 +645,8 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
 ## 📝 Changelog
+
+> Latest version **v4.278.0**: Prompt Queue Visibility, Honest JSON Switch & Friendly Telegram Cards — Prompt tree force-refresh in `src/components/instances/PromptTreeView/usePromptTreeData.ts` keeps queued turns instead of wiping the 30s SWR cache first; rerun ×N keeps each identical queued turn; `default-copy-*` is not Default; `src-tauri/src/modules/repo_db/tree_node_conv.rs` attaches queued prompts by path or session id; `agm instances switch --json` in `src-tauri/src/bin/agm/instance_cmds.rs` no longer fakes `"switched"` and confirms `bound_email`; enqueue notifies the FIFO scheduler immediately; Telegram cards show idle/busy/queued and ✉️ Send. Isolated `agm instances test-create` enqueued three queued ids, copied, sent `p-0db14cf4`; Default and v2-3127 were not stopped. (Thanks to @aukgit)
 
 > Latest version **v4.277.4**: Create Profile UI Restyle, 100-Step Verification Templates & Release Tag Normalization — Restyled the Create Profile dialog in `src/pages/instances/CreateEditDialogs.tsx` with unified dark-glass styling, segmented button controls, and high-contrast form elements; added multi-step prompt breakdowns and verification templates in `src/components/instances/PromptTreeView/verificationTemplates.ts`; integrated flywheel status triggers in `src/components/telegram/ImprovementsFlywheel.tsx` and `src/pages/Instances.tsx`; and purged rogue v5 tags to restore canonical 4.x SemVer progression. (Thanks to @aukgit)
 

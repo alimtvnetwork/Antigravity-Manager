@@ -33,6 +33,19 @@ fn format_running_duration(created_at: i64) -> String {
     }
 }
 
+fn friendly_status_label(running: bool, queued: usize) -> String {
+    if running && queued > 0 {
+        return format!("busy · {queued} queued");
+    }
+    if running {
+        return "busy".to_string();
+    }
+    if queued > 0 {
+        return format!("{queued} queued");
+    }
+    "idle".to_string()
+}
+
 fn shorten_project_name(name: &str) -> String {
     let lower = name.to_lowercase();
     if lower.contains("antigravity") && lower.contains("manager") {
@@ -311,15 +324,16 @@ pub fn format_instance_card_html(card: &InstanceCard) -> String {
     } else {
         card.queued_projects.join(", ")
     };
+    let status = friendly_status_label(card.running, card.queued_prompts.len());
     format!(
-        "{dot} <b>{}</b> (<code>{}</code>){active}\n\
+        "{dot} <b>{}</b> · <i>{}</i>{active}\n\
          👤 <code>{}</code> · PID <code>{}</code>\n\
          🏃 Running projects: <b>{}</b>\n\
          📥 Queued projects: <b>{}</b>\n\
          ⚡ Running prompts ({})\n{}\
          ⏳ Queued prompts ({})\n{}",
         clean_for_telegram_html(&card.instance_name, 40),
-        clean_for_telegram_html(&card.instance_id, 40),
+        clean_for_telegram_html(&status, 32),
         clean_for_telegram_html(&card.bound_email, 48),
         clean_for_telegram_html(&card.pid, 32),
         clean_for_telegram_html(&run_proj, 80),
@@ -350,6 +364,9 @@ pub fn build_instance_card_markup(card: &InstanceCard) -> Value {
     // Telegram copy_text is capped at 256 chars and rejects the whole keyboard
     // when exceeded. Copy/Full both send the complete prompt as a .txt file.
     let mut copy_row = Vec::new();
+    if let Some(payload) = cb("sn", &card.instance_id) {
+        copy_row.push(json!({ "text": "✉️ Send", "callback_data": payload }));
+    }
     if let Some(snip) = copy_source_prompt(card) {
         if let Some(payload) = cb("cp", &snip.id) {
             copy_row.push(json!({ "text": "📋 Copy", "callback_data": payload }));
@@ -502,7 +519,9 @@ fn enqueue_text(
     session: Option<&str>,
     text: &str,
 ) -> Result<ActivePrompt, String> {
-    repo_db::enqueue_prompt_for_instance(instance_id, repo_path, text, session)
+    let prompt = repo_db::enqueue_prompt_for_instance(instance_id, repo_path, text, session)?;
+    crate::modules::scheduler::notify_prompt_queue();
+    Ok(prompt)
 }
 
 fn random_followup() -> &'static str {
@@ -614,6 +633,31 @@ pub async fn handle_instance_callback(token: &str, chat_id: i64, data: &str) -> 
                 "send full prompt ack",
             );
         }
+        "sn" => match resolve_instance_prefix(id) {
+            Some(inst) => {
+                let (reply, markup) = super::send_flow::start_send_for_instance(chat_id, &inst);
+                crate::error::record_ignored(
+                    send_telegram_message_with_markup(token, chat_id, &reply, markup, false).await,
+                    "start telegram send from instance card",
+                );
+            }
+            None => {
+                crate::error::record_ignored(
+                    send_telegram_message_with_markup(
+                        token,
+                        chat_id,
+                        &format!(
+                            "⚠️ Unknown instance <code>{}</code>.",
+                            clean_for_telegram_html(id, 24)
+                        ),
+                        None,
+                        false,
+                    )
+                    .await,
+                    "unknown instance prefix for send",
+                );
+            }
+        },
         "rr" => {
             let reply = match resolve_instance_prefix(id) {
                 Some(inst) => rerun_latest(&inst).await,
@@ -796,6 +840,7 @@ mod tests {
     fn callback_payloads_fit_budget() {
         assert!(instance_callback_within_budget("ff", "default"));
         assert!(instance_callback_within_budget("rr", "v2-3127"));
+        assert!(instance_callback_within_budget("sn", "default"));
         assert!(instance_callback_within_budget("cp", "p-239ec5"));
         assert!(instance_callback_within_budget("ad", "v3-7391"));
         let payload = cb("ff", "default").expect("payload");
@@ -847,8 +892,33 @@ mod tests {
             "copy_text rejects the whole keyboard over 256 chars"
         );
         assert!(markup.contains("i:cp:p-239ec"));
+        assert!(markup.contains("i:sn:default"));
+        assert!(markup.contains("✉️ Send"));
         assert!(markup.contains("📋 Copy"));
         assert!(markup.contains("📄 Full"));
+    }
+
+    #[test]
+    fn friendly_status_label_covers_idle_busy_queued() {
+        assert_eq!(friendly_status_label(false, 0), "idle");
+        assert_eq!(friendly_status_label(true, 0), "busy");
+        assert_eq!(friendly_status_label(false, 2), "2 queued");
+        assert_eq!(friendly_status_label(true, 3), "busy · 3 queued");
+        let card = InstanceCard {
+            instance_id: "default".to_string(),
+            instance_name: "Default".to_string(),
+            running: false,
+            bound_email: "a@b.c".to_string(),
+            pid: "-".to_string(),
+            is_active: false,
+            running_prompts: Vec::new(),
+            queued_prompts: Vec::new(),
+            running_projects: Vec::new(),
+            queued_projects: Vec::new(),
+        };
+        let html = format_instance_card_html(&card);
+        assert!(html.contains("idle"));
+        assert!(!html.contains("(<code>default</code>)"));
     }
 
     #[test]

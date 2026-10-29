@@ -1109,6 +1109,8 @@ pub fn enqueue_prompt_for_instance(
 
     invalidate_prompt_tree_cache(Some(&canonical_inst));
 
+    crate::modules::scheduler::notify_prompt_queue();
+
     crate::modules::logger::log_info(&format!(
         "[RepoDB] enqueue_prompt_for_instance recorded prompt '{}' for instance '{}' in '{}'",
         active_prompt.id, canonical_inst, repo_path

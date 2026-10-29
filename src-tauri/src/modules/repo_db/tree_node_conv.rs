@@ -1,6 +1,8 @@
 //! Repo DB: tree conversation node builders
 
-use super::models::{AgmConversationNode, AgmPromptTurnNode, CascadeRunStatusType, RunningProject};
+use super::models::{
+    ActivePrompt, AgmConversationNode, AgmPromptTurnNode, CascadeRunStatusType, RunningProject,
+};
 use super::project_queries::normalize_path_for_compare;
 use super::sequences::{
     ensure_conversation_sequence_in_conn, extract_prompt_tail_snippet, extract_prompt_words_preview,
@@ -8,6 +10,7 @@ use super::sequences::{
 use super::state::get_active_agy_workers;
 use super::text_utils::{extract_smart_prompt_summary, StrExt};
 use rusqlite::Connection;
+use std::collections::{HashMap, HashSet};
 
 fn is_placeholder_title(title: &str) -> bool {
     let trimmed = title.trim();
@@ -123,6 +126,45 @@ pub(crate) fn should_retain_unrunning_conversation(only_running: bool, is_runnin
         return true;
     }
     is_running
+}
+
+fn is_queued_or_pending_status(status: &str) -> bool {
+    const QUEUED_STATUSES: &[&str] = &["queued", "queue", "pending"];
+    status.equals_any_ignore_case(QUEUED_STATUSES)
+}
+
+/// Collect active prompts that belong on this project node: same instance +
+/// path, empty path, or a session_id that matches an existing conversation.
+pub(crate) fn collect_active_prompts_for_project(
+    map: &HashMap<(String, String), Vec<ActivePrompt>>,
+    inst: &str,
+    path: &str,
+    conv_nodes: &[AgmConversationNode],
+) -> Vec<ActivePrompt> {
+    let conv_ids: HashSet<&str> = conv_nodes
+        .iter()
+        .map(|c| c.conversation_id.as_str())
+        .collect();
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut out: Vec<ActivePrompt> = Vec::new();
+    let inst_is_default = is_default_instance_match(inst);
+    for ((ap_inst, ap_path), aps) in map {
+        if !is_instance_compatible(ap_inst, inst, inst_is_default) {
+            continue;
+        }
+        let path_ok = ap_path == path;
+        for ap in aps {
+            if !seen.insert(ap.id.clone()) {
+                continue;
+            }
+            let sid = ap.session_id.as_deref().unwrap_or("");
+            let session_ok = !sid.is_empty() && conv_ids.contains(sid);
+            if path_ok || session_ok {
+                out.push(ap.clone());
+            }
+        }
+    }
+    out
 }
 
 /// Evaluates whether an unrunning conversation candidate has sufficient title or prompt content.
@@ -400,383 +442,376 @@ pub(crate) fn build_active_prompt_conv_nodes(
     let now = ctx.now;
     let (instance_seq_num, instance_name, instance_exe_name) =
         resolve_instance_meta(&proj.instance_id, registry);
-    if let Some(aps) =
-        active_prompts_by_inst_and_path.get(&(norm_proj_inst.to_string(), norm_path.to_string()))
-    {
-        for ap in aps {
-            let cid = ap.session_id.clone().unwrap_or_else(|| ap.id.clone());
-            let target_idx = conv_nodes.iter().position(|c| {
-                let is_id_match =
-                    c.conversation_id == cid || c.conversation_id.eq_ignore_ascii_case(&cid);
-                if is_id_match {
-                    return true;
-                }
-                let content_trimmed = ap.prompt_content.trim();
-                let has_matching_prompt = c.prompts.iter().any(|p| {
-                    let is_text_match = p.prompt_text.trim() == content_trimmed;
-                    let is_preview_match = p.preview_200w.trim() == content_trimmed;
-                    is_text_match || is_preview_match
-                });
-                if has_matching_prompt {
-                    return true;
-                }
-                c.full_prompt_text.as_deref().unwrap_or("").trim() == content_trimmed
+    let aps = collect_active_prompts_for_project(
+        active_prompts_by_inst_and_path,
+        norm_proj_inst,
+        norm_path,
+        conv_nodes,
+    );
+    for ap in &aps {
+        let cid = ap.session_id.clone().unwrap_or_else(|| ap.id.clone());
+        let target_idx = conv_nodes.iter().position(|c| {
+            let is_id_match =
+                c.conversation_id == cid || c.conversation_id.eq_ignore_ascii_case(&cid);
+            if is_id_match {
+                return true;
+            }
+            let content_trimmed = ap.prompt_content.trim();
+            let has_matching_prompt = c.prompts.iter().any(|p| {
+                let is_text_match = p.prompt_text.trim() == content_trimmed;
+                let is_preview_match = p.preview_200w.trim() == content_trimmed;
+                is_text_match || is_preview_match
             });
+            if has_matching_prompt {
+                return true;
+            }
+            c.full_prompt_text.as_deref().unwrap_or("").trim() == content_trimmed
+        });
 
-            if let Some(idx) = target_idx {
-                let target_conv = &mut conv_nodes[idx];
-                const PENDING_STAGES: &[&str] = &["queue", "pending"];
-                const ACTIVE_STAGES: &[&str] = &["running", "dispatched", "in_flight"];
-                let is_pending_stage = ap.status.has_any_word_ignore_case(PENDING_STAGES);
-                let is_active_stage = ap.status.has_any_word_ignore_case(ACTIVE_STAGES);
-                let is_relevant_status = is_pending_stage || is_active_stage;
+        if let Some(idx) = target_idx {
+            let target_conv = &mut conv_nodes[idx];
+            const PENDING_STAGES: &[&str] = &["queued", "queue", "pending"];
+            const ACTIVE_STAGES: &[&str] = &["running", "dispatched", "in_flight"];
+            let is_pending_stage = ap.status.has_any_word_ignore_case(PENDING_STAGES);
+            let is_active_stage = ap.status.has_any_word_ignore_case(ACTIVE_STAGES);
+            let is_relevant_status = is_pending_stage || is_active_stage;
 
-                if is_relevant_status {
-                    let is_fresh = (now - ap.updated_at) <= 600;
-                    let is_alive_and_fresh = is_inst_alive && is_fresh;
-                    let is_queued = is_pending_stage;
-                    let is_ap_run = is_alive_and_fresh && is_active_stage;
+            if is_relevant_status {
+                let is_fresh = (now - ap.updated_at) <= 600;
+                let is_alive_and_fresh = is_inst_alive && is_fresh;
+                let is_queued = is_pending_stage;
+                let is_ap_run = is_alive_and_fresh && is_active_stage;
 
-                    let (ap_media_paths, ap_media_thumbnails) =
-                        if let Some(ref payload) = ap.image_payload {
-                            let paths: Vec<String> = payload
-                                .split(';')
-                                .map(|s| s.trim())
-                                .filter(|s| !s.is_empty())
-                                .map(|path| workspace_relative_media(path, norm_path))
-                                .collect();
-                            (paths.clone(), paths)
-                        } else {
-                            (Vec::new(), Vec::new())
-                        };
-
-                    // For active running prompts, attach to existing transcript turn if found.
-                    // For queued prompts, NEVER merge into past completed turns — each queued prompt is an independent queued action!
-                    let existing_turn = if is_ap_run && !is_queued {
-                        target_conv
-                            .prompts
-                            .iter_mut()
-                            .find(|p| p.prompt_text.trim() == ap.prompt_content.trim())
+                let (ap_media_paths, ap_media_thumbnails) =
+                    if let Some(ref payload) = ap.image_payload {
+                        let paths: Vec<String> = payload
+                            .split(';')
+                            .map(|s| s.trim())
+                            .filter(|s| !s.is_empty())
+                            .map(|path| workspace_relative_media(path, norm_path))
+                            .collect();
+                        (paths.clone(), paths)
                     } else {
-                        None
+                        (Vec::new(), Vec::new())
                     };
 
-                    if let Some(turn) = existing_turn {
-                        if !ap_media_paths.is_empty() {
-                            for m in &ap_media_paths {
-                                if !turn.media_paths.contains(m) {
-                                    turn.media_paths.push(m.clone());
-                                }
-                                if !target_conv.media_paths.contains(m) {
-                                    target_conv.media_paths.push(m.clone());
-                                }
-                            }
-                            for t in &ap_media_thumbnails {
-                                if !turn.media_thumbnails.contains(t) {
-                                    turn.media_thumbnails.push(t.clone());
-                                }
-                                if !target_conv.media_thumbnails.contains(t) {
-                                    target_conv.media_thumbnails.push(t.clone());
-                                }
-                            }
-                        }
-                        if is_ap_run {
-                            turn.is_running = true;
-                            turn.status = "RUNNING".to_string();
-                            target_conv.is_running = true;
-                            target_conv.status = "RUNNING".to_string();
-                        } else if is_queued {
-                            turn.is_queued = true;
-                            turn.status = "QUEUED".to_string();
-                            let can_enqueue = !target_conv.is_running;
-                            if can_enqueue {
-                                target_conv.is_queued = true;
-                                target_conv.status = "QUEUED".to_string();
-                            }
-                        }
-                    } else {
-                        let turn_num = target_conv.prompts.len() + 1;
-                        let (ap_preview, _) =
-                            extract_prompt_words_preview(&ap.prompt_content, word_cap);
-                        let ap_turn = AgmPromptTurnNode {
-                            turn_number: turn_num,
-                            step_index: target_conv.prompts.len(),
-                            prompt_text: ap.prompt_content.clone(),
-                            preview_200w: ap_preview,
-                            status: if is_ap_run {
-                                "RUNNING".to_string()
-                            } else if is_queued {
-                                "QUEUED".to_string()
-                            } else {
-                                "COMPLETED".to_string()
-                            },
-                            is_running: is_ap_run,
-                            is_queued,
-                            timestamp: chrono::DateTime::from_timestamp(ap.updated_at, 0)
-                                .map(|dt| dt.to_rfc3339())
-                                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
-                            created_at: if ap.created_at > 0 && ap.created_at < 100_000_000_000 {
-                                ap.created_at * 1000
-                            } else {
-                                ap.created_at
-                            },
-                            media_paths: ap_media_paths.clone(),
-                            media_thumbnails: ap_media_thumbnails.clone(),
-                        };
+                // For active running prompts, attach to existing transcript turn if found.
+                // For queued prompts, NEVER merge into past completed turns — each queued prompt is an independent queued action!
+                let existing_turn = if is_ap_run && !is_queued {
+                    target_conv
+                        .prompts
+                        .iter_mut()
+                        .find(|p| p.prompt_text.trim() == ap.prompt_content.trim())
+                } else {
+                    None
+                };
+
+                if let Some(turn) = existing_turn {
+                    if !ap_media_paths.is_empty() {
                         for m in &ap_media_paths {
+                            if !turn.media_paths.contains(m) {
+                                turn.media_paths.push(m.clone());
+                            }
                             if !target_conv.media_paths.contains(m) {
                                 target_conv.media_paths.push(m.clone());
                             }
                         }
                         for t in &ap_media_thumbnails {
+                            if !turn.media_thumbnails.contains(t) {
+                                turn.media_thumbnails.push(t.clone());
+                            }
                             if !target_conv.media_thumbnails.contains(t) {
                                 target_conv.media_thumbnails.push(t.clone());
                             }
                         }
-                        target_conv.prompts.push(ap_turn);
-                        if is_queued {
+                    }
+                    if is_ap_run {
+                        turn.is_running = true;
+                        turn.status = "RUNNING".to_string();
+                        target_conv.is_running = true;
+                        target_conv.status = "RUNNING".to_string();
+                    } else if is_queued {
+                        turn.is_queued = true;
+                        turn.status = "QUEUED".to_string();
+                        let can_enqueue = !target_conv.is_running;
+                        if can_enqueue {
                             target_conv.is_queued = true;
-                        }
-                        let can_enqueue_conv = is_queued && !target_conv.is_running;
-                        if is_ap_run {
-                            target_conv.is_running = true;
-                            target_conv.status = "RUNNING".to_string();
-                        } else if can_enqueue_conv {
                             target_conv.status = "QUEUED".to_string();
                         }
                     }
-                }
-                continue;
-            }
-            let (preview_200w, word_count) =
-                extract_prompt_words_preview(&ap.prompt_content, word_cap);
-
-            let title = extract_smart_prompt_summary(&ap.prompt_content, 60);
-            let is_ghost =
-                is_vacant_ghost_conversation(&title, &ap.prompt_content, word_count, true);
-            if is_ghost {
-                continue;
-            }
-
-            let has_active_worker = if let Ok(workers) = get_active_agy_workers().lock() {
-                let clean_target = normalize_path_for_compare(&proj.repo_path);
-                workers.iter().any(|(key, &wpid)| {
-                    let (w_inst, w_path) = match key.split_once(':') {
-                        Some((inst, path)) => (inst, path),
-                        None => ("", key.as_str()),
+                } else {
+                    let turn_num = target_conv.prompts.len() + 1;
+                    let (ap_preview, _) =
+                        extract_prompt_words_preview(&ap.prompt_content, word_cap);
+                    let ap_turn = AgmPromptTurnNode {
+                        turn_number: turn_num,
+                        step_index: target_conv.prompts.len(),
+                        prompt_text: ap.prompt_content.clone(),
+                        preview_200w: ap_preview,
+                        status: if is_ap_run {
+                            "RUNNING".to_string()
+                        } else if is_queued {
+                            "QUEUED".to_string()
+                        } else {
+                            "COMPLETED".to_string()
+                        },
+                        is_running: is_ap_run,
+                        is_queued,
+                        timestamp: chrono::DateTime::from_timestamp(ap.updated_at, 0)
+                            .map(|dt| dt.to_rfc3339())
+                            .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+                        created_at: if ap.created_at > 0 && ap.created_at < 100_000_000_000 {
+                            ap.created_at * 1000
+                        } else {
+                            ap.created_at
+                        },
+                        media_paths: ap_media_paths.clone(),
+                        media_thumbnails: ap_media_thumbnails.clone(),
                     };
-                    let is_inst_match = if is_default_instance_match(&proj.instance_id) {
-                        is_default_instance_match(w_inst)
-                    } else {
-                        w_inst.eq_ignore_ascii_case(&proj.instance_id)
-                    };
-                    let has_clean_target = !clean_target.is_empty();
-                    let is_path_equal = normalize_path_for_compare(w_path) == clean_target;
-                    let is_path_match = has_clean_target && is_path_equal;
-
-                    let is_target_match = is_inst_match && is_path_match;
-                    let has_valid_pid = wpid > 0;
-                    if is_target_match && has_valid_pid {
-                        crate::modules::instance::is_pid_alive_os(wpid)
-                    } else {
-                        false
+                    for m in &ap_media_paths {
+                        if !target_conv.media_paths.contains(m) {
+                            target_conv.media_paths.push(m.clone());
+                        }
                     }
-                })
-            } else {
-                false
-            };
+                    for t in &ap_media_thumbnails {
+                        if !target_conv.media_thumbnails.contains(t) {
+                            target_conv.media_thumbnails.push(t.clone());
+                        }
+                    }
+                    target_conv.prompts.push(ap_turn);
+                    if is_queued {
+                        target_conv.is_queued = true;
+                    }
+                    let can_enqueue_conv = is_queued && !target_conv.is_running;
+                    if is_ap_run {
+                        target_conv.is_running = true;
+                        target_conv.status = "RUNNING".to_string();
+                    } else if can_enqueue_conv {
+                        target_conv.status = "QUEUED".to_string();
+                    }
+                }
+            }
+            continue;
+        }
+        let (preview_200w, word_count) = extract_prompt_words_preview(&ap.prompt_content, word_cap);
 
-            let has_non_idle_summary = if let Some(ref session_id) = ap.session_id {
-                let mut is_non_idle = false;
-                for (owning_inst_id, base) in candidate_dirs {
-                    let norm_owning = if is_default_instance_match(owning_inst_id) {
-                        "default"
-                    } else {
-                        owning_inst_id.as_str()
-                    };
-                    if norm_owning == norm_proj_inst || norm_owning == proj.instance_id {
-                        let s_db = base.join("conversation_summaries.db");
-                        if s_db.exists() {
-                            if let Ok(s_conn) = Connection::open_with_flags(
-                                &s_db,
-                                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
-                                    | rusqlite::OpenFlags::SQLITE_OPEN_URI,
-                            ) {
-                                // Justification: busy_timeout on a third-party read-only database is a nicety; reads continue with the default
-                                crate::error::record_ignored(
-                                    s_conn.pragma_update(None, "busy_timeout", 1000),
-                                    "set busy_timeout on Antigravity summaries database",
-                                );
-                                let query = "SELECT status, not_fully_idle FROM conversation_summaries WHERE conversation_id = ?1 LIMIT 1";
-                                if let Ok((sum_status, not_idle)) =
-                                    s_conn.query_row(query, [session_id], |row| {
-                                        Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
-                                    })
-                                {
-                                    let cascade_status =
-                                        CascadeRunStatusType::from_status_str(&sum_status);
-                                    let has_idle_marker = cascade_status.is_idle_or_terminal();
-                                    let is_cascade_running = cascade_status.is_running();
-                                    let has_busy_flag = not_idle > 0;
-                                    let is_turn_busy = is_cascade_running && has_busy_flag;
-                                    let is_active_turn = is_turn_busy && !has_idle_marker;
-                                    if is_active_turn {
-                                        is_non_idle = true;
-                                        break;
-                                    }
+        let title = extract_smart_prompt_summary(&ap.prompt_content, 60);
+        let is_ghost = is_vacant_ghost_conversation(&title, &ap.prompt_content, word_count, true);
+        if is_ghost && !is_queued_or_pending_status(&ap.status) {
+            continue;
+        }
+
+        let has_active_worker = if let Ok(workers) = get_active_agy_workers().lock() {
+            let clean_target = normalize_path_for_compare(&proj.repo_path);
+            workers.iter().any(|(key, &wpid)| {
+                let (w_inst, w_path) = match key.split_once(':') {
+                    Some((inst, path)) => (inst, path),
+                    None => ("", key.as_str()),
+                };
+                let is_inst_match = if is_default_instance_match(&proj.instance_id) {
+                    is_default_instance_match(w_inst)
+                } else {
+                    w_inst.eq_ignore_ascii_case(&proj.instance_id)
+                };
+                let has_clean_target = !clean_target.is_empty();
+                let is_path_equal = normalize_path_for_compare(w_path) == clean_target;
+                let is_path_match = has_clean_target && is_path_equal;
+
+                let is_target_match = is_inst_match && is_path_match;
+                let has_valid_pid = wpid > 0;
+                if is_target_match && has_valid_pid {
+                    crate::modules::instance::is_pid_alive_os(wpid)
+                } else {
+                    false
+                }
+            })
+        } else {
+            false
+        };
+
+        let has_non_idle_summary = if let Some(ref session_id) = ap.session_id {
+            let mut is_non_idle = false;
+            for (owning_inst_id, base) in candidate_dirs {
+                let norm_owning = if is_default_instance_match(owning_inst_id) {
+                    "default"
+                } else {
+                    owning_inst_id.as_str()
+                };
+                if norm_owning == norm_proj_inst || norm_owning == proj.instance_id {
+                    let s_db = base.join("conversation_summaries.db");
+                    if s_db.exists() {
+                        if let Ok(s_conn) = Connection::open_with_flags(
+                            &s_db,
+                            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                                | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+                        ) {
+                            // Justification: busy_timeout on a third-party read-only database is a nicety; reads continue with the default
+                            crate::error::record_ignored(
+                                s_conn.pragma_update(None, "busy_timeout", 1000),
+                                "set busy_timeout on Antigravity summaries database",
+                            );
+                            let query = "SELECT status, not_fully_idle FROM conversation_summaries WHERE conversation_id = ?1 LIMIT 1";
+                            if let Ok((sum_status, not_idle)) =
+                                s_conn.query_row(query, [session_id], |row| {
+                                    Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
+                                })
+                            {
+                                let cascade_status =
+                                    CascadeRunStatusType::from_status_str(&sum_status);
+                                let has_idle_marker = cascade_status.is_idle_or_terminal();
+                                let is_cascade_running = cascade_status.is_running();
+                                let has_busy_flag = not_idle > 0;
+                                let is_turn_busy = is_cascade_running && has_busy_flag;
+                                let is_active_turn = is_turn_busy && !has_idle_marker;
+                                if is_active_turn {
+                                    is_non_idle = true;
+                                    break;
                                 }
                             }
                         }
                     }
                 }
-                is_non_idle
-            } else {
-                false
-            };
-
-            let has_confirmed_running = has_active_worker || has_non_idle_summary;
-
-            const QUEUED_STATUSES: &[&str] = &["queued", "pending"];
-            const RUNNING_STATUSES: &[&str] = &["running", "in_flight", "dispatched"];
-            let is_ap_queued = ap.status.equals_any(QUEUED_STATUSES);
-            let max_allowed_ttl = if has_active_worker { 300 } else { 45 };
-            let is_running_status = ap.status.equals_any(RUNNING_STATUSES);
-            let is_within_ttl = (now - ap.updated_at) <= max_allowed_ttl;
-            let is_status_fresh = is_running_status && is_within_ttl;
-            let is_executing = is_inst_alive && has_confirmed_running;
-            let is_run = is_status_fresh && is_executing;
-            let should_retain_ap = should_retain_unrunning_conversation(only_running, is_run);
-            if !should_retain_ap {
-                continue;
             }
-            let c_seq = if let Some(ref conn) = conn_opt {
-                ensure_conversation_sequence_in_conn(
-                    conn,
-                    &cid,
-                    project_key,
-                    &title,
-                    &ap.instance_id,
-                )
-            } else {
-                (conv_nodes.len() as i64) + 1
-            };
-            let short_id = if cid.len() >= 8 {
-                cid[..8].to_string()
-            } else {
-                cid.clone()
-            };
-            let tail_snippet = extract_prompt_tail_snippet(&ap.prompt_content, 12);
+            is_non_idle
+        } else {
+            false
+        };
 
-            let (c_inst_seq, c_inst_name, c_inst_exe) = if ap.instance_id == proj.instance_id {
-                (
-                    instance_seq_num,
-                    instance_name.clone(),
-                    instance_exe_name.clone(),
-                )
-            } else {
-                resolve_instance_meta(&ap.instance_id, registry)
-            };
+        let has_confirmed_running = has_active_worker || has_non_idle_summary;
 
-            let ap_category = {
-                let p_lower = ap.prompt_content.to_lowercase();
-                if p_lower.contains("you are research")
-                    || p_lower.contains("you are worker")
-                    || p_lower.contains("<system_message>")
-                {
-                    "subagent".to_string()
-                } else {
-                    "user".to_string()
-                }
-            };
-            let ap_step_summary = if is_run {
-                Some("Prompt in flight / processing".to_string())
-            } else if is_ap_queued {
-                Some("In queue, waiting for slot".to_string())
-            } else {
-                None
-            };
-
-            let (ap_media_paths, ap_media_thumbnails) = if let Some(ref payload) = ap.image_payload
-            {
-                let paths: Vec<String> = payload
-                    .split(';')
-                    .map(|s| s.trim())
-                    .filter(|s| !s.is_empty())
-                    .map(|path| workspace_relative_media(path, norm_path))
-                    .collect();
-                (paths.clone(), paths)
-            } else {
-                (Vec::new(), Vec::new())
-            };
-
-            let ap_turn = AgmPromptTurnNode {
-                turn_number: 1,
-                step_index: 0,
-                prompt_text: ap.prompt_content.clone(),
-                preview_200w: preview_200w.clone(),
-                status: if is_run {
-                    "RUNNING".to_string()
-                } else if is_ap_queued {
-                    "QUEUED".to_string()
-                } else {
-                    "COMPLETED".to_string()
-                },
-                is_running: is_run,
-                is_queued: is_ap_queued,
-                timestamp: chrono::DateTime::from_timestamp(ap.updated_at, 0)
-                    .map(|dt| dt.to_rfc3339())
-                    .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
-                created_at: if ap.created_at > 0 && ap.created_at < 100_000_000_000 {
-                    ap.created_at * 1000
-                } else {
-                    ap.created_at
-                },
-                media_paths: ap_media_paths.clone(),
-                media_thumbnails: ap_media_thumbnails.clone(),
-            };
-
-            conv_nodes.push(AgmConversationNode {
-                seq_id: c_seq,
-                seq_code: format!("C{:03}", c_seq),
-                gitmap_seq_code: format!("GM:{}", short_id),
-                conversation_id: cid,
-                short_id,
-                title,
-                status: if is_run {
-                    "RUNNING".to_string()
-                } else if is_ap_queued {
-                    "QUEUED".to_string()
-                } else if is_running_status {
-                    "IDLE".to_string()
-                } else {
-                    ap.status.to_uppercase()
-                },
-                is_running: is_run,
-                step_count: 0,
-                instance_id: ap.instance_id.clone(),
-                instance_seq_num: c_inst_seq,
-                instance_name: c_inst_name,
-                instance_exe_name: c_inst_exe,
-                prompt_preview_200w: preview_200w,
-                prompt_tail_snippet: tail_snippet,
-                prompt_word_count: word_count,
-                last_modified: ap.updated_at.to_string(),
-                byte_size: Some(ap.prompt_content.len()),
-                repeat_count: None,
-                repeat_badge: None,
-                sub_runs: Vec::new(),
-                prompt_category: ap_category,
-                is_queued: is_ap_queued,
-                latest_step_summary: ap_step_summary,
-                latest_response: None,
-                execution_results: None,
-                tool_calls_summary: None,
-                full_prompt_text: Some(ap.prompt_content.clone()),
-                media_paths: ap_media_paths,
-                media_thumbnails: ap_media_thumbnails,
-                prompts: vec![ap_turn],
-            });
+        const RUNNING_STATUSES: &[&str] = &["running", "in_flight", "dispatched"];
+        let is_ap_queued = is_queued_or_pending_status(&ap.status);
+        let max_allowed_ttl = if has_active_worker { 300 } else { 45 };
+        let is_running_status = ap.status.equals_any(RUNNING_STATUSES);
+        let is_within_ttl = (now - ap.updated_at) <= max_allowed_ttl;
+        let is_status_fresh = is_running_status && is_within_ttl;
+        let is_executing = is_inst_alive && has_confirmed_running;
+        let is_run = is_status_fresh && is_executing;
+        let should_retain_ap =
+            is_ap_queued || should_retain_unrunning_conversation(only_running, is_run);
+        if !should_retain_ap {
+            continue;
         }
+        let c_seq = if let Some(ref conn) = conn_opt {
+            ensure_conversation_sequence_in_conn(conn, &cid, project_key, &title, &ap.instance_id)
+        } else {
+            (conv_nodes.len() as i64) + 1
+        };
+        let short_id = if cid.len() >= 8 {
+            cid[..8].to_string()
+        } else {
+            cid.clone()
+        };
+        let tail_snippet = extract_prompt_tail_snippet(&ap.prompt_content, 12);
+
+        let (c_inst_seq, c_inst_name, c_inst_exe) = if ap.instance_id == proj.instance_id {
+            (
+                instance_seq_num,
+                instance_name.clone(),
+                instance_exe_name.clone(),
+            )
+        } else {
+            resolve_instance_meta(&ap.instance_id, registry)
+        };
+
+        let ap_category = {
+            let p_lower = ap.prompt_content.to_lowercase();
+            if p_lower.contains("you are research")
+                || p_lower.contains("you are worker")
+                || p_lower.contains("<system_message>")
+            {
+                "subagent".to_string()
+            } else {
+                "user".to_string()
+            }
+        };
+        let ap_step_summary = if is_run {
+            Some("Prompt in flight / processing".to_string())
+        } else if is_ap_queued {
+            Some("In queue, waiting for slot".to_string())
+        } else {
+            None
+        };
+
+        let (ap_media_paths, ap_media_thumbnails) = if let Some(ref payload) = ap.image_payload {
+            let paths: Vec<String> = payload
+                .split(';')
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .map(|path| workspace_relative_media(path, norm_path))
+                .collect();
+            (paths.clone(), paths)
+        } else {
+            (Vec::new(), Vec::new())
+        };
+
+        let ap_turn = AgmPromptTurnNode {
+            turn_number: 1,
+            step_index: 0,
+            prompt_text: ap.prompt_content.clone(),
+            preview_200w: preview_200w.clone(),
+            status: if is_run {
+                "RUNNING".to_string()
+            } else if is_ap_queued {
+                "QUEUED".to_string()
+            } else {
+                "COMPLETED".to_string()
+            },
+            is_running: is_run,
+            is_queued: is_ap_queued,
+            timestamp: chrono::DateTime::from_timestamp(ap.updated_at, 0)
+                .map(|dt| dt.to_rfc3339())
+                .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+            created_at: if ap.created_at > 0 && ap.created_at < 100_000_000_000 {
+                ap.created_at * 1000
+            } else {
+                ap.created_at
+            },
+            media_paths: ap_media_paths.clone(),
+            media_thumbnails: ap_media_thumbnails.clone(),
+        };
+
+        conv_nodes.push(AgmConversationNode {
+            seq_id: c_seq,
+            seq_code: format!("C{:03}", c_seq),
+            gitmap_seq_code: format!("GM:{}", short_id),
+            conversation_id: cid,
+            short_id,
+            title,
+            status: if is_run {
+                "RUNNING".to_string()
+            } else if is_ap_queued {
+                "QUEUED".to_string()
+            } else if is_running_status {
+                "IDLE".to_string()
+            } else {
+                ap.status.to_uppercase()
+            },
+            is_running: is_run,
+            step_count: 0,
+            instance_id: ap.instance_id.clone(),
+            instance_seq_num: c_inst_seq,
+            instance_name: c_inst_name,
+            instance_exe_name: c_inst_exe,
+            prompt_preview_200w: preview_200w,
+            prompt_tail_snippet: tail_snippet,
+            prompt_word_count: word_count,
+            last_modified: ap.updated_at.to_string(),
+            byte_size: Some(ap.prompt_content.len()),
+            repeat_count: None,
+            repeat_badge: None,
+            sub_runs: Vec::new(),
+            prompt_category: ap_category,
+            is_queued: is_ap_queued,
+            latest_step_summary: ap_step_summary,
+            latest_response: None,
+            execution_results: None,
+            tool_calls_summary: None,
+            full_prompt_text: Some(ap.prompt_content.clone()),
+            media_paths: ap_media_paths,
+            media_thumbnails: ap_media_thumbnails,
+            prompts: vec![ap_turn],
+        });
     }
 }
 
@@ -831,6 +866,72 @@ mod tests {
         ));
         // Meaningful title -> not ghost
         assert!(!is_vacant_ghost_conversation("Fix login bug", "", 0, true));
+    }
+
+    #[test]
+    fn test_collect_active_prompts_matches_session_across_paths() {
+        let conv = AgmConversationNode {
+            seq_id: 1,
+            seq_code: "C001".into(),
+            gitmap_seq_code: "GM:abcd".into(),
+            conversation_id: "conv-session-1".into(),
+            short_id: "abcd".into(),
+            title: "Work".into(),
+            status: "IDLE".into(),
+            is_running: false,
+            step_count: 1,
+            instance_id: "default".into(),
+            instance_seq_num: None,
+            instance_name: String::new(),
+            instance_exe_name: String::new(),
+            prompt_preview_200w: "hello".into(),
+            prompt_tail_snippet: String::new(),
+            prompt_word_count: 1,
+            last_modified: "1".into(),
+            byte_size: None,
+            repeat_count: None,
+            repeat_badge: None,
+            sub_runs: Vec::new(),
+            prompt_category: String::new(),
+            is_queued: false,
+            latest_step_summary: None,
+            latest_response: None,
+            execution_results: None,
+            tool_calls_summary: None,
+            full_prompt_text: None,
+            media_paths: Vec::new(),
+            media_thumbnails: Vec::new(),
+            prompts: Vec::new(),
+        };
+        let mut map: HashMap<(String, String), Vec<ActivePrompt>> = HashMap::new();
+        map.insert(
+            ("default".into(), "/other/path".into()),
+            vec![ActivePrompt {
+                id: "queued-1".into(),
+                project_id: "work".into(),
+                instance_id: "default".into(),
+                repo_path: "/other/path".into(),
+                prompt_content: "enqueue me".into(),
+                model: None,
+                session_id: Some("conv-session-1".into()),
+                status: "queued".into(),
+                created_at: 1,
+                updated_at: 1,
+                image_payload: None,
+            }],
+        );
+        let collected = collect_active_prompts_for_project(
+            &map,
+            "default",
+            "/workspace/work",
+            std::slice::from_ref(&conv),
+        );
+        assert_eq!(collected.len(), 1);
+        assert_eq!(collected[0].id, "queued-1");
+        assert!(is_queued_or_pending_status("QUEUED"));
+        assert!(is_queued_or_pending_status("queued"));
+        assert!(is_queued_or_pending_status("pending"));
+        assert!(!is_queued_or_pending_status("running"));
     }
 
     #[test]

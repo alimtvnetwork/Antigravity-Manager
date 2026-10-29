@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.277.0)
+> Professional AI Account Management & Protocol Proxy System (v4.278.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.277.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.278.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.278.0**: Prompt Queue Visibility, Honest JSON Switch & Friendly Telegram Cards — Prompt tree force-refresh in `src/components/instances/PromptTreeView/usePromptTreeData.ts` keeps queued turns instead of wiping the 30s SWR cache first; rerun ×N keeps each identical queued turn; `default-copy-*` is not Default; `src-tauri/src/modules/repo_db/tree_node_conv.rs` attaches queued prompts by path or session id; `agm instances switch --json` in `src-tauri/src/bin/agm/instance_cmds.rs` no longer fakes `"switched"` and confirms `bound_email`; enqueue notifies the FIFO scheduler immediately; Telegram cards show idle/busy/queued and ✉️ Send. Isolated `agm instances test-create` enqueued three queued ids, copied, sent `p-0db14cf4`; Default and v2-3127 were not stopped. (Thanks to @aukgit)
 
 > Latest version **v4.277.0**: Create Profile UI Restyle, 100-Step Verification Templates & Release Tag Normalization — Restyled the Create Profile dialog in `src/pages/instances/CreateEditDialogs.tsx` with unified dark-glass styling, segmented button controls, and high-contrast form elements; added multi-step prompt breakdowns and verification templates in `src/components/instances/PromptTreeView/verificationTemplates.ts`; integrated flywheel status triggers in `src/components/telegram/ImprovementsFlywheel.tsx` and `src/pages/Instances.tsx`; and purged rogue v5 tags to restore canonical 4.x SemVer progression. (Thanks to @aukgit)
 

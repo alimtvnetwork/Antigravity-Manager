@@ -13,6 +13,7 @@ import { persistClientCrash } from '../../../lib/error-listener';
 import { auditRecord } from '../../audit/audit-client';
 import type { AgmConversationNode, AgmPromptTurnNode } from './types';
 import { isGhostConversation } from './conversationGuards';
+import { patchPromptTreeSwrCache } from './usePromptTreeData';
 import { detectPromptCategory } from './tierClassification';
 import type { PromptTreeState } from './usePromptTreeState';
 import { copyPromptWithRichImages, extractPromptImages } from './clipboard';
@@ -43,6 +44,36 @@ export function dispatchConversationId(
     }
 
     return trimmed;
+}
+
+export function resolveRepoPathForDispatch(
+    proj: { repo_path?: string } | null | undefined,
+    selectedProject: { repo_path?: string } | null | undefined,
+    conv: AgmConversationNode | null | undefined,
+    treeData: { repo_path?: string; conversations: { conversation_id: string }[] }[]
+): string {
+    const direct = (
+        proj?.repo_path ||
+        selectedProject?.repo_path ||
+        (conv as { repo_path?: string } | null | undefined)?.repo_path ||
+        ''
+    ).trim();
+    if (direct) {
+        return direct;
+    }
+    const convId = conv?.conversation_id;
+    if (!convId) {
+        return '';
+    }
+    for (const node of treeData) {
+        if (node.conversations.some((c) => c.conversation_id === convId)) {
+            const path = (node.repo_path || '').trim();
+            if (path) {
+                return path;
+            }
+        }
+    }
+    return '';
 }
 
 export function workspaceRelativeImageTarget(absPath: string, repoPath: string): string {
@@ -505,7 +536,7 @@ export function usePromptTreePromptActions({
             if (!promptContent && conv) {
                 promptContent = resolvePromptBody(conv);
             }
-            const repoPath = proj?.repo_path || selectedProject?.repo_path || (conv as { repo_path?: string })?.repo_path || '';
+            const repoPath = resolveRepoPathForDispatch(proj, selectedProject, conv, treeData);
             const targetInstId = selectedConversation?.instance_id || conv?.instance_id || proj?.instance_id || instanceId || 'default';
             const targetConvId = dispatchConversationId(
                 conversationTargetMode,
@@ -740,7 +771,7 @@ ${activePromptText}
             if (!promptContent && conv) {
                 promptContent = resolvePromptBody(conv);
             }
-            const repoPath = proj?.repo_path || selectedProject?.repo_path || (conv as { repo_path?: string })?.repo_path || '';
+            const repoPath = resolveRepoPathForDispatch(proj, selectedProject, conv, treeData);
             const targetInstId = selectedConversation?.instance_id || conv.instance_id || proj?.instance_id || instanceId || 'default';
             const targetConvId = dispatchConversationId(
                 conversationTargetMode,
@@ -820,8 +851,8 @@ ${activePromptText}
                     };
                 }
 
-                setTreeData((prevTree) =>
-                    prevTree.map((projNode) => ({
+                setTreeData((prevTree) => {
+                    const next = prevTree.map((projNode) => ({
                         ...projNode,
                         conversations: projNode.conversations.map((c) =>
                             c.conversation_id === targetConv.conversation_id
@@ -832,8 +863,10 @@ ${activePromptText}
                                   }
                                 : c
                         ),
-                    }))
-                );
+                    }));
+                    patchPromptTreeSwrCache(targetInstId, () => next);
+                    return next;
+                });
             }
 
             // Invalidate prompt tree cache first so tree reload fetches fresh state including enqueued turn
@@ -1161,6 +1194,7 @@ ${activePromptText}
                     ...overrides,
                 });
                 if (res.dispatched > 0) {
+                    const targetInstId = conv?.instance_id || instanceId;
                     // 0ms Optimistic UI Injection for rerun rounds
                     if (conv) {
                         const existingTurns = conv.prompts || [];
@@ -1204,8 +1238,8 @@ ${activePromptText}
                             };
                         }
 
-                        setTreeData((prevTree) =>
-                            prevTree.map((projNode) => ({
+                        setTreeData((prevTree) => {
+                            const next = prevTree.map((projNode) => ({
                                 ...projNode,
                                 conversations: projNode.conversations.map((c) =>
                                     c.conversation_id === conv.conversation_id
@@ -1216,11 +1250,12 @@ ${activePromptText}
                                           }
                                         : c
                                 ),
-                            }))
-                        );
+                            }));
+                            patchPromptTreeSwrCache(targetInstId, () => next);
+                            return next;
+                        });
                     }
 
-                    const targetInstId = conv?.instance_id || instanceId;
                     if (isTauri()) {
                         try {
                             await invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId }).catch(async () => {
