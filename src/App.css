@@ -560,11 +560,11 @@ html.palette-one-dark .dark\:hover\:bg-\[\#40285e\]\/60,
   position: relative;
   transform: none;
   transition:
-    background-color 260ms cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 260ms cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 260ms cubic-bezier(0.4, 0, 0.2, 1),
-    filter 260ms cubic-bezier(0.4, 0, 0.2, 1),
-    color 180ms cubic-bezier(0.4, 0, 0.2, 1);
+    background-color 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    filter 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dark .agm-hover-shade {
@@ -624,11 +624,11 @@ html.palette-one-dark .dark\:hover\:bg-\[\#40285e\]\/60,
   pointer-events: none;
   background: var(--agm-wash-veil);
   opacity: 0;
-  transition: opacity 260ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .agm-hover-shade:hover {
-  animation: agm-hover-wash 280ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: agm-hover-wash 300ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
   transform: none;
 }
 

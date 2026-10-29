@@ -951,6 +951,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                     onBackup={coreActions.handleBackup}
                     onRestore={coreActions.handleRestore}
                     onExportSqlite={() => coreActions.handleOpenExportModal({ target_type: 'full_tree' }, 'sqlite')}
+                    onExportMarkdown={() => coreActions.handleOpenExportModal({ target_type: 'full_tree' }, 'markdown')}
                     onImportSqlite={coreActions.handleOpenImportModal}
                     onCopyAllTreePrompts={coreActions.handleCopyAllTreePrompts}
                     onFileRestore={coreActions.handleFileRestore}

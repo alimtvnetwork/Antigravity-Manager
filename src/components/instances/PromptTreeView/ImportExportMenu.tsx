@@ -5,6 +5,7 @@ import {
     ChevronDown,
     Copy,
     Database,
+    FileCode,
     FileDown,
     FileJson,
     FileUp,
@@ -19,6 +20,8 @@ export interface ImportExportMenuProps {
     onExportSqlite: () => void;
     /** Export the full prompt tree to a JSON backup (existing handler). */
     onExportJson: () => void;
+    /** Export the full prompt tree or scoped section as Markdown (.md). */
+    onExportMarkdown?: () => void;
     /** Import a portable SQLite `.db` tree export into the live database. */
     onImportSqlite: () => void;
     /** Import a JSON tree backup (existing handler). */
@@ -42,6 +45,7 @@ export function ImportExportMenu(props: ImportExportMenuProps) {
     const {
         onExportSqlite,
         onExportJson,
+        onExportMarkdown,
         onImportSqlite,
         onImportJson,
         onRestore,
@@ -198,6 +202,26 @@ export function ImportExportMenu(props: ImportExportMenuProps) {
                             </div>
                             <span className="text-[10px] text-slate-400 font-mono">.json</span>
                         </button>
+
+                        {/* Export Markdown */}
+                        {onExportMarkdown && (
+                            <button
+                                type="button"
+                                disabled={isLoading}
+                                onClick={() => {
+                                    onExportMarkdown();
+                                    close();
+                                }}
+                                className={menuItemClass}
+                                title="Export the prompt tree section as Markdown (.md) for AI analysis"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <FileCode className="w-3.5 h-3.5 text-sky-500" />
+                                    <span>Export Tree as Markdown</span>
+                                </div>
+                                <span className="text-[10px] text-slate-400 font-mono">.md</span>
+                            </button>
+                        )}
 
                         <button
                             type="button"

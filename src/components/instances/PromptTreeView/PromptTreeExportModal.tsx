@@ -5,6 +5,7 @@ import {
     FileJson,
     Database,
     FileText,
+    FileCode,
     Image as ImageIcon,
     Folder,
     MessageSquare,
@@ -28,13 +29,13 @@ export interface PromptTreeExportModalProps {
     isOpen: boolean;
     onClose: () => void;
     preselectedScope?: ExportScopeParams;
-    initialFormat?: 'json' | 'sqlite' | 'yaml';
+    initialFormat?: 'json' | 'sqlite' | 'yaml' | 'markdown';
     treeData: AgmProjectTreeNode[];
     selectedProject?: AgmProjectTreeNode | null;
     selectedConversation?: AgmConversationNode | null;
     onExecuteExport: (params: {
         scope: ExportScopeParams;
-        format: 'json' | 'sqlite' | 'yaml';
+        format: 'json' | 'sqlite' | 'yaml' | 'markdown';
         embed_images: boolean;
         export_mode?: 'standalone' | 'lean';
     }) => Promise<void>;
@@ -53,7 +54,7 @@ export function PromptTreeExportModal({
     const [targetType, setTargetType] = useState<ExportScopeParams['target_type']>('full_tree');
     const [selectedProjId, setSelectedProjId] = useState<string>('');
     const [selectedConvId, setSelectedConvId] = useState<string>('');
-    const [format, setFormat] = useState<'json' | 'sqlite' | 'yaml'>('json');
+    const [format, setFormat] = useState<'json' | 'sqlite' | 'yaml' | 'markdown'>('json');
     const [embedImages, setEmbedImages] = useState<boolean>(true);
     const [isExporting, setIsExporting] = useState<boolean>(false);
     const [exportSuccess, setExportSuccess] = useState<boolean>(false);
@@ -305,7 +306,7 @@ export function PromptTreeExportModal({
                     <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">
                         Export Format
                     </label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         {/* JSON */}
                         <div
                             onClick={() => setFormat('json')}
@@ -333,7 +334,7 @@ export function PromptTreeExportModal({
                         >
                             <Database className="w-6 h-6 text-indigo-500 mb-1" />
                             <span className="text-xs font-bold">SQLite (.db)</span>
-                            <span className="text-[10px] text-slate-400 mt-0.5">Portable Database</span>
+                            <span className="text-[10px] text-slate-400 mt-0.5">Portable DB</span>
                         </div>
 
                         {/* YAML */}
@@ -348,7 +349,22 @@ export function PromptTreeExportModal({
                         >
                             <FileText className="w-6 h-6 text-emerald-500 mb-1" />
                             <span className="text-xs font-bold">YAML (.yaml)</span>
-                            <span className="text-[10px] text-slate-400 mt-0.5">Human Readable</span>
+                            <span className="text-[10px] text-slate-400 mt-0.5">YAML Structure</span>
+                        </div>
+
+                        {/* Markdown (.md) */}
+                        <div
+                            onClick={() => setFormat('markdown')}
+                            className={cn(
+                                "flex flex-col items-center justify-center p-3 rounded-xl border text-center cursor-pointer transition-all",
+                                format === 'markdown'
+                                    ? "border-sky-500 bg-sky-500/10 text-sky-900 dark:text-sky-200 ring-2 ring-sky-500/30"
+                                    : "border-slate-200 dark:border-[#382352] hover:bg-slate-50 dark:hover:bg-[#1a1228]"
+                            )}
+                        >
+                            <FileCode className="w-6 h-6 text-sky-500 mb-1" />
+                            <span className="text-xs font-bold">Markdown (.md)</span>
+                            <span className="text-[10px] text-slate-400 mt-0.5">AI Ready Doc</span>
                         </div>
                     </div>
                 </div>

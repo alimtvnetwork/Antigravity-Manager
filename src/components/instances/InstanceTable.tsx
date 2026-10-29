@@ -110,11 +110,11 @@ export default function InstanceTable({
                                 <tr
                                     key={inst.config.id}
                                     className={cn(
-                                        'group transition-colors duration-150 border-b border-slate-200/90 dark:border-slate-800/90 last:border-b-0',
+                                        'group transition-colors duration-300 ease-out border-b border-slate-200 dark:border-slate-800/90 last:border-b-0',
                                         data.isBusy && 'pointer-events-none select-none opacity-60',
                                         data.isActive
-                                            ? 'bg-sky-50/40 dark:bg-[#0a2338] hover:bg-sky-50/70 dark:hover:bg-[#0d2c46]'
-                                            : 'hover:bg-slate-50/80 dark:hover:bg-[#0d253a]/70'
+                                            ? 'bg-sky-100/70 dark:bg-[#0c2f4d] hover:bg-sky-100 dark:hover:bg-[#113d63] border-l-4 border-l-sky-500 shadow-xs'
+                                            : 'hover:bg-slate-100/90 dark:hover:bg-[#191e33] border-l-4 border-l-transparent'
                                     )}
                                 >
                                     <ProfileCell

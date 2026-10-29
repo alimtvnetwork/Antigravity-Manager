@@ -34,13 +34,13 @@ export interface PromptTreeCoreActions {
     setIsExportModalOpen: (open: boolean) => void;
     exportScopeTarget?: ExportScopeParams;
     setExportScopeTarget: (scope?: ExportScopeParams) => void;
-    exportInitialFormat: 'json' | 'sqlite' | 'yaml';
-    setExportInitialFormat: (format: 'json' | 'sqlite' | 'yaml') => void;
-    handleOpenExportModal: (scope?: ExportScopeParams, initialFormat?: 'json' | 'sqlite' | 'yaml') => void;
+    exportInitialFormat: 'json' | 'sqlite' | 'yaml' | 'markdown';
+    setExportInitialFormat: (format: 'json' | 'sqlite' | 'yaml' | 'markdown') => void;
+    handleOpenExportModal: (scope?: ExportScopeParams, initialFormat?: 'json' | 'sqlite' | 'yaml' | 'markdown') => void;
     handleCloseExportModal: () => void;
     executeSectionExport: (params: {
         scope: ExportScopeParams;
-        format: 'json' | 'sqlite' | 'yaml';
+        format: 'json' | 'sqlite' | 'yaml' | 'markdown';
         embed_images: boolean;
         export_mode?: 'standalone' | 'lean';
     }) => Promise<void>;
@@ -945,11 +945,11 @@ export function usePromptTreeCoreActions({
 
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [exportScopeTarget, setExportScopeTarget] = useState<ExportScopeParams | undefined>(undefined);
-    const [exportInitialFormat, setExportInitialFormat] = useState<'json' | 'sqlite' | 'yaml'>('json');
+    const [exportInitialFormat, setExportInitialFormat] = useState<'json' | 'sqlite' | 'yaml' | 'markdown'>('json');
 
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-    const handleOpenExportModal = useCallback((scope?: ExportScopeParams, initialFormat?: 'json' | 'sqlite' | 'yaml') => {
+    const handleOpenExportModal = useCallback((scope?: ExportScopeParams, initialFormat?: 'json' | 'sqlite' | 'yaml' | 'markdown') => {
         setExportScopeTarget(scope);
         if (initialFormat) {
             setExportInitialFormat(initialFormat);
@@ -972,12 +972,12 @@ export function usePromptTreeCoreActions({
     const executeSectionExport = useCallback(
         async (params: {
             scope: ExportScopeParams;
-            format: 'json' | 'sqlite' | 'yaml';
+            format: 'json' | 'sqlite' | 'yaml' | 'markdown';
             embed_images: boolean;
             export_mode?: 'standalone' | 'lean';
         }) => {
             const { scope, format, embed_images, export_mode } = params;
-            const ext = format === 'sqlite' ? 'db' : format === 'yaml' ? 'yaml' : 'json';
+            const ext = format === 'sqlite' ? 'db' : format === 'yaml' ? 'yaml' : format === 'markdown' ? 'md' : 'json';
             const targetSlug = scope.project_name || scope.project_id || scope.conversation_id || scope.target_type;
             const mode = export_mode || (embed_images ? 'standalone' : 'lean');
             const modeLabel = mode === 'standalone' ? 'Standalone' : 'Clean';
@@ -1003,7 +1003,13 @@ export function usePromptTreeCoreActions({
                     for (let i = 0; i < binary.length; i++) {
                         bytes[i] = binary.charCodeAt(i);
                     }
-                    const mimeType = format === 'sqlite' ? 'application/x-sqlite3' : format === 'yaml' ? 'text/yaml' : 'application/json';
+                    const mimeType = format === 'sqlite'
+                        ? 'application/x-sqlite3'
+                        : format === 'yaml'
+                        ? 'text/yaml'
+                        : format === 'markdown'
+                        ? 'text/markdown'
+                        : 'application/json';
                     const blob = new Blob([bytes], { type: mimeType });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -1024,6 +1030,8 @@ export function usePromptTreeCoreActions({
                     ? [{ name: 'SQLite Database', extensions: ['db', 'sqlite'] }]
                     : format === 'yaml'
                     ? [{ name: 'YAML Document', extensions: ['yaml', 'yml'] }]
+                    : format === 'markdown'
+                    ? [{ name: 'Markdown Document', extensions: ['md', 'markdown'] }]
                     : mode === 'standalone'
                     ? [
                         { name: 'Standalone JSON (.standalone.json)', extensions: ['standalone.json', 'json'] },

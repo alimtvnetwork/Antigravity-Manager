@@ -127,6 +127,10 @@ export function ConversationNode({
     const enqueuedTurnsCount = conv.prompts
         ? conv.prompts.filter((p) => Boolean(p.is_queued) || (p.status && p.status.toLowerCase().includes('queue'))).length
         : 0;
+    const totalImagesCount = useMemo(() => {
+        const turnMedia = (conv.prompts || []).reduce((acc, p) => acc + (p.media_paths?.length || 0), 0);
+        return turnMedia + (conv.media_paths?.length || 0);
+    }, [conv.prompts, conv.media_paths]);
 
     const handleSaveTitle = async (draftTitle: string) => {
         setIsEditingTitle(false);
@@ -213,7 +217,7 @@ export function ConversationNode({
                     });
                 }}
                 className={cn(
-                    'group flex items-center justify-between rounded-md px-1.5 py-0.5 text-xs leading-snug cursor-pointer transition-colors duration-150 relative outline-none focus:outline-none focus-visible:!outline-none border border-transparent',
+                    'group flex flex-col justify-between rounded-md px-1.5 py-1 text-xs leading-snug cursor-pointer transition-colors duration-300 ease-out relative outline-none focus:outline-none focus-visible:!outline-none border border-transparent',
                     isSelected && selectedTurnNumber === null
                         ? 'bg-gradient-to-r from-violet-600/30 to-purple-600/20 text-white font-medium border-violet-500/30'
                         : isSelected
@@ -222,171 +226,201 @@ export function ConversationNode({
                 )}
                 title={`${conv.title || 'Conversation'} · ${conv.step_count || 1} steps · Click to view (F2 to rename)`}
             >
-                <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
-                    {/* Branch connector glyph to project */}
-                    <span className="text-slate-400 dark:text-purple-400/80 font-mono text-[10px] select-none shrink-0" aria-hidden="true">
-                        {isLastConv ? '└──' : '├──'}
-                    </span>
-                    {hasPrompts && (
-                        <button
-                            type="button"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setIsExpanded((prev) => !prev);
-                            }}
-                            className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-[#281b3d] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer shrink-0 transition-colors"
-                            title={isExpanded ? 'Collapse prompt turns' : 'Expand prompt turns'}
-                        >
-                            {isExpanded ? (
-                                <ChevronDown className="w-3 h-3" />
-                            ) : (
-                                <ChevronRight className="w-3 h-3" />
-                            )}
-                        </button>
-                    )}
-                    {promptCategory.tier === PromptOriginTier.SubagentInstruction && (
-                        <span className="text-purple-400 dark:text-purple-400 font-mono text-[10px] select-none shrink-0" title="AI Subagent Instruction">
-                            └── ↳
+                {/* Line 1: Hierarchical Metadata, Badges, Recency & Queue Status */}
+                <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                        {/* Branch connector glyph to project */}
+                        <span className="text-slate-400 dark:text-purple-400/80 font-mono text-[10px] select-none shrink-0" aria-hidden="true">
+                            {isLastConv ? '└──' : '├──'}
                         </span>
-                    )}
-                    <span title={promptCategory.roleBadge || promptCategory.tier} className="shrink-0 flex items-center">
-                        <IconComponent
-                            className={cn('h-3.5 w-3.5 shrink-0', isSelected ? 'text-white' : (promptCategory.tier === PromptOriginTier.SubagentInstruction ? 'text-purple-500' : promptCategory.tier === PromptOriginTier.SystemMessage ? 'text-zinc-500' : promptCategory.tier === PromptOriginTier.ToolOutput ? 'text-amber-500' : 'text-sky-500'))}
-                        />
-                    </span>
-                    <span
-                        className={cn(
-                            'text-[9px] font-mono px-1 py-0.2 rounded-xs shrink-0 font-medium whitespace-nowrap',
-                            isSelected
-                                ? 'bg-blue-700/80 text-white'
-                                : 'bg-slate-200/90 dark:bg-[#40285e] text-slate-600 dark:text-cyan-300'
+                        {hasPrompts && (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsExpanded((prev) => !prev);
+                                }}
+                                className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-[#281b3d] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer shrink-0 transition-colors"
+                                title={isExpanded ? 'Collapse prompt turns' : 'Expand prompt turns'}
+                            >
+                                {isExpanded ? (
+                                    <ChevronDown className="w-3 h-3" />
+                                ) : (
+                                    <ChevronRight className="w-3 h-3" />
+                                )}
+                            </button>
                         )}
-                        title={`Conversation #${conv.seq_id} (Sequential AGM Index)${conv.short_id ? ` · GitMap SHA: ${conv.short_id}` : (conv.gitmap_seq_code ? ` · GitMap: ${conv.gitmap_seq_code}` : '')}`}
-                    >
-                        {formatSeqBadge(conv.seq_code, 'C001')}
-                    </span>
-                    {(conv.repeat_badge || (conv.repeat_count && conv.repeat_count > 1)) && (
+                        {promptCategory.tier === PromptOriginTier.SubagentInstruction && (
+                            <span className="text-purple-400 dark:text-purple-400 font-mono text-[10px] select-none shrink-0" title="AI Subagent Instruction">
+                                └── ↳
+                            </span>
+                        )}
+                        <span title={promptCategory.roleBadge || promptCategory.tier} className="shrink-0 flex items-center">
+                            <IconComponent
+                                className={cn('h-3.5 w-3.5 shrink-0', isSelected ? 'text-white' : (promptCategory.tier === PromptOriginTier.SubagentInstruction ? 'text-purple-500' : promptCategory.tier === PromptOriginTier.SystemMessage ? 'text-zinc-500' : promptCategory.tier === PromptOriginTier.ToolOutput ? 'text-amber-500' : 'text-sky-500'))}
+                            />
+                        </span>
                         <span
                             className={cn(
-                                "px-1.5 py-0.2 rounded-md text-[8.5px] font-mono font-bold shrink-0 border",
+                                'text-[9px] font-mono px-1 py-0.2 rounded-xs shrink-0 font-medium whitespace-nowrap',
                                 isSelected
-                                    ? "bg-amber-300 text-amber-950 border-amber-200"
-                                    : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
+                                    ? 'bg-blue-700/80 text-white'
+                                    : 'bg-slate-200/90 dark:bg-[#40285e] text-slate-600 dark:text-cyan-300'
                             )}
-                            title={`${conv.repeat_count || 2} duplicate/repeated prompt runs`}
+                            title={`Conversation #${conv.seq_id} (Sequential AGM Index)${conv.short_id ? ` · GitMap SHA: ${conv.short_id}` : (conv.gitmap_seq_code ? ` · GitMap: ${conv.gitmap_seq_code}` : '')}`}
                         >
-                            {conv.repeat_badge || `x${conv.repeat_count}`}
+                            {formatSeqBadge(conv.seq_code, 'C001')}
                         </span>
-                    )}
-                    {isEditingTitle ? (
-                        <input
-                            type="text"
-                            autoFocus
-                            value={editingTitle}
-                            onClick={(e) => e.stopPropagation()}
-                            onDoubleClick={(e) => e.stopPropagation()}
-                            onChange={(e) => setEditingTitle(e.target.value)}
-                            onKeyDown={(e) => {
-                                e.stopPropagation();
-                                if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleSaveTitle(editingTitle);
-                                } else if (e.key === 'Escape') {
-                                    e.preventDefault();
-                                    setIsEditingTitle(false);
-                                    setEditingTitle(conv.title || '');
-                                }
-                            }}
-                            onBlur={() => handleSaveTitle(editingTitle)}
-                            className="w-full px-1.5 py-0.5 rounded bg-white dark:bg-[#120a1f] border border-cyan-500 text-xs text-slate-900 dark:text-white outline-none ring-1 ring-cyan-500/50"
-                        />
-                    ) : (
-                        <span
-                            onDoubleClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                setIsEditingTitle(true);
-                                setEditingTitle(conv.title || '');
-                            }}
-                            onContextMenu={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onOpenContextMenu?.({
-                                    type: 'conversation',
-                                    x: e.clientX,
-                                    y: e.clientY,
-                                    conversationId: conv.conversation_id,
-                                    currentTitle: conv.title || conv.short_id || '',
-                                    conversationNode: conv,
-                                    repoPath: project.repo_path,
-                                    instanceId: conv.instance_id || project.instance_id,
-                                });
-                            }}
-                            className="truncate text-[11px] cursor-text hover:underline hover:decoration-dotted"
-                            title={`${conv.title || conv.short_id || conv.conversation_id.slice(0, 8)} (Double-click to rename)`}
-                        >
-                            {conv.title || conv.short_id || conv.conversation_id.slice(0, 8)}
-                        </span>
-                    )}
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                    {(() => {
-                        const recency = formatRelativeRecency(conv.last_modified, isRunning, isQueued);
-                        if (isRunning) {
+                        {(conv.repeat_badge || (conv.repeat_count && conv.repeat_count > 1)) && (
+                            <span
+                                className={cn(
+                                    "px-1.5 py-0.2 rounded-md text-[8.5px] font-mono font-bold shrink-0 border",
+                                    isSelected
+                                        ? "bg-amber-300 text-amber-950 border-amber-200"
+                                        : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
+                                )}
+                                title={`${conv.repeat_count || 2} duplicate/repeated prompt runs`}
+                            >
+                                {conv.repeat_badge || `x${conv.repeat_count}`}
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        {(() => {
+                            const recency = formatRelativeRecency(conv.last_modified, isRunning, isQueued);
+                            if (isRunning) {
+                                return (
+                                    <span className={cn(
+                                        "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-bold font-mono border overflow-hidden animate-pulse",
+                                        isSelected && selectedTurnNumber === null
+                                            ? "bg-emerald-400 text-emerald-950 border-emerald-300"
+                                            : "bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border-emerald-500/40"
+                                    )} title="Running now">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] animate-pulse" />
+                                        RUNNING
+                                    </span>
+                                );
+                            }
+                            if (isQueued) {
+                                return (
+                                    <span className={cn(
+                                        "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-bold font-mono border",
+                                        isSelected && selectedTurnNumber === null
+                                            ? "bg-amber-300 text-amber-950 border-amber-200"
+                                            : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40"
+                                    )} title="Queued in FIFO queue">
+                                        <Clock className="w-2.5 h-2.5 text-amber-500" />
+                                        <span>QUEUED</span>
+                                    </span>
+                                );
+                            }
                             return (
-                                <span className={cn(
-                                    "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-bold font-mono border overflow-hidden animate-pulse",
-                                    isSelected && selectedTurnNumber === null
-                                        ? "bg-emerald-400 text-emerald-950 border-emerald-300"
-                                        : "bg-emerald-500/15 text-emerald-700 dark:text-[#1af18d] border-emerald-500/40"
-                                )} title="Running now">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] animate-pulse" />
-                                    RUNNING
+                                <span
+                                    className={cn(
+                                        "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-mono border transition-colors",
+                                        isSelected && selectedTurnNumber === null
+                                            ? "bg-violet-950/60 border-violet-400/40 text-violet-200"
+                                            : "bg-zinc-900/40 dark:bg-[#120d20]/60 border-zinc-700/40 dark:border-purple-900/40 text-zinc-400"
+                                    )}
+                                    title={`Last active: ${recency.formattedTime}`}
+                                >
+                                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", recency.dotClass)} />
+                                    <span className={cn("font-medium", recency.textClass)}>{recency.label}</span>
                                 </span>
                             );
-                        }
-                        if (isQueued) {
-                            return (
-                                <span className={cn(
+                        })()}
+                        {enqueuedTurnsCount > 0 && (isRunning || !isQueued || enqueuedTurnsCount > 1) && (
+                            <span
+                                className={cn(
                                     "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-bold font-mono border",
                                     isSelected && selectedTurnNumber === null
                                         ? "bg-amber-300 text-amber-950 border-amber-200"
                                         : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40"
-                                )} title="Queued in FIFO queue">
-                                    <Clock className="w-2.5 h-2.5 text-amber-500" />
-                                    <span>QUEUED</span>
-                                </span>
-                            );
-                        }
-                        return (
-                            <span
-                                className={cn(
-                                    "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-mono border transition-colors",
-                                    isSelected && selectedTurnNumber === null
-                                        ? "bg-violet-950/60 border-violet-400/40 text-violet-200"
-                                        : "bg-zinc-900/40 dark:bg-[#120d20]/60 border-zinc-700/40 dark:border-purple-900/40 text-zinc-400"
                                 )}
-                                title={`Last active: ${recency.formattedTime}`}
+                                title={`${enqueuedTurnsCount} prompt(s) enqueued in FIFO queue`}
                             >
-                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", recency.dotClass)} />
-                                <span className={cn("font-medium", recency.textClass)}>{recency.label}</span>
+                                <Clock className="w-2.5 h-2.5 text-amber-500" />
+                                <span>+{enqueuedTurnsCount} queued</span>
                             </span>
-                        );
-                    })()}
-                    {enqueuedTurnsCount > 0 && (isRunning || !isQueued || enqueuedTurnsCount > 1) && (
+                        )}
+                    </div>
+                </div>
+
+                {/* Line 2: Full Title Preview, Turn Count & Media Pill */}
+                <div className="flex items-center justify-between w-full pl-5 mt-0.5">
+                    <div className="min-w-0 flex-1 mr-2">
+                        {isEditingTitle ? (
+                            <input
+                                type="text"
+                                autoFocus
+                                value={editingTitle}
+                                onClick={(e) => e.stopPropagation()}
+                                onDoubleClick={(e) => e.stopPropagation()}
+                                onChange={(e) => setEditingTitle(e.target.value)}
+                                onKeyDown={(e) => {
+                                    e.stopPropagation();
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleSaveTitle(editingTitle);
+                                    } else if (e.key === 'Escape') {
+                                        e.preventDefault();
+                                        setIsEditingTitle(false);
+                                        setEditingTitle(conv.title || '');
+                                    }
+                                }}
+                                onBlur={() => handleSaveTitle(editingTitle)}
+                                className="w-full px-1.5 py-0.5 rounded bg-white dark:bg-[#120a1f] border border-cyan-500 text-xs text-slate-900 dark:text-white outline-none ring-1 ring-cyan-500/50"
+                            />
+                        ) : (
+                            <span
+                                onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    setIsEditingTitle(true);
+                                    setEditingTitle(conv.title || '');
+                                }}
+                                onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    onOpenContextMenu?.({
+                                        type: 'conversation',
+                                        x: e.clientX,
+                                        y: e.clientY,
+                                        conversationId: conv.conversation_id,
+                                        currentTitle: conv.title || conv.short_id || '',
+                                        conversationNode: conv,
+                                        repoPath: project.repo_path,
+                                        instanceId: conv.instance_id || project.instance_id,
+                                    });
+                                }}
+                                className="block truncate text-[11px] font-medium text-slate-700 dark:text-slate-200 cursor-text hover:underline hover:decoration-dotted"
+                                title={`${conv.title || conv.short_id || conv.conversation_id.slice(0, 8)} (Double-click to rename)`}
+                            >
+                                {conv.title || conv.short_id || conv.conversation_id.slice(0, 8)}
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0 text-[10px]">
+                        {totalImagesCount > 0 && (
+                            <span
+                                className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-xs bg-sky-500/10 text-sky-600 dark:text-sky-300 border border-sky-500/30 font-medium"
+                                title={`Total attached images: ${totalImagesCount}`}
+                            >
+                                🖼️ {totalImagesCount}
+                            </span>
+                        )}
                         <span
                             className={cn(
-                                "flex items-center gap-1 px-1.5 py-0.2 rounded-md text-[8.5px] font-bold font-mono border",
-                                isSelected && selectedTurnNumber === null
-                                    ? "bg-amber-300 text-amber-950 border-amber-200"
-                                    : "bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/40"
+                                "px-1.5 py-0.2 rounded-xs font-mono font-medium",
+                                isSelected
+                                    ? "bg-purple-900/40 text-purple-200"
+                                    : "bg-slate-100 dark:bg-zinc-800/80 text-slate-500 dark:text-zinc-400"
                             )}
-                            title={`${enqueuedTurnsCount} prompt(s) enqueued in FIFO queue`}
+                            title={`${conv.step_count || (conv.prompts?.length || 1)} step(s)`}
                         >
-                            <Clock className="w-2.5 h-2.5 text-amber-500" />
-                            <span>+{enqueuedTurnsCount} queued</span>
+                            {conv.step_count || (conv.prompts?.length || 1)} turns
                         </span>
-                    )}
+                    </div>
                 </div>
             </div>
 
@@ -453,62 +487,68 @@ export function ConversationNode({
                                     });
                                 }}
                                 className={cn(
-                                    "group/turn flex items-center justify-between rounded-md px-1.5 py-0.5 text-xs leading-snug cursor-pointer transition-colors outline-none focus-visible:!outline-none border-l-2",
+                                    "group/turn flex flex-col rounded-md px-1.5 py-1 text-xs leading-snug cursor-pointer transition-all duration-300 ease-out outline-none focus-visible:!outline-none border-l-2",
                                     isTurnActive
                                         ? "bg-sky-500/10 border-sky-500 text-sky-400 font-medium"
                                         : "border-transparent hover:bg-slate-100/80 dark:hover:bg-zinc-800/60"
                                 )}
                                 title={`Turn ${turn.turn_number} (${turn.status}) · Click to inspect prompt`}
                             >
-                                <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
-                                    {/* Branch connector glyph */}
-                                    <span className="text-slate-300 dark:text-purple-400 font-mono text-[10px] select-none shrink-0">
-                                        {isLastTurn ? '└──' : '├──'}
-                                    </span>
-                                    {/* Turn ID badge */}
-                                    <span className="font-mono text-[9px] px-1 py-0.2 rounded-xs bg-slate-200 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold shrink-0">
-                                        T{turn.turn_number}
-                                    </span>
-                                    {/* Media chips if images present */}
-                                    {hasImages && (
-                                        <span
-                                            className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded-xs text-[9px] bg-sky-500/10 text-sky-600 dark:text-sky-300 border border-sky-500/30 shrink-0 font-medium"
-                                            title={`Attached images (${turn.media_paths.length}):\n${turn.media_paths.join('\n')}`}
-                                        >
-                                            🖼️ {turn.media_paths.length}
+                                {/* Line 1: Turn Number, Connectors, Media Chips & Status */}
+                                <div className="flex items-center justify-between w-full">
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                        {/* Branch connector glyph */}
+                                        <span className="text-slate-300 dark:text-purple-400 font-mono text-[10px] select-none shrink-0">
+                                            {isLastTurn ? '└──' : '├──'}
                                         </span>
-                                    )}
-                                    {/* Prompt preview snippet in Poppins font */}
-                                    <span className="font-[Poppins,sans-serif] font-poppins text-[11px] truncate text-slate-700 dark:text-slate-300 flex-1">
-                                        {turn.preview_200w || turn.prompt_text || `Prompt Turn #${turn.turn_number}`}
-                                    </span>
+                                        {/* Turn ID badge */}
+                                        <span className="font-mono text-[9px] px-1 py-0.2 rounded-xs bg-slate-200 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold shrink-0">
+                                            T{turn.turn_number}
+                                        </span>
+                                        {/* Media chips if images present */}
+                                        {hasImages && (
+                                            <span
+                                                className="inline-flex items-center gap-0.5 px-1 py-0.2 rounded-xs text-[9px] bg-sky-500/10 text-sky-600 dark:text-sky-300 border border-sky-500/30 shrink-0 font-medium"
+                                                title={`Attached images (${turn.media_paths.length}):\n${turn.media_paths.join('\n')}`}
+                                            >
+                                                🖼️ {turn.media_paths.length}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {/* Status Badges */}
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        {turn.is_running || (turn.status && (turn.status.toLowerCase().includes('run') || turn.status.toLowerCase().includes('exec'))) ? (
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shrink-0 font-bold">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                                                RUNNING
+                                            </span>
+                                        ) : (Boolean(turn.is_queued) || (turn.status && turn.status.toLowerCase().includes('queue'))) ? (
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0 font-bold">
+                                                <Clock className="w-2.5 h-2.5 text-amber-500" />
+                                                QUEUED
+                                            </span>
+                                        ) : (
+                                            (() => {
+                                                const turnRecency = formatRelativeRecency(turn.created_at || turn.timestamp);
+                                                return (
+                                                    <span
+                                                        className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-mono text-zinc-400 bg-zinc-900/40 dark:bg-[#120d20]/60 border border-zinc-700/40 dark:border-purple-900/40"
+                                                        title={`Turn executed: ${turnRecency.formattedTime}`}
+                                                    >
+                                                        <span className={cn("w-1 h-1 rounded-full shrink-0", turnRecency.dotClass)} />
+                                                        <span className={cn("font-medium", turnRecency.textClass)}>{turnRecency.label}</span>
+                                                    </span>
+                                                );
+                                            })()
+                                        )}
+                                    </div>
                                 </div>
-                                {/* Status Badges */}
-                                <div className="flex items-center gap-1 shrink-0">
-                                    {turn.is_running || (turn.status && (turn.status.toLowerCase().includes('run') || turn.status.toLowerCase().includes('exec'))) ? (
-                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shrink-0 font-bold">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                                            RUNNING
-                                        </span>
-                                    ) : (Boolean(turn.is_queued) || (turn.status && turn.status.toLowerCase().includes('queue'))) ? (
-                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0 font-bold">
-                                            <Clock className="w-2.5 h-2.5 text-amber-500" />
-                                            QUEUED
-                                        </span>
-                                    ) : (
-                                        (() => {
-                                            const turnRecency = formatRelativeRecency(turn.created_at || turn.timestamp);
-                                            return (
-                                                <span
-                                                    className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-mono text-zinc-400 bg-zinc-900/40 dark:bg-[#120d20]/60 border border-zinc-700/40 dark:border-purple-900/40"
-                                                    title={`Turn executed: ${turnRecency.formattedTime}`}
-                                                >
-                                                    <span className={cn("w-1 h-1 rounded-full shrink-0", turnRecency.dotClass)} />
-                                                    <span className={cn("font-medium", turnRecency.textClass)}>{turnRecency.label}</span>
-                                                </span>
-                                            );
-                                        })()
-                                    )}
+
+                                {/* Line 2: Full Prompt Preview */}
+                                <div className="w-full pl-4 mt-0.5">
+                                    <p className="font-[Poppins,sans-serif] font-poppins text-[11px] truncate text-slate-700 dark:text-slate-300">
+                                        {turn.preview_200w || turn.prompt_text || `Prompt Turn #${turn.turn_number}`}
+                                    </p>
                                 </div>
                             </div>
                         );

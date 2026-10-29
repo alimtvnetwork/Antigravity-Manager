@@ -813,7 +813,59 @@ pub fn serialize_to_yaml(env: &ExportEnvelope) -> Result<String, AppError> {
     Ok(out)
 }
 
-/// Exports prompt tree data to a file at `dest_path` in JSON, YAML, or SQLite format.
+/// Serializes prompt tree envelope to clean, human & AI readable Markdown (.md).
+pub fn serialize_to_markdown(env: &ExportEnvelope) -> Result<String, AppError> {
+    let mut out = String::new();
+    out.push_str("# Prompt Tree Export\n\n");
+    out.push_str(&format!("- **Exported At:** {}\n", env.exported_at));
+    out.push_str(&format!("- **AGM Version:** {}\n", env.agm_version));
+    out.push_str(&format!("- **Scope:** {}\n", env.scope.target_type));
+    out.push_str(&format!(
+        "- **Stats:** {} project(s), {} conversation(s), {} prompt(s), {} embedded image(s)\n\n",
+        env.stats.project_count,
+        env.stats.conversation_count,
+        env.stats.prompt_count,
+        env.stats.image_count
+    ));
+
+    for project in &env.data.projects {
+        out.push_str(&format!(
+            "## Project: {} (`{}`)\n\n",
+            project.repo_name, project.repo_path
+        ));
+        out.push_str(&format!("- **Project ID:** `{}`\n", project.id));
+        out.push_str(&format!(
+            "- **Last Detected:** {}\n\n",
+            project.last_detected_at
+        ));
+
+        let mut conv_map: HashMap<&str, Vec<&ActivePrompt>> = HashMap::new();
+        for p in &env.data.active_prompts {
+            if p.project_id == project.id {
+                let session = p.session_id.as_deref().unwrap_or(&p.id);
+                conv_map.entry(session).or_default().push(p);
+            }
+        }
+
+        for (conv_id, mut prompts) in conv_map {
+            prompts.sort_by_key(|p| p.created_at);
+            out.push_str(&format!("### Conversation: `{conv_id}`\n\n"));
+            out.push_str(&format!("- **Total Prompts:** {}\n\n", prompts.len()));
+
+            for (idx, p) in prompts.iter().enumerate() {
+                out.push_str(&format!("#### Turn {} (Status: {})\n\n", idx + 1, p.status));
+                out.push_str(&format!("- *Created Timestamp:* {}\n", p.created_at));
+                out.push_str("\n```text\n");
+                out.push_str(&p.prompt_content);
+                out.push_str("\n```\n\n");
+            }
+        }
+    }
+
+    Ok(out)
+}
+
+/// Exports prompt tree data to a file at `dest_path` in JSON, YAML, Markdown, or SQLite format.
 pub fn export_prompt_tree_to_file(
     scope: &ExportScope,
     options: &ExportOptions,
@@ -834,6 +886,11 @@ pub fn export_prompt_tree_to_file(
         || dest_path.extension().map_or(false, |ext| {
             ext.eq_ignore_ascii_case("yaml") || ext.eq_ignore_ascii_case("yml")
         });
+    let is_markdown = options.format.eq_ignore_ascii_case("markdown")
+        || options.format.eq_ignore_ascii_case("md")
+        || dest_path.extension().map_or(false, |ext| {
+            ext.eq_ignore_ascii_case("md") || ext.eq_ignore_ascii_case("markdown")
+        });
 
     if is_sqlite {
         crate::modules::repo_db::sqlite_export::write_scoped_prompt_tree_db(
@@ -844,6 +901,9 @@ pub fn export_prompt_tree_to_file(
         if is_yaml {
             let yaml_str = serialize_to_yaml(&envelope)?;
             std::fs::write(dest_path, yaml_str.as_bytes()).map_err(AppError::from)?;
+        } else if is_markdown {
+            let md_str = serialize_to_markdown(&envelope)?;
+            std::fs::write(dest_path, md_str.as_bytes()).map_err(AppError::from)?;
         } else {
             let json_str = serde_json::to_string_pretty(&envelope)
                 .map_err(|e| AppError::Config(e.to_string()))?;
@@ -878,6 +938,7 @@ pub fn export_prompt_tree_to_bytes(
     let ext = match options.format.to_lowercase().as_str() {
         "sqlite" | "db" => "db",
         "yaml" | "yml" => "yaml",
+        "markdown" | "md" => "md",
         _ => "json",
     };
     let file_name = format!("prompt-tree-{}-{stamp}.{ext}", scope.target_type);

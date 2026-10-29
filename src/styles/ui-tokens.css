@@ -80,10 +80,10 @@
    -------------------------------------------------------------------------- */
 .ui-interactive-row {
   transition:
-    background-color 140ms ease-out,
-    border-color 140ms ease-out,
-    color 140ms ease-out,
-    box-shadow 180ms ease-out;
+    background-color 300ms ease-out,
+    border-color 300ms ease-out,
+    color 300ms ease-out,
+    box-shadow 300ms ease-out;
 }
 
 /* --------------------------------------------------------------------------

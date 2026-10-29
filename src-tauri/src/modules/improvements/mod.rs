@@ -16,7 +16,7 @@ pub use roots::{
     normalize_instance_id, repo_root,
 };
 
-pub const BATCH_SIZE: u32 = 10;
+pub const BATCH_SIZE: u32 = 20;
 pub const TOTAL_ITEMS: u32 = 100;
 pub const BATCH_COUNT: u32 = TOTAL_ITEMS / BATCH_SIZE;
 pub const LEDGER_REL: &str = ".ai-memory/improvements/flywheel.json";
@@ -107,7 +107,7 @@ impl FlywheelState {
                 BatchRecord {
                     index,
                     status: "pending".to_string(),
-                    title: format!("Batch {index:02} — items {item_start:02}–{item_end:02}"),
+                    title: format!("Slot {index:02} — items {item_start:02}–{item_end:02}"),
                     prompt_rel: PROMPT_NEXT.to_string(),
                     item_start,
                     item_end,
@@ -206,10 +206,13 @@ fn build_dispatch_prompt(
 ) -> String {
     let batch_line = match batch {
         Some(b) => format!(
-            "Batch {}/{} (items {}–{}) — follow 10-at-a-time sequence.\n",
+            "Slot {}/{} (items {}–{}) — follow 20-at-a-time sequence and commit altogether.\n",
             b.index, BATCH_COUNT, b.item_start, b.item_end
         ),
-        None => "Plan exactly 100 improvements as 10 batches of 10.\n".to_string(),
+        None => {
+            "Plan exactly 100 improvements in 5 slots of 20, committing each slot altogether.\n"
+                .to_string()
+        }
     };
     let workspace_disp = workspace.to_string_lossy();
     let prompt_exists = workspace.join(prompt_rel).is_file();
@@ -302,7 +305,7 @@ pub fn next_batch(dry_run: bool, instance_id: &str) -> AppResult<FlywheelState> 
         .position(|b| b.status == "pending")
         .ok_or_else(|| {
             AppError::Unknown(
-                "all 10 batches are already dispatched. Plan 100 to start a new wave.".to_string(),
+                "all slots are already dispatched. Plan 100 to start a new wave.".to_string(),
             )
         })?;
     let batch_index = state.batches[pending].index;
@@ -562,12 +565,13 @@ mod tests {
             ImprovementKind::parse("all").unwrap(),
             ImprovementKind::System
         );
-        assert_eq!(BATCH_COUNT, 10);
+        assert_eq!(BATCH_COUNT, 5);
         assert_eq!(TOTAL_ITEMS, 100);
         let state = FlywheelState::empty(ImprovementKind::Ui, 1);
-        assert_eq!(state.batches.len(), 10);
+        assert_eq!(state.batches.len(), 5);
         assert_eq!(state.batches[0].item_start, 1);
-        assert_eq!(state.batches[9].item_end, 100);
+        assert_eq!(state.batches[0].item_end, 20);
+        assert_eq!(state.batches[4].item_end, 100);
     }
 
     #[test]
@@ -616,7 +620,7 @@ mod tests {
     #[test]
     fn test_status_never_requires_source_checkout() {
         let state = load_state_for("default").expect("status must succeed without AGM source cwd");
-        assert_eq!(state.batches.len(), 10);
+        assert!(state.batches.len() == 5 || state.batches.len() == 10);
         assert!(!state.workspace_root.is_empty());
     }
 }

@@ -59,7 +59,7 @@ export function ActionsCell({
                             onClick={onStop}
                             data-ui-name="instance-stop-btn"
                             data-ui-id={`instance-stop-${inst.config.id}`}
-                            className="flex items-center justify-center h-7 px-2.5 text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white rounded-l-full transition-all duration-150 ease-out active:translate-y-0.5 cursor-pointer disabled:opacity-50"
+                            className="flex items-center justify-center h-7 px-2.5 text-rose-600 dark:text-rose-400 hover:bg-rose-600 hover:text-white rounded-l-full transition-all duration-300 ease-out font-semibold cursor-pointer disabled:opacity-50"
                             title="Stop Instance"
                         >
                             {currentAction === 'stop' ? (
@@ -75,7 +75,7 @@ export function ActionsCell({
                             onClick={onRestart}
                             data-ui-name="instance-restart-btn"
                             data-ui-id={`instance-restart-${inst.config.id}`}
-                            className="flex items-center justify-center h-7 px-2.5 text-amber-600 dark:text-amber-400 hover:bg-amber-400 hover:text-zinc-950 hover:font-bold hover:shadow-[0_2px_0_0_#b45309] active:translate-y-0.5 active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50"
+                            className="flex items-center justify-center h-7 px-2.5 text-amber-600 dark:text-amber-400 hover:bg-amber-500 hover:text-zinc-950 font-semibold transition-all duration-300 ease-out cursor-pointer disabled:opacity-50"
                             title="Restart Instance on Current Account"
                         >
                             {currentAction === 'restart' ? (
@@ -93,7 +93,7 @@ export function ActionsCell({
                         onClick={onLaunch}
                         data-ui-name="instance-launch-btn"
                         data-ui-id={`instance-launch-${inst.config.id}`}
-                        className="flex items-center justify-center h-7 px-2.5 text-teal-600 dark:text-teal-400 hover:bg-emerald-600 hover:text-white rounded-l-full transition-all duration-150 ease-out active:translate-y-0.5 cursor-pointer disabled:opacity-50"
+                        className="flex items-center justify-center h-7 px-2.5 text-teal-600 dark:text-teal-400 hover:bg-emerald-600 hover:text-white rounded-l-full transition-all duration-300 ease-out font-semibold cursor-pointer disabled:opacity-50"
                         title="Launch Instance"
                     >
                         {currentAction === 'launch' ? (
@@ -111,7 +111,7 @@ export function ActionsCell({
                     onClick={onSwitch}
                     data-ui-name="instance-switch-btn"
                     data-ui-id={`instance-switch-${inst.config.id}`}
-                    className="flex items-center justify-center h-7 px-2.5 text-amber-500 dark:text-amber-400 bg-amber-500/10 dark:bg-amber-500/15 border-x border-amber-500/30 hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-black hover:font-bold hover:shadow-[0_2px_0_0_#a16207] active:translate-y-0.5 active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50"
+                    className="flex items-center justify-center h-7 px-2.5 text-amber-600 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/20 hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-black hover:!text-black font-semibold transition-all duration-300 ease-out cursor-pointer disabled:opacity-50"
                     title="Switch Account"
                 >
                     {currentAction === 'switch' ? (
@@ -128,7 +128,7 @@ export function ActionsCell({
                     onClick={onFastForward}
                     data-ui-name="instance-fastforward-btn"
                     data-ui-id={`instance-fastforward-${inst.config.id}`}
-                    className="flex items-center justify-center h-7 px-2.5 text-amber-600 dark:text-amber-400 hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-zinc-950 hover:font-bold hover:shadow-[0_2px_0_0_#a16207] active:translate-y-0.5 active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50"
+                    className="flex items-center justify-center h-7 px-2.5 text-amber-600 dark:text-amber-300 hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:text-black hover:!text-black font-semibold transition-all duration-300 ease-out cursor-pointer disabled:opacity-50"
                     title="Fast Forward to Best Candidate"
                 >
                     {currentAction === 'fast-forward' ? (
@@ -146,7 +146,7 @@ export function ActionsCell({
                     onClick={onOpenPromptTree}
                     data-ui-name="instance-tree-btn"
                     data-ui-id={`instance-tree-${inst.config.id}`}
-                    className="flex items-center justify-center h-7 px-2.5 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-600 hover:text-white active:translate-y-0.5 transition-all duration-150 ease-out cursor-pointer disabled:opacity-50"
+                    className="flex items-center justify-center h-7 px-2.5 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-600 hover:text-white font-semibold transition-all duration-300 ease-out cursor-pointer disabled:opacity-50"
                     title="Prompts & History"
                 >
                     <Layers className="w-3.5 h-3.5" />
@@ -161,7 +161,7 @@ export function ActionsCell({
                         onClick={onAudit}
                         data-ui-name="instance-audit-btn"
                         data-ui-id={`instance-audit-${inst.config.id}`}
-                        className="flex items-center justify-center h-7 px-2.5 text-amber-600 dark:text-amber-400 hover:bg-amber-400 hover:text-zinc-950 hover:font-bold hover:shadow-[0_2px_0_0_#b45309] active:translate-y-0.5 active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50"
+                        className="flex items-center justify-center h-7 px-2.5 text-amber-600 dark:text-amber-300 hover:bg-amber-500 hover:text-zinc-950 font-semibold transition-all duration-300 ease-out cursor-pointer disabled:opacity-50"
                         title="Audit Trail & Switch History"
                     >
                         <History className="w-3.5 h-3.5" />
@@ -179,7 +179,7 @@ export function ActionsCell({
                     data-ui-name="instance-more-btn"
                     data-ui-id={`instance-more-${inst.config.id}`}
                     className={cn(
-                        'flex items-center justify-center h-7 px-2 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#40285e] rounded-r-full active:translate-y-0.5 transition-all duration-150 ease-out cursor-pointer disabled:opacity-50',
+                        'flex items-center justify-center h-7 px-2 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#40285e] rounded-r-full font-semibold transition-all duration-300 ease-out cursor-pointer disabled:opacity-50',
                         isMoreOpen && 'bg-slate-200 dark:bg-[#40285e]'
                     )}
                     title="More Actions (Prompts, Audit, Sync, Settings, Clone, Delete)"

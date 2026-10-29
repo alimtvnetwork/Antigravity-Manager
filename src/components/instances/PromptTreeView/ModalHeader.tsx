@@ -33,6 +33,7 @@ export interface ModalHeaderProps {
     onBackup: () => void;
     onRestore: () => void;
     onExportSqlite: () => void;
+    onExportMarkdown?: () => void;
     onImportSqlite: () => void;
     onCopyAllTreePrompts: () => Promise<void> | void;
     onFileRestore: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -68,6 +69,7 @@ export function ModalHeader(props: ModalHeaderProps) {
         onBackup,
         onRestore,
         onExportSqlite,
+        onExportMarkdown,
         onImportSqlite,
         onCopyAllTreePrompts,
         onFileRestore,
@@ -143,6 +145,7 @@ export function ModalHeader(props: ModalHeaderProps) {
                         <ImportExportMenu
                             onExportSqlite={onExportSqlite}
                             onExportJson={onBackup}
+                            onExportMarkdown={onExportMarkdown}
                             onImportSqlite={onImportSqlite}
                             onImportJson={onRestore}
                             onRestore={onRestore}
@@ -156,7 +159,7 @@ export function ModalHeader(props: ModalHeaderProps) {
                         type="button"
                         onClick={onResetTree}
                         disabled={isLoading || isResetting}
-                        className="flex items-center justify-center gap-1 h-7 px-2.5 text-[11px] font-bold text-zinc-950 bg-amber-400 hover:bg-amber-300 shadow-[0_2px_0_0_#b45309] active:translate-y-0.5 active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center justify-center gap-1 h-7 px-2.5 text-[11px] font-bold text-zinc-950 bg-amber-400 hover:bg-amber-300 shadow-[0_2px_0_0_#b45309] transition-all duration-300 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Reset tree from disk transcripts (wipes SQLite cache and rescans)"
                         aria-label="Reset"
                     >
@@ -169,7 +172,7 @@ export function ModalHeader(props: ModalHeaderProps) {
                         type="button"
                         onClick={onRefreshAll}
                         disabled={isLoading}
-                        className="flex items-center justify-center gap-1 h-7 px-2.5 text-[11px] font-semibold text-white bg-sky-600 hover:bg-sky-500 shadow-[0_2px_0_0_#0284c7] active:translate-y-0.5 active:shadow-none transition-all duration-150 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center justify-center gap-1 h-7 px-2.5 text-[11px] font-semibold text-white bg-sky-600 hover:bg-sky-500 shadow-[0_2px_0_0_#0284c7] transition-all duration-300 ease-out cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Refresh the tree now"
                         aria-label="Refresh"
                     >

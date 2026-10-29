@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlignLeft, ListChecks, Play, RefreshCw, Sparkles } from 'lucide-react';
+import { AlignLeft, FileDown, ListChecks, Play, RefreshCw, Sparkles } from 'lucide-react';
 import { showToast } from '../common/ToastContainer';
 import { useErrorStore } from '../../stores/error-store';
 import { useInstanceStore } from '../../stores/useInstanceStore';
@@ -73,8 +73,52 @@ export default function ImprovementsFlywheel() {
         }
     };
 
-    const pending = state?.batches.filter((b) => b.status === 'pending').length ?? 10;
+    const exportMarkdown = () => {
+        if (!state) return;
+        const totalBatches = state.batches?.length || 5;
+        let md = `# AGM 100 Improvements Flywheel\n\n`;
+        md += `- **Kind:** ${state.kind}\n`;
+        md += `- **Wave:** ${state.wave}\n`;
+        md += `- **Completed Slots:** ${state.completed_batches}/${totalBatches}\n`;
+        md += `- **Pending Slots:** ${state.batches.filter((b) => b.status === 'pending').length}\n`;
+        md += `- **Workspace:** \`${state.workspace_root || 'Current Workspace'}\`\n`;
+        md += `- **Ledger:** \`${state.ledger_rel}\`\n\n`;
+        md += `## Task Backlog & Hints\n\n`;
+        if (state.task_hints && state.task_hints.length > 0) {
+            for (const hint of state.task_hints) {
+                md += `- ${hint}\n`;
+            }
+        } else {
+            md += `*(No active pending task files found)*\n`;
+        }
+        md += `\n## Improvement Slots (Batches of ${state.batch_size || 20})\n\n`;
+        for (const b of state.batches) {
+            const mark = b.status === 'pending' ? '[ ]' : '[x]';
+            md += `### ${mark} ${b.title} (${b.status.toUpperCase()})\n`;
+            md += `- **Items:** ${b.item_start}–${b.item_end}\n`;
+            md += `- **Prompt Reference:** \`${b.prompt_rel}\`\n\n`;
+        }
+        md += `\n## AI Execution Protocol\n\n`;
+        md += `1. Execute improvements in slots of ${state.batch_size || 20}.\n`;
+        md += `2. After each slot of 20 improvements, make an atomic GitMap commit.\n`;
+        md += `3. Consolidate completed subtask plans upon completion.\n`;
+
+        const blob = new Blob([md], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `flywheel-100-improvements-wave-${state.wave}-${Date.now()}.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Exported 100 Improvements as Markdown', 'success', 2200);
+    };
+
+    const pending = state?.batches.filter((b) => b.status === 'pending').length ?? 5;
     const done = state?.completed_batches ?? 0;
+    const totalSlots = state?.batches.length ?? 5;
+    const slotSize = state?.batch_size ?? 20;
 
     return (
         <div
@@ -96,7 +140,7 @@ export default function ImprovementsFlywheel() {
                     </p>
                 </div>
                 <span className="text-[10px] uppercase font-bold tracking-wide px-2 py-1 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/70 dark:border-amber-800/60">
-                    {done}/10 batches
+                    {done}/{totalSlots} slots
                 </span>
             </div>
 
@@ -140,7 +184,7 @@ export default function ImprovementsFlywheel() {
                         ) : (
                             <Play className="w-3.5 h-3.5 inline mr-1" />
                         )}
-                        Next 10
+                        Next {slotSize}
                     </button>
                     <span className="w-px self-stretch bg-slate-200 dark:bg-[#40285e]" />
                     <button
@@ -167,6 +211,16 @@ export default function ImprovementsFlywheel() {
                             <RefreshCw className="w-3.5 h-3.5 animate-spin inline mr-1" />
                         ) : null}
                         Status
+                    </button>
+                    <span className="w-px self-stretch bg-slate-200 dark:bg-[#40285e]" />
+                    <button
+                        type="button"
+                        onClick={exportMarkdown}
+                        className="agm-hover-shade px-3 py-1.5 text-xs font-semibold text-sky-600 dark:text-sky-400 hover:text-sky-500 cursor-pointer"
+                        title="Export current 100 improvements roadmap as Markdown (.md) for AI"
+                    >
+                        <FileDown className="w-3.5 h-3.5 inline mr-1" />
+                        Export MD
                     </button>
                 </div>
 

@@ -28,15 +28,17 @@ export interface FlywheelState {
 
 export type ImprovementKind = 'ui' | 'code' | 'system' | 'ideas';
 
-export function emptyFlywheelState(): FlywheelState {
-    const batches: ImprovementBatch[] = Array.from({ length: 10 }, (_, i) => {
+export function emptyFlywheelState(batchSize = 10): FlywheelState {
+    const total = 100;
+    const count = Math.max(1, Math.floor(total / batchSize));
+    const batches: ImprovementBatch[] = Array.from({ length: count }, (_, i) => {
         const index = i + 1;
-        const item_start = i * 10 + 1;
-        const item_end = index * 10;
+        const item_start = i * batchSize + 1;
+        const item_end = index * batchSize;
         return {
             index,
             status: 'pending',
-            title: `Batch ${String(index).padStart(2, '0')} — items ${String(item_start).padStart(2, '0')}–${String(item_end).padStart(2, '0')}`,
+            title: `Slot ${String(index).padStart(2, '0')} — items ${String(item_start).padStart(2, '0')}–${String(item_end).padStart(2, '0')}`,
             prompt_rel: '01-prompts/30-improvements/07-implement-next-10-improvements.md',
             item_start,
             item_end,
@@ -45,8 +47,8 @@ export function emptyFlywheelState(): FlywheelState {
     return {
         wave: 1,
         kind: 'system',
-        total: 100,
-        batch_size: 10,
+        total,
+        batch_size: batchSize,
         next_batch: 1,
         completed_batches: 0,
         last_action: 'unplanned',
