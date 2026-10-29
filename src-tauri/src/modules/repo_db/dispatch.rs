@@ -17,12 +17,13 @@ pub(crate) fn prompt_push_landed(agy_ok: bool) -> bool {
     agy_ok
 }
 
-/// Directly dispatch/send backed-up prompts to the running projects with flexible instance matching.
+/// Directly dispatch/send backed-up prompts that belong to this instance.
 pub fn dispatch_backed_up_prompts(instance_id: &str) -> Result<usize, String> {
     dispatch_running_prompts(instance_id)
 }
 
-/// Directly dispatch/send backed-up prompts to the running projects without queuing
+/// Directly dispatch/send backed-up prompts to the running projects without queuing.
+/// Strict tenant match only: never inject another instance's prompt into Default.
 pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
     let conn = connect_db()?;
     let now = Utc::now().timestamp();
@@ -36,135 +37,27 @@ pub fn dispatch_running_prompts(instance_id: &str) -> Result<usize, String> {
             }
         });
     let is_default_target = target_inst == "default" || target_inst == "__default__";
-
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
-             FROM active_prompts 
-             WHERE status IN ('backed_up', 'pending', 'in_progress', 'queued')
-             ORDER BY created_at ASC, id ASC",
-        )
-        .map_err(|e| format!("Failed to prepare dispatch query: {}", e))?;
-
-    let all_backed_up = stmt
-        .query_map([], |row| {
-            Ok(ActivePrompt {
-                id: row.get(0)?,
-                project_id: row.get(1)?,
-                instance_id: row.get(2)?,
-                repo_path: row.get(3)?,
-                prompt_content: row.get(4)?,
-                model: row.get(5)?,
-                session_id: row.get(6)?,
-                status: row.get(7)?,
-                created_at: row.get(8)?,
-                updated_at: row.get(9)?,
-                image_payload: row.get(10).ok(),
-            })
-        })
-        .map_err(|e| format!("Failed to query backed-up prompts: {}", e))?
-        .flatten()
-        .collect::<Vec<ActivePrompt>>();
-
-    let mut prompts: Vec<ActivePrompt> = all_backed_up
+    let all_backed_up = query_dispatchable_prompts(&conn)?;
+    let prompts: Vec<ActivePrompt> = all_backed_up
         .iter()
         .cloned()
         .filter(|p| {
-            let prompt_inst = crate::modules::instance::resolve_instance_id(&p.instance_id)
-                .unwrap_or_else(|_| {
-                    if p.instance_id == "__default__" || p.instance_id.is_empty() {
-                        "default".to_string()
-                    } else {
-                        p.instance_id.clone()
-                    }
-                });
-            let is_match = if is_default_target {
-                prompt_inst == "default" || prompt_inst == "__default__" || prompt_inst.is_empty()
-            } else {
-                prompt_inst == target_inst
-            };
-            let rationale = ProjectAuditRationaleType::from_dispatch(is_match);
-            crate::modules::logger::log_instance_prompt_audit(
+            prompt_matches_target(
+                p,
                 &target_inst,
+                is_default_target,
                 "dispatch_running_prompts",
-                &p.id,
-                &p.repo_path,
-                "",
-                None,
-                PromptAuditCriteriaType::PromptDispatcherInstanceMatching.as_str(),
-                is_match,
-                rationale.as_str(),
-            );
-            is_match
+            )
         })
         .collect();
 
-    // Flexible instance matching: If the target instance doesn't match or is missing,
-    // dispatch to active instance or default instance instead of silently failing with 0 matches.
-    if prompts.is_empty() && !all_backed_up.is_empty() {
+    if prompts.is_empty() {
         crate::modules::logger::log_info(&format!(
-            "[RepoDB] No exact instance match for target '{}'; falling back flexibly across {} backed-up prompt(s)",
+            "[RepoDB] No backed-up/queued prompts for instance '{}'; not falling back to another instance ({} other dispatchable row(s) left untouched)",
             target_inst,
             all_backed_up.len()
         ));
-
-        // 1. Try active instance
-        let active_inst = crate::modules::instance::get_active_instance_id()
-            .unwrap_or_else(|_| "default".to_string());
-        let active_resolved = crate::modules::instance::resolve_instance_id(&active_inst)
-            .unwrap_or_else(|_| "default".to_string());
-        let is_active_default = active_resolved == "default" || active_resolved == "__default__";
-
-        prompts = all_backed_up
-            .iter()
-            .cloned()
-            .filter(|p| {
-                let prompt_inst = crate::modules::instance::resolve_instance_id(&p.instance_id)
-                    .unwrap_or_else(|_| {
-                        if p.instance_id == "__default__" || p.instance_id.is_empty() {
-                            "default".to_string()
-                        } else {
-                            p.instance_id.clone()
-                        }
-                    });
-                if is_active_default {
-                    prompt_inst == "default"
-                        || prompt_inst == "__default__"
-                        || prompt_inst.is_empty()
-                } else {
-                    prompt_inst == active_resolved
-                }
-            })
-            .collect();
-
-        // 2. If still empty, try default instance
-        if prompts.is_empty() {
-            prompts = all_backed_up
-                .iter()
-                .cloned()
-                .filter(|p| {
-                    let prompt_inst = crate::modules::instance::resolve_instance_id(&p.instance_id)
-                        .unwrap_or_else(|_| {
-                            if p.instance_id == "__default__" || p.instance_id.is_empty() {
-                                "default".to_string()
-                            } else {
-                                p.instance_id.clone()
-                            }
-                        });
-                    prompt_inst == "default"
-                        || prompt_inst == "__default__"
-                        || prompt_inst.is_empty()
-                })
-                .collect();
-        }
-
-        // 3. If still empty, dispatch all available backed-up prompts
-        if prompts.is_empty() {
-            crate::modules::logger::log_info(
-                "[RepoDB] Fallback to all backed-up prompts regardless of instance tag",
-            );
-            prompts = all_backed_up;
-        }
+        return Ok(0);
     }
 
     let mut dispatched_count = 0;
@@ -789,6 +682,35 @@ mod tests {
             updated_at,
             image_payload: None,
         }
+    }
+
+    #[test]
+    fn prompt_matches_target_rejects_foreign_instance() {
+        let mut foreign = make_prompt("other", 1, 1);
+        foreign.instance_id = "default".to_string();
+        assert!(!prompt_matches_target(
+            &foreign,
+            "test-sandbox",
+            false,
+            "unit"
+        ));
+        let mut own = make_prompt("own", 1, 1);
+        own.instance_id = "test-sandbox".to_string();
+        assert!(prompt_matches_target(&own, "test-sandbox", false, "unit"));
+        let mut default_prompt = make_prompt("def", 1, 1);
+        default_prompt.instance_id = "default".to_string();
+        assert!(prompt_matches_target(
+            &default_prompt,
+            "default",
+            true,
+            "unit"
+        ));
+        assert!(!prompt_matches_target(
+            &default_prompt,
+            "test-sandbox",
+            false,
+            "unit"
+        ));
     }
 
     #[test]

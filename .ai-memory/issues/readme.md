@@ -8,8 +8,8 @@ This directory contains active issue tracking and bug reports.
 ## Fixed in v4.209.0
 - [../rca/17-instance-pid-stop-switch-and-audit-trail.md](../rca/17-instance-pid-stop-switch-and-audit-trail.md) (solved in `52aaf4cb`: the bare number is the PID; stop returned success after dropping that PID; the audit dialog read `recent_switches` while the query returned `records`)
 
-## Open (2026-10-29)
-- [66-instances-switch-json-fake-success.md](./66-instances-switch-json-fake-success.md) (`agm instances switch --json` prints `"status": "switched"` without calling `switch_account_to_instance`; live 2026-10-29: JSON left `rokixshohag1@gmail.com`, non-JSON then switched to `david.copper.riseup@gmail.com`)
+## Fixed in v4.278.0
+- [66-instances-switch-json-fake-success.md](./66-instances-switch-json-fake-success.md) (`agm instances switch --json` no longer prints `"switched"` before `switch_account_to_instance`; `bound_email` must match or `success: false`)
 
 ## Open (planned, spec 85)
 - [47-pro-badge-missing-when-tier-not-fetched-rca.md](./47-pro-badge-missing-when-tier-not-fetched-rca.md) (cache skip still open; raw-id half is issue 58)
