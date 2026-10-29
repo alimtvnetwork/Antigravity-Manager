@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.276.0-3B82F6?style=flat-square" alt="Version v4.276.0">
+    <img src="https://img.shields.io/badge/Version-v4.277.0-3B82F6?style=flat-square" alt="Version v4.277.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,7 +116,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.276.0)**
+**Bar 2: Version-Based Installation (v4.277.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.258.0/install.ps1))) -Version "v4.258.0"
 ```
@@ -645,6 +645,8 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
 ## 📝 Changelog
+
+> Latest version **v4.277.0**: Create Profile UI Restyle, 100-Step Verification Templates & Release Tag Normalization — Restyled the Create Profile dialog in `src/pages/instances/CreateEditDialogs.tsx` with unified dark-glass styling, segmented button controls, and high-contrast form elements; added multi-step prompt breakdowns and verification templates in `src/components/instances/PromptTreeView/verificationTemplates.ts`; integrated flywheel status triggers in `src/components/telegram/ImprovementsFlywheel.tsx` and `src/pages/Instances.tsx`; and purged rogue v5 tags to restore canonical 4.x SemVer progression. (Thanks to @aukgit)
 
 > Latest version **v4.276.0**: Telegram Crash, CSV Download & Copy Whole Prompt — Screenshot capture in `src-tauri/src/modules/telegram_inbound/open_shot.rs` no longer calls `ShowWindow`/`SetForegroundWindow` on the live AGM window and kills the helper after 8s so the manager stays responsive; CSV/txt `sendDocument` uses `application/octet-stream` with an empty caption first and `daemon.rs` falls back to pasted bytes instead of another copy-button keyboard; instance-card Copy and Full send the complete prompt as a `.txt` via `i:cp:` because Telegram `copy_text` is capped at 256 characters; `.agm-hover-shade` in `src/App.css` animates color/shadow/filter only (`transform: none`); isolated `agm instances test-create` / `test-clean` E2E backed up prompt `p-555265fc` while Default and v2-3127 stayed running. Spec: `02-spec/21-app/236-telegram-feature-enhancement/`. (Thanks to @aukgit)
 

@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.277.0 (2026-10-29)**:
+        -   **[Instance UI & Verification Templates] Restyled Create Profile Modal, 100-Step Prompt Breakdown & Release Tag Normalization (Thanks to @aukgit)**:
+            -   **Description**: Restyled the Create Profile dialog in `src/pages/instances/CreateEditDialogs.tsx` with unified dark-glass styling, segmented button controls, and high-contrast form elements; added multi-step prompt breakdowns and verification templates in `src/components/instances/PromptTreeView/verificationTemplates.ts`; integrated flywheel status triggers in `src/components/telegram/ImprovementsFlywheel.tsx` and `src/pages/Instances.tsx`; and purged rogue v5 tags to restore canonical 4.x SemVer progression. (Thanks to @aukgit)
+
     *   **v4.276.0 (2026-10-29)**:
         -   **[Telegram Crash, CSV Download & Copy Whole Prompt] Stop screenshot self-focus hang, deliver CSV as a file, copy full prompt (Thanks to @aukgit)**:
             -   **Description**: Screenshot capture in `src-tauri/src/modules/telegram_inbound/open_shot.rs` no longer calls `ShowWindow`/`SetForegroundWindow` on the live AGM window and kills the helper after 8s so the manager stays responsive; CSV/txt `sendDocument` uses `application/octet-stream` with an empty caption first and `daemon.rs` falls back to pasted bytes instead of another copy-button keyboard; instance-card Copy and Full send the complete prompt as a `.txt` via `i:cp:` because Telegram `copy_text` is capped at 256 characters; `.agm-hover-shade` in `src/App.css` animates color/shadow/filter only (`transform: none`); isolated `agm instances test-create` / `test-clean` E2E backed up prompt `p-555265fc` while Default and v2-3127 stayed running. Spec: `02-spec/21-app/236-telegram-feature-enhancement/`. (Thanks to @aukgit)

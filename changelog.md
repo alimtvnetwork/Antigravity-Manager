@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.277.0] - 2026-10-29
+
+### Added
+- 100-Step Prompt Breakdown & Verification Templates: Added multi-step verification templates and prompt breakdowns in `src/components/instances/PromptTreeView/verificationTemplates.ts` (Thanks to @aukgit)
+- Restyled Create Profile Modal: Modernized dialog in `src/pages/instances/CreateEditDialogs.tsx` with unified dark-glass styling, segmented button controls, and high-contrast form elements (Thanks to @aukgit)
+
+### Fixed
+- Release Tag Normalization: Purged rogue v5 tags and releases from GitHub, restoring canonical 4.x SemVer progression and eliminating spurious update notifications (Thanks to @aukgit)
+
+---
+
 ## [v4.276.0] - 2026-10-29
 
 ### Fixed
@@ -1501,6 +1512,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.277.0 (2026-10-29)**:
+        -   **[Instance UI & Verification Templates] Restyled Create Profile Modal, 100-Step Prompt Breakdown & Release Tag Normalization (Thanks to @aukgit)**:
+            -   **Description**: Restyled the Create Profile dialog in `src/pages/instances/CreateEditDialogs.tsx` with unified dark-glass styling, segmented button controls, and high-contrast form elements; added multi-step prompt breakdowns and verification templates in `src/components/instances/PromptTreeView/verificationTemplates.ts`; integrated flywheel status triggers in `src/components/telegram/ImprovementsFlywheel.tsx` and `src/pages/Instances.tsx`; and purged rogue v5 tags to restore canonical 4.x SemVer progression. (Thanks to @aukgit)
+
+
     *   **v4.275.3 (2026-10-28)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
