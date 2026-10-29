@@ -888,3 +888,9 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 <p align="center">
   <em>Antigravity Tools · Managed and enhanced by Md. Alim Ul Karim &amp; Riseup Asia LLC · Special thanks and heartfelt gratitude to <a href="https://lbjlaq.github.io/Antigravity-Manager/">lbjlaq</a> and the original upstream repository <a href="https://github.com/lbjlaq/Antigravity-Manager">lbjlaq/Antigravity-Manager</a> for creating this project in the first place.</em>
 </p>
+
+## Memory
+
+- .ai-memory/memory/readme.md
+- .ai-memory/memory/learned/01-recent-session-2026-10-29.md
+- .ai-memory/plans/readme.md

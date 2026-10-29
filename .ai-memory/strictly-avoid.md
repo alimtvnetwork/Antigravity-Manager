@@ -650,3 +650,5 @@ Allowed work:
 **Why:** On 2026-10-29 HEAD was `86877cf53` while installed GUI stayed `v4.276.0`. Clicking Copy in that window would test the bug, not the fix.
 
 
+- Do not store a personal access token inside a git remote URL. Use SSH.
+- Do not commit Go coverage profiles or SQLite `-shm` and `-wal` sidecars.

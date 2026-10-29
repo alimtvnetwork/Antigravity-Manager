@@ -233,3 +233,7 @@ Updated 2026-10-29T14:10:00Z from `git log` (HEAD `86877cf53`). Referenced by `.
 | 212 | [212-implementing-next-five-tasks.md](./completed/212-implementing-next-five-tasks.md) | COMPLETED | Pipeline response header sanitizer, window control capsule formatter, FIFO dead letter queue spillover guard, caller process ancestry tree scanner, and GitHub release notes parity guard (Steps 271–275). |
 | 220 | [220-gitmap-and-antigravity-tools-manager-updates-and-testing.md](./completed/220-gitmap-and-antigravity-tools-manager-updates-and-testing.md) | COMPLETED | Hardened prompt restore on quota finish & cross-instance switch, auto-pick rerun randomizer with varied multi-round execution, GitMap code modularization (<300 lines), and Master E2E 25/25 gates verified (Steps 311–315). |
 | 227 | [227-rerun-and-attachment-format-correction.md](./completed/227-rerun-and-attachment-format-correction.md) | COMPLETED | Enforce strict FIFO prompt queueing on rerun operations (Telegram inbound and frontend resend) and format bracketed prompt attachments with canonical file semicolon syntax (e.g. @[file;<path>]) across Antigravity Manager. |
+
+## Recent Completed Tasks Register
+
+- 2026-10-29 — Recorded the warm-up gate session. Sequences 08 through 13 remain pending catalogs. The live gate engine is in go-email-reader commit `f3864ee`.

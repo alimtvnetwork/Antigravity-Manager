@@ -47,3 +47,4 @@ Note: `.ai-memory/learned/23-28` (outside this folder) are a separate older seri
 ## Other topic folders
 
 `avoid/`, `constraints/`, `done/`, `features/`, `issues/`, `preferences/`, `project/`, `sessions/`, `specs/`, `standards/`, `suggestions/`, `transactions/`, `workflow/`. Their files are indexed in [01-index.md](./01-index.md).
+| [learned/01-recent-session-2026-10-29.md](learned/01-recent-session-2026-10-29.md) | 2026-10-29 warm-up gate session, gitmap IDE setup, and repo-cache heatmaps. |

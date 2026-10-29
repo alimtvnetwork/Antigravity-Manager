@@ -186,3 +186,6 @@
 - .ai-memory/plans/pending/101-instance-clone-audit-theme-and-ui-enhancements.md
 - .ai-memory/plans/pending/105-audit-pagination-supabase-tab-account-switch-details-and-instance-view-modes.md
 - .ai-memory/plans/completed/225-prompt-tree-view-issues.md
+- .ai-memory/memory/readme.md
+- .ai-memory/memory/learned/01-recent-session-2026-10-29.md
+- .ai-memory/plans/readme.md
