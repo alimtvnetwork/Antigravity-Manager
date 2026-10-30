@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.279.0)
+> Professional AI Account Management & Protocol Proxy System (v4.279.1)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.279.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.279.1-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.279.1**: Flywheel E5001 & Next Breakdown — packaged `/instances` no longer fails `improvements_status` when the install cwd lacks `01-prompts/30-improvements`; `src-tauri/src/modules/improvements/roots.rs` ledgers on the instance workspace and `src/services/improvementsService.ts` returns `emptyFlywheelState()` instead of opening the E5001 modal; Next breakdown lists pending plans/issues from every bound workspace. Frontend `improvementsFlywheelUtils` 6 passed. (Thanks to @aukgit)
 
 > Latest version **v4.279.0**: Prompt Tree Enqueue Visibility — Enqueue and rerun show queued turns on the clicked instance immediately without waiting for the 30s tree refresh; `applySelectedTurnOverlay` in `src/components/instances/PromptTreeView/usePromptTreeData.ts` keeps QUEUED while inspecting a completed turn; Enqueue shows the live count; `src-tauri/src/modules/repo_db/tree_collect.rs` marks queued prompts without a 600s recency gate. Isolated `agm instances test-create` enqueued five `queued-*` ids on sandbox `test-enqueue-ui-1793289596-9596`; Default PID 3804 and `v2-3127` were not stopped. (Thanks to @aukgit)
 

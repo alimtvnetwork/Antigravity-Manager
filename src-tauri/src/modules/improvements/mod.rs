@@ -11,7 +11,10 @@ use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub use roots::{dispatch_root, ledger_root, normalize_instance_id, repo_root};
+pub use roots::{
+    collect_instance_task_hints, collect_workspace_task_hints, dispatch_root, ledger_root,
+    normalize_instance_id, repo_root,
+};
 
 pub const BATCH_SIZE: u32 = 10;
 pub const TOTAL_ITEMS: u32 = 100;
@@ -91,6 +94,8 @@ pub struct FlywheelState {
     pub batches: Vec<BatchRecord>,
     #[serde(default)]
     pub workspace_root: String,
+    #[serde(default)]
+    pub task_hints: Vec<String>,
 }
 
 impl FlywheelState {
@@ -122,6 +127,7 @@ impl FlywheelState {
             dispatched_prompt_id: None,
             batches,
             workspace_root: String::new(),
+            task_hints: Vec::new(),
         }
     }
 }
@@ -131,7 +137,9 @@ fn ledger_path(root: &Path) -> PathBuf {
 }
 
 fn attach_workspace(mut state: FlywheelState, instance_id: &str) -> FlywheelState {
-    state.workspace_root = dispatch_root(instance_id).to_string_lossy().to_string();
+    let root = dispatch_root(instance_id);
+    state.workspace_root = root.to_string_lossy().to_string();
+    state.task_hints = collect_instance_task_hints(instance_id);
     state
 }
 
@@ -194,6 +202,7 @@ fn build_dispatch_prompt(
     wave: u32,
     workspace: &Path,
     action: &str,
+    task_hints: &[String],
 ) -> String {
     let batch_line = match batch {
         Some(b) => format!(
@@ -204,14 +213,26 @@ fn build_dispatch_prompt(
     };
     let workspace_disp = workspace.to_string_lossy();
     let prompt_exists = workspace.join(prompt_rel).is_file();
+    let task_block = if task_hints.is_empty() {
+        "No `.ai-memory/plans` or issues found. Inventory the current project tasks, tickets, and unfinished work, then break those down.\n".to_string()
+    } else {
+        format!(
+            "Pending tasks in this instance (any bound workspace):\n{}\n",
+            task_hints
+                .iter()
+                .map(|h| format!("- {h}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        )
+    };
     let source_hint = if prompt_exists {
         format!("Read and follow `{prompt_rel}` end to end in this workspace.\n")
     } else {
         format!(
             "`{prompt_rel}` is not in this workspace. Follow the fallback for `{action}`:\n\
              - plan: inventory current work and write 100 improvements as 10 batches of 10 under `.ai-memory/plans/`.\n\
-             - next: implement the next 10 pending items from `.ai-memory/plans/`, `.ai-memory/plans/subtasks/`, or the current task backlog.\n\
-             - detail: expand current plans and tasks into exhaustive 100-step breakdowns any AI can execute.\n"
+             - next: implement the next 10 pending items listed below, then `.ai-memory/plans/`, `.ai-memory/plans/subtasks/`, or the current task backlog.\n\
+             - detail: expand the tasks listed below (and any other current plans) into exhaustive 100-step breakdowns any AI can execute.\n"
         )
     };
     format!(
@@ -219,6 +240,7 @@ fn build_dispatch_prompt(
          Work in this instance workspace (any project, not only AGM):\n\
          `{workspace_disp}`\n\n\
          {source_hint}\n\
+         {task_block}\n\
          Kind: {kind_label}\n\
          Wave: {wave}\n\
          Action: {action}\n\
@@ -253,6 +275,7 @@ pub fn plan_flywheel(
     };
     state.updated_at = Utc::now().timestamp();
     if !dry_run {
+        let hints = collect_instance_task_hints(&inst);
         let body = build_dispatch_prompt(
             kind.as_str(),
             kind.discovery_prompt(),
@@ -260,6 +283,7 @@ pub fn plan_flywheel(
             state.wave,
             &root,
             "plan",
+            &hints,
         );
         state.dispatched_prompt_id = Some(dispatch_prompt(&inst, &body)?);
         state.last_action = format!("plan-dispatched:{}", kind.discovery_prompt());
@@ -276,10 +300,15 @@ pub fn next_batch(dry_run: bool, instance_id: &str) -> AppResult<FlywheelState> 
         .batches
         .iter()
         .position(|b| b.status == "pending")
-        .ok_or_else(|| AppError::Config("all 10 batches are already dispatched".to_string()))?;
+        .ok_or_else(|| {
+            AppError::Unknown(
+                "all 10 batches are already dispatched. Plan 100 to start a new wave.".to_string(),
+            )
+        })?;
     let batch_index = state.batches[pending].index;
     if dry_run {
-        state.last_action = format!("next-dry-run:{batch_index}");
+        let hint_n = collect_instance_task_hints(&inst).len();
+        state.last_action = format!("next-dry-run:{batch_index}:{hint_n}-tasks");
         state.dispatched_prompt_id = None;
         state.updated_at = Utc::now().timestamp();
         return Ok(attach_workspace(state, &inst));
@@ -288,7 +317,8 @@ pub fn next_batch(dry_run: bool, instance_id: &str) -> AppResult<FlywheelState> 
     let wave = state.wave;
     let prompt_body = {
         let batch = &state.batches[pending];
-        build_dispatch_prompt(&kind, PROMPT_NEXT, Some(batch), wave, &root, "next")
+        let hints = collect_instance_task_hints(&inst);
+        build_dispatch_prompt(&kind, PROMPT_NEXT, Some(batch), wave, &root, "next", &hints)
     };
     state.batches[pending].status = "dispatched".to_string();
     state.next_batch = (batch_index + 1).min(BATCH_COUNT);
@@ -310,9 +340,11 @@ pub fn detail_flywheel(dry_run: bool, instance_id: &str) -> AppResult<FlywheelSt
     let mut state = load_state_for(&inst)?;
     state.updated_at = Utc::now().timestamp();
     if dry_run {
-        state.last_action = "detail-dry-run".to_string();
+        let hint_n = collect_instance_task_hints(&inst).len();
+        state.last_action = format!("detail-dry-run:{hint_n}-tasks");
         state.dispatched_prompt_id = None;
     } else {
+        let hints = collect_instance_task_hints(&inst);
         let body = build_dispatch_prompt(
             &state.kind,
             PROMPT_DETAIL,
@@ -320,6 +352,7 @@ pub fn detail_flywheel(dry_run: bool, instance_id: &str) -> AppResult<FlywheelSt
             state.wave,
             &root,
             "detail",
+            &hints,
         );
         state.dispatched_prompt_id = Some(dispatch_prompt(&inst, &body)?);
         state.last_action = format!("detail-dispatched:{PROMPT_DETAIL}");
@@ -374,7 +407,8 @@ pub fn format_telegram_html(state: &FlywheelState) -> String {
          Next: <i>{}</i>\n\
          Ledger <code>{}</code>\n\
          Workspace <code>{}</code>\n\
-         <i>Plan 100, then Next 10 until the wave is done.</i>",
+         Tasks <code>{}</code>\n\
+         <i>Plan 100, then Next 10, or Detail any pending tasks.</i>",
         escape_html(&state.kind, 24),
         state.wave,
         state.completed_batches,
@@ -382,7 +416,8 @@ pub fn format_telegram_html(state: &FlywheelState) -> String {
         pending,
         escape_html(next, 80),
         LEDGER_REL,
-        escape_html(&state.workspace_root, 80)
+        escape_html(&state.workspace_root, 80),
+        state.task_hints.len()
     )
 }
 
@@ -405,7 +440,11 @@ pub fn format_cli_text(state: &FlywheelState) -> String {
         ),
         format!("  ledger {}", state.ledger_rel),
         format!("  workspace {}", state.workspace_root),
+        format!("  tasks {}", state.task_hints.len()),
     ];
+    for hint in state.task_hints.iter().take(8) {
+        lines.push(format!("    · {hint}"));
+    }
     if let Some(id) = &state.dispatched_prompt_id {
         lines.push(format!("  dispatched_prompt_id {id}"));
     }
@@ -543,10 +582,35 @@ mod tests {
     #[test]
     fn test_dispatch_prompt_fallback_mentions_any_workspace() {
         let tmp = std::env::temp_dir().join("agm-fw-no-prompts");
-        let body = build_dispatch_prompt("system", PROMPT_NEXT, None, 1, &tmp, "next");
+        let body = build_dispatch_prompt("system", PROMPT_NEXT, None, 1, &tmp, "next", &[]);
         assert!(body.contains("any project, not only AGM"));
         assert!(body.contains("fallback for `next`"));
         assert!(body.contains(LEDGER_REL));
+        assert!(body.contains("Inventory the current project tasks"));
+    }
+
+    #[test]
+    fn test_dispatch_prompt_lists_pending_tasks() {
+        let tmp = std::env::temp_dir().join(format!(
+            "agm-fw-tasks-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0)
+        ));
+        let pending = tmp.join(".ai-memory").join("plans").join("pending");
+        std::fs::create_dir_all(&pending).expect("create pending");
+        std::fs::write(pending.join("42-next-breakdown.md"), "# detail\n").expect("write");
+        let hints = collect_workspace_task_hints(&tmp);
+        let body = build_dispatch_prompt("system", PROMPT_DETAIL, None, 1, &tmp, "detail", &hints);
+        assert!(body.contains("42-next-breakdown"));
+        assert!(body.contains("Pending tasks in this instance"));
+        assert!(body.contains("fallback for `detail`"));
+        crate::error::record_ignored(
+            std::fs::remove_dir_all(&tmp),
+            "cleanup flywheel prompt fixture",
+        );
     }
 
     #[test]

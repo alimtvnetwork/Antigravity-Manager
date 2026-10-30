@@ -2,6 +2,8 @@
 //! Packaged GUI cwd is the install dir, so `01-prompts/30-improvements` is optional.
 
 use crate::error::AppResult;
+use std::collections::HashSet;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -129,6 +131,113 @@ pub fn repo_root() -> AppResult<PathBuf> {
     Ok(ledger_root("default"))
 }
 
+const TASK_HINT_CAP: usize = 16;
+
+fn skip_task_stem(stem: &str) -> bool {
+    matches!(
+        stem.to_ascii_lowercase().as_str(),
+        "readme" | "index" | "changelog" | "license"
+    )
+}
+
+fn skip_task_dir(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "completed" | "archived" | "closed" | "changelog"
+    )
+}
+
+fn push_md_stems(dir: &Path, out: &mut Vec<String>, seen: &mut HashSet<String>, recurse: bool) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    let mut paths: Vec<PathBuf> = entries.flatten().map(|e| e.path()).collect();
+    paths.sort();
+    for path in paths {
+        if out.len() >= TASK_HINT_CAP {
+            return;
+        }
+        let name = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default();
+        if path.is_dir() {
+            if skip_task_dir(name) {
+                continue;
+            }
+            if recurse {
+                push_md_stems(&path, out, seen, false);
+            }
+            continue;
+        }
+        if path.extension().and_then(|e| e.to_str()) != Some("md") {
+            continue;
+        }
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+            continue;
+        };
+        if skip_task_stem(stem) {
+            continue;
+        }
+        let key = stem.to_ascii_lowercase();
+        if seen.insert(key) {
+            out.push(stem.to_string());
+        }
+    }
+}
+
+/// Pending plans, issues, and open questions in any project workspace.
+/// Used so Detail/Next can break down tasks without AGM's `01-prompts` tree.
+pub fn collect_workspace_task_hints(workspace: &Path) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut seen = HashSet::new();
+    let dirs = [
+        workspace.join(".ai-memory/plans/pending"),
+        workspace.join(".ai-memory/issues"),
+        workspace.join(".ai-memory/plans"),
+        workspace.join(".ai-memory/ambiguous-questions"),
+        workspace.join(".ai-memory/plans/subtasks"),
+    ];
+    for dir in dirs {
+        if out.len() >= TASK_HINT_CAP {
+            break;
+        }
+        let recurse = dir
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| matches!(n, "subtasks" | "pending" | "ambiguous-questions"));
+        push_md_stems(&dir, &mut out, &mut seen, recurse);
+    }
+    out
+}
+
+/// Union of task hints across every folder bound to the instance, plus the dispatch root.
+pub fn collect_instance_task_hints(instance_id: &str) -> Vec<String> {
+    let inst = normalize_instance_id(instance_id);
+    let mut roots: Vec<PathBuf> = crate::modules::instance::get_instance_workspace_paths(&inst)
+        .into_iter()
+        .map(PathBuf::from)
+        .collect();
+    let dispatch = dispatch_root(&inst);
+    if !roots.iter().any(|r| r == &dispatch) {
+        roots.insert(0, dispatch);
+    }
+    let mut out = Vec::new();
+    let mut seen = HashSet::new();
+    for root in roots {
+        for hint in collect_workspace_task_hints(&root) {
+            let key = hint.to_ascii_lowercase();
+            if seen.insert(key) {
+                out.push(hint);
+                if out.len() >= TASK_HINT_CAP {
+                    return out;
+                }
+            }
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,5 +283,46 @@ mod tests {
     fn test_repo_root_never_config_error() {
         let root = repo_root().expect("repo_root must succeed without 01-prompts");
         assert!(!root.as_os_str().is_empty());
+    }
+
+    #[test]
+    fn test_collect_workspace_task_hints_any_project() {
+        let base = unique_tmp("tasks");
+        let pending = base.join(".ai-memory").join("plans").join("pending");
+        fs::create_dir_all(&pending).expect("create pending");
+        fs::write(pending.join("01-fix-login.md"), "# login\n").expect("write pending");
+        fs::write(
+            base.join(".ai-memory").join("plans").join("readme.md"),
+            "# skip\n",
+        )
+        .expect("write readme");
+        let completed = base.join(".ai-memory").join("plans").join("completed");
+        fs::create_dir_all(&completed).expect("create completed");
+        fs::write(completed.join("99-old-done.md"), "# done\n").expect("write completed");
+        fs::write(
+            base.join(".ai-memory")
+                .join("issues")
+                .join("66-open-switch.md"),
+            "# issue\n",
+        )
+        .expect("write issue");
+        let hints = collect_workspace_task_hints(&base);
+        assert!(
+            hints.iter().any(|h| h.contains("01-fix-login")),
+            "expected pending task, got {hints:?}"
+        );
+        assert!(
+            hints.iter().any(|h| h.contains("66-open-switch")),
+            "expected open issue, got {hints:?}"
+        );
+        assert!(
+            !hints.iter().any(|h| h.eq_ignore_ascii_case("readme")),
+            "readme must not be a task hint: {hints:?}"
+        );
+        assert!(
+            !hints.iter().any(|h| h.contains("old-done")),
+            "completed plans must not be task hints: {hints:?}"
+        );
+        crate::error::record_ignored(fs::remove_dir_all(&base), "cleanup flywheel task fixture");
     }
 }

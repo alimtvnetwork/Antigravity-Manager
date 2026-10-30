@@ -1,5 +1,18 @@
 # Changelog
 
+## [v4.279.1] - 2026-10-30
+
+### Fixed
+- Packaged GUI `/instances` opened E5001 because `improvements_status` required `01-prompts/30-improvements` in the install cwd. `src-tauri/src/modules/improvements/roots.rs` now ledgers on the instance workspace (or app data); `repo_root()` never Config-fails; `src/services/improvementsService.ts` status uses `trackWarning` and returns `emptyFlywheelState()` instead of opening the modal (Thanks to @aukgit)
+
+### Improved
+- Next breakdown (`improvements_detail`) lists pending plans, issues, and questions from every bound workspace via `collect_instance_task_hints`; the Instances flywheel button and toast show those task counts even when AGM prompt files are missing (Thanks to @aukgit)
+
+### Tests
+- Frontend `improvementsFlywheelUtils` 6 passed (empty 10-batch fallback, Next-breakdown hints skip completed/readme). Local cargo lib/CLI rebuild OOM'd on this machine; CI compiles the crate (Thanks to @aukgit)
+
+---
+
 ## [v4.279.0] - 2026-10-29
 
 ### Fixed
@@ -1566,6 +1579,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.279.1 (2026-10-30)**:
+        -   **[Flywheel E5001 & Next Breakdown] Packaged Instances status no longer requires AGM source prompts (Thanks to @aukgit)**:
+            -   **Description**: `improvements_status` ledgers on the instance workspace instead of the install cwd; Next breakdown lists pending plans/issues from every bound workspace. Frontend status never opens the E5001 modal. (Thanks to @aukgit)
+
+
     *   **v4.279.0 (2026-10-30)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

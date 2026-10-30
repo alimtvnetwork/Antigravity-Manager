@@ -188,6 +188,7 @@ pub(crate) mod tests {
                 dispatched_prompt_id: None,
                 batches: Vec::new(),
                 workspace_root: String::new(),
+                task_hints: Vec::new(),
             },
         );
         assert!(html.contains("100 Improvements"));

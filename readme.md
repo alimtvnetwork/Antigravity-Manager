@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.279.0-3B82F6?style=flat-square" alt="Version v4.279.0">
+    <img src="https://img.shields.io/badge/Version-v4.279.1-3B82F6?style=flat-square" alt="Version v4.279.1">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,7 +116,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.279.0)**
+**Bar 2: Version-Based Installation (v4.279.1)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.258.0/install.ps1))) -Version "v4.258.0"
 ```
@@ -646,6 +646,8 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
 ## 📝 Changelog
+
+> Latest version **v4.279.1**: Flywheel E5001 & Next Breakdown — packaged `/instances` no longer fails `improvements_status` when the install cwd lacks `01-prompts/30-improvements`; `src-tauri/src/modules/improvements/roots.rs` ledgers on the instance workspace and `src/services/improvementsService.ts` returns `emptyFlywheelState()` instead of opening the E5001 modal; Next breakdown lists pending plans/issues from every bound workspace. Frontend `improvementsFlywheelUtils` 6 passed. (Thanks to @aukgit)
 
 > Latest version **v4.279.0**: Prompt Tree Enqueue Visibility — Enqueue and rerun show queued turns on the clicked instance immediately without waiting for the 30s tree refresh; `applySelectedTurnOverlay` in `src/components/instances/PromptTreeView/usePromptTreeData.ts` keeps QUEUED while inspecting a completed turn; Enqueue shows the live count; `src-tauri/src/modules/repo_db/tree_collect.rs` marks queued prompts without a 600s recency gate. Isolated `agm instances test-create` enqueued five `queued-*` ids on sandbox `test-enqueue-ui-1793289596-9596`; Default PID 3804 and `v2-3127` were not stopped. (Thanks to @aukgit)
 

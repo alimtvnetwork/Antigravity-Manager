@@ -80,14 +80,29 @@ pub fn get_instance_workspace_folders(instance_id: &str, data_dir: &str) -> Vec<
 
 /// Resolve workspace roots for an instance by its ID
 pub fn get_instance_workspace_paths(instance_id: &str) -> Vec<String> {
-    let registry = load_registry().unwrap_or_default();
+    let registry = match load_registry() {
+        Ok(reg) => reg,
+        Err(e) => {
+            tracing::warn!("instance workspace registry unavailable: {e}");
+            Default::default()
+        }
+    };
+    let inst_norm = if instance_id.is_empty() || instance_id == "__default__" {
+        "default"
+    } else {
+        instance_id
+    };
     let data_dir = registry
         .instances
         .iter()
-        .find(|i| i.id == instance_id)
+        .find(|i| {
+            i.id == instance_id
+                || i.id == inst_norm
+                || (inst_norm == "default" && (i.id == "default" || i.id == "__default__"))
+        })
         .map(|i| i.data_dir.as_str())
         .unwrap_or("");
-    get_instance_workspace_folders(instance_id, data_dir)
+    get_instance_workspace_folders(inst_norm, data_dir)
 }
 
 /// Restore and re-inject prompts for a freshly restarted instance

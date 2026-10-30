@@ -4,6 +4,7 @@ import { showToast } from '../common/ToastContainer';
 import { useErrorStore } from '../../stores/error-store';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 import {
+    emptyFlywheelState,
     improvementsService,
     type FlywheelState,
     type ImprovementKind,
@@ -39,6 +40,7 @@ export default function ImprovementsFlywheel() {
                 source: 'ImprovementsFlywheel.loadStatus',
                 triggerAction: 'improvements_status',
             });
+            setState(emptyFlywheelState());
         } finally {
             setBusy(null);
         }
@@ -86,8 +88,9 @@ export default function ImprovementsFlywheel() {
                         100 Improvements Flywheel
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        Plan 100, implement 10, or detail-out the active instance workspace
-                        (any project). Same path as{' '}
+                        Plan 100, implement the next 10, or detail a 100-step breakdown
+                        for any pending tasks in the active instance workspace (any project).
+                        Same path as{' '}
                         <code className="font-mono">agm improvements</code> and{' '}
                         <code className="font-mono">/improvements</code>.
                     </p>
@@ -151,7 +154,7 @@ export default function ImprovementsFlywheel() {
                         ) : (
                             <AlignLeft className="w-3.5 h-3.5 inline mr-1" />
                         )}
-                        Detail
+                        Next breakdown
                     </button>
                     <span className="w-px self-stretch bg-slate-200 dark:bg-[#40285e]" />
                     <button
@@ -181,8 +184,21 @@ export default function ImprovementsFlywheel() {
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {pending} pending · action <span className="font-mono">{state?.last_action ?? 'unplanned'}</span> ·
                 workspace <span className="font-mono">{workspaceLabel(state?.workspace_root)}</span> ·
+                {state?.task_hints?.length ?? 0} tasks ·
                 ledger <span className="font-mono">.ai-memory/improvements/flywheel.json</span>
             </p>
+            {(state?.task_hints?.length ?? 0) > 0 ? (
+                <ul className="flex flex-wrap gap-1.5 text-[10px] font-mono">
+                    {state?.task_hints?.slice(0, 8).map((hint) => (
+                        <li
+                            key={hint}
+                            className="px-2 py-0.5 rounded-full border border-slate-200 dark:border-[#40285e] bg-slate-50 dark:bg-[#090611] text-slate-600 dark:text-slate-300"
+                        >
+                            {hint}
+                        </li>
+                    ))}
+                </ul>
+            ) : null}
 
             <ol className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] font-mono">
                 {(state?.batches ?? []).map((batch) => (

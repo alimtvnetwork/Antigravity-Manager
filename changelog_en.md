@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.279.1 (2026-10-30)**:
+        -   **[Flywheel E5001 & Next Breakdown] Packaged Instances status no longer requires AGM source prompts (Thanks to @aukgit)**:
+            -   **Description**: Packaged GUI `/instances` opened E5001 because `improvements_status` required `01-prompts/30-improvements` in the install cwd. `src-tauri/src/modules/improvements/roots.rs` ledgers on the instance workspace (or app data); `src/services/improvementsService.ts` status uses `trackWarning` and `emptyFlywheelState()`. Next breakdown (`improvements_detail`) lists pending plans, issues, and questions from every bound workspace via `collect_instance_task_hints`. Frontend `improvementsFlywheelUtils` 6 passed. (Thanks to @aukgit)
+
     *   **v4.279.0 (2026-10-29)**:
         -   **[Prompt Tree Enqueue Visibility] Show queued count on click, keep QUEUED on completed turns (Thanks to @aukgit)**:
             -   **Description**: Enqueue/rerun inject queued turns immediately without force-resetting the prompt tree cache; `applySelectedTurnOverlay` keeps the conversation QUEUED while inspecting an older completed turn; Enqueue shows the live count; `tree_collect.rs` marks queued status without a 600s recency gate. Isolated `agm instances test-create` enqueued five `queued-*` ids on sandbox `test-enqueue-ui-1793289596-9596`; Default PID 3804 and `v2-3127` were not stopped. (Thanks to @aukgit)

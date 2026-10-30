@@ -23,9 +23,41 @@ export interface FlywheelState {
     dispatched_prompt_id: string | null;
     batches: ImprovementBatch[];
     workspace_root?: string;
+    task_hints?: string[];
 }
 
 export type ImprovementKind = 'ui' | 'code' | 'system' | 'ideas';
+
+export function emptyFlywheelState(): FlywheelState {
+    const batches: ImprovementBatch[] = Array.from({ length: 10 }, (_, i) => {
+        const index = i + 1;
+        const item_start = i * 10 + 1;
+        const item_end = index * 10;
+        return {
+            index,
+            status: 'pending',
+            title: `Batch ${String(index).padStart(2, '0')} — items ${String(item_start).padStart(2, '0')}–${String(item_end).padStart(2, '0')}`,
+            prompt_rel: '01-prompts/30-improvements/07-implement-next-10-improvements.md',
+            item_start,
+            item_end,
+        };
+    });
+    return {
+        wave: 1,
+        kind: 'system',
+        total: 100,
+        batch_size: 10,
+        next_batch: 1,
+        completed_batches: 0,
+        last_action: 'unplanned',
+        updated_at: 0,
+        ledger_rel: '.ai-memory/improvements/flywheel.json',
+        dispatched_prompt_id: null,
+        batches,
+        workspace_root: '',
+        task_hints: [],
+    };
+}
 
 export const improvementsService = {
     async plan(
@@ -73,7 +105,9 @@ export const improvementsService = {
                 source: 'ImprovementsService.status',
                 triggerAction: 'improvements_status',
             });
-            throw error;
+            // Status is a page-load probe. Never open the E5001 modal when
+            // the packaged GUI cwd is the install dir.
+            return emptyFlywheelState();
         }
     },
 

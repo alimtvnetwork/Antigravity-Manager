@@ -49,6 +49,7 @@ const SUGGESTED_FIXES: SuggestedFixMap = {
     'Configuration validation error in settings payload',
     'Review settings for syntax or missing required fields',
     'Reset configuration to defaults if corrupted',
+    'Instances 100 Improvements status no longer needs 01-prompts/30-improvements in the install folder — upgrade past 4.279.0 so the flywheel uses the instance workspace',
   ],
   E6001: [
     'Account management operation failed',
