@@ -24,11 +24,22 @@ pub fn improvements_next(
 }
 
 #[tauri::command]
-pub fn improvements_status() -> AppResult<FlywheelState> {
-    improvements::load_state()
+pub fn improvements_status(instance_id: Option<String>) -> AppResult<FlywheelState> {
+    let inst = instance_id.unwrap_or_else(|| "default".to_string());
+    improvements::load_state_for(&inst)
 }
 
 #[tauri::command]
-pub fn improvements_check() -> AppResult<FlywheelState> {
-    improvements::check_pending()
+pub fn improvements_check(instance_id: Option<String>) -> AppResult<FlywheelState> {
+    let inst = instance_id.unwrap_or_else(|| "default".to_string());
+    improvements::check_pending_for(&inst)
+}
+
+#[tauri::command]
+pub fn improvements_detail(
+    dry_run: Option<bool>,
+    instance_id: Option<String>,
+) -> AppResult<FlywheelState> {
+    let inst = instance_id.unwrap_or_else(|| "default".to_string());
+    improvements::detail_flywheel(dry_run.unwrap_or(false), &inst)
 }

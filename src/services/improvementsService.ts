@@ -22,6 +22,7 @@ export interface FlywheelState {
     ledger_rel: string;
     dispatched_prompt_id: string | null;
     batches: ImprovementBatch[];
+    workspace_root?: string;
 }
 
 export type ImprovementKind = 'ui' | 'code' | 'system' | 'ideas';
@@ -62,11 +63,13 @@ export const improvementsService = {
         }
     },
 
-    async status(): Promise<FlywheelState> {
+    async status(instanceId?: string): Promise<FlywheelState> {
         try {
-            return await invoke<FlywheelState>('improvements_status');
+            return await invoke<FlywheelState>('improvements_status', {
+                instanceId: instanceId ?? 'default',
+            });
         } catch (error) {
-            useErrorStore.getState().captureError(error, {
+            useErrorStore.getState().trackWarning(error, {
                 source: 'ImprovementsService.status',
                 triggerAction: 'improvements_status',
             });
@@ -74,13 +77,30 @@ export const improvementsService = {
         }
     },
 
-    async check(): Promise<FlywheelState> {
+    async check(instanceId?: string): Promise<FlywheelState> {
         try {
-            return await invoke<FlywheelState>('improvements_check');
+            return await invoke<FlywheelState>('improvements_check', {
+                instanceId: instanceId ?? 'default',
+            });
         } catch (error) {
             useErrorStore.getState().captureError(error, {
                 source: 'ImprovementsService.check',
                 triggerAction: 'improvements_check',
+            });
+            throw error;
+        }
+    },
+
+    async detail(dryRun: boolean, instanceId?: string): Promise<FlywheelState> {
+        try {
+            return await invoke<FlywheelState>('improvements_detail', {
+                dryRun,
+                instanceId: instanceId ?? 'default',
+            });
+        } catch (error) {
+            useErrorStore.getState().captureError(error, {
+                source: 'ImprovementsService.detail',
+                triggerAction: 'improvements_detail',
             });
             throw error;
         }

@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ListChecks, Play, RefreshCw, Sparkles } from 'lucide-react';
+import { AlignLeft, ListChecks, Play, RefreshCw, Sparkles } from 'lucide-react';
 import { showToast } from '../common/ToastContainer';
 import { useErrorStore } from '../../stores/error-store';
+import { useInstanceStore } from '../../stores/useInstanceStore';
 import {
     improvementsService,
     type FlywheelState,
     type ImprovementKind,
 } from '../../services/improvementsService';
+import {
+    flywheelActionToast,
+    resolveImprovementsInstanceId,
+    workspaceLabel,
+} from '../../services/improvementsFlywheelUtils';
 
 const KINDS: { id: ImprovementKind; label: string }[] = [
     { id: 'system', label: 'System' },
@@ -16,6 +22,8 @@ const KINDS: { id: ImprovementKind; label: string }[] = [
 ];
 
 export default function ImprovementsFlywheel() {
+    const activeInstanceId = useInstanceStore((s) => s.activeInstanceId);
+    const instanceId = resolveImprovementsInstanceId(activeInstanceId);
     const [kind, setKind] = useState<ImprovementKind>('system');
     const [dryRun, setDryRun] = useState(true);
     const [busy, setBusy] = useState<string | null>(null);
@@ -24,7 +32,7 @@ export default function ImprovementsFlywheel() {
     const loadStatus = useCallback(async () => {
         setBusy('status');
         try {
-            const next = await improvementsService.status();
+            const next = await improvementsService.status(instanceId);
             setState(next);
         } catch (err) {
             useErrorStore.getState().trackWarning(err, {
@@ -34,35 +42,25 @@ export default function ImprovementsFlywheel() {
         } finally {
             setBusy(null);
         }
-    }, []);
+    }, [instanceId]);
 
     useEffect(() => {
         void loadStatus();
     }, [loadStatus]);
 
-    const run = async (action: 'plan' | 'next' | 'check') => {
+    const run = async (action: 'plan' | 'next' | 'check' | 'detail') => {
         setBusy(action);
         try {
             const next =
                 action === 'plan'
-                    ? await improvementsService.plan(kind, dryRun)
+                    ? await improvementsService.plan(kind, dryRun, instanceId)
                     : action === 'next'
-                      ? await improvementsService.next(dryRun)
-                      : await improvementsService.check();
+                      ? await improvementsService.next(dryRun, instanceId)
+                      : action === 'detail'
+                        ? await improvementsService.detail(dryRun, instanceId)
+                        : await improvementsService.check(instanceId);
             setState(next);
-            showToast(
-                action === 'plan'
-                    ? dryRun
-                        ? 'Planned 10 batches of 10 (dry-run, no prompt dispatched)'
-                        : 'Planned 100 improvements and queued the discovery prompt'
-                    : action === 'next'
-                      ? dryRun
-                          ? `Next batch ${next.next_batch} previewed (dry-run)`
-                          : `Dispatched next 10 (batch ${Math.max(1, next.completed_batches)})`
-                      : 'Ledger refreshed',
-                'success',
-                2200,
-            );
+            showToast(flywheelActionToast(action, dryRun, next), 'success', 2200);
         } catch (err) {
             useErrorStore.getState().captureError(err, {
                 source: 'ImprovementsFlywheel.run',
@@ -88,7 +86,8 @@ export default function ImprovementsFlywheel() {
                         100 Improvements Flywheel
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        Plan 100 items, then implement 10 at a time. Same path as{' '}
+                        Plan 100, implement 10, or detail-out the active instance workspace
+                        (any project). Same path as{' '}
                         <code className="font-mono">agm improvements</code> and{' '}
                         <code className="font-mono">/improvements</code>.
                     </p>
@@ -143,6 +142,20 @@ export default function ImprovementsFlywheel() {
                     <span className="w-px self-stretch bg-slate-200 dark:bg-[#40285e]" />
                     <button
                         type="button"
+                        onClick={() => void run('detail')}
+                        disabled={busy !== null}
+                        className="agm-hover-shade px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer disabled:opacity-50"
+                    >
+                        {busy === 'detail' ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin inline mr-1" />
+                        ) : (
+                            <AlignLeft className="w-3.5 h-3.5 inline mr-1" />
+                        )}
+                        Detail
+                    </button>
+                    <span className="w-px self-stretch bg-slate-200 dark:bg-[#40285e]" />
+                    <button
+                        type="button"
                         onClick={() => void loadStatus()}
                         disabled={busy !== null}
                         className="agm-hover-shade px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer disabled:opacity-50"
@@ -167,6 +180,7 @@ export default function ImprovementsFlywheel() {
 
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
                 {pending} pending · action <span className="font-mono">{state?.last_action ?? 'unplanned'}</span> ·
+                workspace <span className="font-mono">{workspaceLabel(state?.workspace_root)}</span> ·
                 ledger <span className="font-mono">.ai-memory/improvements/flywheel.json</span>
             </p>
 

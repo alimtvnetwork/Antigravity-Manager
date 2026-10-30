@@ -24,8 +24,8 @@ pub(crate) fn dispatch_improvements_domain(args: &[String]) {
         }
         "next" | "next-10" | "next10" | "run" => improvements::next_batch(dry_run, &instance),
         "detail" => improvements::detail_flywheel(dry_run, &instance),
-        "check" | "ck" => improvements::check_pending(),
-        "status" | "st" | "ls" => improvements::load_state(),
+        "check" | "ck" => improvements::check_pending_for(&instance),
+        "status" | "st" | "ls" => improvements::load_state_for(&instance),
         other => {
             eprintln!(
                 "[ERROR] Unknown improvements subcommand '{other}'. Run 'agm improvements help'."
@@ -117,8 +117,9 @@ pub(crate) fn print_improvements_help() {
     println!();
     println!("Description:");
     println!("  Plan exactly 100 improvements as 10 batches of 10, then implement each batch");
-    println!("  as a sequence of thought. Wraps 01-prompts/30-improvements/ (01–07).");
-    println!("  Ledger: .ai-memory/improvements/flywheel.json");
+    println!("  as a sequence of thought. Wraps 01-prompts/30-improvements/ (01–07)");
+    println!("  when present; otherwise a self-contained fallback runs against the");
+    println!("  instance workspace (any project). Ledger lives on that workspace.");
     println!("  Same option exists on the Telegram page UI and as /improvements in Telegram.");
     println!();
     println!("Commands:");
@@ -148,7 +149,7 @@ pub(crate) fn print_improvements_help() {
     println!("  /improvements plan [ui]  Start a 100-item wave");
     println!("  /improvements next       Implement the next 10");
     println!("  /next10                  Alias for next-10");
-    println!("  Callbacks: im:pl  im:n10  im:st  im:ck  (≤60 bytes)");
+    println!("  Callbacks: im:pl  im:n10  im:dt  im:st  im:ck  (≤60 bytes)");
     println!();
     println!("Examples:");
     println!("  agm improvements help");

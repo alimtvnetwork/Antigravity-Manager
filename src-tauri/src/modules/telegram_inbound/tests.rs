@@ -167,6 +167,7 @@ pub(crate) mod tests {
         assert!(markup.contains("im:n10"));
         assert!(markup.contains("im:st"));
         assert!(markup.contains("im:ck"));
+        assert!(markup.contains("im:dt"));
         assert!(crate::modules::improvements::is_improvements_command(
             "/improvements"
         ));
@@ -186,6 +187,7 @@ pub(crate) mod tests {
                 ledger_rel: crate::modules::improvements::LEDGER_REL.to_string(),
                 dispatched_prompt_id: None,
                 batches: Vec::new(),
+                workspace_root: String::new(),
             },
         );
         assert!(html.contains("100 Improvements"));

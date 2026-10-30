@@ -1,6 +1,8 @@
 //! 100-improvements flywheel: plan 100 items as 10 batches of 10, then
 //! dispatch `01-prompts/30-improvements/` discovery or next-10 prompts.
 
+mod roots;
+
 use crate::error::{AppError, AppResult};
 use crate::modules::repo_db;
 use chrono::Utc;
@@ -8,7 +10,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+
+pub use roots::{dispatch_root, ledger_root, normalize_instance_id, repo_root};
 
 pub const BATCH_SIZE: u32 = 10;
 pub const TOTAL_ITEMS: u32 = 100;
@@ -86,6 +89,8 @@ pub struct FlywheelState {
     pub ledger_rel: String,
     pub dispatched_prompt_id: Option<String>,
     pub batches: Vec<BatchRecord>,
+    #[serde(default)]
+    pub workspace_root: String,
 }
 
 impl FlywheelState {
@@ -116,57 +121,54 @@ impl FlywheelState {
             ledger_rel: LEDGER_REL.to_string(),
             dispatched_prompt_id: None,
             batches,
+            workspace_root: String::new(),
         }
     }
-}
-
-pub fn repo_root() -> AppResult<PathBuf> {
-    let mut cmd = Command::new("git");
-    cmd.args(["rev-parse", "--show-toplevel"]);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
-    if let Ok(out) = cmd.output() {
-        if out.status.success() {
-            let text = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !text.is_empty() {
-                let root = PathBuf::from(text);
-                if root.join("01-prompts/30-improvements").is_dir() {
-                    return Ok(root);
-                }
-            }
-        }
-    }
-    let mut dir = std::env::current_dir()
-        .map_err(|e| AppError::Io(std::io::Error::other(format!("cwd: {e}"))))?;
-    loop {
-        if dir.join("01-prompts/30-improvements").is_dir() {
-            return Ok(dir);
-        }
-        if !dir.pop() {
-            break;
-        }
-    }
-    Err(AppError::Config(
-        "could not locate repository root containing 01-prompts/30-improvements".to_string(),
-    ))
 }
 
 fn ledger_path(root: &Path) -> PathBuf {
     root.join(LEDGER_REL)
 }
 
+fn attach_workspace(mut state: FlywheelState, instance_id: &str) -> FlywheelState {
+    state.workspace_root = dispatch_root(instance_id).to_string_lossy().to_string();
+    state
+}
+
 pub fn load_state() -> AppResult<FlywheelState> {
-    let root = repo_root()?;
+    load_state_for("default")
+}
+
+pub fn load_state_for(instance_id: &str) -> AppResult<FlywheelState> {
+    let inst = normalize_instance_id(instance_id);
+    let root = ledger_root(&inst);
     let path = ledger_path(&root);
     if !path.exists() {
-        return Ok(FlywheelState::empty(ImprovementKind::System, 1));
+        return Ok(attach_workspace(
+            FlywheelState::empty(ImprovementKind::System, 1),
+            &inst,
+        ));
     }
-    let raw = fs::read_to_string(&path)
-        .map_err(|e| AppError::Io(std::io::Error::other(format!("read {LEDGER_REL}: {e}"))))?;
-    serde_json::from_str(&raw).map_err(|e| AppError::Config(format!("parse {LEDGER_REL}: {e}")))
+    let raw = match fs::read_to_string(&path) {
+        Ok(body) => body,
+        Err(e) => {
+            tracing::warn!("improvements ledger read failed, using empty: {e}");
+            return Ok(attach_workspace(
+                FlywheelState::empty(ImprovementKind::System, 1),
+                &inst,
+            ));
+        }
+    };
+    match serde_json::from_str(&raw) {
+        Ok(state) => Ok(attach_workspace(state, &inst)),
+        Err(e) => {
+            tracing::warn!("improvements ledger parse failed, using empty: {e}");
+            Ok(attach_workspace(
+                FlywheelState::empty(ImprovementKind::System, 1),
+                &inst,
+            ))
+        }
+    }
 }
 
 fn save_state(root: &Path, state: &FlywheelState) -> AppResult<()> {
@@ -190,6 +192,8 @@ fn build_dispatch_prompt(
     prompt_rel: &str,
     batch: Option<&BatchRecord>,
     wave: u32,
+    workspace: &Path,
+    action: &str,
 ) -> String {
     let batch_line = match batch {
         Some(b) => format!(
@@ -198,11 +202,26 @@ fn build_dispatch_prompt(
         ),
         None => "Plan exactly 100 improvements as 10 batches of 10.\n".to_string(),
     };
+    let workspace_disp = workspace.to_string_lossy();
+    let prompt_exists = workspace.join(prompt_rel).is_file();
+    let source_hint = if prompt_exists {
+        format!("Read and follow `{prompt_rel}` end to end in this workspace.\n")
+    } else {
+        format!(
+            "`{prompt_rel}` is not in this workspace. Follow the fallback for `{action}`:\n\
+             - plan: inventory current work and write 100 improvements as 10 batches of 10 under `.ai-memory/plans/`.\n\
+             - next: implement the next 10 pending items from `.ai-memory/plans/`, `.ai-memory/plans/subtasks/`, or the current task backlog.\n\
+             - detail: expand current plans and tasks into exhaustive 100-step breakdowns any AI can execute.\n"
+        )
+    };
     format!(
         "# AGM Improvements Flywheel\n\n\
-         Read and follow `{prompt_rel}` end to end.\n\n\
+         Work in this instance workspace (any project, not only AGM):\n\
+         `{workspace_disp}`\n\n\
+         {source_hint}\n\
          Kind: {kind_label}\n\
          Wave: {wave}\n\
+         Action: {action}\n\
          {batch_line}\
          Ledger: `{LEDGER_REL}`\n\n\
          Use execute-parent-task-with-n-steps-v6. GitMap-only search. Relative Git paths only.\n\
@@ -211,14 +230,9 @@ fn build_dispatch_prompt(
 }
 
 fn dispatch_prompt(instance_id: &str, prompt: &str) -> AppResult<String> {
-    let root = repo_root()?;
-    let repo = root.to_string_lossy().to_string();
-    let inst = if instance_id.trim().is_empty() {
-        "default"
-    } else {
-        instance_id.trim()
-    };
-    let queued = repo_db::enqueue_prompt_for_instance(inst, &repo, prompt, None)
+    let inst = normalize_instance_id(instance_id);
+    let repo = dispatch_root(&inst).to_string_lossy().to_string();
+    let queued = repo_db::enqueue_prompt_for_instance(&inst, &repo, prompt, None)
         .map_err(|e| AppError::Unknown(format!("enqueue improvements prompt: {e}")))?;
     Ok(queued.id)
 }
@@ -228,8 +242,9 @@ pub fn plan_flywheel(
     dry_run: bool,
     instance_id: &str,
 ) -> AppResult<FlywheelState> {
-    let root = repo_root()?;
-    let prev_wave = load_state().ok().map(|s| s.wave).unwrap_or(0);
+    let inst = normalize_instance_id(instance_id);
+    let root = ledger_root(&inst);
+    let prev_wave = load_state_for(&inst).ok().map(|s| s.wave).unwrap_or(0);
     let mut state = FlywheelState::empty(kind, prev_wave.saturating_add(1).max(1));
     state.last_action = if dry_run {
         "plan-dry-run".to_string()
@@ -238,17 +253,25 @@ pub fn plan_flywheel(
     };
     state.updated_at = Utc::now().timestamp();
     if !dry_run {
-        let body = build_dispatch_prompt(kind.as_str(), kind.discovery_prompt(), None, state.wave);
-        state.dispatched_prompt_id = Some(dispatch_prompt(instance_id, &body)?);
+        let body = build_dispatch_prompt(
+            kind.as_str(),
+            kind.discovery_prompt(),
+            None,
+            state.wave,
+            &root,
+            "plan",
+        );
+        state.dispatched_prompt_id = Some(dispatch_prompt(&inst, &body)?);
         state.last_action = format!("plan-dispatched:{}", kind.discovery_prompt());
     }
     save_state(&root, &state)?;
-    Ok(state)
+    Ok(attach_workspace(state, &inst))
 }
 
 pub fn next_batch(dry_run: bool, instance_id: &str) -> AppResult<FlywheelState> {
-    let root = repo_root()?;
-    let mut state = load_state()?;
+    let inst = normalize_instance_id(instance_id);
+    let root = ledger_root(&inst);
+    let mut state = load_state_for(&inst)?;
     let pending = state
         .batches
         .iter()
@@ -259,13 +282,13 @@ pub fn next_batch(dry_run: bool, instance_id: &str) -> AppResult<FlywheelState> 
         state.last_action = format!("next-dry-run:{batch_index}");
         state.dispatched_prompt_id = None;
         state.updated_at = Utc::now().timestamp();
-        return Ok(state);
+        return Ok(attach_workspace(state, &inst));
     }
     let kind = state.kind.clone();
     let wave = state.wave;
     let prompt_body = {
         let batch = &state.batches[pending];
-        build_dispatch_prompt(&kind, PROMPT_NEXT, Some(batch), wave)
+        build_dispatch_prompt(&kind, PROMPT_NEXT, Some(batch), wave, &root, "next")
     };
     state.batches[pending].status = "dispatched".to_string();
     state.next_batch = (batch_index + 1).min(BATCH_COUNT);
@@ -275,30 +298,43 @@ pub fn next_batch(dry_run: bool, instance_id: &str) -> AppResult<FlywheelState> 
         .filter(|b| b.status == "dispatched" || b.status == "done")
         .count() as u32;
     state.updated_at = Utc::now().timestamp();
-    state.dispatched_prompt_id = Some(dispatch_prompt(instance_id, &prompt_body)?);
+    state.dispatched_prompt_id = Some(dispatch_prompt(&inst, &prompt_body)?);
     state.last_action = format!("next-dispatched:{batch_index}");
     save_state(&root, &state)?;
-    Ok(state)
+    Ok(attach_workspace(state, &inst))
 }
 
 pub fn detail_flywheel(dry_run: bool, instance_id: &str) -> AppResult<FlywheelState> {
-    let root = repo_root()?;
-    let mut state = load_state()?;
+    let inst = normalize_instance_id(instance_id);
+    let root = ledger_root(&inst);
+    let mut state = load_state_for(&inst)?;
     state.updated_at = Utc::now().timestamp();
     if dry_run {
         state.last_action = "detail-dry-run".to_string();
         state.dispatched_prompt_id = None;
     } else {
-        let body = build_dispatch_prompt(&state.kind, PROMPT_DETAIL, None, state.wave);
-        state.dispatched_prompt_id = Some(dispatch_prompt(instance_id, &body)?);
+        let body = build_dispatch_prompt(
+            &state.kind,
+            PROMPT_DETAIL,
+            None,
+            state.wave,
+            &root,
+            "detail",
+        );
+        state.dispatched_prompt_id = Some(dispatch_prompt(&inst, &body)?);
         state.last_action = format!("detail-dispatched:{PROMPT_DETAIL}");
     }
     save_state(&root, &state)?;
-    Ok(state)
+    Ok(attach_workspace(state, &inst))
 }
 
 pub fn check_pending() -> AppResult<FlywheelState> {
-    let mut state = load_state()?;
+    check_pending_for("default")
+}
+
+pub fn check_pending_for(instance_id: &str) -> AppResult<FlywheelState> {
+    let inst = normalize_instance_id(instance_id);
+    let mut state = load_state_for(&inst)?;
     state.last_action = format!("check:{PROMPT_CHECK}");
     state.updated_at = Utc::now().timestamp();
     state.completed_batches = state
@@ -306,9 +342,9 @@ pub fn check_pending() -> AppResult<FlywheelState> {
         .iter()
         .filter(|b| b.status == "dispatched" || b.status == "done")
         .count() as u32;
-    let root = repo_root()?;
+    let root = ledger_root(&inst);
     save_state(&root, &state)?;
-    Ok(state)
+    Ok(attach_workspace(state, &inst))
 }
 
 fn escape_html(input: &str, max_chars: usize) -> String {
@@ -337,6 +373,7 @@ pub fn format_telegram_html(state: &FlywheelState) -> String {
          ✅ {}/{} batches · ⏳ {} pending\n\
          Next: <i>{}</i>\n\
          Ledger <code>{}</code>\n\
+         Workspace <code>{}</code>\n\
          <i>Plan 100, then Next 10 until the wave is done.</i>",
         escape_html(&state.kind, 24),
         state.wave,
@@ -344,7 +381,8 @@ pub fn format_telegram_html(state: &FlywheelState) -> String {
         BATCH_COUNT,
         pending,
         escape_html(next, 80),
-        LEDGER_REL
+        LEDGER_REL,
+        escape_html(&state.workspace_root, 80)
     )
 }
 
@@ -366,6 +404,7 @@ pub fn format_cli_text(state: &FlywheelState) -> String {
             state.last_action
         ),
         format!("  ledger {}", state.ledger_rel),
+        format!("  workspace {}", state.workspace_root),
     ];
     if let Some(id) = &state.dispatched_prompt_id {
         lines.push(format!("  dispatched_prompt_id {id}"));
@@ -397,7 +436,10 @@ pub fn telegram_markup() -> Value {
                 { "text": "⏭ Next 10", "callback_data": "im:n10" }
             ],
             [
-                { "text": "📊 Status", "callback_data": "im:st" },
+                { "text": "🧩 Detail", "callback_data": "im:dt" },
+                { "text": "📊 Status", "callback_data": "im:st" }
+            ],
+            [
                 { "text": "🔎 Check", "callback_data": "im:ck" }
             ]
         ]
@@ -424,6 +466,7 @@ pub fn parse_improvements_callback(data: &str) -> Option<&'static str> {
     match data.trim() {
         "im:pl" => Some("plan"),
         "im:n10" => Some("next"),
+        "im:dt" => Some("detail"),
         "im:st" => Some("status"),
         "im:ck" => Some("check"),
         _ => None,
@@ -464,8 +507,8 @@ pub fn handle_rest(rest: &str) -> AppResult<FlywheelState> {
         "plan" => plan_flywheel(kind, dry_run, &instance),
         "next" => next_batch(dry_run, &instance),
         "detail" => detail_flywheel(dry_run, &instance),
-        "check" => check_pending(),
-        _ => load_state(),
+        "check" => check_pending_for(&instance),
+        _ => load_state_for(&instance),
     }
 }
 
@@ -490,10 +533,26 @@ mod tests {
 
     #[test]
     fn test_callback_budget() {
-        for key in ["im:pl", "im:n10", "im:st", "im:ck"] {
+        for key in ["im:pl", "im:n10", "im:dt", "im:st", "im:ck"] {
             assert!(key.len() <= 60);
             assert!(parse_improvements_callback(key).is_some());
         }
         assert!(parse_improvements_callback("i:st:abc").is_none());
+    }
+
+    #[test]
+    fn test_dispatch_prompt_fallback_mentions_any_workspace() {
+        let tmp = std::env::temp_dir().join("agm-fw-no-prompts");
+        let body = build_dispatch_prompt("system", PROMPT_NEXT, None, 1, &tmp, "next");
+        assert!(body.contains("any project, not only AGM"));
+        assert!(body.contains("fallback for `next`"));
+        assert!(body.contains(LEDGER_REL));
+    }
+
+    #[test]
+    fn test_status_never_requires_source_checkout() {
+        let state = load_state_for("default").expect("status must succeed without AGM source cwd");
+        assert_eq!(state.batches.len(), 10);
+        assert!(!state.workspace_root.is_empty());
     }
 }

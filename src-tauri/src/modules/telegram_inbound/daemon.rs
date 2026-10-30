@@ -15,6 +15,7 @@ async fn handle_improvements_callback(token: &str, chat_id: i64, data: &str) -> 
     let rest = match action {
         "plan" => "plan",
         "next" => "next",
+        "detail" => "detail",
         "check" => "check",
         _ => "status",
     };

@@ -423,6 +423,7 @@ pub fn run() {
             commands::improvements_next,
             commands::improvements_status,
             commands::improvements_check,
+            commands::improvements_detail,
             // Window Management commands
             commands::minimize_window,
             commands::maximize_window,
