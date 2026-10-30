@@ -1,0 +1,96 @@
+{
+  "wave": 3,
+  "kind": "ideas",
+  "total": 100,
+  "batch_size": 10,
+  "next_batch": 1,
+  "completed_batches": 0,
+  "last_action": "plan-dispatched:01-prompts/30-improvements/05-next-100-ideas-for-improvements.md",
+  "updated_at": 1793347377,
+  "ledger_rel": ".ai-memory/improvements/flywheel.json",
+  "dispatched_prompt_id": "queued-1793347377953-0000-80fc53",
+  "batches": [
+    {
+      "index": 1,
+      "status": "pending",
+      "title": "Batch 01 — items 01–10",
+      "prompt_rel": "01-prompts/30-improvements/07-implement-next-10-improvements.md",
+      "item_start": 1,
+      "item_end": 10
+    },
+    {
+      "index": 2,
+      "status": "pending",
+      "title": "Batch 02 — items 11–20",
+      "prompt_rel": "01-prompts/30-improvements/07-implement-next-10-improvements.md",
+      "item_start": 11,
+      "item_end": 20
+    },
+    {
+      "index": 3,
+      "status": "pending",
+      "title": "Batch 03 — items 21–30",
+      "prompt_rel": "01-prompts/30-improvements/07-implement-next-10-improvements.md",
+      "item_start": 21,
+      "item_end": 30
+    },
+    {
+      "index": 4,
+      "status": "pending",
+      "title": "Batch 04 — items 31–40",
+      "prompt_rel": "01-prompts/30-improvements/07-implement-next-10-improvements.md",
+      "item_start": 31,
+      "item_end": 40
+    },
+    {
+      "index": 5,
+      "status": "pending",
+      "title": "Batch 05 — items 41–50",
+      "prompt_rel": "01-prompts/30-improvements/07-implement-next-10-improvements.md",
+      "item_start": 41,
+      "item_end": 50
+    },
+    {
+      "index": 6,
+      "status": "pending",
+      "title": "Batch 06 — items 51–60",
+      "prompt_rel": "01-prompts/30-improvements/07-implement-next-10-improvements.md",
+      "item_start": 51,
+      "item_end": 60
+    },
+    {
+      "index": 7,
+      "status": "pending",
+      "title": "Batch 07 — items 61–70",
+      "prompt_rel": "01-prompts/30-improvements/07-implement-next-10-improvements.md",
+      "item_start": 61,
+      "item_end": 70
+    },
+    {
+      "index": 8,
+      "status": "pending",
+      "title": "Batch 08 — items 71–80",
+      "prompt_rel": "01-prompts/30-improvements/07-implement-next-10-improvements.md",
+      "item_start": 71,
+      "item_end": 80
+    },
+    {
+      "index": 9,
+      "status": "pending",
+      "title": "Batch 09 — items 81–90",
+      "prompt_rel": "01-prompts/30-improvements/07-implement-next-10-improvements.md",
+      "item_start": 81,
+      "item_end": 90
+    },
+    {
+      "index": 10,
+      "status": "pending",
+      "title": "Batch 10 — items 91–100",
+      "prompt_rel": "01-prompts/30-improvements/07-implement-next-10-improvements.md",
+      "item_start": 91,
+      "item_end": 100
+    }
+  ],
+  "workspace_root": "",
+  "task_hints": []
+}
