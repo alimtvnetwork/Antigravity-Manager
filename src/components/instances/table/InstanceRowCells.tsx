@@ -265,9 +265,12 @@ export function StatusProcessEnvCell({ inst, data, isCopied, onCopy }: StatusPro
     const [isExeCopied, setIsExeCopied] = useState(false);
     const fullPath = resolveDataDir(inst);
     const exeFull = inst.config.executable_path || '';
+    const isWindows = fullPath.includes('\\') || exeFull.includes('\\') || /^[a-zA-Z]:/.test(fullPath) || /^[a-zA-Z]:/.test(exeFull);
+    const sep = isWindows ? '\\' : '/';
+    const defaultExeTail = `...${sep}Antigravity.exe`;
     const exeTail = exeFull
         ? (formatShortPath(exeFull) || formatPathEnding(exeFull))
-        : (inst.config.is_default || inst.config.id === 'default' ? '.../Antigravity.exe' : 'Default IDE');
+        : (inst.config.is_default || inst.config.id === 'default' ? defaultExeTail : 'Default IDE');
     const exeEnding = exeTail;
     const dataEnding = fullPath ? (formatShortPath(fullPath) || formatPathEnding(fullPath)) : '—';
 
@@ -287,70 +290,69 @@ export function StatusProcessEnvCell({ inst, data, isCopied, onCopy }: StatusPro
 
     return (
         <td
-            className="px-2 py-1 whitespace-nowrap min-w-[340px] w-[40%]"
+            className="px-2 py-1 whitespace-nowrap min-w-[220px] max-w-[280px]"
             title={`Status: ${data.isBusy ? getActionLabel(data.currentAction) : inst.is_running ? (inst.pid ? `Running (PID: ${inst.pid})` : 'Running') : 'Idle'}\nIDE Executable: ${exeFull || exeEnding}\nData Directory: ${fullPath}`}
         >
-            <div className="flex items-center justify-between gap-1.5 text-[11px] font-mono whitespace-nowrap flex-nowrap w-full">
-                <div className="flex items-center gap-1.5 min-w-0 font-mono text-[11px] truncate flex-1 whitespace-nowrap flex-nowrap">
-                    {/* Status Pill */}
-                    {data.isBusy ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-900 dark:bg-cyan-950 dark:text-cyan-200 border border-blue-400/80 dark:border-cyan-400/80 backdrop-blur-xs animate-pulse shadow-xs shrink-0 whitespace-nowrap">
-                            <RotateCw className="w-2.5 h-2.5 animate-spin text-blue-600 dark:text-cyan-300 shrink-0" />
-                            <span>{getActionLabel(data.currentAction)}</span>
-                        </span>
-                    ) : inst.is_running ? (
-                        <span
-                            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-900 dark:bg-emerald-950/80 dark:text-[#1af18d] border border-emerald-400/80 dark:border-emerald-500/60 backdrop-blur-xs shadow-xs font-mono shrink-0 whitespace-nowrap"
-                            title={inst.pid ? `Process ID (PID): ${inst.pid} — Active and Running` : 'Process ID (PID): Active and Running'}
-                        >
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-[#1af18d] animate-pulse shrink-0" />
-                            <span>{inst.pid ? `PID: ${inst.pid}` : 'Running'}</span>
-                        </span>
-                    ) : (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-200 text-slate-800 dark:bg-[#1c132b] dark:text-slate-200 border border-slate-300 dark:border-[#523478] backdrop-blur-xs shrink-0 whitespace-nowrap">
-                            Idle
-                        </span>
-                    )}
+            <div className="flex flex-col gap-1 text-[11px] font-mono">
+                {/* Line 1: Status Pill & IDE Executable */}
+                <div className="flex items-center justify-between gap-1.5 min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate">
+                        {data.isBusy ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-blue-100 text-blue-900 dark:bg-cyan-950 dark:text-cyan-200 border border-blue-400/80 dark:border-cyan-400/80 backdrop-blur-xs animate-pulse shadow-xs shrink-0 whitespace-nowrap">
+                                <RotateCw className="w-2.5 h-2.5 animate-spin text-blue-600 dark:text-cyan-300 shrink-0" />
+                                <span>{getActionLabel(data.currentAction)}</span>
+                            </span>
+                        ) : inst.is_running ? (
+                            <span
+                                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-100 text-emerald-900 dark:bg-emerald-950/80 dark:text-[#1af18d] border border-emerald-400/80 dark:border-emerald-500/60 backdrop-blur-xs shadow-xs font-mono shrink-0 whitespace-nowrap"
+                                title={inst.pid ? `Process ID (PID): ${inst.pid} — Active and Running` : 'Process ID (PID): Active and Running'}
+                            >
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-[#1af18d] animate-pulse shrink-0" />
+                                <span>{inst.pid ? `PID: ${inst.pid}` : 'Running'}</span>
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9.5px] font-semibold bg-slate-200 text-slate-800 dark:bg-[#1c132b] dark:text-slate-200 border border-slate-300 dark:border-[#523478] backdrop-blur-xs shrink-0 whitespace-nowrap">
+                                Idle
+                            </span>
+                        )}
 
-                    {/* Path Endings together on the exact same line */}
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1 text-[11px] text-slate-700 dark:text-slate-200 font-mono truncate">
                         <div
-                            className="flex items-center gap-1 min-w-0 shrink truncate font-semibold"
+                            className="flex items-center gap-1 min-w-0 flex-1 truncate text-slate-700 dark:text-slate-200 font-semibold text-[10.5px]"
                             title={`IDE: ${exeFull || exeEnding}`}
                         >
-                            <Terminal className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                            <Terminal className="w-3 h-3 text-slate-400 shrink-0" />
                             <span className="truncate whitespace-nowrap">{exeEnding}</span>
                         </div>
-                        <span className="text-slate-400 dark:text-slate-500 shrink-0 select-none text-[10px]">·</span>
-                        <div
-                            className="flex items-center gap-1 min-w-0 text-[10px] text-slate-500 dark:text-slate-400 truncate"
-                            title={`Data: ${fullPath}`}
-                        >
-                            <Folder className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                            <span className="truncate whitespace-nowrap">{dataEnding}</span>
-                        </div>
                     </div>
-                </div>
 
-                {/* Right side: Segmented pill capsule with copy buttons */}
-                <div className="inline-flex items-center rounded-full border border-slate-200 dark:border-[#40285e] bg-slate-100/80 dark:bg-[#090611]/80 backdrop-blur-xs p-0.5 shrink-0 ml-1 shadow-2xs whitespace-nowrap flex-nowrap">
                     <button
                         type="button"
                         onClick={handleCopyExe}
                         data-ui-name="copy-exe-btn"
                         data-ui-id={`copy-exe-${inst.config.id}`}
-                        className="px-1.5 py-0.5 rounded-l-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-all duration-300 ease-out cursor-pointer"
+                        className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60 transition-all duration-300 ease-out cursor-pointer shrink-0"
                         title={isExeCopied ? 'Copied executable path!' : 'Copy executable path'}
                     >
                         {isExeCopied ? <Check className="w-3 h-3 text-emerald-500" /> : <Terminal className="w-3 h-3" />}
                     </button>
-                    <span className="w-px h-2.5 bg-slate-200 dark:bg-[#40285e] shrink-0" />
+                </div>
+
+                {/* Line 2: Data Environment Directory */}
+                <div className="flex items-center justify-between gap-1.5 min-w-0">
+                    <div
+                        className="flex items-center gap-1 min-w-0 flex-1 text-[10px] text-slate-500 dark:text-slate-400 truncate"
+                        title={`Data: ${fullPath}`}
+                    >
+                        <Folder className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate whitespace-nowrap">{dataEnding}</span>
+                    </div>
+
                     <button
                         type="button"
                         onClick={onCopy}
                         data-ui-name="copy-path-btn"
                         data-ui-id={`copy-path-${inst.config.id}`}
-                        className="px-1.5 py-0.5 rounded-r-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-all duration-300 ease-out cursor-pointer"
+                        className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60 transition-all duration-300 ease-out cursor-pointer shrink-0"
                         title={isCopied ? 'Copied data path!' : 'Copy full data path'}
                     >
                         {isCopied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}

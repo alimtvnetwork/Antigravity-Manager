@@ -89,10 +89,10 @@ export default function InstanceTable({
                 <table className="w-full max-w-full table-fixed text-left text-xs">
                     <thead>
                         <tr className="border-b border-slate-200/90 dark:border-slate-800/90 bg-slate-50/80 dark:bg-[#090611] text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            <th className="px-2 py-1.5 w-[20%] min-w-[150px]">Profile & Account</th>
-                            <th className="px-2 py-1.5 w-[26%] min-w-[190px]">Model & Weekly Quota</th>
-                            <th className="px-2 py-1.5 w-[40%] min-w-[340px]">Status, Process & Environment</th>
-                            <th className="px-2 py-1.5 text-right w-[14%] min-w-[150px]">Actions</th>
+                            <th className="px-2 py-1.5 w-[22%] min-w-[150px]">Profile & Account</th>
+                            <th className="px-2 py-1.5 w-[28%] min-w-[190px]">Model & Weekly Quota</th>
+                            <th className="px-2 py-1.5 w-[32%] min-w-[220px]">Status, Process & Environment</th>
+                            <th className="px-2 py-1.5 text-right w-[18%] min-w-[160px]">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="font-medium">

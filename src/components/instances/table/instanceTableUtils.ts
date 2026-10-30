@@ -7,7 +7,11 @@ export function formatShortPath(fullPath: string): string {
     const sep = isWindows ? '\\' : '/';
     const parts = fullPath.split(/[\\/]/).filter(Boolean);
     if (parts.length === 0) return fullPath;
-    return `...${sep}${parts[parts.length - 1]}`;
+    let candidate = parts[parts.length - 1];
+    if (parts.length >= 2 && (candidate.toLowerCase() === 'data' || candidate.length <= 6)) {
+        candidate = `${parts[parts.length - 2]}${sep}${candidate}`;
+    }
+    return `...${sep}${candidate}`;
 }
 
 /** Keep the distinctive ending of a file or directory name visible in a narrow cell. */
@@ -21,8 +25,8 @@ export function formatPathEnding(fullPath: string, keep = 32): string {
     if (parts.length >= 2 && (candidate.toLowerCase() === 'data' || candidate.length <= 6)) {
         candidate = `${parts[parts.length - 2]}${sep}${candidate}`;
     }
-    if (candidate.length <= keep) return `…${sep}${candidate}`;
-    return `…${candidate.slice(candidate.length - keep)}`;
+    if (candidate.length <= keep) return `...${sep}${candidate}`;
+    return `...${candidate.slice(candidate.length - keep)}`;
 }
 
 export function getActionLabel(action: InstanceActionType): string {

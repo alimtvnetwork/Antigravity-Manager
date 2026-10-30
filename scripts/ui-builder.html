@@ -734,6 +734,102 @@
       from { opacity: 0; }
       to { opacity: 1; }
     }
+
+    /* =============================================================
+       COMPONENT 5: Instance Two-Liner Row & Zero-Shift Table
+       ============================================================= */
+    .instance-demo-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      font-family: inherit;
+      background: var(--bg-surface);
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+    }
+    .instance-demo-table th {
+      padding: 8px 12px;
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(0, 0, 0, 0.2);
+      text-align: left;
+    }
+    .instance-demo-row {
+      border-bottom: 1px solid var(--border-subtle);
+      border-left: 4px solid transparent;
+      transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .instance-demo-row.active {
+      background: rgba(12, 47, 77, 0.5);
+      border-left-color: #0284c7;
+    }
+    .instance-demo-row:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .instance-demo-row.active:hover {
+      background: rgba(17, 61, 99, 0.8);
+    }
+    .instance-demo-table td {
+      padding: 8px 12px;
+      vertical-align: middle;
+    }
+    .env-two-liner {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-family: monospace;
+    }
+    .env-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .env-path-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .badge-pill {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .badge-running {
+      background: rgba(26, 241, 141, 0.15);
+      color: #1af18d;
+      border: 1px solid rgba(26, 241, 141, 0.4);
+    }
+    .badge-idle {
+      background: rgba(255, 255, 255, 0.08);
+      color: #94a3b8;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+    }
+    .btn-micro-copy {
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 10px;
+      transition: color 0.3s ease, background-color 0.3s ease;
+    }
+    .btn-micro-copy:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.15);
+    }
   </style>
 </head>
 <body>
@@ -747,6 +843,7 @@
     </div>
     <div style="display: flex; gap: 8px;">
       <button class="btn" id="btn-theme-toggle">🌓 Toggle Light/Dark</button>
+      <button class="btn btn-primary" id="btn-export-md" style="background: linear-gradient(135deg, #0284c7, #0369a1); border-color: #38bdf8; color: #ffffff;">📑 Export AI Spec (.md)</button>
       <button class="btn btn-primary" id="btn-export-json">💾 Export JSON</button>
       <button class="btn" id="btn-import-json">📂 Import JSON</button>
     </div>
@@ -983,7 +1080,110 @@
         </div>
       </div>
 
-      <!-- PREVIEW 4: Modal Stacking Context Simulator -->
+      <!-- PREVIEW 5: Instance Two-Liner Row & Zero-Shift Table -->
+      <div class="preview-card">
+        <div class="preview-card-header">
+          <div class="card-title">
+            <span>Instance Two-Liner Row & Zero-Shift Table</span>
+          </div>
+          <span class="card-badge">Zero Displacement & 300ms CSS3 Transitions</span>
+        </div>
+
+        <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+          Environment section restructured into two distinct lines: Line 1 pairs Process Status and IDE Executable path with quick copy; Line 2 renders the distinctive data folder ending (e.g. <code>...\v2\data</code> instead of undifferentiated <code>...\data</code>) with data copy. Zero layout jumps on hover with 0.3s CSS3 transitions.
+        </p>
+
+        <div style="overflow-x: auto; margin-top: 10px;">
+          <table class="instance-demo-table">
+            <thead>
+              <tr>
+                <th style="width: 22%;">Profile & Account</th>
+                <th style="width: 28%;">Model & Weekly Quota</th>
+                <th style="width: 32%;">Status, Process & Environment</th>
+                <th style="width: 18%; text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Active Row -->
+              <tr class="instance-demo-row active">
+                <td>
+                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="font-weight: 700; color: #fff;">#1 Default</span>
+                      <span class="badge-pill" style="background: rgba(2, 132, 199, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.5);">ACTIVE</span>
+                    </div>
+                    <span style="font-size: 10px; color: var(--text-muted); font-family: monospace;">maru*** PRO</span>
+                  </div>
+                </td>
+                <td>
+                  <div style="display: flex; flex-direction: column; gap: 4px; font-size: 10px; font-family: monospace;">
+                    <span style="color: #f59e0b; font-weight: 600;">gemini-2.5-pro (4H) · 88%</span>
+                    <span style="color: var(--text-muted);">Weekly Quota · 63%</span>
+                  </div>
+                </td>
+                <td>
+                  <div class="env-two-liner">
+                    <div class="env-line">
+                      <div class="env-path-group">
+                        <span class="badge-pill badge-running">● PID: 14052</span>
+                        <span style="color: #fff; font-weight: 600;">...\Antigravity.exe</span>
+                      </div>
+                      <button type="button" class="btn-micro-copy" onclick="copySimPath('C:\\...\\Antigravity.exe', this)">Copy Exe</button>
+                    </div>
+                    <div class="env-line">
+                      <div class="env-path-group">
+                        <span style="color: var(--text-muted);">📁 ...\Antigravity</span>
+                      </div>
+                      <button type="button" class="btn-micro-copy" onclick="copySimPath('C:\\...\\.gemini\\antigravity', this)">Copy Data</button>
+                    </div>
+                  </div>
+                </td>
+                <td style="text-align: right;">
+                  <button class="btn" style="padding: 4px 8px; font-size: 10px;">Actions</button>
+                </td>
+              </tr>
+
+              <!-- Idle Row -->
+              <tr class="instance-demo-row">
+                <td>
+                  <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="font-weight: 700; color: #cbd5e1;">#2 v2</span>
+                    </div>
+                    <span style="font-size: 10px; color: var(--text-muted); font-family: monospace;">saki*** PRO</span>
+                  </div>
+                </td>
+                <td>
+                  <div style="display: flex; flex-direction: column; gap: 4px; font-size: 10px; font-family: monospace;">
+                    <span style="color: #10b981; font-weight: 600;">gemini-2.5-pro (4H) · 100%</span>
+                    <span style="color: var(--text-muted);">Weekly Quota · 100%</span>
+                  </div>
+                </td>
+                <td>
+                  <div class="env-two-liner">
+                    <div class="env-line">
+                      <div class="env-path-group">
+                        <span class="badge-pill badge-idle">Idle</span>
+                        <span style="color: #cbd5e1; font-weight: 600;">...\Antigravity-v2-3127.exe</span>
+                      </div>
+                      <button type="button" class="btn-micro-copy" onclick="copySimPath('C:\\...\\Antigravity-v2-3127.exe', this)">Copy Exe</button>
+                    </div>
+                    <div class="env-line">
+                      <div class="env-path-group">
+                        <span style="color: var(--text-muted);">📁 ...\v2\data</span>
+                      </div>
+                      <button type="button" class="btn-micro-copy" onclick="copySimPath('C:\\...\\.gemini\\antigravity\\v2\\data', this)">Copy Data</button>
+                    </div>
+                  </div>
+                </td>
+                <td style="text-align: right;">
+                  <button class="btn" style="padding: 4px 8px; font-size: 10px;">Actions</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
       <div class="preview-card">
         <div class="preview-card-header">
           <div class="card-title">
@@ -1183,6 +1383,62 @@
       downloadAnchor.click();
       downloadAnchor.remove();
     });
+
+    // Markdown Spec Export for AI Pair Programming
+    document.getElementById('btn-export-md').addEventListener('click', () => {
+      let md = `# Antigravity Manager — UI Specification & AI Implementation Contract\n\n`;
+      md += `> Generated by AGM UI Builder Workbench on ${new Date().toISOString()}\n\n`;
+      md += `## 1. Design System Tokens & Current State\n\n`;
+      md += `- **Theme:** \`${state.theme}\` (${state.isLight ? 'Light Theme' : 'Dark Theme'})\n`;
+      md += `- **Quota Progress:** \`${state.quota}%\` (Track: ${state.trackHeight}px, Node: ${state.nodeSize}px, Hover Glow: ${state.hoverGlow})\n`;
+      md += `- **Canvas Background:** \`var(--bg-canvas)\` (#090611 dark / #f8fafc light)\n`;
+      md += `- **Surface Background:** \`var(--bg-surface)\` (#171025 dark / #ffffff light)\n`;
+      md += `- **Border Subtle:** \`var(--border-subtle)\` (#40285e dark / #e2e8f0 light)\n`;
+      md += `- **Animation Standard:** \`transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1)\` (duration-300 ease-out)\n\n`;
+      md += `## 2. Instance Section: Zero Positional Shift on Hover\n\n`;
+      md += `- **Invariant:** Elements MUST NOT move position on hover or active states.\n`;
+      md += `- **Banned Properties on Hover/Active:** \`translate-y-*\`, \`scale-*\`, dynamic border width additions, asymmetric box-shadows (\`shadow-[0_2px_...]\`), and \`hover:font-bold\`.\n`;
+      md += `- **Permitted Transformations:** Color transitions, background fills, opacity shifts, and ring/border color changes.\n`;
+      md += `- **Transition Standard:** Standard 0.3s CSS3 transition (\`duration-300 ease-out\`).\n`;
+      md += `- **WCAG Contrast Requirement:** Deep contrast ratios (>10:1) on active and hover states.\n\n`;
+      md += `## 3. Instance Table: Two-Liner Row Architecture\n\n`;
+      md += `To prevent horizontal table overflow and eliminate horizontal scrollbars on desktop viewports (>=1024px), columns adhere to a consistent 2-line layout:\n\n`;
+      md += `- **Column 1 (Profile & Account):** Line 1: Sequence (#1), Profile Name, Default/Active Badge; Line 2: Masked Email, PRO Tier.\n`;
+      md += `- **Column 2 (Model & Quota):** Line 1: Primary Model (4H) + Progress Bar; Line 2: Weekly Quota + Progress Bar.\n`;
+      md += `- **Column 3 (Status, Process & Environment):**\n`;
+      md += `  - **Line 1:** Process Status Badge (\`● PID: <num>\` or \`Idle\`) + IDE Executable (\`...\\Antigravity.exe\`) + Micro Copy Executable Button.\n`;
+      md += `  - **Line 2:** Data Directory icon + Distinctive Folder Path (\`...\\v2\\data\` or \`...\\Antigravity\`) + Micro Copy Data Button.\n`;
+      md += `- **Column 4 (Actions):** Centered action capsule with dedicated launch/restart/switch/fastforward/prompts buttons.\n\n`;
+      md += `## 4. Prompt Tree View: Two-Liner Node Architecture\n\n`;
+      md += `- **Conversation Nodes:** Line 1: Chevron, Branch Connector, Conversation Index, Last Active Recency, Status Badge; Line 2: Full Conversation Title preview with turn count pill.\n`;
+      md += `- **Turn Nodes:** Line 1: Tree connector, Turn sequence (T1), Media chips, Status; Line 2: Full prompt text preview in readable font with media pills.\n\n`;
+      md += `## 5. 100 Improvements Flywheel Protocol\n\n`;
+      md += `- **Batch Scaling:** 5 slots of 20 improvements (total 100 improvements).\n`;
+      md += `- **Atomic Commit Invariant:** Commit each slot of 20 improvements immediately upon completion using semantic GitMap verbs.\n`;
+      md += `- **Plan Consolidation:** Once all slots are completed, consolidate subtasks into a single master summary document in \`02-spec/21-app/\`.\n`;
+
+      const blob = new Blob([md], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", url);
+      downloadAnchor.setAttribute("download", `agm-ui-ai-spec-${Date.now()}.md`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    window.copySimPath = function(text, btn) {
+      navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.innerText;
+        btn.innerText = '✓ Copied';
+        btn.style.color = '#1af18d';
+        setTimeout(() => {
+          btn.innerText = orig;
+          btn.style.color = '';
+        }, 1500);
+      });
+    };
 
     document.getElementById('btn-apply-json').addEventListener('click', () => {
       try {
