@@ -399,25 +399,15 @@ def detect_base_branch(target: Path) -> str:
 
 
 def detect_latest_version(target: Path) -> str:
-    """Detect current SemVer string from git tags or version files."""
-    code, out, _ = run_cmd("git tag --list \"v[0-9]*\" --sort=-v:refname", target)
-    has_tag_output = code == 0 and bool(out.strip())
-
-    if has_tag_output:
-        for line in out.splitlines():
-            tag = line.strip().lstrip("v")
-            match = re.match(r"^(\d+\.\d+\.\d+)$", tag)
-
-            if match:
-                return match.group(1)
-
+    """Detect current SemVer string from version.json (canonical SOT), package.json, or fallback git tags."""
+    # Priority 1: Canonical version manifests (version.json is single source of truth)
     for vf in ["version.json", "package.json", "version.txt", "VERSION"]:
         vpath = target / vf
 
         if vpath.exists():
             try:
                 content = vpath.read_text(encoding="utf-8")
-                match = re.search(r'"[Vv]ersion"\s*:\s*"(\d+\.\d+\.\d+)"', content)
+                match = re.search(r'"[Vv]ersion"\s*:\s*"(\d+\.\d+\.\d+)(?:-[^"]*)?"', content)
 
                 if match:
                     return match.group(1)
@@ -428,6 +418,18 @@ def detect_latest_version(target: Path) -> str:
                     return match.group(1)
             except Exception:
                 pass
+
+    # Priority 2: Git tags fallback (ONLY if no manifest files exist)
+    code, out, _ = run_cmd("git tag --list \"v[0-9]*\" --sort=-v:refname", target)
+    has_tag_output = code == 0 and bool(out.strip())
+
+    if has_tag_output:
+        for line in out.splitlines():
+            tag = line.strip().lstrip("v")
+            match = re.match(r"^(\d+\.\d+\.\d+)$", tag)
+
+            if match:
+                return match.group(1)
 
     return "0.1.0"
 
