@@ -404,7 +404,10 @@ export function DetailHeader(props: DetailHeaderProps) {
                     'DetailHeader.rerunSection'
                 );
             } else if (result.dispatched > 0) {
-                const previewMsg = result.messages?.[0] ? ` ("${result.messages[0]}")` : '';
+                const effectivePromptSummary = originalPrompt
+                    ? originalPrompt.trim().slice(0, 40).replace(/[\r\n]+/g, ' ')
+                    : (result.messages?.[0] || '');
+                const previewMsg = effectivePromptSummary ? ` ("${effectivePromptSummary}…")` : '';
                 setRerunFlash(`Enqueued ×${result.dispatched}`);
                 setActionMsg?.(`Rerun ×${result.dispatched} enqueued in prompt queue!${previewMsg}`);
                 setTimeout(() => setRerunFlash(null), 2500);
@@ -422,19 +425,22 @@ export function DetailHeader(props: DetailHeaderProps) {
                     const baseTurnNumber = existingTurns.length > 0
                         ? Math.max(...existingTurns.map((t) => t.turn_number)) + 1
                         : 1;
-                    const newTurns: AgmPromptTurnNode[] = result.messages.map((msg, idx) => ({
-                        turn_number: baseTurnNumber + idx,
-                        step_index: baseTurnNumber + idx - 1,
-                        prompt_text: msg,
-                        preview_200w: msg.slice(0, 200),
-                        status: 'QUEUED',
-                        is_running: false,
-                        is_queued: true,
-                        timestamp: new Date().toISOString(),
-                        created_at: Date.now() + idx,
-                        media_paths: allMedia,
-                        media_thumbnails: allMedia,
-                    }));
+                    const newTurns: AgmPromptTurnNode[] = result.messages.map((msg, idx) => {
+                        const turnText = originalPrompt || msg;
+                        return {
+                            turn_number: baseTurnNumber + idx,
+                            step_index: baseTurnNumber + idx - 1,
+                            prompt_text: turnText,
+                            preview_200w: turnText.slice(0, 200),
+                            status: 'QUEUED',
+                            is_running: false,
+                            is_queued: true,
+                            timestamp: new Date().toISOString(),
+                            created_at: Date.now() + idx,
+                            media_paths: allMedia,
+                            media_thumbnails: allMedia,
+                        };
+                    });
                     const updatedTurns = [...existingTurns, ...newTurns];
                     setOptimisticQueuedTurns((prev) => [...prev, ...newTurns]);
                     patchPromptTreeSwrCache(targetInstId, (tree) =>

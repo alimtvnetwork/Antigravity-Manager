@@ -148,23 +148,31 @@ pub(crate) fn collect_tree_conversation_items(
 
             let inspection = inspect_conversation_transcript(base, &cid);
 
+            let is_any_antigravity_alive = crate::modules::process::is_antigravity_running(None);
+            let is_inst_effective_alive = is_owning_inst_alive || is_any_antigravity_alive;
+
+            let has_affirmative_running_db =
+                cascade_status.is_running() && is_recent && is_inst_effective_alive;
+            let has_activity_marker = not_fully_idle > 0 && is_recent && is_inst_effective_alive;
+
             let is_terminal = is_explicit_idle || inspection.is_terminal_done;
             let is_live_active = inspection.is_recent_active && !inspection.is_terminal_done;
-            let has_live_supremacy = is_owning_inst_alive && is_live_active;
-
-            let has_activity_marker = not_fully_idle > 0 && is_recent;
-            let is_active_fallback = is_owning_inst_alive && has_activity_marker;
+            let has_live_supremacy = is_inst_effective_alive && is_live_active;
 
             let is_conv_running = if has_live_supremacy {
                 // Live transcript activity supremacy: if the instance process is alive
-                // and the transcript was written within the last 15 seconds without a terminal done record,
+                // and the transcript was written within the freshness window without a terminal done record,
                 // the conversation is actively running in real life regardless of stale database status.
                 true
+            } else if has_affirmative_running_db || has_activity_marker {
+                // Affirmative running status from database and live IDE process trumps
+                // intermediate transcript tail completion markers.
+                true
             } else if is_terminal {
-                // Explicit Idle: unreset not_fully_idle artifacts must not override terminal status
+                // Explicit Idle or confirmed terminal completion without active running signals
                 false
             } else {
-                is_active_fallback
+                false
             };
             let prompt_turns = extract_conversation_prompt_turns(base, &cid, is_conv_running);
             let steps = inspection.step_count;
@@ -251,7 +259,7 @@ pub(crate) fn collect_tree_conversation_items(
                 }
             };
 
-            const QUEUE_STATUSES: &[&str] = &["queued", "queue", "pending", "in_progress"];
+            const QUEUE_STATUSES: &[&str] = &["queued", "queue", "pending"];
             let is_queued = status.has_any_word_ignore_case(QUEUE_STATUSES);
             let latest_step_summary = inspection.latest_step_summary;
 

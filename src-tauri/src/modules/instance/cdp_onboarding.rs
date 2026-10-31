@@ -919,3 +919,92 @@ pub fn cancel_active_task_via_cdp_for_instance(instance_id: &str) -> bool {
     }
     cancelled
 }
+
+const EXTRACT_QUEUED_MESSAGES_JS: &str = r#"(() => {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+    let n, targetSpan = null;
+    while (n = walker.nextNode()) {
+        const val = n.nodeValue.trim();
+        if (val === 'Queued Messages' || val.startsWith('Queued Messages')) {
+            targetSpan = n.parentElement;
+            break;
+        }
+    }
+    if (!targetSpan) return [];
+    let container = targetSpan;
+    for (let i = 0; i < 5; i++) {
+        if (container.parentElement && !container.parentElement.tagName.includes('BODY')) {
+            container = container.parentElement;
+        }
+    }
+    const items = [];
+    const messageEls = container.querySelectorAll('.whitespace-pre-wrap, [class*="line-clamp"], div[title]');
+    for (const el of messageEls) {
+        const t = (el.innerText || el.textContent || '').trim();
+        if (t && !t.includes('Queued Messages') && !t.includes('Sends after agent') && !items.includes(t)) {
+            items.push(t);
+        }
+    }
+    return items;
+})()"#;
+
+/// Extract in-memory composer queued messages from the IDE page via CDP WebSocket.
+pub fn extract_queued_composer_messages_on_ws(ws_url: &str) -> Vec<String> {
+    let mut stream = match connect_ws_stream(ws_url) {
+        Some(s) => s,
+        None => return Vec::new(),
+    };
+    let res = cdp_send_and_recv(
+        &mut stream,
+        1,
+        "Runtime.evaluate",
+        serde_json::json!({
+            "expression": EXTRACT_QUEUED_MESSAGES_JS,
+            "returnByValue": true
+        }),
+    );
+    let Some(val) = res else {
+        return Vec::new();
+    };
+    let arr = val
+        .get("result")
+        .and_then(|r| r.get("result"))
+        .and_then(|r| r.get("value"))
+        .and_then(|v| v.as_array());
+    let Some(items) = arr else {
+        return Vec::new();
+    };
+    items
+        .iter()
+        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+        .collect()
+}
+
+/// Harvest queued messages from live Antigravity IDE instances via Chrome DevTools Protocol.
+pub fn extract_queued_composer_messages_for_instance(instance_id: &str) -> Vec<String> {
+    let data_dir =
+        if instance_id.is_empty() || instance_id == "default" || instance_id == "__default__" {
+            super::storage::get_default_antigravity_data_dir()
+        } else if let Ok(reg) = super::load_registry() {
+            reg.instances
+                .iter()
+                .find(|i| i.id == instance_id || i.name == instance_id)
+                .map(|i| PathBuf::from(&i.data_dir))
+                .unwrap_or_else(super::storage::get_default_antigravity_data_dir)
+        } else {
+            super::storage::get_default_antigravity_data_dir()
+        };
+
+    let mut queued = Vec::new();
+    for port in read_active_ports(&data_dir) {
+        for ws_url in fetch_page_ws_urls(port) {
+            let items = extract_queued_composer_messages_on_ws(&ws_url);
+            for item in items {
+                if !queued.contains(&item) {
+                    queued.push(item);
+                }
+            }
+        }
+    }
+    queued
+}

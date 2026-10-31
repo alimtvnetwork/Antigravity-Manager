@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.281.0)
+> Professional AI Account Management & Protocol Proxy System (v4.282.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.281.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.282.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -546,6 +546,7 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 
 ## 📝 Changelog
 
+> Latest version **v4.282.0**: Running Status Detection Supremacy, Live CDP Queued Messages Harvester & Review Queue Fix — Enforced affirmative database run status and live process supremacy in `src-tauri/src/modules/repo_db/tree_collect.rs` and `transcript.rs` so actively working IDE instances never falsely flip to `IDLE now` due to intermediate planner completions; implemented live DevTools CDP composer queued messages harvesting in `src-tauri/src/modules/instance/cdp_onboarding.rs` (`extract_queued_composer_messages_for_instance`), extracting in-memory queued prompts staged in the active IDE ("Queued Messages N Sends after agent finishes working") and rendering them immediately under the active conversation as `QUEUED` turns in `tree_node_conv.rs`; extended in-flight TTL from 120s to 3600s in `tree_phases.rs` and persisted status as `enqueued_ide` in `agy.rs` to eliminate premature queue item erasure; corrected `queuedPromptCount` in `usePromptTreeData.ts` to strictly return 0 when hydrated turns contain no queued turns, eliminating spurious `1 prompt(s) enqueued in FIFO queue for this conversation` banners during idle prompt review; removed `"in_progress"` from queue status definitions in `tree_collect.rs` and `tree_node_conv.rs` to classify active executions as running; and preserved original task prompt text in `DetailHeader.tsx` during rerun enqueue operations, replacing internal nudge strings with actual prompt summaries in action toasts and optimistic tree turns. (Thanks to @aukgit)
 > Latest version **v4.280.0**: Enqueue & Rerun IDE Direct Dispatch & Turn Status Deadlock Fix — Resolved queue deadlock in `src-tauri/src/modules/repo_db/queue.rs` and `agy.rs` where enqueued prompts never fired into the running Antigravity IDE due to premature idle checks and missing status transitions; enqueued prompts and multi-round reruns now submit directly into the active Antigravity IDE composer via DevTools CDP with `cancel_running_first: false`, staging immediately as native enqueued turns in the IDE; transitions prompt status to `dispatched` upon successful injection to eliminate duplicate execution; bounds Gate 4 summary recency window in `liveness.rs` to 90s to prevent zombie liveness locks; and eliminates transcript turn inversion in `transcript.rs` where historical turns T2–T11 were falsely marked `QUEUED`. (Thanks to @aukgit)
 
 > Latest version **v4.281.0**: Cluster-Wide Cross-Machine Account Exclusion, Canonical W2/W3 Fleet Discovery & Fast-Forward Rationale Transparency — Resolved concurrent account collisions where accounts bound to remote cluster nodes (e.g. `alex.hudson.riseup@gmail.com`) were selected by local profile instances; extended `get_active_in_use_account_ids()` in `src-tauri/src/modules/auto_switcher/instances.rs`, candidate selection in `selection.rs`, manual rotation in `manual.rs`, and frontend `src/stores/useInstanceStore/smart.ts` to strictly exclude all remote active accounts and leases from cached fleet machines; eliminated hardcoded `"w1"` overrides in `src-tauri/src/modules/supabase_sync/query.rs` and `node.rs`, resolving machine identity dynamically via Cluster-IP primacy and GitMap `~/.gitmap/variables.json`; restored canonical nodes `w2` (`192.168.1.7`), `w3` (`192.168.1.12`), and `w1` (`192.168.1.3`) in the Shared Cluster / Fleet table without node loss or deduplication drops; eliminated false `is_local` / `is_lead` hardcoding in `src/components/instances/fleet/useFleetMachines.ts` and `FleetMachineRow.tsx` so remote nodes never hijack local primary accounts; and introduced transparent algorithm rationale telemetry ("let it show") surfacing selection tiers, quota scores, and cluster exclusion counts in toast notifications and auto-switcher logs. (Thanks to @aukgit)

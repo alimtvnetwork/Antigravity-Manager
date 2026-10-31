@@ -16,13 +16,15 @@ use std::path::Path;
 pub(crate) fn transition_stale_inflight_prompts(now: i64) {
     if let Ok(conn) = connect_db() {
         // Justification: stale-status sweep is housekeeping; rows are re-evaluated on the next scan
+        // In-flight active tasks can run for up to an hour. Preserve enqueued and dispatched prompts
+        // for at least 3600s (1 hour) so active tasks in long sessions do not lose their enqueued queue items.
         crate::error::record_ignored(
             conn.execute(
                 "UPDATE active_prompts
              SET status = 'completed', updated_at = ?1
-             WHERE (status IN ('running', 'in_flight', 'queued', 'pending') AND updated_at < ?2)
-                OR (status = 'dispatched' AND updated_at < ?3)",
-                rusqlite::params![now, now - 600, now - 120],
+             WHERE (status IN ('running', 'in_flight') AND updated_at < ?2)
+                OR (status IN ('dispatched', 'enqueued_ide', 'queued', 'pending') AND updated_at < ?3)",
+                rusqlite::params![now, now - 1800, now - 3600],
             ),
             "transition stale in-flight prompts to completed",
         );

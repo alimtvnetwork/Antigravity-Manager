@@ -1028,8 +1028,8 @@ pub fn extract_conversation_prompt_turns(
                 if matched_idx + 1 < n {
                     Some(matched_idx + 1)
                 } else {
-                    // All turns have completed terminal model responses
-                    None
+                    // Conversation is confirmed actively running; mark latest turn as RUNNING
+                    Some(n - 1)
                 }
             } else {
                 Some(matched_idx)

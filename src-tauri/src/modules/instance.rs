@@ -478,7 +478,8 @@ pub use caller_process_ancestry_tree_scanner::*;
 pub use capsule_segmented_button_group_styler::*;
 pub use capsule_segmented_control_validator::*;
 pub use cdp_onboarding::{
-    dismiss_security_notice_dialog_for_data_dir, spawn_security_notice_dismisser,
+    dismiss_security_notice_dialog_for_data_dir, extract_queued_composer_messages_for_instance,
+    spawn_security_notice_dismisser,
 };
 pub use child_health_monitor::*;
 pub use child_process_tree_enumerator::*;
