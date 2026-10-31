@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.281.1] - 2026-10-31
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.281.0] - 2026-10-31
 
 ### Fixed
@@ -1641,11 +1648,9 @@
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
-
     *   **v4.280.0 (2026-10-31)**:
         -   **[Enqueue & Rerun IDE Direct Dispatch & Turn Status Deadlock Fix] Deliver enqueued prompts and reruns directly into active Antigravity IDE (Thanks to @aukgit)**:
             -   **Description**: Resolved queue deadlock in `src-tauri/src/modules/repo_db/queue.rs` and `agy.rs` where enqueued prompts never fired into the running Antigravity IDE due to premature idle checks and missing status transitions; enqueued prompts and multi-round reruns now submit directly into the active Antigravity IDE composer via DevTools CDP with `cancel_running_first: false`, staging immediately as native enqueued turns in the IDE; transitions prompt status to `dispatched` upon successful injection to eliminate duplicate execution; bounds Gate 4 summary recency window in `liveness.rs` to 90s to prevent zombie liveness locks; and eliminates transcript turn inversion in `transcript.rs` where historical turns T2–T11 were falsely marked `QUEUED`. (Thanks to @aukgit)
-
 
     *   **v4.279.1 (2026-10-30)**:
         -   **[Flywheel E5001 & Next Breakdown] Packaged Instances status no longer requires AGM source prompts (Thanks to @aukgit)**:
