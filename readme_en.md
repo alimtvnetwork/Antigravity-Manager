@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.287.0)
+> Professional AI Account Management & Protocol Proxy System (v4.288.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.287.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.288.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.288.0**: Prompt Tree Queue Cache Invalidation CI Fix & First Release of the 4.286.0/4.287.0 Prompt Tree Changes — Fixed Rust compile error E0061 blocking CI and release on main by passing the caller's `instance_id` through to `invalidate_prompt_tree_cache()` in `src-tauri/src/modules/repo_db/queue.rs`, so a scoped clear invalidates only that instance's prompt-tree cache and an all-instances clear invalidates everything; the `v4.286.0` and `v4.287.0` tags pointed at broken-CI commits and never produced releases, so this release ships their prompt-tree changes for the first time; and synchronized all 14 version manifests to 4.288.0. (Thanks to @aukgit)
 
 > Latest version **v4.287.0**: Prompt Tree View Copy Button Attachment Bug Fix & 3-Tier Markdown Normalization — Resolved issue where copying prompts via the Prompt Tree View primary Copy button and dropdown options omitted screenshot attachments; enhanced `DetailHeader.tsx` to resolve active turn media paths, conversation-level attachments, and inline image targets into a unified attachment set and format the copied prompt using `formatPromptWithAttachments()` before writing to clipboard; standardized multimodal prompt attachments to the canonical format `[Attachment XX | Description | filename](file;<exact_path>)` with lowercase `file`, semicolon `;`, zero `@` prefix on display brackets, and automatic screenshot description generation; updated `src/utils/promptAttachment.ts`, `src-tauri/src/modules/repo_db/detection.rs`, and unit test suites while maintaining full backward compatibility with legacy `@[...]` tokens; integrated `useClickOutside` on segmented action capsule containers in `DetailHeader.tsx` so clicking outside immediately dismisses Copy, Dispatch, and Next Breakdown dropdowns; preserved synthetic unit test timestamps in `usePromptTreeData.ts`; and synchronized all 14 version manifests to 4.287.0. (Thanks to @aukgit)
 

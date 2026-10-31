@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.288.0] - 2026-11-01
+
+### Fixed
+- **Prompt Tree Queue Cache Invalidation CI Fix**: Fixed Rust compile error E0061 blocking CI and release on main: `clear_queued_prompts_for_instance` in `src-tauri/src/modules/repo_db/queue.rs` called `invalidate_prompt_tree_cache()` with zero arguments while the function requires one `Option<&str>` argument; the call now passes the caller's `instance_id` through, so a scoped clear invalidates only that instance's prompt-tree cache and an all-instances clear invalidates everything (Thanks to @aukgit)
+- **First Release of the 4.286.0 and 4.287.0 Prompt Tree Changes**: The `v4.286.0` and `v4.287.0` tags pointed at broken-CI commits and never produced releases; this release ships their prompt-tree changes for the first time, as documented under their own headings below (queued-item removal and SWR resuscitation fix, false QUEUED badge elimination, copy-button attachment fix with canonical 3-tier attachment syntax, and popover click-outside dismissal) (Thanks to @aukgit)
+
+### Changed
+- **Minor Version Bump**: Synchronized all 14 version configuration manifests to 4.288.0 (`package.json`, `version.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, etc.) (Thanks to @aukgit)
+
+---
+
 ## [v4.287.0] - 2026-11-01
 
 ### Fixed
@@ -1733,6 +1744,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.288.0 (2026-11-01)**:
+        -   **[提示词树队列缓存失效 CI 修复] 修复 E0061 编译错误并首次发布 4.286.0 与 4.287.0 的提示词树改动 (Thanks to @aukgit)**:
+            -   **Description**: 修复阻塞主分支 CI 与发布的 Rust 编译错误 E0061：`src-tauri/src/modules/repo_db/queue.rs` 中 `clear_queued_prompts_for_instance` 以零参数调用 `invalidate_prompt_tree_cache()`，而该函数需要一个 `Option<&str>` 参数；现将调用方的 `instance_id` 直接透传，定向清理仅失效该实例的提示词树缓存，全量清理则失效全部缓存；`v4.286.0` 与 `v4.287.0` 标签指向编译失败的提交且从未产生发布，本版本首次正式发布其提示词树改动（排队项移除与 SWR 复活修复、虚假 QUEUED 标记消除、复制按钮附件修复与三段式附件规范、下拉菜单点击外部关闭），详见下方各自版本条目 (Thanks to @aukgit).
+
+
     *   **v4.287.0 (2026-11-01)**:
         -   **[提示词树复制按钮附件与三段式链接规范修复] 修复复制缺少截图附件问题并支持点击外部自动关闭下拉菜单 (Thanks to @aukgit)**:
             -   **Description**: 解决提示词树视图中主复制按钮及下拉菜单复制文本时遗漏截图附件的问题；在 `DetailHeader.tsx` 中整合当前轮次、会话级别和内联截图媒体路径，通过 `formatPromptWithAttachments()` 统一转换为标准附件块后写入剪贴板；将多模态附件标准化为 `[Attachment XX | Description | filename](file;<exact_path>)` 规范格式，并保持对旧格式的完全向下兼容；在各分段胶囊按钮容器上引入 `useClickOutside`，实现点击外部区域立即关闭复制、调度与 Next Breakdown 弹出菜单；修复 `usePromptTreeData.ts` 中单元测试合成时间戳的保留逻辑，并通过全量构建门禁 (Thanks to @aukgit)。

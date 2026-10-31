@@ -7,7 +7,7 @@
     "inheritanceRule": "When a section is set to 'inherit', all tooling and codebases resolving that sub-package must inherit the root global Version.",
     "prohibition": "Never hardcode version numbers in code, scripts, or documentation. Always read from or sync with version.json."
   },
-  "Version": "4.287.0",
+  "Version": "4.288.0",
   "Title": "Antigravity Manager Tools",
   "Description": "Cross-platform reverse proxy and account manager for Antigravity (Google DeepMind agentic AI assistant / IDE).",
   "FullName": "Antigravity Manager Tools",
@@ -1417,6 +1417,6 @@
       "03-ai-scripts/update_trial_run.py": "8996c579376b942ac650bc6a9febc43cc7db88ec9d52986e8edf705534a6d4d1"
     }
   },
-  "version": "4.287.0",
+  "version": "4.288.0",
   "releaseDate": "2026-10-31"
 }

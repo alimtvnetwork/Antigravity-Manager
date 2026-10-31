@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.287.0-3B82F6?style=flat-square" alt="Version v4.287.0">
+    <img src="https://img.shields.io/badge/Version-v4.288.0-3B82F6?style=flat-square" alt="Version v4.288.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,7 +116,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.287.0)**
+**Bar 2: Version-Based Installation (v4.288.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.258.0/install.ps1))) -Version "v4.258.0"
 ```
@@ -542,6 +542,9 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
   - **Cold-Start IDE 5-Second Stabilization Ladder & Send Reliability**: Upgraded `src-tauri/src/modules/instance/smart_run.rs` and `src-tauri/src/modules/repo_db/agy.rs` with an adaptive 5-second process stabilization ladder and CDP retry mechanism for cold-started IDE instances, eliminating lost prompts when dispatching to closed IDEs. (Thanks to @aukgit)
   - **Prompt Tree Image Rendering & Queued/Running Visibility**: Added Tauri v2 `core:asset:default` capability permission in `src-tauri/capabilities/default.json` and resolved relative image paths against project `repo_path` before passing to `convertFileSrc` in `clipboard.ts` and `PromptMarkdownPreview.tsx`; protected queued prompts from stale conversation demotion in `conversationGuards.ts`; synthesized running/queued projects from `active_prompts` in `src-tauri/src/modules/repo_db/tree_phases.rs`, ensuring the left panel is never empty when prompts are in flight. (Thanks to @aukgit)
   - **Expand Full / Fold Tab Switch Persistence**: Fixed UI bug in `src/components/instances/PromptTreeView/DetailTabs.tsx` where switching from the Input to Output tab caused the `Expand Full` toggle to unmount; decoupled `hasExpandToggle` so output text can be expanded to full height seamlessly. (Thanks to @aukgit)
+- **v4.288.0** (2026-11-01):
+  - **Prompt Tree Queue Cache Invalidation CI Fix**: Fixed Rust compile error E0061 blocking CI and release on main: `clear_queued_prompts_for_instance` in `src-tauri/src/modules/repo_db/queue.rs` called `invalidate_prompt_tree_cache()` with zero arguments while the function requires one `Option<&str>` argument; the call now passes the caller's `instance_id` through, so a scoped clear invalidates only that instance's prompt-tree cache and an all-instances clear invalidates everything. (Thanks to @aukgit)
+  - **First Release of the 4.286.0 and 4.287.0 Prompt Tree Changes**: The `v4.286.0` and `v4.287.0` tags pointed at broken-CI commits and never produced releases; this release ships their prompt-tree changes for the first time, as documented under their own entries below. (Thanks to @aukgit)
 - **v4.287.0** (2026-11-01):
   - **Prompt Tree View Copy Button Attachment Bug Fix**: Resolved issue where copying prompts via the Prompt Tree View primary Copy button and dropdown options omitted screenshot attachments; enhanced `DetailHeader.tsx` to resolve active turn media paths, conversation-level attachments, and inline image targets into a unified attachment set and format the copied prompt using `formatPromptWithAttachments()` before writing to clipboard; ensured full parity across Plain Text, Rich Format, Local File Links, and Base64 copy modes. (Thanks to @aukgit)
   - **Canonical 3-Tier Attachment Syntax Normalization**: Standardized multimodal prompt attachments to the canonical format `[Attachment XX | Description | filename](file;<exact_path>)` with lowercase `file`, semicolon `;`, zero `@` prefix on display brackets, and automatic screenshot description generation; updated `src/utils/promptAttachment.ts`, `src-tauri/src/modules/repo_db/detection.rs`, and unit test suites while maintaining full backward compatibility with legacy `@[...]` tokens. (Thanks to @aukgit)
