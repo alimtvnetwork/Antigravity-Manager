@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.284.0] - 2026-10-31
+
+### Fixed
+- **CI Compile Errors Blocking Main (Wave 1)**: Restored green CI on main by adding the missing `rolling_4h_quota` field to `ProfileCandidate` in `src-tauri/src/modules/auto_switcher/scoring.rs` and populating it at all seven candidate construction sites in `selection.rs`, capturing the 4-hour quota before the by-value rotation call in `manual.rs` to avoid a use-after-move, and marking the `active_prompt` binding mutable in `src-tauri/src/modules/repo_db/agy.rs` so the dispatched status persists after live DevTools CDP injection instead of double-dispatching (Thanks to @aukgit)
+- **CI Borrow Error Blocking Main (Wave 2)**: Fixed E0500 double mutable borrow in `src-tauri/src/modules/repo_db/tree_node_conv.rs` by resolving the target conversation index under a shared borrow first and then taking a single mutable borrow, preserving the first-running-else-first conversation selection for CDP queued composer message harvesting (Thanks to @aukgit)
+
+### Changed
+- **Minor Version Bump**: Synchronized all version manifests to 4.284.0 (package.json, version.json, src-tauri/Cargo.toml, src-tauri/tauri.conf.json, and related manifests) (Thanks to @aukgit)
+
+---
+
 ## [v4.283.0] - 2026-10-31
 
 ### Added
@@ -1677,6 +1688,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.284.0 (2026-10-31)**:
+        -   **[CI/CD Fix and Release] Restore green CI on main and ship a minor bump release**:
+            -   **Description**: Fixed the CI-blocking compile errors (missing `rolling_4h_quota` field on `ProfileCandidate`, use-after-move in manual rotation, immutable `active_prompt` binding, and E0500 double borrow in tree node conversion) and synchronized all version manifests to 4.284.0 (Thanks to @aukgit).
+
+
     *   **v4.283.0 (2026-10-31)**:
         -   **[Multi-Instance Prompt Queue & Liveness] Enqueued Prompts Detection & Multi-Instance Liveness Parity**:
             -   **Description**: Resolved enqueued prompt invisibility in multi-instance UI by expanding `enqueued_ide` status recognition, resilient DevTools CDP queue harvesting, and universal liveness preservation across single and secondary instances (Thanks to @aukgit).

@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.284.0 (2026-10-31)**:
+        -   **[CI/CD Fix and Release] Restore green CI on main and ship a minor bump release**:
+            -   **Description**: Fixed the CI-blocking compile errors (missing `rolling_4h_quota` field on `ProfileCandidate`, use-after-move in manual rotation, immutable `active_prompt` binding, and E0500 double borrow in tree node conversion) and synchronized all version manifests to 4.284.0 (Thanks to @aukgit).
+
     *   **v4.283.0 (2026-10-31)**:
         -   **[Next 100 Improvements Flywheel Integration in Prompt Tree View] Direct access to 100 Improvements Flywheel, Next Breakdown, and batch execution inside Prompt Tree View (Thanks to @aukgit)**:
             -   **Description**: Directly integrated the 100 Improvements Flywheel and Next Breakdown options into the Prompt Tree View; added Capsule C (`[✨ Next Breakdown | 100 | v]`) into `src/components/instances/PromptTreeView/DetailHeader.tsx` action bar alongside Copy and Dispatch capsules; added "Next Breakdown (100 Improvements)" option to the Unified Dispatch Configuration Popover; created `src/components/instances/PromptTreeView/ImprovementsBreakdownModal.tsx` providing wave visualization, slot progress (`5/5 slots`), active task hints, category selector (`system`, `ui`, `code`, `ideas`), Dry Run inspection, and direct markdown export; and added "Next Breakdown (100 Steps)" to `ConversationContextMenu.tsx` and "Plan 100 Improvements..." to `ProjectContextMenu.tsx`. (Thanks to @aukgit)

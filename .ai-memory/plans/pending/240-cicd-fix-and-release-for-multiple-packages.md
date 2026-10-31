@@ -3,7 +3,9 @@
 Date: 31-Oct-26
 Branch: main
 Base: 3659500cf (origin/main at pull time)
-Current version: 4.281.2 -> target 4.282.0 (minor bump)
+Current version: 4.283.0 -> target 4.284.0 (minor bump, recomputed
+after other agents' v4.282.0/v4.283.0 pushes moved main; original
+wave-1 target 4.282.0 is superseded - see CI state update below)
 
 ## User request (verbatim summary)
 
