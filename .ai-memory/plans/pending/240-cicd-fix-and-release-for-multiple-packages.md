@@ -37,6 +37,18 @@ with a clean tree and local equal to origin on the release branch.
 - 02 - compile-error fix (scoring.rs field, selection.rs seven sites,
   agy.rs `mut`) plus local fmt and clippy pre-flight
 - 03 - bump, tag, release, and final verification
+- 04 - wave-2 E0500 fix (tree_node_conv.rs index-first borrow) on tip
+  608abea60, after other agents' v4.282.0/v4.283.0 pushes moved main
+
+## CI state update (wave 2)
+
+- Wave-1 fix commit 45edad629: CI run 41201814856 fully green (all 6
+  jobs success).
+- New tip 608abea60 (other agents' work on top): CI run 41202605011
+  failed, single error E0500 in tree_node_conv.rs:856. Fixed in this
+  run; the release base is therefore the post-wave-2 tip, and the
+  minor bump is recomputed from the then-current version (4.283.0 ->
+  4.284.0), not the stale 4.282.0 target from wave 1.
 
 Subtask files live in
 .ai-memory/plans/subtasks/240-cicd-fix-and-release-for-multiple-packages/.

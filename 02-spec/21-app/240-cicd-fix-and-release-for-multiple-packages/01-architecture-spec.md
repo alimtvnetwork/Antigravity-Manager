@@ -91,6 +91,23 @@ the v5.0.12 tag pointing at a non-main commit, workflow files
 (.github/workflows/ - untouched, so no workflow-scope push blocker is
 triggered), and any UI or protocol change.
 
+## 2d. Wave 2 - E0500 on the moved tip (other agents' commits)
+
+While the wave-1 fix commit's CI run (41201814856) went fully green,
+other agents pushed feature commits on top (v4.282.0, v4.283.0, and a
+synchronizer fix, tip 608abea60), and CI run 41202605011 on that tip
+failed with a single new error: E0500 in
+src-tauri/src/modules/repo_db/tree_node_conv.rs:856, in the CDP queued
+composer message harvesting block of `build_active_prompt_conv_nodes`.
+The code chained `conv_nodes.iter_mut().find(|c| c.is_running)` with
+`.or_else(|| conv_nodes.first_mut())`, borrowing the vector twice.
+Fix (this run): resolve the index under a shared borrow
+(`position(|c| c.is_running)`, falling back to index 0 when the list
+is non-empty), then take exactly one mutable borrow via
+`&mut conv_nodes[idx]`. Selection semantics are unchanged: first
+running conversation, else the first conversation, else none when the
+list is empty. No other file in this wave is touched.
+
 ## 4. Verification contract
 
 - Local pre-flight per repo house rules: `cargo fmt -- --check` and
