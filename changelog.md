@@ -3,8 +3,12 @@
 ## [v4.284.0] - 2026-10-31
 
 ### Fixed
+- **Manifest-First Version Resolution & Rogue v5 Gate**: Enforced single source of truth versioning across `.agents/scripts/38-sync-prompts-skills-scripts.py` and `03-ai-scripts/38-sync-prompts-skills-scripts.py`; ensured `version.json` and `package.json` are evaluated first before falling back to git tags, preventing upstream release tags from hijacking the repository's canonical 4.x track; preserved major version 4 progression (`v4.284.0`), strictly gating major version 5 until explicitly commanded; purged all legacy `v5*` GitHub releases, remote tags, and local tags across all environments; and documented 4-part RCA in `02-spec/22-app-issues/39-rogue-v5-release-root-cause-analysis-and-manifest-first-fix.md` (Thanks to @aukgit)
 - **CI Compile Errors Blocking Main (Wave 1)**: Restored green CI on main by adding the missing `rolling_4h_quota` field to `ProfileCandidate` in `src-tauri/src/modules/auto_switcher/scoring.rs` and populating it at all seven candidate construction sites in `selection.rs`, capturing the 4-hour quota before the by-value rotation call in `manual.rs` to avoid a use-after-move, and marking the `active_prompt` binding mutable in `src-tauri/src/modules/repo_db/agy.rs` so the dispatched status persists after live DevTools CDP injection instead of double-dispatching (Thanks to @aukgit)
 - **CI Borrow Error Blocking Main (Wave 2)**: Fixed E0500 double mutable borrow in `src-tauri/src/modules/repo_db/tree_node_conv.rs` by resolving the target conversation index under a shared borrow first and then taking a single mutable borrow, preserving the first-running-else-first conversation selection for CDP queued composer message harvesting (Thanks to @aukgit)
+
+### Added
+- **Next 100 Improvements Flywheel Integration in Prompt Tree View**: Directly integrated the 100 Improvements Flywheel and Next Breakdown options into the Prompt Tree View; added Capsule C (`[✨ Next Breakdown | 100 | v]`) into `src/components/instances/PromptTreeView/DetailHeader.tsx` action bar alongside Copy and Dispatch capsules; added "Next Breakdown (100 Improvements)" option to the Unified Dispatch Configuration Popover; added `src/components/instances/PromptTreeView/ImprovementsBreakdownModal.tsx` providing wave visualization, slot progress (`5/5 slots`), active task hints, category selector (`system`, `ui`, `code`, `ideas`), Dry Run inspection, and direct markdown export; and added "Next Breakdown (100 Steps)" to `ConversationContextMenu.tsx` and "Plan 100 Improvements..." to `ProjectContextMenu.tsx` (Thanks to @aukgit)
 
 ### Changed
 - **Minor Version Bump**: Synchronized all version manifests to 4.284.0 (package.json, version.json, src-tauri/Cargo.toml, src-tauri/tauri.conf.json, and related manifests) (Thanks to @aukgit)
@@ -1689,6 +1693,8 @@
 
 *   **Version History**:
     *   **v4.284.0 (2026-10-31)**:
+        -   **[Manifest-First Version Resolution & Rogue v5 Gate] Single source of truth versioning and 4.x progression defense (Thanks to @aukgit)**:
+            -   **Description**: Enforced single source of truth versioning across `.agents/scripts/38-sync-prompts-skills-scripts.py` and `03-ai-scripts/38-sync-prompts-skills-scripts.py`; ensured `version.json` and `package.json` are evaluated first before falling back to git tags, preventing upstream release tags from hijacking the repository's canonical 4.x track; preserved major version 4 progression (`v4.284.0`), strictly gating major version 5 until explicitly commanded; purged all legacy `v5*` GitHub releases, remote tags, and local tags across all environments; and documented 4-part RCA in `02-spec/22-app-issues/39-rogue-v5-release-root-cause-analysis-and-manifest-first-fix.md` (Thanks to @aukgit).
         -   **[CI/CD Fix and Release] Restore green CI on main and ship a minor bump release**:
             -   **Description**: Fixed the CI-blocking compile errors (missing `rolling_4h_quota` field on `ProfileCandidate`, use-after-move in manual rotation, immutable `active_prompt` binding, and E0500 double borrow in tree node conversion) and synchronized all version manifests to 4.284.0 (Thanks to @aukgit).
 
