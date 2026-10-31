@@ -358,6 +358,7 @@ pub fn run() {
             commands::enqueue_prompt,
             commands::cancel_running_prompt,
             commands::resend_queued_prompts,
+            commands::clear_queued_prompts,
             commands::backup_queued_prompts,
             commands::resend_running_prompts,
             commands::resend_all_prompts,

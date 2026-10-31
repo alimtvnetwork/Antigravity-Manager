@@ -90,8 +90,8 @@ pub use dispatch::{
 pub use liveness::is_prompt_running_for_project;
 // ---- queue ----
 pub use queue::{
-    check_and_dispatch_enqueued_prompts, count_enqueued_prompts, enqueue_prompt_for_instance_full,
-    requeue_running_conversations_for_instance,
+    check_and_dispatch_enqueued_prompts, clear_queued_prompts_for_instance, count_enqueued_prompts,
+    enqueue_prompt_for_instance_full, requeue_running_conversations_for_instance,
 };
 // ---- project_queries ----
 pub use project_queries::{

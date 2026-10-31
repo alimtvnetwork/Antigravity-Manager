@@ -23,6 +23,7 @@ import { sendPromptNow } from '../../../services/instanceService';
 import { DetailHeader } from './DetailHeader';
 import { DetailTabs } from './DetailTabs';
 import { PromptInstructionView } from './PromptInstructionView';
+import { PromptTreeBreakdownView } from './PromptTreeBreakdownView';
 import { ResultsView } from './ResultsView';
 import { DetailEmptyState } from './DetailEmptyState';
 import { InspectorModal } from './InspectorModal';
@@ -1185,7 +1186,14 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                         setIsDetailsModalOpen={setIsDetailsModalOpen}
                                     />
 
-                                    {previewTab === 'instruction' ? (
+                                    {previewTab === 'improvements' ? (
+                                        <PromptTreeBreakdownView
+                                            instanceId={instanceId}
+                                            conversationTitle={selectedConversation?.title}
+                                            repoPath={selectedProject?.repo_path || ''}
+                                            onPromptDispatched={() => void loadTree()}
+                                        />
+                                    ) : previewTab === 'instruction' ? (
                                         <PromptInstructionView
                                             selectedConversation={selectedConversation}
                                             previewTab={previewTab}

@@ -1,5 +1,23 @@
 # Changelog
 
+## [v4.286.0] - 2026-10-31
+
+### Fixed
+- **Prompt Tree Queued Item Removal & SWR Resuscitation Fix**: Resolved issue where removing/dequeuing items from the queue failed to remove them in the Prompt Tree View; bounded optimistic queued turns in `src/components/instances/PromptTreeView/usePromptTreeData.ts` to a 12-second TTL (`OPTIMISTIC_QUEUED_TTL_MS`), preventing stale or dequeued turns from being indefinitely resuscitated across background SWR polls; fixed inverted ternary logic in `mergeQueuedTurns` (`hasQueued ? incoming : { ...incoming, is_queued: false }`); ensured force-refresh explicitly purges `previousTreeRef` cache; and added native `clear_queued_prompts` IPC command (`src-tauri/src/commands/cmd_queue_resend.rs`, `src-tauri/src/modules/repo_db/queue.rs`) with an interactive `[ Clear Queue ]` action in `src/components/instances/PromptTreeView/DetailHeader.tsx` (Thanks to @aukgit)
+- **False 1 QUEUED Badge Elimination on Idle Projects**: Resolved bug where idle projects (e.g. `scripts-fixer`, `spec-builder`, `wp-exam`) falsely displayed `1 QUEUED` badges when another project under the same instance had queued composer messages; removed `.or_else(|| conv_nodes.first().map(|_| 0))` fallback in `src-tauri/src/modules/repo_db/tree_node_conv.rs`, strictly requiring an actively running conversation (`conv_nodes.iter().position(|c| c.is_running)`) before attaching live CDP queued turns; and reconciled conversation `is_queued` flags with actual prompt turns in `src-tauri/src/modules/repo_db/tree_nodes.rs`, ensuring `c.is_queued` is true only when `c.prompts.iter().any(|p| p.is_queued)` (Thanks to @aukgit)
+- **Server Cluster Fleet Current Machine Detection & Lead Deduplication**: Fixed host machine detection in `src/components/instances/fleet/useFleetMachines.ts` and `src-tauri/src/modules/supabase_sync/query.rs` so the local host `w2` (192.168.1.7) is reliably identified with the `[Local]` badge; enforced `seen_ips` deduplication in `collect_all_peer_connections()` to eliminate phantom duplicate `server` entry (`192.168.1.3`), ensuring only canonical cluster nodes are registered; and restricted the purple `[Lead]` badge strictly to `w1` in `src/components/instances/fleet/FleetMachineRow.tsx` and `useFleetMachines.ts`, removing loose IP-based assignment (Thanks to @aukgit)
+- **Duplicate "+ New Instance" Button Removal**: Removed redundant duplicate `+ New Instance` button on the Instances page in `src/pages/instances/InstancesHeader.tsx`, leaving a clean, uncluttered toolbar (Thanks to @aukgit)
+
+### Added
+- **Compact Segmented Action Capsules with Reduced Border Radius**: Redesigned Prompt Tree action buttons in `src/components/instances/PromptTreeView/DetailHeader.tsx` to reduce border radius from bulky `rounded-full` pills to modern, compact `rounded-md` (6px radius) capsules with uniform `h-7` height, subtle borders, and `divide-x` dividers; consolidated `[ Send ]` (Hotkey: N), `[ Enqueue ]` (Hotkey: Q), `[ Rerun ×N ]` (Hotkey: R), and dropdown chevron into a contiguous segmented capsule, providing instant 1-click execution for each dispatch mode while preserving full popover configuration (Thanks to @aukgit)
+- **Interactive Next Breakdown Dropdown & Configuration Popover**: Added interactive dropdown popover to `[ ✨ Next Breakdown ({count}) | ▾ ]` in `src/components/instances/PromptTreeView/DetailHeader.tsx`, allowing operators to configure categories (`Code Quality`, `UI / UX`, `Whole System`, `Innovations`), step counts (`10`, `20`, `50`, `100 Tasks`), and Dry Run inspection before dispatch; provided instant automated dispatch actions directly from the popover (Auto-Enqueue Next Batch, Detail Out Tasks, Plan 100 Steps, Check Backlog); and added direct navigation shortcut `[ ✨ Open In-Tree Breakdowns Tab (100) ]` to jump straight into the in-tree breakdown view (Thanks to @aukgit)
+- **In-Tree 100 Improvements Breakdowns View**: Added dedicated `[ ✨ Breakdowns (100) ]` tab to `src/components/instances/PromptTreeView/DetailTabs.tsx` (`PreviewTabType = 'instruction' | 'results' | 'improvements'`); created `src/components/instances/PromptTreeView/PromptTreeBreakdownView.tsx` connecting directly to `improvementsService` (`status`, `plan`, `next`, `detail`, `check`), rendering visual wave progress, slot execution status (`0/5 slots`), active workspace task hints, and CLI command parity hints directly inside the Prompt Tree View modal (Thanks to @aukgit)
+
+### Changed
+- **Minor Version Bump**: Synchronized all 14 version configuration manifests to 4.286.0 (`package.json`, `version.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, etc.) (Thanks to @aukgit)
+
+---
+
 ## [v4.285.0] - 2026-10-31
 
 ### Fixed
@@ -1702,6 +1720,15 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.286.0 (2026-11-01)**:
+        -   **[提示词树排队项移除与 SWR 复活修复] 解决排队项出队后视图残留问题，防止乐观缓存死循环复活 (Thanks to @aukgit)**:
+            -   **Description**: 解决从执行队列中移除或出队时提示词树视图未同步移除的问题；在 `src/components/instances/PromptTreeView/usePromptTreeData.ts` 中为乐观排队轮次引入 12 秒 TTL 机制（`OPTIMISTIC_QUEUED_TTL_MS`），避免出队项在后台 SWR 轮询中被无限次复活；修复 `mergeQueuedTurns` 中的三元条件取反缺陷；强制刷新时清空 `previousTreeRef`；并新增 `clear_queued_prompts` IPC 命令与一键清空排队按钮 (Thanks to @aukgit)。
+        -   **[消除空闲项目虚假 1 QUEUED 徽章] 修复多项目排队状态串扰 (Thanks to @aukgit)**:
+            -   **Description**: 修复空闲项目因同实例下其他项目排队而错误显示 `1 QUEUED` 徽章的问题；移除 `src-tauri/src/modules/repo_db/tree_node_conv.rs` 中降级至首个会话的处理，严格仅当存在正在运行的会话时才挂载 CDP 实时排队数据；在 `src-tauri/src/modules/repo_db/tree_nodes.rs` 中确保 `c.is_queued` 严格基于实际提示词轮次计算 (Thanks to @aukgit)。
+        -   **[紧凑胶囊按钮与交互式 Next Breakdown 下拉菜单] 紧凑圆角胶囊与树内 100 项改进集成 (Thanks to @aukgit)**:
+            -   **Description**: 将 Prompt Tree 操作按钮（Copy、Send、Enqueue、Rerun ×N、Next Breakdown）收紧为低圆角 `rounded-md` (6px) 与固定 `h-7` 高度的深色玻璃分段胶囊；为 `Next Breakdown` 添加交互式下拉面板，支持切换类别（代码、UI、系统、创意）、任务数量（10/20/50/100）及一键执行；在 `DetailTabs.tsx` 中新增 `[ ✨ Breakdowns (100) ]` 标签页并创建 `PromptTreeBreakdownView.tsx` 组件；修复共享集群中本地主机 `w2` 检测与 `server` 节点去重，移除多余的 `+ New Instance` 按钮，并全量同步版本至 4.286.0 (Thanks to @aukgit)。
+
+
     *   **v4.285.0 (2026-10-31)**:
         -   **[GitMap Pipeline Telemetry Audit & Cache Healing] Real-time CI/CD telemetry audit and 100% green pipeline clearance (Thanks to @aukgit)**:
             -   **Description**: Diagnosed and verified CI/CD pipeline runs using GitMap telemetry (`gitmap pe`), cleared stale pipeline database cache, verified 100% green status across all recent CI and Release workflows on `main`, and synchronized all version manifests to 4.285.0 (Thanks to @aukgit).

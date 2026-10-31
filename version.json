@@ -1,19 +1,19 @@
 {
+  "_purpose": "version.json is the single canonical source of truth for repository versioning, releases, metadata, and cross-repo dependencies. All tools, packages, scripts, CI/CD pipelines, manifests, and AI agents must read this file for version information. To bump or change the version in this repository, update the 'Version' field (or sub-package sections) in this file and run the project sync script.",
+  "_instructions": {
+    "versionSourceOfTruth": "Every codebase must use version.json at the repository root as the single source of truth for version numbers.",
+    "howToChangeVersion": "To change the version of the repository, edit the 'Version' field in version.json, then run project sync scripts to propagate it across all files, docs, and manifests.",
+    "subPackageSections": "Supports sub-component sections (e.g. backend, frontend, cli). Set to 'inherit' to use the global root Version, or specify an explicit version string for independent version tracks.",
+    "inheritanceRule": "When a section is set to 'inherit', all tooling and codebases resolving that sub-package must inherit the root global Version.",
+    "prohibition": "Never hardcode version numbers in code, scripts, or documentation. Always read from or sync with version.json."
+  },
+  "Version": "4.286.0",
+  "Title": "Antigravity Manager Tools",
   "Description": "Cross-platform reverse proxy and account manager for Antigravity (Google DeepMind agentic AI assistant / IDE).",
   "FullName": "Antigravity Manager Tools",
   "Publisher": "Maintained by Alim, Sponsored by RISEUP ASIA LLC",
   "RepoSlug": "alimtvnetwork/Antigravity-Manager",
   "RepoUrl": "https://github.com/alimtvnetwork/Antigravity-Manager",
-  "Title": "Antigravity Manager Tools",
-  "Version": "4.285.0",
-  "_instructions": {
-    "howToChangeVersion": "To change the version of the repository, edit the 'Version' field in version.json, then run project sync scripts to propagate it across all files, docs, and manifests.",
-    "inheritanceRule": "When a section is set to 'inherit', all tooling and codebases resolving that sub-package must inherit the root global Version.",
-    "prohibition": "Never hardcode version numbers in code, scripts, or documentation. Always read from or sync with version.json.",
-    "subPackageSections": "Supports sub-component sections (e.g. backend, frontend, cli). Set to 'inherit' to use the global root Version, or specify an explicit version string for independent version tracks.",
-    "versionSourceOfTruth": "Every codebase must use version.json at the repository root as the single source of truth for version numbers."
-  },
-  "_purpose": "version.json is the single canonical source of truth for repository versioning, releases, metadata, and cross-repo dependencies. All tools, packages, scripts, CI/CD pipelines, manifests, and AI agents must read this file for version information. To bump or change the version in this repository, update the 'Version' field (or sub-package sections) in this file and run the project sync script.",
   "backend": "inherit",
   "frontend": "inherit",
   "releaseDate": "2026-10-31",
@@ -1417,5 +1417,6 @@
       "03-ai-scripts/update_trial_run.py": "8996c579376b942ac650bc6a9febc43cc7db88ec9d52986e8edf705534a6d4d1"
     }
   },
-  "version": "4.285.0"
+  "version": "4.286.0",
+  "releaseDate": "2026-10-31"
 }

@@ -1,10 +1,10 @@
-import { Eye, Code, Edit3, Activity, ChevronUp, ChevronDown, MessageSquare, Terminal } from 'lucide-react';
+import { Eye, Code, Edit3, Activity, ChevronUp, ChevronDown, MessageSquare, Terminal, Sparkles } from 'lucide-react';
 import { cn } from '../../../utils/cn';
-import { PromptViewMode, type AgmConversationNode, type ViewMode } from './types';
+import { PromptViewMode, type AgmConversationNode, type ViewMode, type PreviewTabType } from './types';
 
 export interface DetailTabsProps {
-    previewTab: 'instruction' | 'results';
-    setPreviewTab?: (v: 'instruction' | 'results') => void;
+    previewTab: PreviewTabType;
+    setPreviewTab?: (v: PreviewTabType) => void;
     selectedConversation?: AgmConversationNode;
     activeWordCount: number;
     activeByteCount: number;
@@ -144,6 +144,23 @@ export function DetailTabs(props: DetailTabsProps) {
                                 {(selectedConversation?.execution_results || selectedConversation?.latest_response) && (
                                     <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
                                 )}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setPreviewTab('improvements')}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1 rounded-none text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer",
+                                    previewTab === 'improvements'
+                                        ? "bg-amber-600 text-white shadow-2xs"
+                                        : "text-slate-600 dark:text-slate-300 hover:text-amber-500 dark:hover:text-amber-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/80"
+                                )}
+                                aria-label="Next Improvements Breakdowns"
+                                title="Inspect 100 Improvements Flywheel waves, categories, and execution slots"
+                            >
+                                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                                <span>Breakdowns</span>
+                                <span className="text-[9px] px-1 py-0.2 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-300 font-mono">100</span>
                             </button>
                         </>
                     )}

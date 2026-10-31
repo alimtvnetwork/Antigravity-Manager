@@ -109,6 +109,8 @@ export enum CopyFormat {
     Json = 'json',
 }
 
+export type PreviewTabType = 'instruction' | 'results' | 'improvements';
+
 export type ViewMode = PromptViewMode | 'preview' | 'raw' | 'edit';
 
 export type PromptTier = PromptOriginTier | 'USER_PROMPT' | 'SUBAGENT_INSTRUCTION' | 'SYSTEM_MESSAGE' | 'TOOL_OUTPUT';

@@ -4,9 +4,9 @@ import { copyImageAsMarkdownText, writePureImageToClipboard, copyPromptWithRichI
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { formatRelativeRecency } from './formatters';
-import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat, Send, Shield, Sparkles } from 'lucide-react';
+import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat, Send, Shield, Sparkles, Layers, Play, ChevronRight } from 'lucide-react';
 import { cn } from '../../../utils/cn';
-import { CopyFormat, type AgmConversationNode, type AgmPromptTurnNode } from './types';
+import { CopyFormat, type AgmConversationNode, type AgmPromptTurnNode, type PreviewTabType } from './types';
 import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, dispatchConversationId, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, extractUsedNudgesFromConversation, RERUN_RANDOM_MESSAGE_SET, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
 import { patchPromptTreeSwrCache, queuedPromptCount } from './usePromptTreeData';
 import { isGhostConversation } from './conversationGuards';
@@ -14,7 +14,8 @@ import { persistClientCrash } from '../../../lib/error-listener';
 import { useErrorStore } from '../../../stores/error-store';
 import { VERIFICATION_OPTIONS, parseVerificationTypeFromSuffix, getCustomSuffixTemplates, type SuffixTemplate } from './verificationTemplates';
 import { SuffixTemplateModal } from './SuffixTemplateModal';
-import { improvementsService } from '../../../services/improvementsService';
+import { improvementsService, type FlywheelState, type ImprovementKind } from '../../../services/improvementsService';
+import { flywheelActionToast, resolveImprovementsInstanceId } from '../../../services/improvementsFlywheelUtils';
 import { showToast } from '../../common/ToastContainer';
 import { ImprovementsBreakdownModal } from './ImprovementsBreakdownModal';
 
@@ -42,8 +43,8 @@ function reportPromptActionError(err: unknown, source: string): void {
 export type DispatchActionMode = 'send' | 'enqueue' | 'rerun';
 
 export interface DetailHeaderProps {
-    previewTab?: 'instruction' | 'results';
-    setPreviewTab?: (v: 'instruction' | 'results') => void;
+    previewTab?: PreviewTabType;
+    setPreviewTab?: (v: PreviewTabType) => void;
     showAllWords?: boolean;
     setShowAllWords?: (v: boolean | ((prev: boolean) => boolean)) => void;
     isTruncated?: boolean;
@@ -110,6 +111,7 @@ export interface DetailHeaderProps {
 
 export function DetailHeader(props: DetailHeaderProps) {
     const {
+        setPreviewTab,
         selectedConversation, activePromptText,
         confirmationSuffix, setConfirmationSuffix,
         conversationTargetMode = 'current', setConversationTargetMode,
@@ -253,24 +255,64 @@ export function DetailHeader(props: DetailHeaderProps) {
 
     // Improvements Breakdown (100 Improvements Flywheel) state
     const [isBreakdownModalOpen, setIsBreakdownModalOpen] = useState(false);
+    const [isBreakdownDropdownOpen, setIsBreakdownDropdownOpen] = useState(false);
+    const [breakdownCategory, setBreakdownCategory] = useState<ImprovementKind>('code');
+    const [breakdownStepCount, setBreakdownStepCount] = useState<number>(100);
+    const [breakdownDryRun, setBreakdownDryRun] = useState(false);
     const [isBreakingDown, setIsBreakingDown] = useState(false);
+    const [isClearingQueue, setIsClearingQueue] = useState(false);
 
-    const handleTriggerNextBreakdown = async () => {
-        if (isBreakingDown) return;
-        setIsBreakingDown(true);
+    const handleClearQueue = async () => {
+        setIsClearingQueue(true);
         try {
-            const targetInst = selectedConversation.instance_id || propInstanceId || 'default';
-            const nextState = await improvementsService.detail(false, targetInst);
-            setActionMsg?.(`100 Improvements breakdown dispatched (Wave ${nextState.wave})`);
-            showToast(`100 Improvements breakdown dispatched (Wave ${nextState.wave})`, 'success', 2500);
+            const target = selectedConversation.instance_id || propInstanceId || 'default';
+            const count = await invoke<number>('clear_queued_prompts', {
+                instanceId: target,
+            });
+            showToast(`Cleared ${count} queued prompt(s)`, 'success');
             if (_loadTree) {
                 await _loadTree(false, true);
             }
         } catch (err) {
-            reportPromptActionError(err, 'DetailHeader.triggerNextBreakdown');
+            reportPromptActionError(err, 'DetailHeader.handleClearQueue');
+            showToast('Failed to clear queue', 'error');
+        } finally {
+            setIsClearingQueue(false);
+        }
+    };
+
+    const handleRunBreakdownAction = async (action: 'next' | 'plan' | 'detail' | 'check') => {
+        if (isBreakingDown) return;
+        setIsBreakingDown(true);
+        const targetInst = resolveImprovementsInstanceId(selectedConversation.instance_id || propInstanceId || 'default');
+        try {
+            let res: FlywheelState;
+            if (action === 'plan') {
+                res = await improvementsService.plan(breakdownCategory, breakdownDryRun, targetInst);
+            } else if (action === 'next') {
+                res = await improvementsService.next(breakdownDryRun, targetInst);
+            } else if (action === 'detail') {
+                res = await improvementsService.detail(breakdownDryRun, targetInst);
+            } else {
+                res = await improvementsService.check(targetInst);
+            }
+            const msg = flywheelActionToast(action, breakdownDryRun, res);
+            showToast(msg, 'success');
+            setActionMsg?.(msg);
+            setIsBreakdownDropdownOpen(false);
+            if (_loadTree) {
+                await _loadTree(false, true);
+            }
+        } catch (err) {
+            reportPromptActionError(err, `DetailHeader.breakdown.${action}`);
+            showToast(`Breakdown action ${action} failed`, 'error');
         } finally {
             setIsBreakingDown(false);
         }
+    };
+
+    const handleTriggerNextBreakdown = async () => {
+        await handleRunBreakdownAction('next');
     };
 
     // Suffix Template Library & Popover state
@@ -795,14 +837,14 @@ export function DetailHeader(props: DetailHeaderProps) {
                 {/* Right: The Unified Segmented Dark-Glass Action Capsule */}
                 <div className="flex items-center shrink-0 ml-auto gap-2">
                     {/* Capsule A: Copy Split Button [ Copy | v ] */}
-                    <div className="relative inline-flex items-center rounded-full bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 shadow-2xs divide-x divide-slate-200/70 dark:divide-purple-500/20 shrink-0">
+                    <div className="relative inline-flex items-center rounded-md bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 shadow-2xs divide-x divide-slate-200/70 dark:divide-purple-500/20 shrink-0 h-7">
                         {/* Primary Button: Copy full prompt as plain text */}
                         <button
                             type="button"
                             onClick={() => { void handleCopyAll(); }}
                             data-ui-name="prompt-copy-all-btn"
                             data-ui-id={`prompt-copy-all-${selectedConversation.conversation_id}`}
-                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center gap-1.5 px-2.5 h-full rounded-l-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             aria-label="Copy full prompt text"
                         >
                             {isCopiedAllActive ? (
@@ -819,7 +861,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             onClick={() => setIsCopyMenuOpen((prev) => !prev)}
                             data-ui-name="prompt-copy-options-btn"
                             data-ui-id={`prompt-copy-options-${selectedConversation.conversation_id}`}
-                            className="flex items-center justify-center px-2 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center justify-center px-1.5 h-full rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             aria-label="More copy and export options"
                         >
                             <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isCopyMenuOpen && "rotate-180")} />
@@ -1087,75 +1129,67 @@ export function DetailHeader(props: DetailHeaderProps) {
                     </div>
 
                     {/* Capsule B: Combined [Send, Enqueue, Rerun] segmented pill capsule and dropdown */}
-                    <div className="relative inline-flex items-center rounded-full bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 shadow-2xs divide-x divide-slate-200/70 dark:divide-purple-500/20 shrink-0">
+                    <div className="relative inline-flex items-center rounded-md bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 shadow-2xs divide-x divide-slate-200/70 dark:divide-purple-500/20 shrink-0 h-7">
+                        {/* 1. Send Button */}
                         <button
                             type="button"
                             onClick={() => {
-                                if (primaryDispatchAction === 'enqueue') {
-                                    void Promise.resolve(onEnqueue()).catch((err) => {
-                                        reportPromptActionError(err, 'DetailHeader.onEnqueue');
-                                    });
-                                    return;
-                                }
-                                if (primaryDispatchAction === 'rerun') {
-                                    void handleRerun().catch((err) => {
-                                        reportPromptActionError(err, 'DetailHeader.rerunSection');
-                                    });
-                                    return;
-                                }
                                 void Promise.resolve(onResend()).catch((err) => {
                                     reportPromptActionError(err, 'DetailHeader.onResend');
                                 });
                             }}
-                            disabled={isResending || isEnqueueing || isRerunning}
-                            data-ui-name="prompt-dispatch-primary-btn"
-                            data-ui-id={`prompt-dispatch-primary-${selectedConversation.conversation_id}`}
-                            className={cn(
-                                "flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold transition-all duration-300 ease-out cursor-pointer disabled:opacity-50 rounded-l-full",
-                                primaryDispatchAction === 'enqueue'
-                                    ? "text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
-                                    : primaryDispatchAction === 'rerun'
-                                      ? "text-sky-700 dark:text-sky-400 hover:bg-sky-500/10"
-                                      : "text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
-                            )}
-                            title={
-                                primaryDispatchAction === 'enqueue'
-                                    ? "Enqueue (FIFO): Stages prompt into FIFO queue (Hotkey: Q)"
-                                    : primaryDispatchAction === 'rerun'
-                                      ? `Rerun Turn (×${rerunCount}): Enqueues previous turn into FIFO queue (Hotkey: R)`
-                                      : "Send (Preempt): Cancels active task and executes immediately (Hotkey: N)"
-                            }
-                            aria-label="Run selected dispatch mode"
+                            disabled={isResending}
+                            data-ui-name="prompt-dispatch-send-btn"
+                            data-ui-id={`prompt-dispatch-send-${selectedConversation.conversation_id}`}
+                            className="flex items-center gap-1.5 px-2.5 h-full text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 rounded-l-md transition-all duration-150 cursor-pointer disabled:opacity-50"
+                            title="Send (Preempt): Cancels active task and executes immediately (Hotkey: N)"
                         >
-                            {primaryDispatchAction === 'enqueue' ? (
-                                <ListPlus className={cn('w-3 h-3 shrink-0', isEnqueueing && 'animate-pulse')} />
-                            ) : primaryDispatchAction === 'rerun' ? (
-                                <Repeat className={cn('w-3 h-3 shrink-0', isRerunning && 'animate-spin')} />
-                            ) : (
-                                <Send className={cn('w-3 h-3 shrink-0', isResending && 'animate-pulse')} />
-                            )}
-                            <span>
-                                {primaryDispatchAction === 'enqueue'
-                                    ? (isEnqueueing ? 'Queueing…' : 'Enqueue')
-                                    : primaryDispatchAction === 'rerun'
-                                      ? (isRerunning ? 'Rerunning…' : (rerunFlash ?? `Rerun ×${rerunCount}`))
-                                      : (isResending ? 'Sending…' : 'Send')}
-                            </span>
-                            {primaryDispatchAction === 'enqueue' && (
-                                <span className="min-w-4 h-4 px-1 rounded-full bg-amber-500/25 text-amber-800 dark:text-amber-200 text-[9px] font-bold font-mono leading-4 text-center">
+                            <Send className={cn('w-3 h-3 shrink-0', isResending && 'animate-pulse')} />
+                            <span>{isResending ? 'Sending…' : 'Send'}</span>
+                            <kbd className="ml-0.5 px-1 py-0.2 border rounded text-[8.5px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30">N</kbd>
+                        </button>
+
+                        {/* 2. Enqueue Button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                void Promise.resolve(onEnqueue()).catch((err) => {
+                                    reportPromptActionError(err, 'DetailHeader.onEnqueue');
+                                });
+                            }}
+                            disabled={isEnqueueing}
+                            data-ui-name="prompt-dispatch-enqueue-btn"
+                            data-ui-id={`prompt-dispatch-enqueue-${selectedConversation.conversation_id}`}
+                            className="flex items-center gap-1.5 px-2.5 h-full text-[11px] font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 transition-all duration-150 cursor-pointer disabled:opacity-50"
+                            title="Enqueue (FIFO): Stages prompt into FIFO queue behind active task (Hotkey: Q)"
+                        >
+                            <ListPlus className={cn('w-3 h-3 shrink-0', isEnqueueing && 'animate-pulse')} />
+                            <span>{isEnqueueing ? 'Queueing…' : 'Enqueue'}</span>
+                            {enqueuedCount > 0 && (
+                                <span className="min-w-3.5 h-3.5 px-1 rounded-full bg-amber-500/25 text-amber-800 dark:text-amber-200 text-[9px] font-bold font-mono leading-3.5 text-center">
                                     {enqueuedCount}
                                 </span>
                             )}
-                            <kbd className={cn(
-                                "ml-0.5 px-1 py-0.2 border rounded text-[8.5px] font-mono font-bold",
-                                primaryDispatchAction === 'enqueue'
-                                    ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30"
-                                    : primaryDispatchAction === 'rerun'
-                                      ? "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30"
-                                      : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
-                            )}>
-                                {primaryDispatchAction === 'enqueue' ? 'Q' : primaryDispatchAction === 'rerun' ? 'R' : 'N'}
-                            </kbd>
+                            <kbd className="ml-0.5 px-1 py-0.2 border rounded text-[8.5px] font-mono font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30">Q</kbd>
+                        </button>
+
+                        {/* 3. Rerun Button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                void handleRerun().catch((err) => {
+                                    reportPromptActionError(err, 'DetailHeader.rerunSection');
+                                });
+                            }}
+                            disabled={isRerunning}
+                            data-ui-name="prompt-dispatch-rerun-btn"
+                            data-ui-id={`prompt-dispatch-rerun-${selectedConversation.conversation_id}`}
+                            className="flex items-center gap-1.5 px-2.5 h-full text-[11px] font-semibold text-sky-700 dark:text-sky-400 hover:bg-sky-500/10 transition-all duration-150 cursor-pointer disabled:opacity-50"
+                            title={`Rerun Turn (×${rerunCount}): Enqueues previous turn into FIFO queue (Hotkey: R)`}
+                        >
+                            <Repeat className={cn('w-3 h-3 shrink-0', isRerunning && 'animate-spin')} />
+                            <span>{isRerunning ? 'Rerunning…' : (rerunFlash ?? `Rerun ×${rerunCount}`)}</span>
+                            <kbd className="ml-0.5 px-1 py-0.2 border rounded text-[8.5px] font-mono font-bold bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30">R</kbd>
                         </button>
 
                         {/* Dropdown Chevron for Unified Dispatch Menu (Send, Enqueue, Rerun, Target, Templates) */}
@@ -1164,7 +1198,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             onClick={handleToggleDispatchMenu}
                             data-ui-name="prompt-dispatch-options-btn"
                             data-ui-id={`prompt-dispatch-options-${selectedConversation.conversation_id}`}
-                            className="flex items-center justify-center px-2 py-1 rounded-r-full text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center justify-center px-1.5 h-full rounded-r-md text-slate-700 dark:text-slate-300 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             aria-label="Unified dispatch configuration popover"
                             title="Dispatch options: Choose Send, Enqueue, or Rerun and configure target"
                         >
@@ -1671,42 +1705,208 @@ export function DetailHeader(props: DetailHeaderProps) {
                     </div>
 
                     {/* Capsule C: 100 Improvements Flywheel & Next Breakdown Capsule */}
-                    <div className="relative inline-flex items-center rounded-full bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-amber-300/60 dark:border-amber-500/30 shadow-2xs divide-x divide-amber-200/60 dark:divide-amber-500/20 shrink-0">
+                    <div className="relative inline-flex items-center rounded-md bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-amber-300/60 dark:border-amber-500/30 shadow-2xs divide-x divide-amber-200/60 dark:divide-amber-500/20 shrink-0 h-7">
+                        {/* Primary Button */}
                         <button
                             type="button"
-                            onClick={() => void handleTriggerNextBreakdown()}
+                            onClick={() => void handleRunBreakdownAction('next')}
                             disabled={isBreakingDown}
                             data-ui-name="prompt-next-breakdown-btn"
                             data-ui-id={`prompt-next-breakdown-${selectedConversation.conversation_id}`}
-                            className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-l-full"
-                            title="1-Click Dispatch: Generate and enqueue Next 100 Improvements breakdown into active conversation"
+                            className="flex items-center gap-1.5 px-2.5 h-full text-[11px] font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-l-md"
+                            title={`1-Click Auto-Enqueue: Dispatch Next ${breakdownStepCount} Improvements (${breakdownCategory.toUpperCase()})`}
                             aria-label="Next breakdown 100 improvements"
                         >
                             <Sparkles className={cn("w-3 h-3 text-amber-500 shrink-0", isBreakingDown && "animate-spin")} />
                             <span>{isBreakingDown ? 'Breaking Down…' : 'Next Breakdown'}</span>
                             <span className="text-[9px] font-mono font-bold px-1 py-0.2 rounded bg-amber-500/15 border border-amber-500/25 text-amber-600 dark:text-amber-300">
-                                100
+                                {breakdownStepCount}
                             </span>
                         </button>
+
+                        {/* Dropdown Chevron for Next Breakdown Configuration Popover */}
                         <button
                             type="button"
-                            onClick={() => setIsBreakdownModalOpen(true)}
-                            data-ui-name="prompt-flywheel-modal-btn"
-                            className="flex items-center justify-center px-2 py-1 rounded-r-full text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
-                            title="Open 100 Improvements Flywheel dialog (Plan, Slots, Hints, Export)"
-                            aria-label="Open 100 Improvements Flywheel dialog"
+                            onClick={() => setIsBreakdownDropdownOpen((prev) => !prev)}
+                            data-ui-name="prompt-flywheel-dropdown-btn"
+                            className="flex items-center justify-center px-1.5 h-full rounded-r-md text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            title="Open Next Breakdown Interactive Configuration Menu"
+                            aria-label="Open Next Breakdown Interactive Configuration Menu"
                         >
-                            <ChevronDown className="w-3.5 h-3.5 text-amber-500" />
+                            <ChevronDown className={cn("w-3.5 h-3.5 text-amber-500 transition-transform duration-150", isBreakdownDropdownOpen && "rotate-180")} />
                         </button>
+
+                        {/* Flyout 3: Next Breakdown Interactive Dropdown Menu */}
+                        {isBreakdownDropdownOpen && (
+                            <div
+                                className="absolute right-0 top-full mt-1.5 z-50 w-80 sm:w-96 rounded-xl bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-amber-500/30 shadow-2xl p-2.5 animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md space-y-2.5"
+                                onMouseLeave={() => setIsBreakdownDropdownOpen(false)}
+                            >
+                                {/* Header */}
+                                <div className="px-1 pt-0.5 pb-1 text-[10px] font-mono uppercase tracking-wider text-slate-400 dark:text-slate-500 select-none border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5 text-amber-500 dark:text-amber-400 font-bold">
+                                        <Sparkles className="w-3.5 h-3.5" />
+                                        <span>100 Improvements Flywheel</span>
+                                    </div>
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                                        Active Workspace
+                                    </span>
+                                </div>
+
+                                {/* Category Selector */}
+                                <div className="space-y-1">
+                                    <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                                        <span>CATEGORY:</span>
+                                        <span className="text-amber-600 dark:text-amber-400 font-semibold capitalize">{breakdownCategory}</span>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-1 p-0.5 bg-slate-100 dark:bg-slate-950/80 rounded-lg border border-slate-200/80 dark:border-amber-500/20 text-[10.5px]">
+                                        {(['code', 'ui', 'system', 'ideas'] as ImprovementKind[]).map((cat) => (
+                                            <button
+                                                key={cat}
+                                                type="button"
+                                                onClick={() => setBreakdownCategory(cat)}
+                                                className={cn(
+                                                    "py-1 px-1.5 rounded-md font-medium capitalize text-center transition-colors cursor-pointer",
+                                                    breakdownCategory === cat
+                                                        ? "bg-amber-500 text-slate-950 font-bold shadow-2xs"
+                                                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/80"
+                                                )}
+                                            >
+                                                {cat === 'ui' ? 'UI/UX' : cat}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Steps / Tasks Count Selector */}
+                                <div className="space-y-1">
+                                    <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                                        <span>TASK BATCH SIZE:</span>
+                                        <span className="text-amber-600 dark:text-amber-400 font-semibold">{breakdownStepCount} Tasks</span>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-1 p-0.5 bg-slate-100 dark:bg-slate-950/80 rounded-lg border border-slate-200/80 dark:border-amber-500/20 text-[10.5px]">
+                                        {[10, 20, 50, 100].map((count) => (
+                                            <button
+                                                key={count}
+                                                type="button"
+                                                onClick={() => setBreakdownStepCount(count)}
+                                                className={cn(
+                                                    "py-1 px-1.5 rounded-md font-mono font-medium text-center transition-colors cursor-pointer",
+                                                    breakdownStepCount === count
+                                                        ? "bg-amber-500 text-slate-950 font-bold shadow-2xs"
+                                                        : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800/80"
+                                                )}
+                                            >
+                                                {count}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Dry-run Toggle */}
+                                <div className="flex items-center justify-between px-1 py-0.5 text-xs">
+                                    <span className="text-slate-600 dark:text-slate-400 text-[11px] font-medium">
+                                        Dry-run (no prompt dispatch):
+                                    </span>
+                                    <input
+                                        type="checkbox"
+                                        checked={breakdownDryRun}
+                                        onChange={(e) => setBreakdownDryRun(e.target.checked)}
+                                        className="h-3.5 w-3.5 rounded border-slate-300 text-amber-500 focus:ring-amber-500/40 cursor-pointer"
+                                    />
+                                </div>
+
+                                {/* Action Buttons Grid */}
+                                <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800">
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleRunBreakdownAction('next')}
+                                        disabled={isBreakingDown}
+                                        className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 border border-amber-500/40 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                                        title="Auto-enqueue the next improvement wave into active instance"
+                                    >
+                                        <Play className={cn("w-3 h-3 text-amber-500", isBreakingDown && "animate-spin")} />
+                                        <span>Auto-Enqueue ({breakdownStepCount})</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleRunBreakdownAction('detail')}
+                                        disabled={isBreakingDown}
+                                        className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                                        title="Detail out 100-step breakdown for pending tasks in workspace"
+                                    >
+                                        <Layers className="w-3 h-3 text-cyan-400" />
+                                        <span>Detail Out Tasks</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleRunBreakdownAction('plan')}
+                                        disabled={isBreakingDown}
+                                        className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                                        title="Plan 100 improvements for selected category"
+                                    >
+                                        <Sparkles className="w-3 h-3 text-amber-400" />
+                                        <span>Plan 100 Steps</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleRunBreakdownAction('check')}
+                                        disabled={isBreakingDown}
+                                        className="flex items-center justify-center gap-1.5 py-1.5 px-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50"
+                                        title="Check pending improvements in .ai-memory/"
+                                    >
+                                        <RotateCw className="w-3 h-3 text-emerald-400" />
+                                        <span>Check Backlog</span>
+                                    </button>
+                                </div>
+
+                                {/* Link to In-Tree Breakdown View */}
+                                {setPreviewTab && (
+                                    <div className="pt-1 border-t border-slate-100 dark:border-slate-800">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setIsBreakdownDropdownOpen(false);
+                                                setPreviewTab('improvements');
+                                            }}
+                                            className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 bg-gradient-to-r from-amber-500/10 to-purple-500/10 hover:from-amber-500/20 hover:to-purple-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/20 rounded-lg text-xs font-semibold cursor-pointer transition-colors"
+                                        >
+                                            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                                            <span>Open In-Tree Breakdowns Tab (100)</span>
+                                            <ChevronRight className="w-3.5 h-3.5 ml-auto text-slate-400" />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* CLI Command Parity Hint */}
+                                <div className="px-1 text-[9px] font-mono text-slate-400 dark:text-slate-500 truncate" title={`agm improvements next --count ${breakdownStepCount} --kind ${breakdownCategory}`}>
+                                    CLI: agm improvements next --count {breakdownStepCount} --kind {breakdownCategory}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
 
             {/* FIFO Enqueued Prompts Status Banner */}
             {enqueuedCount > 0 && (
-                <div className="flex items-center gap-2 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs font-medium mt-1.5">
-                    <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <span>{enqueuedCount} prompt(s) enqueued in FIFO queue for this conversation.</span>
+                <div className="flex items-center justify-between px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs font-medium mt-1.5">
+                    <div className="flex items-center gap-2">
+                        <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                        <span>{enqueuedCount} prompt(s) enqueued in FIFO queue for this conversation.</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleClearQueue}
+                        disabled={isClearingQueue}
+                        className="text-[10.5px] font-semibold text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 underline cursor-pointer transition-colors"
+                        title="Remove all enqueued prompts for this instance"
+                    >
+                        {isClearingQueue ? 'Clearing…' : 'Clear Queue'}
+                    </button>
                 </div>
             )}
 

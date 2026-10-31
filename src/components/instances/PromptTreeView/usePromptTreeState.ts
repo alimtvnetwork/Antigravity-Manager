@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import type { SyncInterval } from '../../../services/instanceService';
 import { getPromptTreeSyncInterval } from '../../../services/instanceService';
 import { getArchivedProjectsForInstance } from '../../../services/instanceService';
-import { PromptViewMode, type AgmConversationNode, type AgmProjectTreeNode, type ViewMode } from './types';
+import { PromptViewMode, type AgmConversationNode, type AgmProjectTreeNode, type ViewMode, type PreviewTabType } from './types';
 
 export interface InspectorPrompt {
     title: string;
@@ -60,8 +60,8 @@ export interface PromptTreeState {
     isDetailsOpen: boolean;
     setIsDetailsOpen: React.Dispatch<React.SetStateAction<boolean>>;
     setIsExpandedFull: React.Dispatch<React.SetStateAction<boolean>>;
-    activeTab: 'instruction' | 'results';
-    setActiveTab: React.Dispatch<React.SetStateAction<'instruction' | 'results'>>;
+    activeTab: PreviewTabType;
+    setActiveTab: React.Dispatch<React.SetStateAction<PreviewTabType>>;
     isRerunMenuOpen: boolean;
     setIsRerunMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
     isFocusing: boolean;
@@ -84,8 +84,8 @@ export interface PromptTreeState {
     setViewMode: React.Dispatch<React.SetStateAction<ViewMode>>;
     showAllWords: boolean;
     setShowAllWords: React.Dispatch<React.SetStateAction<boolean>>;
-    previewTab: 'instruction' | 'results';
-    setPreviewTab: React.Dispatch<React.SetStateAction<'instruction' | 'results'>>;
+    previewTab: PreviewTabType;
+    setPreviewTab: React.Dispatch<React.SetStateAction<PreviewTabType>>;
     isCopiedResults: boolean;
     setIsCopiedResults: React.Dispatch<React.SetStateAction<boolean>>;
     isCopied: boolean;
@@ -202,8 +202,8 @@ export function usePromptTreeState(instanceId: string): PromptTreeState {
     }, []);
     const setIsExpandedFull = setShowAllWords;
 
-    const [previewTab, _setPreviewTab] = useState<'instruction' | 'results'>('instruction');
-    const setPreviewTab = useCallback((val: React.SetStateAction<'instruction' | 'results'>) => {
+    const [previewTab, _setPreviewTab] = useState<'instruction' | 'results' | 'improvements'>('instruction');
+    const setPreviewTab = useCallback((val: React.SetStateAction<'instruction' | 'results' | 'improvements'>) => {
         _setPreviewTab(val);
     }, []);
     const setActiveTab = setPreviewTab;

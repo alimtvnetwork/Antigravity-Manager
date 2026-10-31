@@ -850,17 +850,10 @@ pub(crate) fn build_active_prompt_conv_nodes(
             &proj.instance_id,
         );
         if !cdp_queued.is_empty() {
-            // WHY index-first: chaining iter_mut().find() with
-            // or_else(|| conv_nodes.first_mut()) borrows conv_nodes
-            // twice (E0500), because the find result holds a mutable
-            // borrow while the closure takes another. Resolving the
-            // index under a shared borrow first, then indexing mutably,
-            // keeps the exact selection (first running, else first,
-            // else none on an empty list) with a single mutable borrow.
-            let active_idx = conv_nodes
-                .iter()
-                .position(|c| c.is_running)
-                .or_else(|| conv_nodes.first().map(|_| 0));
+            // Only attach CDP composer queued messages to an actively RUNNING conversation
+            // in this specific project. Never fall back to conv_nodes.first() for idle projects,
+            // which previously caused every idle project under the instance to falsely show "1 QUEUED".
+            let active_idx = conv_nodes.iter().position(|c| c.is_running);
             if let Some(idx) = active_idx {
                 let target_conv = &mut conv_nodes[idx];
                 for q_text in cdp_queued {

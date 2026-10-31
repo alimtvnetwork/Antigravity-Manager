@@ -140,45 +140,11 @@ pub(crate) fn collect_all_peer_connections() -> Vec<crate::modules::ssh_manager:
     let mut seen_aliases = HashSet::new();
     let mut seen_ips = HashSet::new();
 
-    // 1. Load from ssh_manager registry
-    if let Ok(conns) = crate::modules::ssh_manager::load_ssh_connections() {
-        for c in conns {
-            let a_norm = c.alias.trim().to_ascii_lowercase();
-            let ip_norm = c.ip_address.trim().to_string();
-            if !a_norm.is_empty() && !seen_aliases.contains(&a_norm) {
-                seen_aliases.insert(a_norm);
-                if !ip_norm.is_empty() {
-                    seen_ips.insert(ip_norm);
-                }
-                all_conns.push(c);
-            }
-        }
-    }
-
-    // 2. Load from candidate gitmap-ssh-nodes.json files
-    for seed_path in crate::modules::ssh_manager::candidate_seed_node_paths() {
-        if let Ok(raw) = std::fs::read_to_string(&seed_path) {
-            if let Ok(conns) = crate::modules::ssh_manager::decode_connections_from_json(&raw) {
-                for c in conns {
-                    let a_norm = c.alias.trim().to_ascii_lowercase();
-                    let ip_norm = c.ip_address.trim().to_string();
-                    if !a_norm.is_empty() && !seen_aliases.contains(&a_norm) {
-                        seen_aliases.insert(a_norm);
-                        if !ip_norm.is_empty() {
-                            seen_ips.insert(ip_norm);
-                        }
-                        all_conns.push(c);
-                    }
-                }
-            }
-        }
-    }
-
-    // 3. Load from GitMap cluster nodes CLI (gitmap cluster nodes --json / status)
+    // 1. Authoritative GitMap cluster nodes take highest priority (w1, w2, w3, w4, u1, main)
     for gm_node in crate::modules::telegram_inbound::cluster::query_gitmap_cluster_nodes() {
         let a_norm = gm_node.alias.trim().to_ascii_lowercase();
         let ip_norm = gm_node.ip_address.trim().to_string();
-        if !a_norm.is_empty() && !seen_aliases.contains(&a_norm) {
+        if !a_norm.is_empty() && !seen_aliases.contains(&a_norm) && !seen_ips.contains(&ip_norm) {
             seen_aliases.insert(a_norm);
             if !ip_norm.is_empty() && ip_norm != "Cluster Mesh" {
                 seen_ips.insert(ip_norm.clone());
@@ -201,7 +167,7 @@ pub(crate) fn collect_all_peer_connections() -> Vec<crate::modules::ssh_manager:
         }
     }
 
-    // 4. Canonical fallback: ensure all 6 GitMap cluster nodes (w1, main, u1, w2, w3, w4) are present
+    // 2. Canonical static fallback: ensure all 6 GitMap cluster nodes are recorded
     for &(alias, ip, user, os) in crate::modules::ssh_manager::GITMAP_CLUSTER_NODES {
         let a_norm = alias.trim().to_ascii_lowercase();
         let ip_norm = ip.trim().to_string();
@@ -217,16 +183,57 @@ pub(crate) fn collect_all_peer_connections() -> Vec<crate::modules::ssh_manager:
                 os: os.to_string(),
                 encrypted_password: String::new(),
                 encryption_algo: "RSA-2048".to_string(),
-                os_group: Some(if os.eq_ignore_ascii_case("windows") {
-                    "Windows".to_string()
-                } else {
-                    "Linux".to_string()
-                }),
+                os_group: None,
                 os_version: None,
                 build_version: None,
                 first_run_at: None,
                 created_at: None,
             });
+        }
+    }
+
+    // 3. Load user-added SSH nodes from ssh_manager registry (deduplicate against existing cluster IPs)
+    if let Ok(conns) = crate::modules::ssh_manager::load_ssh_connections() {
+        for c in conns {
+            let a_norm = c.alias.trim().to_ascii_lowercase();
+            let ip_norm = c.ip_address.trim().to_string();
+            // Discard generic non-fleet hosts or duplicates where IP is already claimed by canonical cluster node
+            if a_norm == "github.com" || a_norm == "gitlab.com" {
+                continue;
+            }
+            if !a_norm.is_empty() && !seen_aliases.contains(&a_norm) && !seen_ips.contains(&ip_norm)
+            {
+                seen_aliases.insert(a_norm);
+                if !ip_norm.is_empty() {
+                    seen_ips.insert(ip_norm);
+                }
+                all_conns.push(c);
+            }
+        }
+    }
+
+    // 4. Load from candidate gitmap-ssh-nodes.json seed files
+    for seed_path in crate::modules::ssh_manager::candidate_seed_node_paths() {
+        if let Ok(raw) = std::fs::read_to_string(&seed_path) {
+            if let Ok(conns) = crate::modules::ssh_manager::decode_connections_from_json(&raw) {
+                for c in conns {
+                    let a_norm = c.alias.trim().to_ascii_lowercase();
+                    let ip_norm = c.ip_address.trim().to_string();
+                    if a_norm == "github.com" || a_norm == "gitlab.com" {
+                        continue;
+                    }
+                    if !a_norm.is_empty()
+                        && !seen_aliases.contains(&a_norm)
+                        && !seen_ips.contains(&ip_norm)
+                    {
+                        seen_aliases.insert(a_norm);
+                        if !ip_norm.is_empty() {
+                            seen_ips.insert(ip_norm);
+                        }
+                        all_conns.push(c);
+                    }
+                }
+            }
         }
     }
 

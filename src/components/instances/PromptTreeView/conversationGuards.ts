@@ -1,11 +1,11 @@
 import type { AgmConversationNode } from './types';
 
 export function isConversationOrTurnQueued(conv: AgmConversationNode): boolean {
+    if (conv.prompts && conv.prompts.length > 0) {
+        return conv.prompts.some((p) => Boolean(p.is_queued) || (p.status && p.status.toLowerCase().includes('queue')));
+    }
     if (Boolean(conv.is_queued)) return true;
     if (conv.status && conv.status.toLowerCase().includes('queue')) return true;
-    if (conv.prompts && conv.prompts.some((p) => Boolean(p.is_queued) || (p.status && p.status.toLowerCase().includes('queue')))) {
-        return true;
-    }
     return false;
 }
 

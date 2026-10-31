@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.285.0-3B82F6?style=flat-square" alt="Version v4.285.0">
+    <img src="https://img.shields.io/badge/Version-v4.286.0-3B82F6?style=flat-square" alt="Version v4.286.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,7 +116,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.285.0)**
+**Bar 2: Version-Based Installation (v4.286.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.258.0/install.ps1))) -Version "v4.258.0"
 ```
@@ -542,6 +542,10 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
   - **Cold-Start IDE 5-Second Stabilization Ladder & Send Reliability**: Upgraded `src-tauri/src/modules/instance/smart_run.rs` and `src-tauri/src/modules/repo_db/agy.rs` with an adaptive 5-second process stabilization ladder and CDP retry mechanism for cold-started IDE instances, eliminating lost prompts when dispatching to closed IDEs. (Thanks to @aukgit)
   - **Prompt Tree Image Rendering & Queued/Running Visibility**: Added Tauri v2 `core:asset:default` capability permission in `src-tauri/capabilities/default.json` and resolved relative image paths against project `repo_path` before passing to `convertFileSrc` in `clipboard.ts` and `PromptMarkdownPreview.tsx`; protected queued prompts from stale conversation demotion in `conversationGuards.ts`; synthesized running/queued projects from `active_prompts` in `src-tauri/src/modules/repo_db/tree_phases.rs`, ensuring the left panel is never empty when prompts are in flight. (Thanks to @aukgit)
   - **Expand Full / Fold Tab Switch Persistence**: Fixed UI bug in `src/components/instances/PromptTreeView/DetailTabs.tsx` where switching from the Input to Output tab caused the `Expand Full` toggle to unmount; decoupled `hasExpandToggle` so output text can be expanded to full height seamlessly. (Thanks to @aukgit)
+- **v4.286.0** (2026-10-31):
+  - **Prompt Tree Queued Item Removal & SWR Resuscitation Fix**: Bounded optimistic queued turns in `src/components/instances/PromptTreeView/usePromptTreeData.ts` to 12s TTL to prune dequeued turns and prevent circular SWR cache re-injection; fixed inverted ternary logic in `mergeQueuedTurns`; and added native `clear_queued_prompts` IPC command with interactive `[ Clear Queue ]` button in FIFO banner. (Thanks to @aukgit)
+  - **False 1 QUEUED Badge Elimination on Idle Projects**: Removed conv 0 fallback in `src-tauri/src/modules/repo_db/tree_node_conv.rs`, strictly requiring an actively running conversation before attaching live CDP queued turns, and reconciled conversation `is_queued` flags in `tree_nodes.rs`. (Thanks to @aukgit)
+  - **Compact Action Capsules & Interactive Next Breakdown Dropdown**: Redesigned action buttons in `DetailHeader.tsx` to compact `rounded-md` (6px radius) capsules (`h-7`); combined `[ Send ]`, `[ Enqueue ]`, `[ Rerun ×N ]`, and popover chevron; added interactive Next Breakdown dropdown popover with category/task selectors; added in-tree `PromptTreeBreakdownView.tsx` under `[ ✨ Breakdowns (100) ]` tab in `DetailTabs.tsx`; fixed local host `w2` detection and lead deduplication in server cluster fleet (`useFleetMachines.ts`, `query.rs`); and removed duplicate `+ New Instance` button in `InstancesHeader.tsx`. (Thanks to @aukgit)
 - **v4.285.0** (2026-10-31):
   - **GitMap Pipeline Telemetry Audit & Cache Healing**: Diagnosed and verified CI/CD pipeline runs using GitMap telemetry (`gitmap pe`), cleared stale pipeline database cache, verified 100% green status across all recent CI and Release workflows on `main`, and validated zero unresolved errors or borrow conflicts. (Thanks to @aukgit)
 - **v4.284.0** (2026-10-31):
@@ -671,6 +675,8 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
 ## 📝 Changelog
+
+> Latest version **v4.286.0**: Prompt Tree Queue Removal & False Queued Badge Fix, Compact Action Capsules, In-Tree 100 Improvements Flywheel & Fleet Detection — Bounded optimistic queued turns in `src/components/instances/PromptTreeView/usePromptTreeData.ts` to 12s TTL to prune dequeued turns and prevent circular SWR cache re-injection; eliminated false `1 QUEUED` badge on idle projects by strictly requiring actively running conversations before attaching live CDP queued turns in `src-tauri/src/modules/repo_db/tree_node_conv.rs` and reconciling `c.is_queued` in `tree_nodes.rs`; added native `clear_queued_prompts` command with an interactive `[ Clear Queue ]` action in the FIFO status banner; redesigned action buttons in `src/components/instances/PromptTreeView/DetailHeader.tsx` into compact `rounded-md` capsules (6px radius, uniform `h-7` height, subtle dividers) combining `Send`, `Enqueue`, `Rerun ×N`, and dropdown chevron; added interactive Next Breakdown dropdown popover with category/task selectors and 1-click auto-enqueue; added in-tree 100 Improvements Breakdowns view in `PromptTreeBreakdownView.tsx` under new `[ ✨ Breakdowns (100) ]` tab in `DetailTabs.tsx`; fixed local host machine detection and lead deduplication in server cluster fleet (`useFleetMachines.ts`, `query.rs`); and removed duplicate `+ New Instance` button from `InstancesHeader.tsx`. (Thanks to @aukgit)
 
 > Latest version **v4.284.0**: CI/CD Fix and Release - Restored green CI on main by fixing the compile errors blocking it (missing rolling_4h_quota field on ProfileCandidate, use-after-move in manual rotation, immutable active_prompt binding, and E0500 double borrow in tree node conversion) and synchronized all version manifests to 4.284.0 (Thanks to @aukgit)
 

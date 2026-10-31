@@ -88,8 +88,7 @@ function saveCachedFleetMachines(machines: FleetMachineInfo[]): void {
 function sortFleetMachines(list: FleetMachineInfo[]): FleetMachineInfo[] {
     const listWithFlags = list.map((m) => {
         const alias = (m.node_alias || (m as any).alias || '').trim().toLowerCase();
-        const ip = (m.ip_address || (m as any).ip || '').trim();
-        const isLead = Boolean((m as any).is_lead || alias === 'w1' || ip === '192.168.1.3');
+        const isLead = Boolean((m as any).is_lead || alias === 'w1');
         const isLocal = Boolean((m as any).is_local);
         return {
             ...m,
@@ -134,7 +133,7 @@ function sortFleetMachines(list: FleetMachineInfo[]): FleetMachineInfo[] {
     });
 }
 
-function mapSshNodesToFleet(sshNodes: SshNodeItem[], localId?: string): FleetMachineInfo[] {
+function mapSshNodesToFleet(sshNodes: SshNodeItem[], localId?: string, localAlias?: string, localIp?: string): FleetMachineInfo[] {
     return sshNodes
         .filter((n) => Boolean(n.alias))
         .map((n) => {
@@ -144,9 +143,11 @@ function mapSshNodesToFleet(sshNodes: SshNodeItem[], localId?: string): FleetMac
             const aliasLower = alias.toLowerCase();
             const isLocal = Boolean(
                 (localId && (aliasLower === localId.toLowerCase() || n.alias === localId)) ||
+                (localAlias && aliasLower === localAlias.toLowerCase()) ||
+                (localIp && ip === localIp) ||
                 aliasLower.startsWith('local')
             );
-            const isLead = aliasLower === 'w1' || ip === '192.168.1.3';
+            const isLead = aliasLower === 'w1';
 
             return {
                 node_id: `ssh_${alias}`,
@@ -257,7 +258,7 @@ async function enrichFleetMachines(machines: FleetMachineInfo[]): Promise<FleetM
             (machine as any).is_local ||
             (machine as any).source === 'local'
         );
-        const isLead = Boolean((machine as any).is_lead || aliasLower === 'w1' || ip === '192.168.1.3');
+        const isLead = Boolean((machine as any).is_lead || aliasLower === 'w1');
 
         // Collect bound emails
         const emails = new Set<string>(machine.bound_emails || []);

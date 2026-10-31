@@ -220,7 +220,7 @@ function queuedTurnKey(p: { status: string; prompt_text: string }): string {
 
 export function isQueuedTurn(p: { is_queued?: boolean; status: string }): boolean {
     const s = String(p.status || '').toUpperCase();
-    return Boolean(p.is_queued) || s === 'QUEUED' || s === 'ENQUEUED_IDE' || s === 'DISPATCHED' || s === 'PENDING';
+    return Boolean(p.is_queued) || s === 'QUEUED' || s === 'ENQUEUED_IDE' || s === 'PENDING';
 }
 
 export function queuedPromptCount(conv: { is_queued?: boolean; prompts?: Array<{ is_queued?: boolean; status: string }> } | null | undefined): number {
@@ -279,27 +279,38 @@ export function mergeQueuedTurns(
     }
     const prevQueued = (previous.prompts || []).filter(isQueuedTurn);
     if (prevQueued.length === 0) {
-        return incoming;
+        const hasQueued = (incoming.prompts || []).some(isQueuedTurn);
+        return hasQueued ? incoming : { ...incoming, is_queued: false };
     }
     const incomingPrompts = incoming.prompts || [];
     const used = incomingPrompts.map(() => false);
     const missing: typeof prevQueued = [];
+    const now = Date.now();
+    // Only preserve optimistic queued turns created within the last 12 seconds.
+    // Stale or dequeued turns older than 12s are pruned when omitted by backend.
+    const OPTIMISTIC_QUEUED_TTL_MS = 12_000;
     for (const pq of prevQueued) {
         const key = queuedTurnKey(pq);
         const idx = incomingPrompts.findIndex((p, i) => !used[i] && queuedTurnKey(p) === key);
         if (idx >= 0) {
             used[idx] = true;
         } else {
-            missing.push(pq);
+            const turnAge = typeof pq.created_at === 'number' && pq.created_at > 0
+                ? (pq.created_at < 1e11 ? pq.created_at * 1000 : pq.created_at)
+                : 0;
+            if (turnAge > 0 && now - turnAge < OPTIMISTIC_QUEUED_TTL_MS) {
+                missing.push(pq);
+            }
         }
     }
     if (missing.length === 0) {
         const hasQueued = incomingPrompts.some(isQueuedTurn);
-        return hasQueued ? incoming : { ...incoming, is_queued: true };
+        return hasQueued ? incoming : { ...incoming, is_queued: false };
     }
+    const hasAnyQueued = missing.length > 0 || incomingPrompts.some(isQueuedTurn);
     return {
         ...incoming,
-        is_queued: true,
+        is_queued: hasAnyQueued,
         prompts: [...incomingPrompts, ...missing],
     };
 }
@@ -749,13 +760,15 @@ export function usePromptTreeData({
             setError(null);
             try {
                 const cacheKey = instanceId || 'default';
-                const previousTree = overlaySelectedQueued(
-                    promptTreeSwrCache.get(cacheKey)?.data || [],
-                    selectedConversationRef.current,
-                    selectedProjectRef.current
-                );
                 if (isForce) {
                     invalidatePromptTreeCache(instanceId);
+                    if (selectedConversationRef.current) {
+                        selectedConversationRef.current = {
+                            ...selectedConversationRef.current,
+                            prompts: (selectedConversationRef.current.prompts || []).filter((p) => !p.is_queued),
+                            is_queued: false,
+                        };
+                    }
                     try {
                         await invoke('reset_prompt_tree_cache', { instanceId: instanceId || null });
                     } catch (resetErr: unknown) {
@@ -765,6 +778,13 @@ export function usePromptTreeData({
                         });
                     }
                 }
+                const previousTree = isForce
+                    ? []
+                    : overlaySelectedQueued(
+                          promptTreeSwrCache.get(cacheKey)?.data || [],
+                          selectedConversationRef.current,
+                          selectedProjectRef.current
+                      );
                 const data = await invoke<AgmProjectTreeNode[]>('get_project_conversation_tree', {
                     instanceId: instanceId || undefined,
                     maxWords: 2000,

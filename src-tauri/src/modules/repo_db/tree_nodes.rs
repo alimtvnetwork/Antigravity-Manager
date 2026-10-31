@@ -143,6 +143,18 @@ pub(crate) fn build_project_tree_node(
                 }
             }
         }
+
+        // Reconcile conversation queued status with actual prompt turns
+        if !c.prompts.is_empty() {
+            c.is_queued = c.prompts.iter().any(|p| p.is_queued);
+            if !c.is_queued && c.status.eq_ignore_ascii_case("QUEUED") {
+                c.status = if c.is_running {
+                    "RUNNING".to_string()
+                } else {
+                    "IDLE".to_string()
+                };
+            }
+        }
     }
     crate::modules::logger::log_info(&format!(
         "[PROMPT_LIVENESS_PROBE][PROJECT] instance_id=\"{}\" project=\"{}\" is_running={} rationale=\"{}\"",

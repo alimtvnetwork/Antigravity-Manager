@@ -4,7 +4,6 @@ import {
     Laptop,
     Play,
     RotateCw,
-    Plus,
     FolderSync,
     Sparkles,
     SlidersHorizontal,
@@ -55,8 +54,6 @@ export function InstancesHeader({ api }: { api: InstancePageApi }) {
         handleCleanRestart,
         handleToggleAutoSwitcher,
         handleTriggerRotation,
-        setNewInstanceName,
-        setIsCreateOpen,
         setSettingsModalTarget,
         setIsSettingsModalOpen,
         setPromptTreeInstance,
@@ -673,23 +670,6 @@ export function InstancesHeader({ api }: { api: InstancePageApi }) {
                     >
                         <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                         <span>100 Steps</span>
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            if (api.openCreateDialog) {
-                                api.openCreateDialog();
-                            } else {
-                                const defaultId = instances.find((i) => i.config.is_default || i.config.id === 'default')?.config.id || 'default';
-                                api.setNewInstanceFromInstance?.(defaultId);
-                                setNewInstanceName('');
-                                setIsCreateOpen(true);
-                            }
-                        }}
-                        className="agm-hover-shade group relative flex items-center gap-1.5 px-3.5 py-1.5 rounded-[4px] bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xs cursor-pointer"
-                    >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>{t('instances.create_btn', 'New Instance')}</span>
                     </button>
                 </div>
             </div>

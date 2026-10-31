@@ -68,7 +68,7 @@ export function FleetMachineRow({
     const isLeadNode = Boolean(
         mExt.is_lead !== undefined
             ? mExt.is_lead
-            : (aliasLower === 'w1' || machine.ip_address === '192.168.1.3')
+            : aliasLower === 'w1'
     );
 
     return (

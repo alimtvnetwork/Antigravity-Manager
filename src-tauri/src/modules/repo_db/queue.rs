@@ -474,6 +474,49 @@ pub fn requeue_running_conversations_for_instance(instance_id: &str) -> Result<u
     Ok(count)
 }
 
+/// Clear and cancel all queued prompts for an instance (or across all instances if None/all).
+pub fn clear_queued_prompts_for_instance(instance_id: Option<&str>) -> Result<usize, String> {
+    let conn = connect_db()?;
+    let now = Utc::now().timestamp();
+    let count = match instance_id {
+        Some(inst) if !inst.is_empty() && inst != "all" => {
+            let norm = crate::modules::instance::resolve_instance_id(inst)
+                .unwrap_or_else(|_| inst.to_string());
+            conn.execute(
+                "UPDATE active_prompts SET status = 'cancelled', updated_at = ?1 \
+                 WHERE status IN ('backed_up', 'queued', 'pending', 'enqueued_ide') \
+                   AND (instance_id = ?2 OR (?2 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))",
+                rusqlite::params![now, norm],
+            ).map_err(|e| e.to_string())?
+        }
+        _ => conn
+            .execute(
+                "UPDATE active_prompts SET status = 'cancelled', updated_at = ?1 \
+                 WHERE status IN ('backed_up', 'queued', 'pending', 'enqueued_ide')",
+                rusqlite::params![now],
+            )
+            .map_err(|e| e.to_string())?,
+    };
+
+    if let Ok(mut map) = get_memory_prompts_map().lock() {
+        if let Some(inst) = instance_id {
+            let norm = crate::modules::instance::resolve_instance_id(inst)
+                .unwrap_or_else(|_| inst.to_string());
+            map.retain(|_, p| {
+                p.instance_id != norm
+                    || (p.status != "queued" && p.status != "enqueued_ide" && p.status != "pending")
+            });
+        } else {
+            map.retain(|_, p| {
+                p.status != "queued" && p.status != "enqueued_ide" && p.status != "pending"
+            });
+        }
+    }
+
+    invalidate_prompt_tree_cache();
+    Ok(count)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

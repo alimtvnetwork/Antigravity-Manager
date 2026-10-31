@@ -84,3 +84,13 @@ pub fn backup_running_and_queued_prompts(
         crate::modules::backup_prompts_db::backup_active_running_prompts_for_instance(scope, None)?;
     Ok(batch)
 }
+
+/// Clear and cancel all queued prompts for an instance (or across all instances).
+#[tauri::command]
+pub fn clear_queued_prompts(instance_id: Option<String>) -> Result<usize, String> {
+    let scope = instance_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty() && *s != "all");
+    crate::modules::repo_db::clear_queued_prompts_for_instance(scope)
+}
