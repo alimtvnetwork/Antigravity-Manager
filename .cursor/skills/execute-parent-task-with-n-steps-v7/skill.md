@@ -50,9 +50,11 @@ Active when the user prompt specifies time windows, schedule bounds, restricted 
 3. **Headless & One-Liner Automation (Mandatory for Subagents):**
    - Subagents and automated pipelines must never hang on interactive prompts; always pass headless flags:
      ```bash
-     gitmap cpf "Module - summary" --tz <timezone> --schedule --auto-window --non-interactive
+     gitmap cpf "Module - summary" --tz <timezone> --schedule "<DD-MMM-YY hh:mm:ss>" --auto-window --non-interactive
      ```
    - `--auto-window`: Automatically calculates the next valid morning window slot (07:30 AM) and sets compliant `GIT_AUTHOR_DATE` / `GIT_COMMITTER_DATE` timestamps.
+   - **Pre-commit time validation (mandatory, in order):** query current time in the target timezone (`gitmap time-now --tz <timezone> --format "DD-MMM-YY hh:mm A"`); Saturday/Sunday -> permitted immediately; weekday before 08:00 AM -> permitted; weekday at or after 08:00 AM -> if `--auto-window` is set, shift the timestamp to the next valid window, otherwise halt (strict block) and report the schedule block. Never commit outside a valid window by skipping this check.
+   - **On-call note:** this Option 1 section is on-call only; it applies only when the task explicitly specifies time windows, schedule bounds, or restricted commit pacing. Otherwise Option 2 applies.
 4. **Recommit & History Normalization:**
    - When amending or recommitting prior work: verify clean working tree (`gitmap st`), soft reset (`gitmap git-reset HEAD~1 --no-push`), and recommit using semantic verbs with target timezone stamps.
    - Operational reference: [gitmap-time-restriction](file;.agents/skills/gitmap-time-restriction).
@@ -78,23 +80,24 @@ Active by default when no time restrictions, maintenance windows, or scheduling 
 Invariant across all autonomous agent runs, AI pairs, and headless multi-agent workflows. AI agents are **STRICTLY FORBIDDEN** from committing under human developer credentials (`MD ALIM UL KARIM`, personal emails, etc.). Step 0 of every run unconditionally verifies and locks machine-wide identity to the single autonomous bot:
 
 1. **Identity Presets:**
-   - Name: `"gitmap automation bot - runs autonmously"`.
+   - Name: `"gitmap automation bot - muse - runs autonomously"`.
    - Email: `"info@rgitmap.com"`.
 2. **Machine-Wide & Project Activation (Step 0 Invariant):**
    - Enforce globally and per-project via:
      ```bash
-     gitmap user change-user "gitmap automation bot - runs autonmously" "info@rgitmap.com" --global
-     gitmap user change-user "gitmap automation bot - runs autonmously" "info@rgitmap.com" --project
+     gitmap user change-user "gitmap automation bot - muse - runs autonomously" "info@rgitmap.com" --global
+     gitmap user change-user "gitmap automation bot - muse - runs autonomously" "info@rgitmap.com" --project
      ```
    - Verify identity context using GitMap:
      ```bash
      gitmap user info
      ```
-     Ensure `Active Git` and `Global Git` reflect `gitmap automation bot - runs autonmously <info@rgitmap.com>`.
+     Ensure `Active Git` and `Global Git` reflect `gitmap automation bot - muse - runs autonomously <info@rgitmap.com>`.
+   - **Careful:** do NOT substitute the built-in autobot activation (`gitmap autobot` or `gitmap user switch autobot`) for the commands above. The built-in autobot profile sets a different name and email and does NOT satisfy this identity.
 3. **Pairing with Time Restriction:**
    - When Time-Restriction is active, automated runs combine both:
      ```bash
-     gitmap cpf "Module - summary" --tz <timezone> --schedule --auto-window --non-interactive
+     gitmap cpf "Module - summary" --tz <timezone> --schedule "<DD-MMM-YY hh:mm:ss>" --auto-window --non-interactive
      ```
 4. **Operational reference:** [gitmap-automation-bot](file;.agents/skills/gitmap-automation-bot) and [gitmap-time-restriction](file;.agents/skills/gitmap-time-restriction).
 
@@ -161,7 +164,7 @@ Followed by confirmed task breakdown with explicit `Understood / AI Comprehensio
 - **R5 Mandatory Subagents & Constraint Envelope:** Always call `invoke_subagent` ($A=3, H=2, \text{Capacity}=6$). Every subagent prompt MUST start with the `[CRITICAL_SUBAGENT_CONSTRAINTS]` envelope banning raw search and worker git calls.
 - **R6 One Owner Per File:** Disjoint file boundaries for workers.
 - **R7 Worker Git Ban:** Workers never run git commands; only lead commits.
-- **R8 Mandatory Single Autonomous Bot User:** Machine-wide invariant locked at Step 0 via `gitmap user change-user "gitmap automation bot - runs autonmously" "info@rgitmap.com" --global`. Ban human developer credentials.
+- **R8 Mandatory Single Autonomous Bot User:** Machine-wide invariant locked at Step 0 via `gitmap user change-user "gitmap automation bot - muse - runs autonomously" "info@rgitmap.com" --global`. Ban human developer credentials.
 - **R9 Atomic Commit via GitMap:** Single atomic commit (`gitmap cpf`, `gitmap cbf`, `gitmap cpc`, `gitmap cpr`). Title Case or lowercase subsystem module; NO square brackets `[...]`, NO colons in argument, and NO 'commit' pseudo-module.
 - **R10 Zero Unauthorized Releases:** Never bump versions unless requested.
 - **R11 Leaf Error Sovereignty:** Leaf functions return errors directly; never call exit handlers.
