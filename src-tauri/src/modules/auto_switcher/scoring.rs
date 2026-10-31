@@ -9,6 +9,11 @@ pub struct ProfileCandidate {
     pub account_id: String,
     pub email: String,
     pub quota_percent: f64,
+    // WHY: live 4-hour rolling-window quota percent, used by manual
+    // rotation to classify the selection tier. It mirrors quota_percent
+    // at construction time; the verified path refreshes both with the
+    // freshly measured 4-hour quota, so they stay in sync by construction.
+    pub rolling_4h_quota: f64,
     pub score: f64,
 }
 

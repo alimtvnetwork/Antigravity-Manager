@@ -353,6 +353,10 @@ pub fn select_candidate_profiles(
                         account_id: acc.id.clone(),
                         email: acc.email.clone(),
                         quota_percent: quota,
+                        // WHY: tier classification in manual rotation reads
+                        // the 4-hour quota from this field; it mirrors the
+                        // candidate quota assigned at this site.
+                        rolling_4h_quota: quota,
                         score,
                     };
                     if is_in_cooldown(&acc) {
@@ -419,6 +423,10 @@ pub fn select_candidate_profiles(
                     account_id: acc.id.clone(),
                     email: acc.email.clone(),
                     quota_percent: quota,
+                    // WHY: tier classification in manual rotation reads
+                    // the 4-hour quota from this field; it mirrors the
+                    // candidate quota assigned at this site.
+                    rolling_4h_quota: quota,
                     score,
                 };
                 if is_in_cooldown(acc) {
@@ -474,6 +482,10 @@ pub fn select_candidate_profiles(
                         account_id: acc.id.clone(),
                         email: acc.email.clone(),
                         quota_percent: quota,
+                        // WHY: tier classification in manual rotation reads
+                        // the 4-hour quota from this field; it mirrors the
+                        // candidate quota assigned at this site.
+                        rolling_4h_quota: quota,
                         score,
                     };
                     if is_in_cooldown(acc) {
@@ -527,6 +539,10 @@ pub fn select_candidate_profiles(
                         account_id: acc.id.clone(),
                         email: acc.email.clone(),
                         quota_percent: quota,
+                        // WHY: tier classification in manual rotation reads
+                        // the 4-hour quota from this field; it mirrors the
+                        // candidate quota assigned at this site.
+                        rolling_4h_quota: quota,
                         score,
                     };
                     if is_in_cooldown(acc) {
@@ -940,6 +956,10 @@ pub async fn select_and_verify_next_best_profile(
                 account_id: candidate.account_id,
                 email: candidate.email,
                 quota_percent: fresh_4h_quota,
+                // WHY: manual rotation tier classification reads the live
+                // 4-hour quota from this field; it is the freshly measured
+                // quota assigned as quota_percent at this site.
+                rolling_4h_quota: fresh_4h_quota,
                 score: candidate.score,
             }));
         } else {
@@ -954,6 +974,10 @@ pub async fn select_and_verify_next_best_profile(
                     account_id: candidate.account_id,
                     email: candidate.email,
                     quota_percent: fresh_4h_quota,
+                    // WHY: manual rotation tier classification reads the live
+                    // 4-hour quota from this field; it is the freshly measured
+                    // quota assigned as quota_percent at this site.
+                    rolling_4h_quota: fresh_4h_quota,
                     score: candidate.score,
                 });
             } else if fresh_4h_quota > 5.0 && fresh_4h_quota > highest_emergency_quota {
@@ -963,6 +987,10 @@ pub async fn select_and_verify_next_best_profile(
                     account_id: candidate.account_id,
                     email: candidate.email,
                     quota_percent: fresh_4h_quota,
+                    // WHY: manual rotation tier classification reads the live
+                    // 4-hour quota from this field; it is the freshly measured
+                    // quota assigned as quota_percent at this site.
+                    rolling_4h_quota: fresh_4h_quota,
                     score: candidate.score,
                 });
             }

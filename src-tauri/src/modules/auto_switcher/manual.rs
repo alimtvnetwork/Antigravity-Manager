@@ -177,6 +177,11 @@ pub async fn trigger_manual_rotation_for_instance(
         threshold_activated: Some(switcher_cfg.low_quota_threshold_percent),
     };
 
+    // WHY captured before the move: execute_profile_rotation_with_context
+    // takes candidate by value, so reading candidate.rolling_4h_quota
+    // after the call is a use-after-move (E0382). The quota is an f64
+    // copy, so capturing it first preserves the exact tier decision.
+    let candidate_rolling_4h_quota = candidate.rolling_4h_quota;
     execute_profile_rotation_with_context(
         candidate,
         reason,
@@ -185,7 +190,7 @@ pub async fn trigger_manual_rotation_for_instance(
     )
     .await?;
 
-    let selection_tier_desc = if candidate.rolling_4h_quota >= 99.5 {
+    let selection_tier_desc = if candidate_rolling_4h_quota >= 99.5 {
         "Primary Tier (100% 4h headroom, earliest reset)"
     } else {
         "Fallback Tier (highest combined credits)"

@@ -1043,7 +1043,10 @@ pub fn enqueue_prompt_for_instance(
         copy_to_system_clipboard(prompt_content);
     }
 
-    let active_prompt = ActivePrompt {
+    // WHY mut: the binding is updated to dispatched status below after a
+    // successful live CDP injection, then re-persisted so the background
+    // scheduler does not double-dispatch this prompt.
+    let mut active_prompt = ActivePrompt {
         id: prompt_id,
         project_id: clean_repo_name,
         instance_id: canonical_inst.clone(),
