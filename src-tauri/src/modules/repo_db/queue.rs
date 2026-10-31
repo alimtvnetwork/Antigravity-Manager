@@ -513,7 +513,10 @@ pub fn clear_queued_prompts_for_instance(instance_id: Option<&str>) -> Result<us
         }
     }
 
-    invalidate_prompt_tree_cache();
+    // WHY: pass the caller's scope through, so a scoped clear invalidates only
+    // that instance's prompt-tree cache and an all-instances clear invalidates
+    // everything, matching the function's own contract and tree.rs handling.
+    invalidate_prompt_tree_cache(instance_id);
     Ok(count)
 }
 
