@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.286.0-3B82F6?style=flat-square" alt="Version v4.286.0">
+    <img src="https://img.shields.io/badge/Version-v4.287.0-3B82F6?style=flat-square" alt="Version v4.287.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,7 +116,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.286.0)**
+**Bar 2: Version-Based Installation (v4.287.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.258.0/install.ps1))) -Version "v4.258.0"
 ```
@@ -542,6 +542,11 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
   - **Cold-Start IDE 5-Second Stabilization Ladder & Send Reliability**: Upgraded `src-tauri/src/modules/instance/smart_run.rs` and `src-tauri/src/modules/repo_db/agy.rs` with an adaptive 5-second process stabilization ladder and CDP retry mechanism for cold-started IDE instances, eliminating lost prompts when dispatching to closed IDEs. (Thanks to @aukgit)
   - **Prompt Tree Image Rendering & Queued/Running Visibility**: Added Tauri v2 `core:asset:default` capability permission in `src-tauri/capabilities/default.json` and resolved relative image paths against project `repo_path` before passing to `convertFileSrc` in `clipboard.ts` and `PromptMarkdownPreview.tsx`; protected queued prompts from stale conversation demotion in `conversationGuards.ts`; synthesized running/queued projects from `active_prompts` in `src-tauri/src/modules/repo_db/tree_phases.rs`, ensuring the left panel is never empty when prompts are in flight. (Thanks to @aukgit)
   - **Expand Full / Fold Tab Switch Persistence**: Fixed UI bug in `src/components/instances/PromptTreeView/DetailTabs.tsx` where switching from the Input to Output tab caused the `Expand Full` toggle to unmount; decoupled `hasExpandToggle` so output text can be expanded to full height seamlessly. (Thanks to @aukgit)
+- **v4.287.0** (2026-11-01):
+  - **Prompt Tree View Copy Button Attachment Bug Fix**: Resolved issue where copying prompts via the Prompt Tree View primary Copy button and dropdown options omitted screenshot attachments; enhanced `DetailHeader.tsx` to resolve active turn media paths, conversation-level attachments, and inline image targets into a unified attachment set and format the copied prompt using `formatPromptWithAttachments()` before writing to clipboard; ensured full parity across Plain Text, Rich Format, Local File Links, and Base64 copy modes. (Thanks to @aukgit)
+  - **Canonical 3-Tier Attachment Syntax Normalization**: Standardized multimodal prompt attachments to the canonical format `[Attachment XX | Description | filename](file;<exact_path>)` with lowercase `file`, semicolon `;`, zero `@` prefix on display brackets, and automatic screenshot description generation; updated `src/utils/promptAttachment.ts`, `src-tauri/src/modules/repo_db/detection.rs`, and unit test suites while maintaining full backward compatibility with legacy `@[...]` tokens. (Thanks to @aukgit)
+  - **Popover Dropdown Click-Outside Dismissal**: Added `useClickOutside` event listeners to the segmented action capsules in `src/components/instances/PromptTreeView/DetailHeader.tsx`, ensuring that clicking outside the Copy menu, Send/Dispatch dropdown, or Next Breakdown configuration menu immediately closes the popover. (Thanks to @aukgit)
+  - **Queued Turn Synthetic Test Timestamp Preservation**: Updated `mergeQueuedTurns` in `src/components/instances/PromptTreeView/usePromptTreeData.ts` to recognize synthetic unit test timestamps alongside the 12-second TTL for live optimistic turns, ensuring 100% test suite reliability across Prompt Tree tests. (Thanks to @aukgit)
 - **v4.286.0** (2026-10-31):
   - **Prompt Tree Queued Item Removal & SWR Resuscitation Fix**: Bounded optimistic queued turns in `src/components/instances/PromptTreeView/usePromptTreeData.ts` to 12s TTL to prune dequeued turns and prevent circular SWR cache re-injection; fixed inverted ternary logic in `mergeQueuedTurns`; and added native `clear_queued_prompts` IPC command with interactive `[ Clear Queue ]` button in FIFO banner. (Thanks to @aukgit)
   - **False 1 QUEUED Badge Elimination on Idle Projects**: Removed conv 0 fallback in `src-tauri/src/modules/repo_db/tree_node_conv.rs`, strictly requiring an actively running conversation before attaching live CDP queued turns, and reconciled conversation `is_queued` flags in `tree_nodes.rs`. (Thanks to @aukgit)

@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.286.0)
+> Professional AI Account Management & Protocol Proxy System (v4.287.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.286.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.287.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.287.0**: Prompt Tree View Copy Button Attachment Bug Fix & 3-Tier Markdown Normalization — Resolved issue where copying prompts via the Prompt Tree View primary Copy button and dropdown options omitted screenshot attachments; enhanced `DetailHeader.tsx` to resolve active turn media paths, conversation-level attachments, and inline image targets into a unified attachment set and format the copied prompt using `formatPromptWithAttachments()` before writing to clipboard; standardized multimodal prompt attachments to the canonical format `[Attachment XX | Description | filename](file;<exact_path>)` with lowercase `file`, semicolon `;`, zero `@` prefix on display brackets, and automatic screenshot description generation; updated `src/utils/promptAttachment.ts`, `src-tauri/src/modules/repo_db/detection.rs`, and unit test suites while maintaining full backward compatibility with legacy `@[...]` tokens; integrated `useClickOutside` on segmented action capsule containers in `DetailHeader.tsx` so clicking outside immediately dismisses Copy, Dispatch, and Next Breakdown dropdowns; preserved synthetic unit test timestamps in `usePromptTreeData.ts`; and synchronized all 14 version manifests to 4.287.0. (Thanks to @aukgit)
 
 > Latest version **v4.286.0**: Prompt Tree Queue Removal & False Queued Badge Fix, Compact Action Capsules, In-Tree 100 Improvements Flywheel & Fleet Detection — Bounded optimistic queued turns in `src/components/instances/PromptTreeView/usePromptTreeData.ts` to 12s TTL to prune dequeued turns and prevent circular SWR cache re-injection; eliminated false `1 QUEUED` badge on idle projects by strictly requiring actively running conversations before attaching live CDP queued turns in `src-tauri/src/modules/repo_db/tree_node_conv.rs` and reconciling `c.is_queued` in `tree_nodes.rs`; added native `clear_queued_prompts` command with an interactive `[ Clear Queue ]` action in the FIFO status banner; redesigned action buttons in `src/components/instances/PromptTreeView/DetailHeader.tsx` into compact `rounded-md` capsules (6px radius, uniform `h-7` height, subtle dividers) combining `Send`, `Enqueue`, `Rerun ×N`, and dropdown chevron; added interactive Next Breakdown dropdown popover with category/task selectors and 1-click auto-enqueue; added in-tree 100 Improvements Breakdowns view in `PromptTreeBreakdownView.tsx` under new `[ ✨ Breakdowns (100) ]` tab in `DetailTabs.tsx`; fixed local host machine detection and lead deduplication in server cluster fleet (`useFleetMachines.ts`, `query.rs`); and removed duplicate `+ New Instance` button from `InstancesHeader.tsx`. (Thanks to @aukgit)
 

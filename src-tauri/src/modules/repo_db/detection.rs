@@ -358,13 +358,14 @@ pub fn extract_image_uris_or_paths(content: &str) -> (Vec<String>, Vec<String>) 
 
     let img_exts = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".bmp"];
 
-    // Also scan explicit bracket attachments @[label](file;<path>), [label](file;<path>), or @[file;<path>]
+    // Also scan explicit bracket attachments [label](file;<path>), @[label](file;<path>), or @[file;<path>]
     let mut search_from = 0;
-    while let Some(rel) = content[search_from..].find("@[") {
-        let start = search_from + rel + 2;
+    while let Some(rel) = content[search_from..].find('[') {
+        let is_at_prefixed = rel > 0 && content.as_bytes()[search_from + rel - 1] == b'@';
+        let start = search_from + rel + 1;
         if let Some(end_rel) = content[start..].find(']') {
             let inner = content[start..start + end_rel].trim();
-            let after_bracket = &content[start + end_rel + 1..];
+            let after_bracket = content[start + end_rel + 1..].trim_start();
             if after_bracket.starts_with("(file;") || after_bracket.starts_with("(FILE;") {
                 if let Some(paren_end) = after_bracket.find(')') {
                     let path_part = after_bracket[6..paren_end].trim();
@@ -378,7 +379,7 @@ pub fn extract_image_uris_or_paths(content: &str) -> (Vec<String>, Vec<String>) 
                         }
                     }
                 }
-            } else {
+            } else if is_at_prefixed {
                 let without_file = inner
                     .strip_prefix("file;")
                     .or_else(|| inner.strip_prefix("FILE;"))

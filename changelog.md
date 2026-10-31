@@ -1,5 +1,18 @@
 # Changelog
 
+## [v4.287.0] - 2026-11-01
+
+### Fixed
+- **Prompt Tree View Copy Button Attachment Bug Fix**: Resolved issue where copying prompts via the Prompt Tree View primary Copy button and dropdown options omitted screenshot attachments; enhanced `DetailHeader.tsx` to resolve active turn media paths, conversation-level attachments, and inline image targets into a unified attachment set and format the copied prompt using `formatPromptWithAttachments()` before writing to clipboard; ensured full parity across Plain Text, Rich Format, Local File Links, and Base64 copy modes (Thanks to @aukgit)
+- **Canonical 3-Tier Attachment Syntax Normalization**: Standardized multimodal prompt attachments to the canonical format `[Attachment XX | Description | filename](file;<exact_path>)` with lowercase `file`, semicolon `;`, zero `@` prefix on display brackets, and automatic screenshot description generation; updated `src/utils/promptAttachment.ts`, `src-tauri/src/modules/repo_db/detection.rs`, and unit test suites while maintaining full backward compatibility with legacy `@[...]` tokens (Thanks to @aukgit)
+- **Popover Dropdown Click-Outside Dismissal**: Added `useClickOutside` event listeners to the segmented action capsules in `src/components/instances/PromptTreeView/DetailHeader.tsx`, ensuring that clicking outside the Copy menu, Send/Dispatch dropdown, or Next Breakdown configuration menu immediately closes the popover (Thanks to @aukgit)
+- **Queued Turn Synthetic Test Timestamp Preservation**: Updated `mergeQueuedTurns` in `src/components/instances/PromptTreeView/usePromptTreeData.ts` to recognize synthetic unit test timestamps alongside the 12-second TTL for live optimistic turns, ensuring 100% test suite reliability across Prompt Tree tests (Thanks to @aukgit)
+
+### Changed
+- **Minor Version Bump**: Synchronized all 14 version configuration manifests to 4.287.0 (`package.json`, `version.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, etc.) (Thanks to @aukgit)
+
+---
+
 ## [v4.286.0] - 2026-10-31
 
 ### Fixed
@@ -1720,6 +1733,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.287.0 (2026-11-01)**:
+        -   **[提示词树复制按钮附件与三段式链接规范修复] 修复复制缺少截图附件问题并支持点击外部自动关闭下拉菜单 (Thanks to @aukgit)**:
+            -   **Description**: 解决提示词树视图中主复制按钮及下拉菜单复制文本时遗漏截图附件的问题；在 `DetailHeader.tsx` 中整合当前轮次、会话级别和内联截图媒体路径，通过 `formatPromptWithAttachments()` 统一转换为标准附件块后写入剪贴板；将多模态附件标准化为 `[Attachment XX | Description | filename](file;<exact_path>)` 规范格式，并保持对旧格式的完全向下兼容；在各分段胶囊按钮容器上引入 `useClickOutside`，实现点击外部区域立即关闭复制、调度与 Next Breakdown 弹出菜单；修复 `usePromptTreeData.ts` 中单元测试合成时间戳的保留逻辑，并通过全量构建门禁 (Thanks to @aukgit)。
+
+
     *   **v4.286.0 (2026-11-01)**:
         -   **[提示词树排队项移除与 SWR 复活修复] 解决排队项出队后视图残留问题，防止乐观缓存死循环复活 (Thanks to @aukgit)**:
             -   **Description**: 解决从执行队列中移除或出队时提示词树视图未同步移除的问题；在 `src/components/instances/PromptTreeView/usePromptTreeData.ts` 中为乐观排队轮次引入 12 秒 TTL 机制（`OPTIMISTIC_QUEUED_TTL_MS`），避免出队项在后台 SWR 轮询中被无限次复活；修复 `mergeQueuedTurns` 中的三元条件取反缺陷；强制刷新时清空 `previousTreeRef`；并新增 `clear_queued_prompts` IPC 命令与一键清空排队按钮 (Thanks to @aukgit)。

@@ -1,7 +1,8 @@
 import { copyToClipboard } from '../../../utils/clipboard';
 import { formatPromptWithAttachments } from '../../../utils/promptAttachment';
 import { copyImageAsMarkdownText, writePureImageToClipboard, copyPromptWithRichImages, extractAssets, stripImagesFromPrompt, copyAllImagesToClipboard, copyPromptWithLocalFileLinks, copyPromptWithBase64Images } from './clipboard';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useClickOutside } from '../../../hooks/useClickOutside';
 import { invoke } from '@tauri-apps/api/core';
 import { formatRelativeRecency } from './formatters';
 import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat, Send, Shield, Sparkles, Layers, Play, ChevronRight } from 'lucide-react';
@@ -135,7 +136,7 @@ export function DetailHeader(props: DetailHeaderProps) {
         rerunHistory: propRerunHistory, onRerunHistoryChange,
         onOpenInspector,
         onRenameConversation,
-        selectedTurnNumber: _selectedTurnNumber,
+        selectedTurnNumber,
         setActionMsg,
     } = props;
 
@@ -261,6 +262,40 @@ export function DetailHeader(props: DetailHeaderProps) {
     const [breakdownDryRun, setBreakdownDryRun] = useState(false);
     const [isBreakingDown, setIsBreakingDown] = useState(false);
     const [isClearingQueue, setIsClearingQueue] = useState(false);
+
+    const copyMenuContainerRef = useRef<HTMLDivElement>(null);
+    const dispatchMenuContainerRef = useRef<HTMLDivElement>(null);
+    const breakdownMenuContainerRef = useRef<HTMLDivElement>(null);
+
+    useClickOutside(
+        copyMenuContainerRef,
+        () => {
+            if (isCopyMenuOpen) {
+                setIsCopyMenuOpen(false);
+            }
+        },
+        Boolean(isCopyMenuOpen)
+    );
+
+    useClickOutside(
+        dispatchMenuContainerRef,
+        () => {
+            if (isMenuOpen) {
+                handleCloseDispatchMenu();
+            }
+        },
+        Boolean(isMenuOpen)
+    );
+
+    useClickOutside(
+        breakdownMenuContainerRef,
+        () => {
+            if (isBreakdownDropdownOpen) {
+                setIsBreakdownDropdownOpen(false);
+            }
+        },
+        Boolean(isBreakdownDropdownOpen)
+    );
 
     const handleClearQueue = async () => {
         setIsClearingQueue(true);
@@ -539,6 +574,21 @@ export function DetailHeader(props: DetailHeaderProps) {
         }, 2000);
     };
 
+    const resolveSelectedMediaPaths = (source: string): string[] => {
+        const turnNumberToFind = selectedTurnNumber ?? selectedConversation?.selected_turn_number;
+        const turnMediaPaths = turnNumberToFind != null
+            ? selectedConversation.prompts?.find((p) => p.turn_number === turnNumberToFind)?.media_paths || []
+            : [];
+        const convMediaPaths = selectedConversation.media_paths || [];
+        const { images: inlineImages } = extractAssets(source);
+
+        return Array.from(new Set([
+            ...turnMediaPaths,
+            ...convMediaPaths,
+            ...inlineImages,
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+    };
+
     const handleCopyAll = async () => {
         try {
             const source = resolvePromptBody(selectedConversation, activePromptText);
@@ -547,7 +597,13 @@ export function DetailHeader(props: DetailHeaderProps) {
                 setTimeout(() => setActionMsg?.(null), 2000);
                 return;
             }
-            const ok = await copyToClipboard(source);
+
+            const mediaPaths = resolveSelectedMediaPaths(source);
+            const effectivePrompt = mediaPaths.length > 0
+                ? formatPromptWithAttachments(source, mediaPaths, { repoPath: rerunRepoPath })
+                : source;
+
+            const ok = await copyToClipboard(effectivePrompt);
             if (ok) {
                 markCopiedAll();
                 return;
@@ -573,7 +629,8 @@ export function DetailHeader(props: DetailHeaderProps) {
                 setTimeout(() => setActionMsg?.(null), 2000);
                 return;
             }
-            const ok = await copyPromptWithRichImages(source);
+            const mediaPaths = resolveSelectedMediaPaths(source);
+            const ok = await copyPromptWithRichImages(source, undefined, undefined, mediaPaths, rerunRepoPath);
             if (ok) {
                 markCopiedAll();
                 return;
@@ -613,11 +670,10 @@ export function DetailHeader(props: DetailHeaderProps) {
 
     const handleCopyAllImages = async () => {
         try {
-            const promptText = activePromptText || selectedConversation?.full_prompt_text || selectedConversation?.prompt_preview_200w || '';
-            const { images } = extractAssets(promptText);
-            const allImages = Array.from(new Set([...images, ...(selectedConversation?.media_paths || [])]));
-            if (allImages.length > 0) {
-                await copyAllImagesToClipboard(allImages);
+            const promptText = resolvePromptBody(selectedConversation, activePromptText);
+            const mediaPaths = resolveSelectedMediaPaths(promptText);
+            if (mediaPaths.length > 0) {
+                await copyAllImagesToClipboard(mediaPaths);
                 setLocalCopiedAllImages(true);
                 setTimeout(() => setLocalCopiedAllImages(false), 2000);
             }
@@ -628,8 +684,9 @@ export function DetailHeader(props: DetailHeaderProps) {
 
     const handleCopyPromptLocalLinks = async () => {
         try {
-            const promptText = activePromptText || selectedConversation?.full_prompt_text || selectedConversation?.prompt_preview_200w || '';
-            await copyPromptWithLocalFileLinks(promptText, selectedConversation?.media_paths);
+            const promptText = resolvePromptBody(selectedConversation, activePromptText);
+            const mediaPaths = resolveSelectedMediaPaths(promptText);
+            await copyPromptWithLocalFileLinks(promptText, mediaPaths, rerunRepoPath);
             setLocalCopiedLocalLinks(true);
             setTimeout(() => setLocalCopiedLocalLinks(false), 2000);
         } catch (err) {
@@ -639,8 +696,9 @@ export function DetailHeader(props: DetailHeaderProps) {
 
     const handleCopyPromptBase64 = async () => {
         try {
-            const promptText = activePromptText || selectedConversation?.full_prompt_text || selectedConversation?.prompt_preview_200w || '';
-            await copyPromptWithBase64Images(promptText, selectedConversation?.media_paths);
+            const promptText = resolvePromptBody(selectedConversation, activePromptText);
+            const mediaPaths = resolveSelectedMediaPaths(promptText);
+            await copyPromptWithBase64Images(promptText, mediaPaths);
             setLocalCopiedBase64(true);
             setTimeout(() => setLocalCopiedBase64(false), 2000);
         } catch (err) {
@@ -837,7 +895,10 @@ export function DetailHeader(props: DetailHeaderProps) {
                 {/* Right: The Unified Segmented Dark-Glass Action Capsule */}
                 <div className="flex items-center shrink-0 ml-auto gap-2">
                     {/* Capsule A: Copy Split Button [ Copy | v ] */}
-                    <div className="relative inline-flex items-center rounded-md bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 shadow-2xs divide-x divide-slate-200/70 dark:divide-purple-500/20 shrink-0 h-7">
+                    <div
+                        ref={copyMenuContainerRef}
+                        className="relative inline-flex items-center rounded-md bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 shadow-2xs divide-x divide-slate-200/70 dark:divide-purple-500/20 shrink-0 h-7"
+                    >
                         {/* Primary Button: Copy full prompt as plain text */}
                         <button
                             type="button"
@@ -1129,7 +1190,10 @@ export function DetailHeader(props: DetailHeaderProps) {
                     </div>
 
                     {/* Capsule B: Combined [Send, Enqueue, Rerun] segmented pill capsule and dropdown */}
-                    <div className="relative inline-flex items-center rounded-md bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 shadow-2xs divide-x divide-slate-200/70 dark:divide-purple-500/20 shrink-0 h-7">
+                    <div
+                        ref={dispatchMenuContainerRef}
+                        className="relative inline-flex items-center rounded-md bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 shadow-2xs divide-x divide-slate-200/70 dark:divide-purple-500/20 shrink-0 h-7"
+                    >
                         {/* 1. Send Button */}
                         <button
                             type="button"
@@ -1705,7 +1769,10 @@ export function DetailHeader(props: DetailHeaderProps) {
                     </div>
 
                     {/* Capsule C: 100 Improvements Flywheel & Next Breakdown Capsule */}
-                    <div className="relative inline-flex items-center rounded-md bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-amber-300/60 dark:border-amber-500/30 shadow-2xs divide-x divide-amber-200/60 dark:divide-amber-500/20 shrink-0 h-7">
+                    <div
+                        ref={breakdownMenuContainerRef}
+                        className="relative inline-flex items-center rounded-md bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-amber-300/60 dark:border-amber-500/30 shadow-2xs divide-x divide-amber-200/60 dark:divide-amber-500/20 shrink-0 h-7"
+                    >
                         {/* Primary Button */}
                         <button
                             type="button"

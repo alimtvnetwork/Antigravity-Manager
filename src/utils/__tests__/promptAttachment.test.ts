@@ -32,19 +32,27 @@ function assertEqual<T>(actual: T, expected: T): void {
     }
 }
 
-// Test 1: Canonical formatting uses @[file_name_sequence](file;<path>)
-test('formatPromptWithAttachments outputs canonical @[file_name_sequence](file;<path>) format', () => {
+// Test 1: Canonical formatting uses [Attachment XX | Description | filename](file;<path>)
+test('formatPromptWithAttachments outputs canonical [Attachment XX | Description | filename](file;<path>) format', () => {
     const prompt = 'Investigate error in billing component';
     const attachments = ['assets/screenshots/billing-error.png', 'assets/screenshots/network-trace.png'];
     const result = formatPromptWithAttachments(prompt, attachments, { isWindowsPlatformOverride: false });
 
     assert(result.includes('Attachments:'), 'Result should include Attachments: header');
-    assert(result.includes('1. @[file_name_sequence](file;assets/screenshots/billing-error.png)'), 'Should contain 1. @[file_name_sequence](file;...)');
-    assert(result.includes('2. @[file_name_sequence](file;assets/screenshots/network-trace.png)'), 'Should contain 2. @[file_name_sequence](file;...)');
+    assert(result.includes('1. [Attachment 01 | Billing Error Screenshot | billing-error.png](file;assets/screenshots/billing-error.png)'), 'Should contain 1. [Attachment 01 | ...](file;...)');
+    assert(result.includes('2. [Attachment 02 | Network Trace Screenshot | network-trace.png](file;assets/screenshots/network-trace.png)'), 'Should contain 2. [Attachment 02 | ...](file;...)');
 });
 
-// Test 2: Extraction handles canonical @[file_name_sequence](file;<path>)
-test('extractAttachmentsFromPrompt extracts clean path from canonical @[file_name_sequence](file;<path>)', () => {
+// Test 2: Extraction handles canonical [Attachment XX | Description | filename](file;<path>)
+test('extractAttachmentsFromPrompt extracts clean path from canonical [Attachment XX | Description | filename](file;<path>)', () => {
+    const text = 'Check UI:\nAttachments:\n1. [Attachment 01 | Screenshot Attachment | screenshot.png](file;assets/screenshot.png)';
+    const extracted = extractAttachmentsFromPrompt(text, undefined, false);
+    assertEqual(extracted.length, 1);
+    assertEqual(extracted[0], 'assets/screenshot.png');
+});
+
+// Test 2b: Backward compatibility for previous intermediate syntax @[file_name_sequence](file;<path>)
+test('extractAttachmentsFromPrompt extracts clean path from @[file_name_sequence](file;<path>)', () => {
     const text = 'Check UI:\nAttachments:\n1. @[file_name_sequence](file;assets/screenshot.png)';
     const extracted = extractAttachmentsFromPrompt(text, undefined, false);
     assertEqual(extracted.length, 1);
@@ -96,7 +104,7 @@ test('formatPromptWithAttachments inserts attachments before </USER_REQUEST>', (
     const result = formatPromptWithAttachments(prompt, attachments, { isWindowsPlatformOverride: false });
 
     assert(result.indexOf('Attachments:') < result.indexOf('</USER_REQUEST>'), 'Attachments should come before tag');
-    assert(result.includes('1. @[file_name_sequence](file;assets/bug.png)'), 'Should contain canonical attachment');
+    assert(result.includes('1. [Attachment 01 | Bug Screenshot | bug.png](file;assets/bug.png)'), 'Should contain canonical attachment');
 });
 
 // Test 9: normalizeAttachmentPath strips file; prefix and normalizes correctly
@@ -114,8 +122,8 @@ test('formatPromptWithAttachments handles object inputs with file; prefix', () =
     const attachments = [{ path: 'file;assets/from-path.png' }, { src: 'file;assets/from-src.png' }];
     const result = formatPromptWithAttachments(prompt, attachments, { isWindowsPlatformOverride: false });
 
-    assert(result.includes('1. @[file_name_sequence](file;assets/from-path.png)'), 'Should format object path item canonically');
-    assert(result.includes('2. @[file_name_sequence](file;assets/from-src.png)'), 'Should format object src item canonically');
+    assert(result.includes('1. [Attachment 01 | From Path Screenshot | from-path.png](file;assets/from-path.png)'), 'Should format object path item canonically');
+    assert(result.includes('2. [Attachment 02 | From Src Screenshot | from-src.png](file;assets/from-src.png)'), 'Should format object src item canonically');
 });
 
 // Test 11: Mixed markdown and bracketed images extraction
