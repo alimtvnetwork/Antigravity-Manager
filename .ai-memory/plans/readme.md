@@ -4,6 +4,7 @@
 
 | Plan | Status | Summary |
 | :--- | :--- | :--- |
+| [239-alex-hudson-selection-and-clustering-issue.md](./completed/239-alex-hudson-selection-and-clustering-issue.md) | `COMPLETED` | Cluster-wide cross-instance / cross-machine account exclusion preventing `alex.hudson.riseup@gmail.com` collisions, restoration of canonical cluster nodes W2 (`192.168.1.7`) and W3 (`192.168.1.12`) without node loss, and transparent algorithm rationale telemetry ("let it show"); tagged `v4.281.0`. |
 | [237-prompt-tree-enqueue-visibility.md](./completed/237-prompt-tree-enqueue-visibility.md) | `COMPLETED` | Prompt Tree Enqueue/Rerun show queued turns on the clicked instance immediately; selected-turn overlay keeps QUEUED; no 600s recency gate; isolated five `queued-*` ids; tagged `v4.279.0`. |
 | [236-telegram-feature-enhancement.md](./completed/236-telegram-feature-enhancement.md) | `COMPLETED` | Telegram inbound: screenshot without AGM self-focus hang, CSV as `sendDocument`, per-instance `/status` cards, Copy/Full whole-prompt `.txt` via `i:cp:`, hover shade only, isolated switch+restore E2E, tagged `v4.276.0`. |
 | [235-add-new-option-for-100-improvements.md](./completed/235-add-new-option-for-100-improvements.md) | `COMPLETED` | Shared 100-improvements flywheel on CLI (`agm improvements`), UI pills, Telegram verbs; Instances header **100 Steps**; Prompt Tree `run-100-steps`; Create Profile dark-glass (no DaisyUI magenta ring). |

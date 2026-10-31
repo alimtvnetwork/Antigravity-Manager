@@ -251,6 +251,12 @@ pub fn select_candidate_profiles(
     {
         push_exclusion(&cross_vm_acc);
     }
+    for remote_cluster_acc in crate::modules::supabase_sync::get_remote_cluster_active_accounts() {
+        push_exclusion(&remote_cluster_acc);
+        if let Ok(Some(acc)) = account::get_account_by_email(&remote_cluster_acc) {
+            push_exclusion(&acc.id);
+        }
+    }
 
     // Helper closure to evaluate if an account is in cooldown window
     let is_in_cooldown = |acc: &account::Account| -> bool {

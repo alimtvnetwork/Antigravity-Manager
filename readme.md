@@ -23,7 +23,7 @@
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
 <<<<<<< Updated upstream
-    <img src="https://img.shields.io/badge/Version-v4.279.6-3B82F6?style=flat-square" alt="Version v4.279.6">
+    <img src="https://img.shields.io/badge/Version-v4.281.0-3B82F6?style=flat-square" alt="Version v4.281.0">
 =======
     <img src="https://img.shields.io/badge/Version-v4.280.0-3B82F6?style=flat-square" alt="Version v4.280.0">
 >>>>>>> Stashed changes
@@ -121,7 +121,7 @@ irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/ins
 ```
 
 <<<<<<< Updated upstream
-**Bar 2: Version-Based Installation (v4.279.6)**
+**Bar 2: Version-Based Installation (v4.281.0)**
 =======
 **Bar 2: Version-Based Installation (v4.280.0)**
 >>>>>>> Stashed changes
@@ -550,6 +550,10 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
   - **Cold-Start IDE 5-Second Stabilization Ladder & Send Reliability**: Upgraded `src-tauri/src/modules/instance/smart_run.rs` and `src-tauri/src/modules/repo_db/agy.rs` with an adaptive 5-second process stabilization ladder and CDP retry mechanism for cold-started IDE instances, eliminating lost prompts when dispatching to closed IDEs. (Thanks to @aukgit)
   - **Prompt Tree Image Rendering & Queued/Running Visibility**: Added Tauri v2 `core:asset:default` capability permission in `src-tauri/capabilities/default.json` and resolved relative image paths against project `repo_path` before passing to `convertFileSrc` in `clipboard.ts` and `PromptMarkdownPreview.tsx`; protected queued prompts from stale conversation demotion in `conversationGuards.ts`; synthesized running/queued projects from `active_prompts` in `src-tauri/src/modules/repo_db/tree_phases.rs`, ensuring the left panel is never empty when prompts are in flight. (Thanks to @aukgit)
   - **Expand Full / Fold Tab Switch Persistence**: Fixed UI bug in `src/components/instances/PromptTreeView/DetailTabs.tsx` where switching from the Input to Output tab caused the `Expand Full` toggle to unmount; decoupled `hasExpandToggle` so output text can be expanded to full height seamlessly. (Thanks to @aukgit)
+- **v4.281.0** (2026-10-31):
+  - **Cluster-Wide Cross-Instance / Cross-Machine Account Exclusion**: Resolved concurrent account collisions where accounts actively in use on remote machines (e.g. `alex.hudson.riseup@gmail.com`) were erroneously selected by local instances; extended `get_active_in_use_account_ids()` in `src-tauri/src/modules/auto_switcher/instances.rs`, candidate selection in `selection.rs`, and manual rotation in `manual.rs` to aggregate remote active accounts from cached fleet machines and cluster leases; enriched frontend `src/stores/useInstanceStore/smart.ts` to exclude all remote cluster active accounts across `smartPlayInstance` and `smartRotateProfileAccount`. (Thanks to @aukgit)
+  - **Shared Cluster Fleet Discovery & W2/W3 Node Restoration**: Eliminated hardcoded `"w1"` overrides in `src-tauri/src/modules/supabase_sync/query.rs` and `node.rs`; resolved local machine alias dynamically via Cluster-IP primacy (`resolve_local_node_alias()`) and GitMap `~/.gitmap/variables.json` (`machine.alias` / `machine.name`); restored canonical cluster nodes `w2` (`192.168.1.7`), `w3` (`192.168.1.12`), and `w1` (`192.168.1.3`) in Shared Cluster / Fleet table without dropping or collapsing nodes; fixed false `is_local` and `is_lead` hardcoding in `src/components/instances/fleet/useFleetMachines.ts` and `FleetMachineRow.tsx` so remote nodes are never assigned local primary accounts. (Thanks to @aukgit)
+  - **Fast-Forward & Smart-Switch Algorithm Transparency ("Let It Show")**: Added transparent selection tier classification (`Tier 1: 100% 4h Quota`, `Tier 2: Proportional Fallback`, `Tier 3: Best Candidate Pick`), live candidate evaluation scores, and cluster exclusion counts in `src/stores/useInstanceStore/smart.ts`; surfaced selection rationale in top navigation Fast-Forward toast notifications, `BackgroundTaskRunner.tsx`, and Auto-Switcher settings feedback. (Thanks to @aukgit)
 - **v4.228.1** (2026-10-18):
   - **Conscious Process Termination & Account Switch Synchronization**: Fixed stop instance button and account switching synchronization by implementing Win32 process tree escalation (`taskkill /F /T /PID` and `TerminateProcess`), 8.3 path normalization (`GetShortPathNameW`), and a 200ms kernel settle delay to guarantee process death and lockfile release before credential rewrites in `state.vscdb`. (Thanks to @aukgit)
   - **Active Caller IDE Self-Preservation**: Hardened `detect_caller_instance_id` to trace cloned executables (`Antigravity-<id>.exe`), `ANTIGRAVITY_APP_DATA_DIR`, and `VSCODE_PID`, enforcing caller immunity guards across `rm`, `switch`, `ff`, and `stop` to prevent CLI operations from terminating active IDE developer windows. (Thanks to @aukgit)

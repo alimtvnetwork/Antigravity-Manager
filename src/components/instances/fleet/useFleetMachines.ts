@@ -51,7 +51,7 @@ function isCacheWithinTtl(timestamp?: number): boolean {
     return Date.now() - timestamp < FLEET_CACHE_TTL_MS;
 }
 
-function loadCachedFleetMachines(): FleetMachineInfo[] {
+export function loadCachedFleetMachines(): FleetMachineInfo[] {
     try {
         const raw = localStorage.getItem(FLEET_CACHE_KEY);
         if (raw) {
@@ -86,41 +86,55 @@ function saveCachedFleetMachines(machines: FleetMachineInfo[]): void {
 }
 
 function sortFleetMachines(list: FleetMachineInfo[]): FleetMachineInfo[] {
-    const listWithLead = list.map((m) => {
+    const listWithFlags = list.map((m) => {
         const alias = (m.node_alias || (m as any).alias || '').trim().toLowerCase();
         const ip = (m.ip_address || (m as any).ip || '').trim();
-        const isW1 = alias === 'w1' || ip === '192.168.1.3' || Boolean((m as any).is_local && !alias.includes('main'));
+        const isLead = Boolean((m as any).is_lead || alias === 'w1' || ip === '192.168.1.3');
+        const isLocal = Boolean((m as any).is_local);
         return {
             ...m,
-            is_lead: isW1 ? true : Boolean((m as any).is_lead),
-            is_local: isW1 ? true : Boolean((m as any).is_local),
+            is_lead: isLead,
+            is_local: isLocal,
         };
     });
 
-    return listWithLead.sort((a, b) => {
+    return listWithFlags.sort((a, b) => {
+        // 1. Current local machine always sorted at index 0
+        const aLocal = Boolean((a as any).is_local);
+        const bLocal = Boolean((b as any).is_local);
+        if (aLocal !== bLocal) return aLocal ? -1 : 1;
+
+        // 2. Lead node (w1 / 192.168.1.3) follows
         const aAlias = (a.node_alias || (a as any).alias || '').trim().toLowerCase();
         const bAlias = (b.node_alias || (b as any).alias || '').trim().toLowerCase();
         const aIp = (a.ip_address || (a as any).ip || '').trim();
         const bIp = (b.ip_address || (b as any).ip || '').trim();
 
-        // 1. Lead machine ('w1' / current local machine 192.168.1.3) sorted at index 0 with is_lead: true
-        const aIsW1 = aAlias === 'w1' || aIp === '192.168.1.3' || Boolean(a.is_lead && a.is_local);
-        const bIsW1 = bAlias === 'w1' || bIp === '192.168.1.3' || Boolean(b.is_lead && b.is_local);
+        const aIsW1 = aAlias === 'w1' || aIp === '192.168.1.3';
+        const bIsW1 = bAlias === 'w1' || bIp === '192.168.1.3';
         if (aIsW1 !== bIsW1) return aIsW1 ? -1 : 1;
 
-        // 2. Central orchestrator peer ('main' 192.168.1.20) follows
+        // 3. Canonical cluster sequence (w2, w3, main)
+        const aIsW2 = aAlias === 'w2' || aIp === '192.168.1.7';
+        const bIsW2 = bAlias === 'w2' || bIp === '192.168.1.7';
+        if (aIsW2 !== bIsW2) return aIsW2 ? -1 : 1;
+
+        const aIsW3 = aAlias === 'w3' || aIp === '192.168.1.12';
+        const bIsW3 = bAlias === 'w3' || bIp === '192.168.1.12';
+        if (aIsW3 !== bIsW3) return aIsW3 ? -1 : 1;
+
         const aIsMain = aAlias === 'main' || aIp === '192.168.1.20';
         const bIsMain = bAlias === 'main' || bIp === '192.168.1.20';
         if (aIsMain !== bIsMain) return aIsMain ? -1 : 1;
 
-        // 3. Online status
+        // 4. Online status
         if (a.is_online !== b.is_online) return a.is_online ? -1 : 1;
 
         return (a.node_alias || '').localeCompare(b.node_alias || '');
     });
 }
 
-function mapSshNodesToFleet(sshNodes: SshNodeItem[], _localId?: string): FleetMachineInfo[] {
+function mapSshNodesToFleet(sshNodes: SshNodeItem[], localId?: string): FleetMachineInfo[] {
     return sshNodes
         .filter((n) => Boolean(n.alias))
         .map((n) => {
@@ -128,11 +142,11 @@ function mapSshNodesToFleet(sshNodes: SshNodeItem[], _localId?: string): FleetMa
             const ip = (n.ip_address || n.host || n.ip || '').trim();
 
             const aliasLower = alias.toLowerCase();
-            const isLocal =
-                aliasLower === 'w1' ||
-                ip === '192.168.1.3' ||
-                aliasLower.startsWith('local');
-            const isLead = isLocal || aliasLower === 'w1';
+            const isLocal = Boolean(
+                (localId && (aliasLower === localId.toLowerCase() || n.alias === localId)) ||
+                aliasLower.startsWith('local')
+            );
+            const isLead = aliasLower === 'w1' || ip === '192.168.1.3';
 
             return {
                 node_id: `ssh_${alias}`,
@@ -152,7 +166,7 @@ function mapSshNodesToFleet(sshNodes: SshNodeItem[], _localId?: string): FleetMa
                         is_running: true,
                     },
                 ],
-                bound_emails: isLead ? ['sakibagjdjg@gmail.com', 'cirajayu11@gmail.com'] : aliasLower === 'main' ? ['sakibagjdjg@gmail.com'] : [],
+                bound_emails: aliasLower === 'main' ? ['sakibagjdjg@gmail.com'] : [],
                 git_repo: 'Antigravity-Manager',
                 git_link: 'alimtvnetwork / Antigravity-Manager',
             } as FleetMachineInfo;
@@ -241,12 +255,9 @@ async function enrichFleetMachines(machines: FleetMachineInfo[]): Promise<FleetM
         const aliasLower = alias.toLowerCase();
         const isLocal = Boolean(
             (machine as any).is_local ||
-            aliasLower === 'w1' ||
-            ip === '192.168.1.3' ||
-            aliasLower.startsWith('local') ||
             (machine as any).source === 'local'
         );
-        const isLead = isLocal || aliasLower === 'w1';
+        const isLead = Boolean((machine as any).is_lead || aliasLower === 'w1' || ip === '192.168.1.3');
 
         // Collect bound emails
         const emails = new Set<string>(machine.bound_emails || []);
@@ -257,8 +268,8 @@ async function enrichFleetMachines(machines: FleetMachineInfo[]): Promise<FleetM
             for (const e of emailByIp.get(ip)!) emails.add(e);
         }
 
-        // Only local/lead machine (w1) populates from localPrimaryEmails if no emails are discovered
-        if (emails.size === 0 && isLead && localPrimaryEmails.length > 0) {
+        // Only genuine local machine populates from localPrimaryEmails if no emails are discovered
+        if (emails.size === 0 && isLocal && localPrimaryEmails.length > 0) {
             for (const e of localPrimaryEmails) emails.add(e);
         } else if (emails.size === 0 && aliasLower === 'main') {
             // For central orchestrator peer main, fallback to the known primary account sakibagjdjg@gmail.com

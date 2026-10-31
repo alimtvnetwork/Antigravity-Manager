@@ -91,6 +91,18 @@ pub async fn trigger_manual_rotation_for_instance(
         }
     }
 
+    let remote_cluster_accs = crate::modules::supabase_sync::get_remote_cluster_active_accounts();
+    for r_acc in &remote_cluster_accs {
+        if !excluded.iter().any(|x| x.eq_ignore_ascii_case(r_acc)) {
+            excluded.push(r_acc.clone());
+        }
+        if let Ok(Some(acc)) = account::get_account_by_email(r_acc) {
+            if !excluded.iter().any(|x| x.eq_ignore_ascii_case(&acc.id)) {
+                excluded.push(acc.id.clone());
+            }
+        }
+    }
+
     let candidate = select_and_verify_next_best_profile(
         &inst_id,
         &switcher_cfg.target_model,
@@ -173,9 +185,15 @@ pub async fn trigger_manual_rotation_for_instance(
     )
     .await?;
 
+    let selection_tier_desc = if candidate.rolling_4h_quota >= 99.5 {
+        "Primary Tier (100% 4h headroom, earliest reset)"
+    } else {
+        "Fallback Tier (highest combined credits)"
+    };
+    let remote_excl_cnt = remote_cluster_accs.len();
     Ok(format!(
-        "Successfully rotated profile '{}' to account '{}'",
-        effective_inst, email
+        "Successfully rotated profile '{}' to account '{}' [{}] (Excluded {} cluster-active account(s))",
+        effective_inst, email, selection_tier_desc, remote_excl_cnt
     ))
 }
 

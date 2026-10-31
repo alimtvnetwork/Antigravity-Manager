@@ -62,14 +62,13 @@ export function FleetMachineRow({
     const aliasLower = (machine.node_alias || mExt.alias || '').trim().toLowerCase();
     const isLocalNode = Boolean(
         mExt.is_local ||
-        aliasLower === 'w1' ||
         aliasLower.startsWith('local') ||
         mExt.source === 'local'
     );
     const isLeadNode = Boolean(
         mExt.is_lead !== undefined
             ? mExt.is_lead
-            : ((aliasLower === 'w1' || machine.ip_address === '192.168.1.3') && isLocalNode)
+            : (aliasLower === 'w1' || machine.ip_address === '192.168.1.3')
     );
 
     return (

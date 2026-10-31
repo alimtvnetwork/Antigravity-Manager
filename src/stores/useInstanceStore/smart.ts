@@ -1,5 +1,6 @@
 import * as instanceService from '../../services/instanceService';
 import * as accountService from '../../services/accountService';
+import { loadCachedFleetMachines } from '../../components/instances/fleet/useFleetMachines';
 import { useErrorStore } from '../error-store';
 import { useConfigStore } from '../useConfigStore';
 import type { Account } from '../../types/account';
@@ -7,6 +8,68 @@ import type { InstanceState } from './types';
 
 type SetState = (p: Partial<InstanceState> | ((s: InstanceState) => Partial<InstanceState>)) => void;
 type GetState = () => InstanceState;
+
+function getRemoteClusterActiveAccountIdentifiers(): string[] {
+    const list: string[] = [];
+    try {
+        const machines = loadCachedFleetMachines();
+        for (const m of machines) {
+            if (!(m as any).is_local) {
+                if (Array.isArray(m.bound_emails)) {
+                    for (const email of m.bound_emails) {
+                        const trimmed = email.trim();
+                        if (trimmed && !list.some(x => x.toLowerCase() === trimmed.toLowerCase())) {
+                            list.push(trimmed);
+                        }
+                    }
+                }
+                if (Array.isArray((m as any).active_accounts)) {
+                    for (const email of (m as any).active_accounts) {
+                        const trimmed = (email || '').trim();
+                        if (trimmed && !list.some(x => x.toLowerCase() === trimmed.toLowerCase())) {
+                            list.push(trimmed);
+                        }
+                    }
+                }
+                if (Array.isArray(m.active_instances)) {
+                    for (const inst of m.active_instances) {
+                        if (inst.bound_account_email) {
+                            const trimmed = inst.bound_account_email.trim();
+                            if (trimmed && !list.some(x => x.toLowerCase() === trimmed.toLowerCase())) {
+                                list.push(trimmed);
+                            }
+                        }
+                        if (inst.bound_account_id) {
+                            const trimmed = inst.bound_account_id.trim();
+                            if (trimmed && !list.includes(trimmed)) {
+                                list.push(trimmed);
+                            }
+                        }
+                    }
+                }
+                if (Array.isArray((m as any).leases)) {
+                    for (const lease of (m as any).leases) {
+                        if (lease.account_email) {
+                            const trimmed = lease.account_email.trim();
+                            if (trimmed && !list.some(x => x.toLowerCase() === trimmed.toLowerCase())) {
+                                list.push(trimmed);
+                            }
+                        }
+                        if (lease.account_id) {
+                            const trimmed = lease.account_id.trim();
+                            if (trimmed && !list.includes(trimmed)) {
+                                list.push(trimmed);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } catch {
+        // Best-effort retrieval of cluster exclusions
+    }
+    return list;
+}
 
 export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceState,
     'smartPlayInstance' | 'rotateToNextBestProfile' | 'smartRotateProfileAccount' |
@@ -31,6 +94,13 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
             const activeInUseAccountIds = get()
                 .instances.filter(i => i.is_running && i.config.bound_account_id)
                 .map(i => i.config.bound_account_id as string);
+
+            const clusterExclusions = getRemoteClusterActiveAccountIdentifiers();
+            for (const excl of clusterExclusions) {
+                if (!activeInUseAccountIds.some(x => x.toLowerCase() === excl.toLowerCase())) {
+                    activeInUseAccountIds.push(excl);
+                }
+            }
 
             const { useAccountStore } = await import('../useAccountStore');
             let accounts = useAccountStore.getState().accounts;
@@ -194,6 +264,14 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
                 activeInUseAccountIds.push(currentAccountEmail);
             }
 
+            const clusterExclusions = getRemoteClusterActiveAccountIdentifiers();
+            const clusterExclusionsCount = clusterExclusions.length;
+            for (const excl of clusterExclusions) {
+                if (!activeInUseAccountIds.some(x => x.toLowerCase() === excl.toLowerCase())) {
+                    activeInUseAccountIds.push(excl);
+                }
+            }
+
             // 3. Filter eligible accounts (not disabled, not proxy_disabled, not forbidden, not blocked)
             const eligibleAccounts = accounts.filter(acc => {
                 const isDisabled = Boolean(acc.disabled) || Boolean(acc.proxy_disabled);
@@ -313,10 +391,14 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
             }
 
             // Step 3 (Proportional Sub-100% Fallback): use best live-probed or refreshed sub-100% account
+            let selectionTier = 'Tier 1: 100% 4h Quota';
+            let rationale = '100% 4h quota';
             if (!verifiedCandidate && bestFallbackCandidate) {
                 console.log(
                     `[useInstanceStore] Using Step 3 proportional fallback candidate ${bestFallbackCandidate.account.email} (score: ${bestFallbackCandidate.score}).`
                 );
+                selectionTier = 'Tier 2: Proportional Fallback';
+                rationale = `Proportional fallback (Score: ${bestFallbackCandidate.score})`;
                 verifiedCandidate = bestFallbackCandidate.account;
             }
 
@@ -328,6 +410,14 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
                     currentAccountId,
                     tierMultipliers
                 );
+                if (verifiedCandidate) {
+                    selectionTier = 'Tier 3: Best Candidate Pick';
+                    rationale = 'Evaluated candidate quota';
+                }
+            }
+
+            if (clusterExclusionsCount > 0) {
+                rationale += ` · ${clusterExclusionsCount} cluster exclusion(s)`;
             }
 
             if (!verifiedCandidate) {
@@ -386,6 +476,9 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
                 daysUntilRefill: 0,
                 resumedProjectsCount: resumeResult?.resumed_project_count ?? 0,
                 skippedProjectsCount: resumeResult?.skipped_project_count ?? 0,
+                selectionTier,
+                clusterExclusionsCount,
+                rationale,
             };
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to smart rotate profile' });

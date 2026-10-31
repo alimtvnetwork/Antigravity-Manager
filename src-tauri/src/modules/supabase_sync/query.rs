@@ -3,6 +3,77 @@ use crate::modules::instance;
 use crate::modules::supabase_client::{normalize_supabase_url, SupabaseClient, SupabaseEndpoint};
 use chrono::Utc;
 use std::collections::{HashMap, HashSet};
+use std::sync::RwLock;
+use std::time::{Duration, Instant};
+
+static FLEET_MACHINES_CACHE: RwLock<Option<(Vec<FleetMachineInfo>, Instant)>> = RwLock::new(None);
+
+pub fn update_fleet_machines_cache(machines: &[FleetMachineInfo]) {
+    if let Ok(mut lock) = FLEET_MACHINES_CACHE.write() {
+        *lock = Some((machines.to_vec(), Instant::now()));
+    }
+}
+
+pub fn get_cached_fleet_machines() -> Vec<FleetMachineInfo> {
+    if let Ok(lock) = FLEET_MACHINES_CACHE.read() {
+        if let Some((ref machines, timestamp)) = *lock {
+            if timestamp.elapsed() < Duration::from_secs(60) {
+                return machines.clone();
+            }
+        }
+    }
+    build_local_and_ssh_fleet()
+}
+
+pub fn get_remote_cluster_active_accounts() -> HashSet<String> {
+    let mut remote_accounts = HashSet::new();
+    let fleet = get_cached_fleet_machines();
+    for machine in fleet {
+        if !machine.is_local {
+            for acc in machine.active_accounts {
+                let trimmed = acc.trim();
+                if !trimmed.is_empty() {
+                    remote_accounts.insert(trimmed.to_string());
+                }
+            }
+            for inst in machine.active_instances {
+                if let Some(ref email) = inst.bound_account_email {
+                    let trimmed = email.trim();
+                    if !trimmed.is_empty() {
+                        remote_accounts.insert(trimmed.to_string());
+                    }
+                }
+                if let Some(ref id) = inst.bound_account_id {
+                    let trimmed = id.trim();
+                    if !trimmed.is_empty() {
+                        remote_accounts.insert(trimmed.to_string());
+                    }
+                }
+            }
+            for lease in machine.leases {
+                if !lease.account_email.trim().is_empty() {
+                    remote_accounts.insert(lease.account_email.trim().to_string());
+                }
+                if !lease.account_id.trim().is_empty() {
+                    remote_accounts.insert(lease.account_id.trim().to_string());
+                }
+            }
+        }
+    }
+
+    if let Ok(cluster_items) = crate::modules::ssh_manager::get_cluster_instances_and_balances() {
+        for item in cluster_items {
+            if !item.is_local {
+                let trimmed = item.bound_email.trim();
+                if !trimmed.is_empty() && trimmed != "Unbound" {
+                    remote_accounts.insert(trimmed.to_string());
+                }
+            }
+        }
+    }
+
+    remote_accounts
+}
 
 use super::*;
 
@@ -165,32 +236,28 @@ pub(crate) fn collect_all_peer_connections() -> Vec<crate::modules::ssh_manager:
 /// Build local machine info plus all registered SSH fleet and GitMap nodes
 pub fn build_local_and_ssh_fleet() -> Vec<FleetMachineInfo> {
     let mut machines = build_local_fallback_machine();
+    let local_alias = resolve_local_node_alias();
     if let Some(m) = machines.first_mut() {
-        m.node_alias = "w1".to_string();
-        m.alias = "w1".to_string();
+        m.node_alias = local_alias.clone();
+        m.alias = local_alias.clone();
         m.is_local = true;
     }
     let local_ip = machines
         .first()
         .map(|m| m.ip_address.clone())
         .unwrap_or_default();
-    let local_alias = machines
-        .first()
-        .map(|m| m.alias.clone())
-        .unwrap_or_default();
     let now = Utc::now().timestamp();
 
     let all_conns = collect_all_peer_connections();
     for conn in all_conns {
-        let is_self = conn.ip_address == "192.168.1.3"
-            || (!local_ip.is_empty() && conn.ip_address == local_ip)
-            || conn.alias.eq_ignore_ascii_case("w1")
-            || (conn.alias.eq_ignore_ascii_case(&local_alias)
-                && (local_ip.is_empty() || conn.ip_address == local_ip));
+        let is_self = (!local_ip.is_empty() && conn.ip_address.trim() == local_ip.trim())
+            || (!local_alias.is_empty()
+                && conn.alias.trim().eq_ignore_ascii_case(&local_alias)
+                && (conn.ip_address.is_empty() || conn.ip_address.trim() == local_ip.trim()));
         if is_self {
             if let Some(local_machine) = machines.first_mut() {
-                local_machine.node_alias = "w1".to_string();
-                local_machine.alias = "w1".to_string();
+                local_machine.node_alias = local_alias.clone();
+                local_machine.alias = local_alias.clone();
                 local_machine.is_local = true;
             }
             continue;
@@ -201,7 +268,7 @@ pub fn build_local_and_ssh_fleet() -> Vec<FleetMachineInfo> {
     // Ensure all canonical cluster nodes (w1, main, u1, w2, w3, w4) are preserved without dropping
     for &(alias, ip, user, os) in crate::modules::ssh_manager::GITMAP_CLUSTER_NODES {
         let exists = machines.iter().any(|m| {
-            m.node_alias.eq_ignore_ascii_case(alias) || (!ip.is_empty() && m.ip_address == ip)
+            (!ip.is_empty() && m.ip_address == ip) || m.node_alias.eq_ignore_ascii_case(alias)
         });
         if !exists {
             let record = crate::modules::ssh_manager::SshConnectionRecord {
@@ -228,12 +295,23 @@ pub fn build_local_and_ssh_fleet() -> Vec<FleetMachineInfo> {
     }
 
     machines.sort_by(|a, b| {
-        let a_is_w1 =
-            a.node_alias.eq_ignore_ascii_case("w1") || a.ip_address == "192.168.1.3" || a.is_local;
-        let b_is_w1 =
-            b.node_alias.eq_ignore_ascii_case("w1") || b.ip_address == "192.168.1.3" || b.is_local;
+        if a.is_local != b.is_local {
+            return b.is_local.cmp(&a.is_local);
+        }
+        let a_is_w1 = a.node_alias.eq_ignore_ascii_case("w1") || a.ip_address == "192.168.1.3";
+        let b_is_w1 = b.node_alias.eq_ignore_ascii_case("w1") || b.ip_address == "192.168.1.3";
         if a_is_w1 != b_is_w1 {
             return b_is_w1.cmp(&a_is_w1);
+        }
+        let a_is_w2 = a.node_alias.eq_ignore_ascii_case("w2") || a.ip_address == "192.168.1.7";
+        let b_is_w2 = b.node_alias.eq_ignore_ascii_case("w2") || b.ip_address == "192.168.1.7";
+        if a_is_w2 != b_is_w2 {
+            return b_is_w2.cmp(&a_is_w2);
+        }
+        let a_is_w3 = a.node_alias.eq_ignore_ascii_case("w3") || a.ip_address == "192.168.1.12";
+        let b_is_w3 = b.node_alias.eq_ignore_ascii_case("w3") || b.ip_address == "192.168.1.12";
+        if a_is_w3 != b_is_w3 {
+            return b_is_w3.cmp(&a_is_w3);
         }
         let a_is_main = a.node_alias.eq_ignore_ascii_case("main") || a.ip_address == "192.168.1.20";
         let b_is_main = b.node_alias.eq_ignore_ascii_case("main") || b.ip_address == "192.168.1.20";
@@ -248,6 +326,7 @@ pub fn build_local_and_ssh_fleet() -> Vec<FleetMachineInfo> {
             .cmp(&b.node_alias.to_lowercase())
     });
 
+    update_fleet_machines_cache(&machines);
     machines
 }
 
@@ -475,9 +554,7 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
             .unwrap_or_default()
             .to_string();
         let local_ip = get_local_ip();
-        let is_local = node_id == local_node_id
-            || ip_address == "192.168.1.3"
-            || (!local_ip.is_empty() && ip_address == local_ip);
+        let is_local = node_id == local_node_id || (!local_ip.is_empty() && ip_address == local_ip);
         if is_local {
             has_local = true;
         }
@@ -487,13 +564,18 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
             .unwrap_or_default()
             .to_string();
         if is_local {
-            node_alias = "w1".to_string();
-        } else if (ip_address == "192.168.1.3" || (!local_ip.is_empty() && ip_address == local_ip))
-            && (node_alias.is_empty()
-                || node_alias == "agm-node-local"
-                || node_alias.starts_with("Node-"))
+            node_alias = resolve_local_node_alias();
+        } else if node_alias.is_empty()
+            || node_alias == "agm-node-local"
+            || node_alias.starts_with("Node-")
         {
-            node_alias = "w1".to_string();
+            if let Some(&(canonical_alias, _, _, _)) =
+                crate::modules::ssh_manager::GITMAP_CLUSTER_NODES
+                    .iter()
+                    .find(|&&(_, ip, _, _)| ip == ip_address.trim())
+            {
+                node_alias = canonical_alias.to_string();
+            }
         }
         let uptime_seconds = if is_local {
             get_uptime_seconds()
@@ -617,8 +699,9 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
     if !has_local {
         let fallback = build_local_fallback_machine();
         if let Some(mut local_machine) = fallback.into_iter().next() {
-            local_machine.node_alias = "w1".to_string();
-            local_machine.alias = "w1".to_string();
+            let resolved = resolve_local_node_alias();
+            local_machine.node_alias = resolved.clone();
+            local_machine.alias = resolved;
             local_machine.is_local = true;
             machines.push(local_machine);
         }
@@ -640,7 +723,7 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
     // Ensure all canonical cluster nodes (w1, main, u1, w2, w3, w4) are preserved without dropping
     for &(alias, ip, user, os) in crate::modules::ssh_manager::GITMAP_CLUSTER_NODES {
         let exists = machines.iter().any(|m| {
-            m.node_alias.eq_ignore_ascii_case(alias) || (!ip.is_empty() && m.ip_address == ip)
+            (!ip.is_empty() && m.ip_address == ip) || m.node_alias.eq_ignore_ascii_case(alias)
         });
         if !exists {
             let record = crate::modules::ssh_manager::SshConnectionRecord {
@@ -667,12 +750,23 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
     }
 
     machines.sort_by(|a, b| {
-        let a_is_w1 =
-            a.node_alias.eq_ignore_ascii_case("w1") || a.ip_address == "192.168.1.3" || a.is_local;
-        let b_is_w1 =
-            b.node_alias.eq_ignore_ascii_case("w1") || b.ip_address == "192.168.1.3" || b.is_local;
+        if a.is_local != b.is_local {
+            return b.is_local.cmp(&a.is_local);
+        }
+        let a_is_w1 = a.node_alias.eq_ignore_ascii_case("w1") || a.ip_address == "192.168.1.3";
+        let b_is_w1 = b.node_alias.eq_ignore_ascii_case("w1") || b.ip_address == "192.168.1.3";
         if a_is_w1 != b_is_w1 {
             return b_is_w1.cmp(&a_is_w1);
+        }
+        let a_is_w2 = a.node_alias.eq_ignore_ascii_case("w2") || a.ip_address == "192.168.1.7";
+        let b_is_w2 = b.node_alias.eq_ignore_ascii_case("w2") || b.ip_address == "192.168.1.7";
+        if a_is_w2 != b_is_w2 {
+            return b_is_w2.cmp(&a_is_w2);
+        }
+        let a_is_w3 = a.node_alias.eq_ignore_ascii_case("w3") || a.ip_address == "192.168.1.12";
+        let b_is_w3 = b.node_alias.eq_ignore_ascii_case("w3") || b.ip_address == "192.168.1.12";
+        if a_is_w3 != b_is_w3 {
+            return b_is_w3.cmp(&a_is_w3);
         }
         let a_is_main = a.node_alias.eq_ignore_ascii_case("main") || a.ip_address == "192.168.1.20";
         let b_is_main = b.node_alias.eq_ignore_ascii_case("main") || b.ip_address == "192.168.1.20";
@@ -687,5 +781,6 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
             .cmp(&b.node_alias.to_lowercase())
     });
 
+    update_fleet_machines_cache(&machines);
     Ok(machines)
 }

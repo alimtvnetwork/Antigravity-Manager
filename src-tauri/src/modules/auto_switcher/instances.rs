@@ -125,6 +125,20 @@ pub fn get_active_in_use_account_ids() -> Vec<String> {
             }
         }
     }
+
+    // Also include accounts active on remote cluster / fleet machines
+    for remote_account in crate::modules::supabase_sync::get_remote_cluster_active_accounts() {
+        let clean = remote_account.trim().to_string();
+        if !clean.is_empty() && !in_use.iter().any(|x| x.eq_ignore_ascii_case(&clean)) {
+            in_use.push(clean.clone());
+        }
+        if let Ok(Some(acc)) = account::get_account_by_email(&remote_account) {
+            if !in_use.iter().any(|x| x.eq_ignore_ascii_case(&acc.id)) {
+                in_use.push(acc.id.clone());
+            }
+        }
+    }
+
     in_use
 }
 

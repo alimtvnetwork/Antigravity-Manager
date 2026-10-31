@@ -349,10 +349,11 @@ export function useInstanceSelector(): InstanceSelectorApi {
                 (result.resumedProjectsCount ?? 0) > 0
                     ? ` · Auto-resumed ${result.resumedProjectsCount} project(s) (<1h)`
                     : '';
+            const rationaleText = result.rationale ? ` [${result.rationale}]` : '';
             showToast(
                 t(
                     'instances.smart_switched_toast',
-                    `Transferred ${result.instanceName} to ${result.accountEmail}${resumeText}`
+                    `Transferred ${result.instanceName} to ${result.accountEmail}${rationaleText}${resumeText}`
                 ),
                 'success'
             );

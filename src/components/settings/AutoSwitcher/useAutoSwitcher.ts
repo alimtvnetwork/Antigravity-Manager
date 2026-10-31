@@ -145,7 +145,8 @@ export function useAutoSwitcher(config?: AutoProfileSwitcherConfig, onChange: (c
             const resumeNote = (result.resumedProjectsCount ?? 0) > 0
                 ? ` · Auto-resumed ${result.resumedProjectsCount} project(s) (<1h)`
                 : '';
-            setRotationFeedback(`Successfully rotated to profile '${result.instanceName}' with account '${result.accountEmail}'${resumeNote}`);
+            const rationale = result.rationale ? ` [${result.rationale}]` : '';
+            setRotationFeedback(`Successfully rotated to profile '${result.instanceName}' with account '${result.accountEmail}'${rationale}${resumeNote}`);
         } catch (e: any) {
             setRotationFeedback(`Error: ${e?.message || e?.toString() || 'Rotation failed'}`);
         } finally {

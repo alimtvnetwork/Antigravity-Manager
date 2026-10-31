@@ -43,6 +43,9 @@ export interface InstanceState {
         daysUntilRefill: number;
         resumedProjectsCount?: number;
         skippedProjectsCount?: number;
+        selectionTier?: string;
+        clusterExclusionsCount?: number;
+        rationale?: string;
     }>;
     cleanAndRestartWorkspace: () => Promise<string>;
     resumeRecentProjectPrompts: (instanceId?: string) => Promise<AutoResumeResult>;

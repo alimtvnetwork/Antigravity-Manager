@@ -211,7 +211,8 @@ function BackgroundTaskRunner() {
 
                         const result = await instanceStore.smartRotateProfileAccount(instId);
                         if (result) {
-                            showToast(`Smart Fast-Forward: Switched instance ${instId} to ${result.accountEmail} (quota ${remainingQuota}% <= ${threshold}%)`, 'success');
+                            const rationale = result.rationale ? ` [${result.rationale}]` : '';
+                            showToast(`Smart Fast-Forward: Switched instance ${instId} to ${result.accountEmail}${rationale} (quota ${remainingQuota}% <= ${threshold}%)`, 'success');
                         }
                     }
                 }
