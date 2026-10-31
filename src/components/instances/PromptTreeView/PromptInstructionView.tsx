@@ -1339,7 +1339,7 @@ export function PromptInstructionView(props: PromptInstructionViewProps) {
                                 type="button"
                                 onClick={handleCopyImagesUnified}
                                 disabled={isCopyingAllImages}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:hover:bg-purple-900/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800/40 transition-all duration-150 ease-out active:scale-[0.98] shadow-2xs cursor-pointer disabled:opacity-50"
                                 title={attachedImages.length > 1 ? `Copy all ${attachedImages.length} images to clipboard as composite PNG (ready for OneNote or chat)` : "Copy image to clipboard as pure PNG (ready to paste directly into OneNote or chat)"}
                             >
                                 {(isCopiedAllImages || copiedPureImageIdx !== null) ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3 text-purple-600 dark:text-purple-400" />}

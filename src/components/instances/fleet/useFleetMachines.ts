@@ -7,7 +7,7 @@ import { showToast } from '../../common/ToastContainer';
 import { useErrorStore } from '../../../stores/error-store';
 import type { FleetMachineInfo } from './fleetTypes';
 
-const POLL_INTERVAL_SECONDS = 300;
+const POLL_INTERVAL_SECONDS = 30;
 const FLEET_CACHE_KEY = 'agm_fleet_machines_cache_v2';
 const FLEET_CACHE_TTL_MS = 30 * 1000; // 30s TTL envelope
 
@@ -462,7 +462,15 @@ export function useFleetMachines(): FleetMachinesState {
 
                     if (effectiveMachines.length === 0) {
                         try {
-                            const sshNodes = await invoke<SshNodeItem[]>('list_ssh_nodes');
+                            let sshNodes = await invoke<SshNodeItem[]>('list_ssh_nodes');
+                            if (!sshNodes || sshNodes.length === 0) {
+                                try {
+                                    await invoke('import_ssh_nodes_from_gitmap');
+                                    sshNodes = await invoke<SshNodeItem[]>('list_ssh_nodes');
+                                } catch {
+                                    // Best-effort auto-import from gitmap
+                                }
+                            }
                             if (sshNodes && sshNodes.length > 0) {
                                 effectiveMachines = mapSshNodesToFleet(sshNodes, localId);
                             }

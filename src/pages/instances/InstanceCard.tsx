@@ -10,7 +10,9 @@ import {
     Folder,
     Cpu,
     ArrowLeftRight,
+    Sparkles,
 } from 'lucide-react';
+import ImprovementsFlywheel from '../../components/telegram/ImprovementsFlywheel';
 import { cn } from '../../utils/cn';
 import { maskEmail } from '../../utils/maskEmail';
 import { Gemini } from '@lobehub/icons';
@@ -136,6 +138,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
     } = api;
 
     const [isEmailRevealed, setIsEmailRevealed] = useState(false);
+    const [showImprovements, setShowImprovements] = useState(false);
 
     const data = useInstanceCardData(inst, runningTreeNodes, actionState);
     const { boundAccount, displayEmail, geminiModel, weeklyQuota, hasActiveTask, effectiveExePath, currentAction, isBusy } =
@@ -413,6 +416,29 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                     </div>
 
                     {cardDensity !== 'compact' && <InstanceCardProjects api={api} inst={inst} />}
+
+                    {cardDensity !== 'compact' && (
+                        <div className="mt-2 pt-2 border-t border-slate-200/60 dark:border-[#40285e]/60">
+                            <button
+                                type="button"
+                                onClick={() => setShowImprovements((prev) => !prev)}
+                                className="w-full flex items-center justify-between px-2.5 py-1 rounded-[5px] text-[11px] font-semibold bg-amber-500/10 hover:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/25 transition-colors cursor-pointer"
+                            >
+                                <span className="flex items-center gap-1.5">
+                                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                                    <span>100 Improvements Flywheel</span>
+                                </span>
+                                <span className="text-[10px] font-mono opacity-80">
+                                    {showImprovements ? 'Hide ▲' : 'Show (Coding Guidelines) ▼'}
+                                </span>
+                            </button>
+                            {showImprovements && (
+                                <div className="mt-2">
+                                    <ImprovementsFlywheel instanceId={inst.config.id} compact />
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <InstanceCardActions api={api} inst={inst} data={data} hasActiveTask={hasActiveTask} />

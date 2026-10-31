@@ -22,11 +22,20 @@ const KINDS: { id: ImprovementKind; label: string }[] = [
     { id: 'ideas', label: 'Ideas' },
 ];
 
-export default function ImprovementsFlywheel() {
+interface ImprovementsFlywheelProps {
+    instanceId?: string;
+    compact?: boolean;
+}
+
+export default function ImprovementsFlywheel({
+    instanceId: propInstanceId,
+    compact = false,
+}: ImprovementsFlywheelProps = {}) {
     const activeInstanceId = useInstanceStore((s) => s.activeInstanceId);
-    const instanceId = resolveImprovementsInstanceId(activeInstanceId);
-    const [kind, setKind] = useState<ImprovementKind>('system');
-    const [dryRun, setDryRun] = useState(true);
+    const instanceId = resolveImprovementsInstanceId(propInstanceId || activeInstanceId);
+    const [kind, setKind] = useState<ImprovementKind>('code');
+    const [taskCount, setTaskCount] = useState<number>(20);
+    const [dryRun, setDryRun] = useState(false);
     const [busy, setBusy] = useState<string | null>(null);
     const [state, setState] = useState<FlywheelState | null>(null);
 
@@ -118,7 +127,6 @@ export default function ImprovementsFlywheel() {
     const pending = state?.batches.filter((b) => b.status === 'pending').length ?? 5;
     const done = state?.completed_batches ?? 0;
     const totalSlots = state?.batches.length ?? 5;
-    const slotSize = state?.batch_size ?? 20;
 
     return (
         <div
@@ -173,18 +181,32 @@ export default function ImprovementsFlywheel() {
                         Plan 100
                     </button>
                     <span className="w-px self-stretch bg-slate-200 dark:bg-[#40285e]" />
+                    <select
+                        value={taskCount}
+                        onChange={(e) => setTaskCount(Number(e.target.value))}
+                        className="bg-transparent border-0 focus:ring-0 focus:outline-none text-xs font-semibold px-2 py-1.5 text-slate-700 dark:text-slate-200 cursor-pointer"
+                        title="Number of improvement tasks to enqueue"
+                        aria-label="Tasks count to enqueue"
+                    >
+                        <option value={5}>5 Tasks</option>
+                        <option value={10}>10 Tasks</option>
+                        <option value={20}>20 Tasks</option>
+                        <option value={50}>50 Tasks</option>
+                    </select>
+                    <span className="w-px self-stretch bg-slate-200 dark:bg-[#40285e]" />
                     <button
                         type="button"
                         onClick={() => void run('next')}
                         disabled={busy !== null}
-                        className="agm-hover-shade px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 cursor-pointer disabled:opacity-50"
+                        className="agm-hover-shade px-3 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 cursor-pointer disabled:opacity-50"
+                        title={`Automatically enqueue ${taskCount} improvement tasks to IDE`}
                     >
                         {busy === 'next' ? (
                             <RefreshCw className="w-3.5 h-3.5 animate-spin inline mr-1" />
                         ) : (
                             <Play className="w-3.5 h-3.5 inline mr-1" />
                         )}
-                        Next {slotSize}
+                        Auto-Enqueue ({taskCount})
                     </button>
                     <span className="w-px self-stretch bg-slate-200 dark:bg-[#40285e]" />
                     <button
@@ -254,25 +276,27 @@ export default function ImprovementsFlywheel() {
                 </ul>
             ) : null}
 
-            <ol className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] font-mono">
-                {(state?.batches ?? []).map((batch) => (
-                    <li
-                        key={batch.index}
-                        className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-[#090611] border border-slate-200 dark:border-[#40285e]"
-                    >
-                        <span className="truncate text-slate-700 dark:text-slate-300">{batch.title}</span>
-                        <span
-                            className={
-                                batch.status === 'pending'
-                                    ? 'text-amber-600 dark:text-amber-400'
-                                    : 'text-emerald-600 dark:text-emerald-400'
-                            }
+            {!compact && (
+                <ol className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] font-mono">
+                    {(state?.batches ?? []).map((batch) => (
+                        <li
+                            key={batch.index}
+                            className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-[#090611] border border-slate-200 dark:border-[#40285e]"
                         >
-                            {batch.status}
-                        </span>
-                    </li>
-                ))}
-            </ol>
+                            <span className="truncate text-slate-700 dark:text-slate-300">{batch.title}</span>
+                            <span
+                                className={
+                                    batch.status === 'pending'
+                                        ? 'text-amber-600 dark:text-amber-400'
+                                        : 'text-emerald-600 dark:text-emerald-400'
+                                }
+                            >
+                                {batch.status}
+                            </span>
+                        </li>
+                    ))}
+                </ol>
+            )}
         </div>
     );
 }

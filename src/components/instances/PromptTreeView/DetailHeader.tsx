@@ -764,14 +764,14 @@ export function DetailHeader(props: DetailHeaderProps) {
                 {/* Right: The Unified Segmented Dark-Glass Action Capsule */}
                 <div className="flex items-center shrink-0 ml-auto gap-2">
                     {/* Capsule A: Copy Split Button [ Copy | v ] */}
-                    <div className="relative flex items-center rounded-lg bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 p-0.5 divide-x divide-slate-200/70 dark:divide-purple-500/20 shadow-2xs shrink-0">
+                    <div className="relative inline-flex items-center rounded-full bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200/80 dark:border-purple-500/30 shadow-2xs divide-x divide-slate-200/70 dark:divide-purple-500/20 shrink-0">
                         {/* Primary Button: Copy full prompt as plain text */}
                         <button
                             type="button"
                             onClick={() => { void handleCopyAll(); }}
                             data-ui-name="prompt-copy-all-btn"
                             data-ui-id={`prompt-copy-all-${selectedConversation.conversation_id}`}
-                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center gap-1.5 px-3 py-1 rounded-l-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] font-semibold transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             aria-label="Copy full prompt text"
                         >
                             {isCopiedAllActive ? (
@@ -788,7 +788,7 @@ export function DetailHeader(props: DetailHeaderProps) {
                             onClick={() => setIsCopyMenuOpen((prev) => !prev)}
                             data-ui-name="prompt-copy-options-btn"
                             data-ui-id={`prompt-copy-options-${selectedConversation.conversation_id}`}
-                            className="flex items-center justify-center px-1.5 py-1 rounded-r-md text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            className="flex items-center justify-center px-2 py-1 rounded-r-full text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-800/80 text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
                             aria-label="More copy and export options"
                         >
                             <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 transition-transform duration-150", isCopyMenuOpen && "rotate-180")} />

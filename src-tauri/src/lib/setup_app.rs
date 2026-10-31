@@ -142,6 +142,16 @@ pub(crate) fn setup_app(
         crate::modules::instance::warm_up_smart_process_cache();
     });
 
+    // Auto-sync cluster SSH nodes from GitMap/repo-secrets on first launch in background
+    std::thread::spawn(|| {
+        if let Ok((sources, stats)) = crate::modules::ssh_manager::import_ssh_from_gitmap() {
+            crate::modules::logger::log_info(&format!(
+                "[ClusterSSH:Startup] Auto-synced cluster SSH nodes on launch from {}: {} total ({} inserted, {} updated)",
+                sources, stats.total, stats.inserted, stats.updated
+            ));
+        }
+    });
+
     // Immediately start management server (8045) for Web access
     let handle = app.handle().clone();
     tauri::async_runtime::spawn(async move {

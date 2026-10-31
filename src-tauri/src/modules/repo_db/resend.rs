@@ -239,7 +239,43 @@ fn resend_single_pass(
             );
         }
 
-        if let Err(spawn_err) = spawn_or_replace_prompt_via_agy(&prompt, true) {
+        // Prioritize live DevTools CDP submission if instance is running, falling back to agy CLI
+        let (is_running, _, pids) =
+            crate::modules::instance::is_instance_process_running_smart(&prompt.instance_id);
+        let target_is_new = prompt.session_id.as_deref().map(str::trim) == Some("new");
+        let mut dispatched_via_cdp = false;
+
+        if is_running {
+            crate::modules::instance::focus_running_instance(&pids, Some(&prompt.repo_path));
+            let clean = super::text_utils::extract_clean_user_prompt(&prompt.prompt_content);
+            let text_to_send = if clean.trim().is_empty() {
+                prompt.prompt_content.trim()
+            } else {
+                clean.as_str()
+            };
+            if crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance_with_mode(
+                &prompt.instance_id,
+                text_to_send,
+                true,
+                target_is_new,
+            )
+            .is_ok()
+            {
+                crate::modules::logger::log_info(&format!(
+                    "[RepoDB] Restored prompt '{}' dispatched via live DevTools CDP into running IDE",
+                    prompt.id
+                ));
+                dispatched_via_cdp = true;
+            }
+        }
+
+        let sent = if dispatched_via_cdp {
+            Ok(())
+        } else {
+            spawn_or_replace_prompt_via_agy(&prompt, true)
+        };
+
+        if let Err(spawn_err) = sent {
             crate::modules::logger::log_error(&format!(
                 "[RepoDB] Prompt '{}' was not re-pushed ({spawn_err}); left {}",
                 prompt.id, prompt.status

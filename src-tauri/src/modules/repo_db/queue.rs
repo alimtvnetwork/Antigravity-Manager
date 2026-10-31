@@ -237,8 +237,41 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
             );
         }
 
-        // Spawn prompt via agy
-        let sent = spawn_prompt_via_agy(&prompt);
+        // Dispatch: Prioritize live DevTools CDP submission if IDE is running, falling back to agy CLI
+        let (is_inst_running, _, pids) =
+            crate::modules::instance::is_instance_process_running_smart(&inst_id);
+        let target_is_new = prompt.session_id.as_deref().map(str::trim) == Some("new");
+        let mut dispatched_via_cdp = false;
+
+        if is_inst_running {
+            crate::modules::instance::focus_running_instance(&pids, Some(&prompt.repo_path));
+            let clean = super::text_utils::extract_clean_user_prompt(&prompt.prompt_content);
+            let text_to_send = if clean.trim().is_empty() {
+                prompt.prompt_content.trim()
+            } else {
+                clean.as_str()
+            };
+            if crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance_with_mode(
+                &inst_id,
+                text_to_send,
+                false,
+                target_is_new,
+            )
+            .is_ok()
+            {
+                crate::modules::logger::log_info(&format!(
+                    "[PromptQueueScheduler] Prompt '{}' dispatched via live DevTools CDP into running IDE",
+                    prompt.id
+                ));
+                dispatched_via_cdp = true;
+            }
+        }
+
+        let sent = if dispatched_via_cdp {
+            Ok(())
+        } else {
+            spawn_prompt_via_agy(&prompt)
+        };
         if let Err(ref spawn_err) = sent {
             crate::modules::logger::log_warn(&format!(
                 "[PromptQueueScheduler] agy dispatch failed for prompt '{}': {spawn_err}; keeping in queue",

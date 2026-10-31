@@ -1,4 +1,4 @@
-﻿# AI Memory Plans Index (`.ai-memory/plans/`)
+# AI Memory Plans Index (`.ai-memory/plans/`)
 
 ## Active
 
@@ -235,6 +235,7 @@ Updated 2026-10-30T02:53:00Z from `git log` (HEAD `3f678d03a`). Referenced by `.
 | 212 | [212-implementing-next-five-tasks.md](./completed/212-implementing-next-five-tasks.md) | COMPLETED | Pipeline response header sanitizer, window control capsule formatter, FIFO dead letter queue spillover guard, caller process ancestry tree scanner, and GitHub release notes parity guard (Steps 271–275). |
 | 220 | [220-gitmap-and-antigravity-tools-manager-updates-and-testing.md](./completed/220-gitmap-and-antigravity-tools-manager-updates-and-testing.md) | COMPLETED | Hardened prompt restore on quota finish & cross-instance switch, auto-pick rerun randomizer with varied multi-round execution, GitMap code modularization (<300 lines), and Master E2E 25/25 gates verified (Steps 311–315). |
 | 227 | [227-rerun-and-attachment-format-correction.md](./completed/227-rerun-and-attachment-format-correction.md) | COMPLETED | Enforce strict FIFO prompt queueing on rerun operations (Telegram inbound and frontend resend) and format bracketed prompt attachments with canonical file semicolon syntax (e.g. @[file;<path>]) across Antigravity Manager. |
+| 238 | [238-antigravity-manager-and-tools-ui-issues.md](./completed/238-antigravity-manager-and-tools-ui-issues.md) | COMPLETED | Live DevTools CDP enqueue and rerun dispatch into IDE, 50x switch restore stability, 5–10s post-switch prompt privacy masking shield, startup cluster SSH auto-sync & 30s auto-refresh, instance-scoped improvements flywheel with 20 auto-enqueue tasks, rounded-full Copy/Send segmented capsules, C: drive Cargo installation, and CLI UI manipulation parity. |
 
 ## Recent Completed Tasks Register
 

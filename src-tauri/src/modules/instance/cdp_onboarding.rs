@@ -720,18 +720,25 @@ pub fn submit_prompt_via_cdp_for_instance_with_mode(
         ));
     }
 
-    for port in ports {
-        for ws_url in fetch_page_ws_urls(port) {
-            if submit_prompt_on_ws(&ws_url, trimmed, cancel_running_first, open_new_chat_first) {
-                crate::modules::logger::log_info(&format!(
-                    "[Instance] Submitted prompt ({} chars, cancel_first: {}, new_chat: {}) into live Antigravity conversation via CDP for instance '{}'",
-                    trimmed.len(),
-                    cancel_running_first,
-                    open_new_chat_first,
-                    instance_id
-                ));
-                return Ok(());
+    for attempt in 1..=4 {
+        for port in &ports {
+            for ws_url in fetch_page_ws_urls(*port) {
+                if submit_prompt_on_ws(&ws_url, trimmed, cancel_running_first, open_new_chat_first)
+                {
+                    crate::modules::logger::log_info(&format!(
+                        "[Instance] Submitted prompt ({} chars, cancel_first: {}, new_chat: {}, attempt: {}) into live Antigravity conversation via CDP for instance '{}'",
+                        trimmed.len(),
+                        cancel_running_first,
+                        open_new_chat_first,
+                        attempt,
+                        instance_id
+                    ));
+                    return Ok(());
+                }
             }
+        }
+        if attempt < 4 {
+            std::thread::sleep(std::time::Duration::from_millis(300));
         }
     }
     Err(format!(

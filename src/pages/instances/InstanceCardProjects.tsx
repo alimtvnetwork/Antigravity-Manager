@@ -41,8 +41,23 @@ export function InstanceCardProjects({ api, inst }: { api: InstancePageApi; inst
     const maxP = (config as { instance_card_max_projects?: number })?.instance_card_max_projects || 3;
     const displayedProjects = sortedProjects.slice(0, maxP);
 
+    const isSettling =
+        api.resumeIndicator?.instanceId === inst.config.id &&
+        (api.resumeIndicator.status === 'scheduled' || api.resumeIndicator.status === 'restoring');
+
     return (
-        <div className="mt-2 p-2 rounded-[5px] bg-gray-50/80 dark:bg-[#171025]/80 border border-gray-200/70 dark:border-[#40285e] text-xs">
+        <div className="relative mt-2 p-2 rounded-[5px] bg-gray-50/80 dark:bg-[#171025]/80 border border-gray-200/70 dark:border-[#40285e] text-xs">
+            {isSettling && (
+                <div className="absolute inset-0 bg-slate-900/70 dark:bg-[#090611]/85 backdrop-blur-[3px] z-10 flex flex-col items-center justify-center gap-1 rounded-[5px] p-2 text-center select-none border border-amber-500/30">
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse font-mono">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                        <span>🔒 Masked ({api.resumeIndicator?.secondsLeft ?? 10}s)</span>
+                    </span>
+                    <span className="text-[10px] text-slate-300 dark:text-slate-400 font-medium">
+                        Prompts masked during switch settle
+                    </span>
+                </div>
+            )}
             <div className="flex items-center justify-between text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1.5 pb-1 border-b border-gray-200/60 dark:border-[#40285e]/60">
                 <span className="flex items-center gap-1">
                     <Folder className="w-3 h-3 text-blue-500" />

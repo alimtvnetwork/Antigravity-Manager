@@ -1107,6 +1107,42 @@ pub fn enqueue_prompt_for_instance(
         }
     }
 
+    // If instance is currently running, submit prompt directly into Antigravity IDE composer via CDP
+    // with cancel_running_first: false, so Antigravity IDE natively queues it into its turn queue!
+    let clean_prompt = extract_clean_user_prompt(prompt_content);
+    let fallback_prompt = if clean_prompt.trim().is_empty() {
+        prompt_content.trim()
+    } else {
+        clean_prompt.as_str()
+    };
+    let (is_running, _, pids) =
+        crate::modules::instance::is_instance_process_running_smart(&canonical_inst);
+    let target_is_new = conversation_id.map(str::trim) == Some("new");
+    if is_running {
+        crate::modules::instance::focus_running_instance(&pids, Some(repo_path));
+        let cdp_res =
+            crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance_with_mode(
+                &canonical_inst,
+                fallback_prompt,
+                false, // cancel_running_first: false -> Preserves active turn, queues natively in IDE!
+                target_is_new,
+            );
+        match cdp_res {
+            Ok(()) => {
+                crate::modules::logger::log_info(&format!(
+                    "[RepoDB] enqueue_prompt_for_instance injected prompt '{}' directly via live DevTools CDP into running IDE (cancel_running_first: false)",
+                    active_prompt.id
+                ));
+            }
+            Err(ref cdp_err) => {
+                crate::modules::logger::log_warn(&format!(
+                    "[RepoDB] Live DevTools CDP enqueue injection failed for prompt '{}': {}; keeping in SQLite FIFO queue",
+                    active_prompt.id, cdp_err
+                ));
+            }
+        }
+    }
+
     invalidate_prompt_tree_cache(Some(&canonical_inst));
 
     crate::modules::scheduler::notify_prompt_queue();
