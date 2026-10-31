@@ -73,22 +73,30 @@ Active by default when no time restrictions, maintenance windows, or scheduling 
 
 ---
 
-## 🤖 AI Automation Bot Integration (Applies to Both Options)
+## 🤖 System-Wide Single Autonomous Bot User (Mandatory Across All Runs)
 
-Active when the user requests an automated bot persona, AI commit authoring, or headless execution.
+Invariant across all autonomous agent runs, AI pairs, and headless multi-agent workflows. AI agents are **STRICTLY FORBIDDEN** from committing under human developer credentials (`MD ALIM UL KARIM`, personal emails, etc.). Step 0 of every run unconditionally verifies and locks machine-wide identity to the single autonomous bot:
 
 1. **Identity Presets:**
-   - Name: `"gitmap automation"` (or `"AI automation bot"`).
-   - Email: `"local@local"`.
-2. **Activation:**
-   - Run `gitmap autobot` or `gitmap change-user "gitmap automation <local@local>"`.
-3. **Pairing with Time Restriction:**
-   - When both Autobot and Time-Restriction are active, automated runs must combine both:
+   - Name: `"gitmap automation bot - runs autonmously"`.
+   - Email: `"info@rgitmap.com"`.
+2. **Machine-Wide & Project Activation (Step 0 Invariant):**
+   - Enforce globally and per-project via:
      ```bash
-     gitmap autobot
+     gitmap user change-user "gitmap automation bot - runs autonmously" "info@rgitmap.com" --global
+     gitmap user change-user "gitmap automation bot - runs autonmously" "info@rgitmap.com" --project
+     ```
+   - Verify identity context using GitMap:
+     ```bash
+     gitmap user info
+     ```
+     Ensure `Active Git` and `Global Git` reflect `gitmap automation bot - runs autonmously <info@rgitmap.com>`.
+3. **Pairing with Time Restriction:**
+   - When Time-Restriction is active, automated runs combine both:
+     ```bash
      gitmap cpf "Module - summary" --tz <timezone> --schedule --auto-window --non-interactive
      ```
-4. **Operational reference:** [gitmap-automation-bot](file;.agents/skills/gitmap-automation-bot).
+4. **Operational reference:** [gitmap-automation-bot](file;.agents/skills/gitmap-automation-bot) and [gitmap-time-restriction](file;.agents/skills/gitmap-time-restriction).
 
 ---
 
@@ -145,14 +153,16 @@ Followed by confirmed task breakdown with explicit `Understood / AI Comprehensio
 
 ## Core Invariants & Rules Reference
 
+- **R0 Code Search Ban & Anti-Pattern:** TOTAL BAN on `Get-ChildItem` (all variants: `Get-ChildItem -Path <dir> -Recurse -Filter "*pat*"`, bare `Get-ChildItem`), `dir`, `ls`, `Select-String`, `findstr`, `grep`, `git grep`, `rg`, `ripgrep`. Exclusively use GitMap (`gitmap find "*<pat>*" [dir]`, `gitmap find-files-any "<substring>"`, `gitmap lf <dir>`, `gitmap aum search "<pattern>" [dir]`, `gitmap cat <filepath>`).
 - **R1 Zero Builds / Tests Ban:** Never run full builds or test suites. Only targeted, file-scoped checks on modified files.
 - **R2 Targeted Checks Only:** Check only specifically modified files.
 - **R3 Evidence or It Did Not Happen:** Every claim must cite a file path, diffstat, or exit code.
 - **R4 Never Invent Commands:** Verify commands with harmless calls.
-- **R5 Mandatory Subagents:** Always call `invoke_subagent` ($A=3, H=2, \text{Capacity}=6$).
+- **R5 Mandatory Subagents & Constraint Envelope:** Always call `invoke_subagent` ($A=3, H=2, \text{Capacity}=6$). Every subagent prompt MUST start with the `[CRITICAL_SUBAGENT_CONSTRAINTS]` envelope banning raw search and worker git calls.
 - **R6 One Owner Per File:** Disjoint file boundaries for workers.
 - **R7 Worker Git Ban:** Workers never run git commands; only lead commits.
-- **R8/R9 Atomic Commit via GitMap:** Single atomic commit. Title Case or lowercase subsystem module; NO square brackets `[...]`, NO colons, and NO 'commit' pseudo-module.
+- **R8 Mandatory Single Autonomous Bot User:** Machine-wide invariant locked at Step 0 via `gitmap user change-user "gitmap automation bot - runs autonmously" "info@rgitmap.com" --global`. Ban human developer credentials.
+- **R9 Atomic Commit via GitMap:** Single atomic commit (`gitmap cpf`, `gitmap cbf`, `gitmap cpc`, `gitmap cpr`). Title Case or lowercase subsystem module; NO square brackets `[...]`, NO colons in argument, and NO 'commit' pseudo-module.
 - **R10 Zero Unauthorized Releases:** Never bump versions unless requested.
 - **R11 Leaf Error Sovereignty:** Leaf functions return errors directly; never call exit handlers.
 - **R11b Strict Relative Git Paths:** Absolute paths and `file:///` URIs are banned.
