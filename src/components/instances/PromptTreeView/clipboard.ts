@@ -200,7 +200,26 @@ export function extractAssets(text: string): { images: string[]; files: string[]
         }
     }
 
-    const bracketRegex = /@\[(?:file;\s*)?(.*?)\]/gi;
+    const fileLinkRegex = /@?\[.*?\]\(file;\s*([^)]+)\)/gi;
+    let fileLinkMatch: RegExpExecArray | null;
+    while ((fileLinkMatch = fileLinkRegex.exec(text)) !== null) {
+        if (fileLinkMatch[1]) {
+            const raw = fileLinkMatch[1].trim();
+            const isImg = isLikelyImageUri(raw);
+            const key = (extractLocalPathFromUri(raw) || raw).replace(/\\/g, '/').toLowerCase();
+            if (isImg) {
+                if (!seenImages.has(key)) {
+                    seenImages.add(key);
+                    images.push(raw);
+                }
+            } else if (!seenFiles.has(key)) {
+                seenFiles.add(key);
+                files.push(raw);
+            }
+        }
+    }
+
+    const bracketRegex = /@\[(?:file;\s*)?([^\]]+)\](?!\(file;)/gi;
     let bracketMatch: RegExpExecArray | null;
     while ((bracketMatch = bracketRegex.exec(text)) !== null) {
         if (bracketMatch[1]) {

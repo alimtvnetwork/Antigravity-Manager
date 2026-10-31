@@ -32,20 +32,20 @@ function assertEqual<T>(actual: T, expected: T): void {
     }
 }
 
-// Test 1: Canonical formatting uses @[file;<path>]
-test('formatPromptWithAttachments outputs canonical @[file;<path>] format', () => {
+// Test 1: Canonical formatting uses @[file_name_sequence](file;<path>)
+test('formatPromptWithAttachments outputs canonical @[file_name_sequence](file;<path>) format', () => {
     const prompt = 'Investigate error in billing component';
     const attachments = ['assets/screenshots/billing-error.png', 'assets/screenshots/network-trace.png'];
     const result = formatPromptWithAttachments(prompt, attachments, { isWindowsPlatformOverride: false });
 
     assert(result.includes('Attachments:'), 'Result should include Attachments: header');
-    assert(result.includes('1. @[file;assets/screenshots/billing-error.png]'), 'Should contain 1. @[file;...]');
-    assert(result.includes('2. @[file;assets/screenshots/network-trace.png]'), 'Should contain 2. @[file;...]');
+    assert(result.includes('1. @[file_name_sequence](file;assets/screenshots/billing-error.png)'), 'Should contain 1. @[file_name_sequence](file;...)');
+    assert(result.includes('2. @[file_name_sequence](file;assets/screenshots/network-trace.png)'), 'Should contain 2. @[file_name_sequence](file;...)');
 });
 
-// Test 2: Extraction handles canonical @[file;<path>]
-test('extractAttachmentsFromPrompt extracts clean path from canonical @[file;<path>]', () => {
-    const text = 'Check UI:\nAttachments:\n1. @[file;assets/screenshot.png]';
+// Test 2: Extraction handles canonical @[file_name_sequence](file;<path>)
+test('extractAttachmentsFromPrompt extracts clean path from canonical @[file_name_sequence](file;<path>)', () => {
+    const text = 'Check UI:\nAttachments:\n1. @[file_name_sequence](file;assets/screenshot.png)';
     const extracted = extractAttachmentsFromPrompt(text, undefined, false);
     assertEqual(extracted.length, 1);
     assertEqual(extracted[0], 'assets/screenshot.png');
@@ -61,7 +61,7 @@ test('extractAttachmentsFromPrompt maintains backward compatibility with legacy 
 
 // Test 4: Tolerates whitespace surrounding semicolon
 test('extractAttachmentsFromPrompt tolerates whitespace after file semicolon', () => {
-    const text = 'Check UI:\nAttachments:\n1. @[file;   assets/spaced.png]';
+    const text = 'Check UI:\nAttachments:\n1. @[file_name_sequence](file;   assets/spaced.png)';
     const extracted = extractAttachmentsFromPrompt(text, undefined, false);
     assertEqual(extracted.length, 1);
     assertEqual(extracted[0], 'assets/spaced.png');
@@ -69,22 +69,22 @@ test('extractAttachmentsFromPrompt tolerates whitespace after file semicolon', (
 
 // Test 5: Mixed formats deduplicate cleanly
 test('extractAttachmentsFromPrompt deduplicates mixed canonical and legacy inputs', () => {
-    const text = '1. @[file;assets/dup.png]\n2. @[assets/dup.png]';
+    const text = '1. @[file_name_sequence](file;assets/dup.png)\n2. @[assets/dup.png]';
     const extracted = extractAttachmentsFromPrompt(text, undefined, false);
     assertEqual(extracted.length, 1);
     assertEqual(extracted[0], 'assets/dup.png');
 });
 
-// Test 6: stripAttachmentsFromPrompt removes canonical @[file;...] blocks
+// Test 6: stripAttachmentsFromPrompt removes canonical @[file_name_sequence](file;...) blocks
 test('stripAttachmentsFromPrompt removes canonical and legacy attachment blocks', () => {
-    const text = 'Some prompt\n\nAttachments:\n1. @[file;assets/shot.png]\n2. @[file;assets/shot2.png]';
+    const text = 'Some prompt\n\nAttachments:\n1. @[file_name_sequence](file;assets/shot.png)\n2. @[file_name_sequence](file;assets/shot2.png)';
     const cleaned = stripAttachmentsFromPrompt(text);
     assertEqual(cleaned, 'Some prompt');
 });
 
 // Test 7: stripAttachmentsFromPrompt removes mixed canonical and legacy attachment blocks
 test('stripAttachmentsFromPrompt removes mixed canonical and legacy blocks', () => {
-    const text = 'Some prompt\n\nAttachments:\n1. @[file;assets/shot.png]\n2. @[assets/legacy.png]';
+    const text = 'Some prompt\n\nAttachments:\n1. @[file_name_sequence](file;assets/shot.png)\n2. @[assets/legacy.png]';
     const cleaned = stripAttachmentsFromPrompt(text);
     assertEqual(cleaned, 'Some prompt');
 });
@@ -96,7 +96,7 @@ test('formatPromptWithAttachments inserts attachments before </USER_REQUEST>', (
     const result = formatPromptWithAttachments(prompt, attachments, { isWindowsPlatformOverride: false });
 
     assert(result.indexOf('Attachments:') < result.indexOf('</USER_REQUEST>'), 'Attachments should come before tag');
-    assert(result.includes('1. @[file;assets/bug.png]'), 'Should contain canonical attachment');
+    assert(result.includes('1. @[file_name_sequence](file;assets/bug.png)'), 'Should contain canonical attachment');
 });
 
 // Test 9: normalizeAttachmentPath strips file; prefix and normalizes correctly
@@ -114,13 +114,13 @@ test('formatPromptWithAttachments handles object inputs with file; prefix', () =
     const attachments = [{ path: 'file;assets/from-path.png' }, { src: 'file;assets/from-src.png' }];
     const result = formatPromptWithAttachments(prompt, attachments, { isWindowsPlatformOverride: false });
 
-    assert(result.includes('1. @[file;assets/from-path.png]'), 'Should format object path item canonically');
-    assert(result.includes('2. @[file;assets/from-src.png]'), 'Should format object src item canonically');
+    assert(result.includes('1. @[file_name_sequence](file;assets/from-path.png)'), 'Should format object path item canonically');
+    assert(result.includes('2. @[file_name_sequence](file;assets/from-src.png)'), 'Should format object src item canonically');
 });
 
 // Test 11: Mixed markdown and bracketed images extraction
 test('extractAttachmentsFromPrompt extracts both markdown and canonical bracketed images', () => {
-    const prompt = 'Here is an image: ![Alt](assets/md-img.png)\n\nAttachments:\n1. @[file;assets/bracket-img.png]';
+    const prompt = 'Here is an image: ![Alt](assets/md-img.png)\n\nAttachments:\n1. @[file_name_sequence](file;assets/bracket-img.png)';
     const extracted = extractAttachmentsFromPrompt(prompt, undefined, false);
 
     assertEqual(extracted.length, 2);

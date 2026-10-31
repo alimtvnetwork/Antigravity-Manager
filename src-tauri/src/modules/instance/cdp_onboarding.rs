@@ -633,11 +633,14 @@ fn submit_prompt_on_ws(
     }
     msg_id += 1;
 
-    std::thread::sleep(Duration::from_millis(120));
+    std::thread::sleep(Duration::from_millis(150));
 
-    // 3. Click the Send message button or dispatch Enter key
+    // 3. Click the Send message button or dispatch Enter key via CDP / React Fiber
     let send_js = r#"(() => {
         const btnSelectors = [
+            'button[data-testid="send-button"]',
+            'button[data-tooltip-id="input-send-button-send-tooltip"]',
+            'button[data-tooltip-id*="send"]',
             'button[aria-label="Send message"]',
             'button[aria-label="Send Prompt"]',
             'button[aria-label="Send"]',
@@ -646,34 +649,109 @@ fn submit_prompt_on_ws(
         ];
         for (const sel of btnSelectors) {
             const btn = document.querySelector(sel);
-            if (btn && !btn.disabled) {
+            if (btn && !btn.disabled && !btn.getAttribute('aria-label')?.includes('Cancel')) {
                 btn.click();
                 return 'sent';
             }
         }
-        // Fallback: Dispatch Enter key event to active element
-        const active = document.activeElement;
-        if (active) {
-            active.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
-            return 'sent';
+        // Fallback A: React Fiber handleEnter / lexicalRef
+        const input = document.querySelector('[aria-label="Message input"]') || document.activeElement;
+        if (input) {
+            const key = Object.keys(input).find(k => k.startsWith('__reactFiber$'));
+            let cur = key ? input[key] : null;
+            while (cur) {
+                if (cur.memoizedProps?.handleEnter && cur.memoizedProps?.lexicalRef?.current) {
+                    try {
+                        const editor = cur.memoizedProps.lexicalRef.current;
+                        cur.memoizedProps.handleEnter({ preventDefault: () => {}, stopPropagation: () => {}, shiftKey: false, altKey: false }, editor);
+                        return 'sent';
+                    } catch (_) {}
+                }
+                cur = cur.return;
+            }
         }
         return 'not_ready';
     })()"#;
-    let Some(send_res) = cdp_send_and_recv(
+    let mut sent = false;
+    if let Some(send_res) = cdp_send_and_recv(
         &mut stream,
         msg_id,
         "Runtime.evaluate",
         serde_json::json!({ "expression": send_js, "returnByValue": true }),
-    ) else {
-        return false;
-    };
-    let send_val = send_res
-        .get("result")
-        .and_then(|r| r.get("result"))
-        .and_then(|r| r.get("value"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
-    send_val == "sent"
+    ) {
+        let send_val = send_res
+            .get("result")
+            .and_then(|r| r.get("result"))
+            .and_then(|r| r.get("value"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if send_val == "sent" {
+            sent = true;
+        }
+    }
+    msg_id += 1;
+
+    // 4. Also dispatch trusted CDP Enter keyboard event ladder as authoritative confirmation
+    cdp_send_and_recv(
+        &mut stream,
+        msg_id,
+        "Input.dispatchKeyEvent",
+        serde_json::json!({
+            "type": "rawKeyDown",
+            "windowsVirtualKeyCode": 13,
+            "nativeVirtualKeyCode": 13,
+            "macCharCode": 13,
+            "unmodifiedText": "\r",
+            "text": "\r",
+            "key": "Enter",
+            "code": "Enter"
+        }),
+    );
+    msg_id += 1;
+
+    cdp_send_and_recv(
+        &mut stream,
+        msg_id,
+        "Input.dispatchKeyEvent",
+        serde_json::json!({
+            "type": "keyUp",
+            "windowsVirtualKeyCode": 13,
+            "nativeVirtualKeyCode": 13,
+            "macCharCode": 13,
+            "unmodifiedText": "\r",
+            "text": "\r",
+            "key": "Enter",
+            "code": "Enter"
+        }),
+    );
+    msg_id += 1;
+
+    // Verify whether input was submitted or consumed
+    std::thread::sleep(Duration::from_millis(150));
+    let check_js = r#"(() => {
+        const input = document.querySelector('[aria-label="Message input"]');
+        if (!input) return 'ok';
+        const txt = (input.innerText || '').trim();
+        return txt.length === 0 ? 'cleared' : 'remaining';
+    })()"#;
+    if let Some(check_res) = cdp_send_and_recv(
+        &mut stream,
+        msg_id,
+        "Runtime.evaluate",
+        serde_json::json!({ "expression": check_js, "returnByValue": true }),
+    ) {
+        let check_val = check_res
+            .get("result")
+            .and_then(|r| r.get("result"))
+            .and_then(|r| r.get("value"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if check_val == "cleared" || check_val == "ok" {
+            sent = true;
+        }
+    }
+
+    sent
 }
 
 /// Submit a prompt directly into the running Antigravity IDE's conversation composer

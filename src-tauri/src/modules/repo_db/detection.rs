@@ -358,24 +358,40 @@ pub fn extract_image_uris_or_paths(content: &str) -> (Vec<String>, Vec<String>) 
 
     let img_exts = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg", ".bmp"];
 
-    // Also scan explicit bracket attachments @[...] or @[file;...]
+    // Also scan explicit bracket attachments @[label](file;<path>), [label](file;<path>), or @[file;<path>]
     let mut search_from = 0;
     while let Some(rel) = content[search_from..].find("@[") {
         let start = search_from + rel + 2;
         if let Some(end_rel) = content[start..].find(']') {
             let inner = content[start..start + end_rel].trim();
-            let without_file = inner
-                .strip_prefix("file;")
-                .or_else(|| inner.strip_prefix("FILE;"))
-                .unwrap_or(inner)
-                .trim();
-            let lower = without_file.to_lowercase();
-            if img_exts.iter().any(|ext| lower.ends_with(ext)) {
-                let p_str = without_file.strip_prefix("file:///").unwrap_or_else(|| {
-                    without_file.strip_prefix("file://").unwrap_or(without_file)
-                });
-                if !found_paths.contains(&p_str.to_string()) {
-                    found_paths.push(p_str.to_string());
+            let after_bracket = &content[start + end_rel + 1..];
+            if after_bracket.starts_with("(file;") || after_bracket.starts_with("(FILE;") {
+                if let Some(paren_end) = after_bracket.find(')') {
+                    let path_part = after_bracket[6..paren_end].trim();
+                    let lower = path_part.to_lowercase();
+                    if img_exts.iter().any(|ext| lower.ends_with(ext)) {
+                        let p_str = path_part.strip_prefix("file:///").unwrap_or_else(|| {
+                            path_part.strip_prefix("file://").unwrap_or(path_part)
+                        });
+                        if !found_paths.contains(&p_str.to_string()) {
+                            found_paths.push(p_str.to_string());
+                        }
+                    }
+                }
+            } else {
+                let without_file = inner
+                    .strip_prefix("file;")
+                    .or_else(|| inner.strip_prefix("FILE;"))
+                    .unwrap_or(inner)
+                    .trim();
+                let lower = without_file.to_lowercase();
+                if img_exts.iter().any(|ext| lower.ends_with(ext)) {
+                    let p_str = without_file.strip_prefix("file:///").unwrap_or_else(|| {
+                        without_file.strip_prefix("file://").unwrap_or(without_file)
+                    });
+                    if !found_paths.contains(&p_str.to_string()) {
+                        found_paths.push(p_str.to_string());
+                    }
                 }
             }
             search_from = start + end_rel + 1;

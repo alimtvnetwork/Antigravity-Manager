@@ -628,14 +628,14 @@ await test('verifies prompt rerun attachment formatting with mediaPaths produces
 
     const content = String(promptCall.args.promptContent);
     assertTrue(
-        content.includes('@[file;'),
-        `Enqueued prompt content must contain canonical "@[file;" third-bracket prefix. Got:\n${content}`
+        content.includes('@[file_name_sequence](file;'),
+        `Enqueued prompt content must contain canonical "@[file_name_sequence](file;" prefix. Got:\n${content}`
     );
     assertTrue(
-        content.includes('1. @[file;assets/test.png]') ||
-        content.includes('@[file;/work/test-repo/assets/test.png]') ||
-        content.includes('@[file;\\work\\test-repo\\assets\\test.png]'),
-        `Enqueued prompt content must format attachment canonically with @[file;...]. Got:\n${content}`
+        content.includes('1. @[file_name_sequence](file;assets/test.png)') ||
+        content.includes('@[file_name_sequence](file;/work/test-repo/assets/test.png)') ||
+        content.includes('@[file_name_sequence](file;\\work\\test-repo\\assets\\test.png)'),
+        `Enqueued prompt content must format attachment canonically with @[file_name_sequence](file;...). Got:\n${content}`
     );
     assertFalse(
         /1\.\s*@\[(?!file;).*?assets\/test\.png\]/.test(content),
