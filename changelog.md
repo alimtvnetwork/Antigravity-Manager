@@ -1,5 +1,12 @@
 # Changelog
 
+## [v4.279.2] - 2026-10-31
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
 ## [v4.279.1] - 2026-10-30
 
 ### Fixed
@@ -1583,16 +1590,13 @@
         -   **[Flywheel E5001 & Next Breakdown] Packaged Instances status no longer requires AGM source prompts (Thanks to @aukgit)**:
             -   **Description**: `improvements_status` ledgers on the instance workspace instead of the install cwd; Next breakdown lists pending plans/issues from every bound workspace. Frontend status never opens the E5001 modal. (Thanks to @aukgit)
 
-
     *   **v4.279.0 (2026-10-30)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
-
     *   **v4.278.0 (2026-10-29)**:
         -   **[Prompt Queue Visibility, Honest JSON Switch & Friendly Telegram Cards] Enqueue/rerun show on click, JSON switch proves bound_email, Telegram Send (Thanks to @aukgit)**:
             -   **Description**: Prompt tree force-refresh keeps queued turns instead of wiping the 30s SWR cache first; rerun ×N keeps each identical queued turn; `agm instances switch --json` no longer fakes `"switched"`; Telegram cards show idle/busy/queued and ✉️ Send. Isolated `agm instances test-create` enqueued three queued ids, copied, sent `p-0db14cf4`; Default and v2-3127 were not stopped. (Thanks to @aukgit)
-
 
     *   **v4.277.0 (2026-10-29)**:
         -   **[Instance UI & Verification Templates] Restyled Create Profile Modal, 100-Step Prompt Breakdown & Release Tag Normalization (Thanks to @aukgit)**:
