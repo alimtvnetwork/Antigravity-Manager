@@ -4,7 +4,7 @@ import { copyImageAsMarkdownText, writePureImageToClipboard, copyPromptWithRichI
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { formatRelativeRecency } from './formatters';
-import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat, Send, Shield } from 'lucide-react';
+import { Clock, Copy, Check, Image as ImageIcon, ChevronDown, ExternalLink, RotateCw, ListPlus, FileText, Code, Maximize2, Repeat, Send, Shield, Sparkles } from 'lucide-react';
 import { cn } from '../../../utils/cn';
 import { CopyFormat, type AgmConversationNode, type AgmPromptTurnNode } from './types';
 import { copyPromptAiPayload, resolvePromptBody, dispatchRerunMessages, dispatchConversationId, loadPersistedRerunCount, loadPersistedRerunMessageOption, savePersistedRerunCount, savePersistedRerunMessageOption, extractUsedNudgesFromConversation, RERUN_RANDOM_MESSAGE_SET, RERUN_MIN_COUNT, RERUN_MAX_COUNT, type PromptAiCopyKind, type RerunMessageOption } from './usePromptTreePromptActions';
@@ -14,6 +14,9 @@ import { persistClientCrash } from '../../../lib/error-listener';
 import { useErrorStore } from '../../../stores/error-store';
 import { VERIFICATION_OPTIONS, parseVerificationTypeFromSuffix, getCustomSuffixTemplates, type SuffixTemplate } from './verificationTemplates';
 import { SuffixTemplateModal } from './SuffixTemplateModal';
+import { improvementsService } from '../../../services/improvementsService';
+import { showToast } from '../../common/ToastContainer';
+import { ImprovementsBreakdownModal } from './ImprovementsBreakdownModal';
 
 function DispatchFieldHint({ id, text }: { id: string; text: string }) {
     return (
@@ -245,6 +248,28 @@ export function DetailHeader(props: DetailHeaderProps) {
             setTimeout(() => setIsTitleCopied(false), 2000);
         } catch (err) {
             reportPromptActionError(err, 'DetailHeader.copyConversationTitle');
+        }
+    };
+
+    // Improvements Breakdown (100 Improvements Flywheel) state
+    const [isBreakdownModalOpen, setIsBreakdownModalOpen] = useState(false);
+    const [isBreakingDown, setIsBreakingDown] = useState(false);
+
+    const handleTriggerNextBreakdown = async () => {
+        if (isBreakingDown) return;
+        setIsBreakingDown(true);
+        try {
+            const targetInst = selectedConversation.instance_id || propInstanceId || 'default';
+            const nextState = await improvementsService.detail(false, targetInst);
+            setActionMsg?.(`100 Improvements breakdown dispatched (Wave ${nextState.wave})`);
+            showToast(`100 Improvements breakdown dispatched (Wave ${nextState.wave})`, 'success', 2500);
+            if (_loadTree) {
+                await _loadTree(false, true);
+            }
+        } catch (err) {
+            reportPromptActionError(err, 'DetailHeader.triggerNextBreakdown');
+        } finally {
+            setIsBreakingDown(false);
         }
     };
 
@@ -1567,6 +1592,24 @@ export function DetailHeader(props: DetailHeaderProps) {
                                     <span className="text-[10px] text-slate-400 font-mono">Full-Screen</span>
                                 </button>
 
+                                {/* Next Breakdown (100 Improvements Flywheel) */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        handleCloseDispatchMenu();
+                                        void handleTriggerNextBreakdown();
+                                    }}
+                                    disabled={isBreakingDown}
+                                    data-ui-name="prompt-flywheel-dropdown-item"
+                                    className="w-full flex items-center justify-between px-2 py-1.5 text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-slate-800/80 rounded-lg text-left cursor-pointer transition-colors disabled:opacity-50"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Sparkles className={cn('w-3.5 h-3.5 text-amber-500 shrink-0', isBreakingDown && 'animate-spin')} />
+                                        <span className="font-medium">{isBreakingDown ? 'Breaking Down…' : 'Next Breakdown (100 Improvements)'}</span>
+                                    </div>
+                                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-mono">Flywheel</span>
+                                </button>
+
                                 {/* Dispatch Action Button inside dropdown */}
                                 <div className="pt-1 border-t border-slate-100 dark:border-slate-800">
                                     {primaryDispatchAction === 'enqueue' ? (
@@ -1626,6 +1669,36 @@ export function DetailHeader(props: DetailHeaderProps) {
                             </div>
                         )}
                     </div>
+
+                    {/* Capsule C: 100 Improvements Flywheel & Next Breakdown Capsule */}
+                    <div className="relative inline-flex items-center rounded-full bg-slate-100/90 dark:bg-slate-900/90 backdrop-blur-md border border-amber-300/60 dark:border-amber-500/30 shadow-2xs divide-x divide-amber-200/60 dark:divide-amber-500/20 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => void handleTriggerNextBreakdown()}
+                            disabled={isBreakingDown}
+                            data-ui-name="prompt-next-breakdown-btn"
+                            data-ui-id={`prompt-next-breakdown-${selectedConversation.conversation_id}`}
+                            className="flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-500/10 transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer disabled:opacity-50 rounded-l-full"
+                            title="1-Click Dispatch: Generate and enqueue Next 100 Improvements breakdown into active conversation"
+                            aria-label="Next breakdown 100 improvements"
+                        >
+                            <Sparkles className={cn("w-3 h-3 text-amber-500 shrink-0", isBreakingDown && "animate-spin")} />
+                            <span>{isBreakingDown ? 'Breaking Down…' : 'Next Breakdown'}</span>
+                            <span className="text-[9px] font-mono font-bold px-1 py-0.2 rounded bg-amber-500/15 border border-amber-500/25 text-amber-600 dark:text-amber-300">
+                                100
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setIsBreakdownModalOpen(true)}
+                            data-ui-name="prompt-flywheel-modal-btn"
+                            className="flex items-center justify-center px-2 py-1 rounded-r-full text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 text-[11px] transition-all duration-150 ease-out active:scale-[0.98] cursor-pointer"
+                            title="Open 100 Improvements Flywheel dialog (Plan, Slots, Hints, Export)"
+                            aria-label="Open 100 Improvements Flywheel dialog"
+                        >
+                            <ChevronDown className="w-3.5 h-3.5 text-amber-500" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -1643,6 +1716,20 @@ export function DetailHeader(props: DetailHeaderProps) {
                 onClose={() => setIsSuffixModalOpen(false)}
                 onSelectTemplate={(tid) => setConfirmationSuffix(tid)}
                 activeTemplateId={confirmationSuffix}
+            />
+
+            {/* Improvements Breakdown Flywheel Modal */}
+            <ImprovementsBreakdownModal
+                isOpen={isBreakdownModalOpen}
+                onClose={() => setIsBreakdownModalOpen(false)}
+                instanceId={selectedConversation.instance_id || propInstanceId || 'default'}
+                conversationTitle={selectedConversation.title || selectedConversation.short_id}
+                repoPath={rerunRepoPath || (selectedConversation as { repo_path?: string })?.repo_path}
+                onPromptDispatched={() => {
+                    if (_loadTree) {
+                        void _loadTree(false, true);
+                    }
+                }}
             />
         </div>
     );

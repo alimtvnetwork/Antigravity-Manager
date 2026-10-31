@@ -21,7 +21,10 @@ import {
     Info,
     Image,
     Download,
+    Sparkles,
 } from 'lucide-react';
+import { improvementsService } from '../../../services/improvementsService';
+import { showToast } from '../../common/ToastContainer';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 import type { AgmConversationNode } from './types';
@@ -620,6 +623,23 @@ export function ConversationContextMenu({
         }
     };
 
+    const handleDoNextBreakdown = async () => {
+        onClose();
+        try {
+            const targetInstId = conversationNode?.instance_id || instanceId || 'default';
+            const nextState = await improvementsService.detail(false, targetInstId);
+            showToast(`100 Improvements breakdown dispatched (Wave ${nextState.wave})`, 'success', 2500);
+        } catch (err) {
+            useErrorStore.getState().captureException(
+                err instanceof Error ? err : new Error(String(err)),
+                {
+                    source: 'ConversationContextMenu.handleDoNextBreakdown',
+                    triggerAction: 'next_improvements_breakdown',
+                }
+            );
+        }
+    };
+
     const handleDoCloneCompact = async () => {
         onClose();
         if (onCloneAndCompact) {
@@ -1108,6 +1128,20 @@ export function ConversationContextMenu({
                     <span>Verify Last 10 & Enqueue</span>
                 </div>
                 <span className="text-[9px] font-mono text-purple-400">Audit</span>
+            </button>
+
+            {/* Next Breakdown (100 Improvements Flywheel) */}
+            <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer"
+                onClick={() => void handleDoNextBreakdown()}
+                title="Synthesize and enqueue Next 100 Improvements breakdown prompt into instance"
+            >
+                <div className="flex items-center gap-2.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>Next Breakdown (100 Steps)</span>
+                </div>
+                <span className="text-[9px] font-mono text-amber-500 font-bold">100</span>
             </button>
 
             {/* Clone Conversation & Compact Memory */}

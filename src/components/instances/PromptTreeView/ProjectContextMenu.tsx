@@ -12,7 +12,11 @@ import {
     Repeat,
     FileText,
     Trash2,
+    Sparkles,
 } from 'lucide-react';
+import { improvementsService } from '../../../services/improvementsService';
+import { showToast } from '../../common/ToastContainer';
+import { useErrorStore } from '../../../stores/error-store';
 
 export interface ProjectContextMenuProps {
     x: number;
@@ -222,6 +226,34 @@ export function ProjectContextMenu({
                     <span className="text-[10px] font-mono text-slate-400">All</span>
                 </button>
             )}
+
+            {/* Plan 100 Improvements */}
+            <button
+                type="button"
+                className="flex w-full items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer"
+                onClick={async (e) => {
+                    e.stopPropagation();
+                    onClose();
+                    try {
+                        await improvementsService.plan('system', false, projectId);
+                        showToast(`100 Improvements plan dispatched for ${projectName || projectId}`, 'success', 2500);
+                    } catch (err) {
+                        useErrorStore.getState().captureException(
+                            err instanceof Error ? err : new Error(String(err)),
+                            {
+                                source: 'ProjectContextMenu.planImprovements',
+                                triggerAction: 'improvements_plan',
+                            }
+                        );
+                    }
+                }}
+            >
+                <div className="flex items-center gap-2.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Plan 100 Improvements...</span>
+                </div>
+                <span className="text-[10px] font-mono text-amber-500 font-bold">100</span>
+            </button>
 
             <div className="border-t border-slate-100 dark:border-[#2b1b42] my-1" />
             <div className="px-3 pt-0.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">

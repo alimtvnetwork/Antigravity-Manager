@@ -2,6 +2,9 @@
 
 ## [v4.283.0] - 2026-10-31
 
+### Added
+- **Next 100 Improvements Flywheel Integration in Prompt Tree View**: Directly integrated the 100 Improvements Flywheel and Next Breakdown options into the Prompt Tree View; added Capsule C (`[✨ Next Breakdown | 100 | v]`) into `src/components/instances/PromptTreeView/DetailHeader.tsx` action bar alongside Copy and Dispatch capsules; added "Next Breakdown (100 Improvements)" option to the Unified Dispatch Configuration Popover; added `src/components/instances/PromptTreeView/ImprovementsBreakdownModal.tsx` providing wave visualization, slot progress (`5/5 slots`), active task hints, category selector (`system`, `ui`, `code`, `ideas`), Dry Run inspection, and direct markdown export; and added "Next Breakdown (100 Steps)" to `ConversationContextMenu.tsx` and "Plan 100 Improvements..." to `ProjectContextMenu.tsx` (Thanks to @aukgit)
+
 ### Fixed
 - **Multi-Instance Running & Enqueued Prompt Detection Parity**: Resolved issue where enqueued prompts failed to appear in Prompt Tree View or multi-instance UI; expanded `is_queued_or_pending_status` in `src-tauri/src/modules/repo_db/tree_node_conv.rs` to include `enqueued_ide`, `dispatched`, and `in_progress`, preventing ghost conversation pruning from dropping enqueued IDE turns (Thanks to @aukgit)
 - **Universal Multi-Instance Liveness & Queue Retention**: Unified project liveness evaluation in `src-tauri/src/modules/repo_db/tree_nodes.rs` using `is_owning_instance_alive` with `find_pids_for_data_dir` fallback, eliminating false `INSTANCE_PROCESS_DEAD` overrides on secondary profiles; updated `only_running` filter in `tree_nodes.rs` to affirmatively preserve projects and conversations with active queued prompts (`c.is_queued` or `p.is_queued`), preventing enqueued tasks from disappearing when filtering by running tasks (Thanks to @aukgit)
