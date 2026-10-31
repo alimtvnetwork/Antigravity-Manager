@@ -368,6 +368,7 @@ pub fn run() {
             commands::get_instance_workspace_folders,
             commands::get_project_conversation_tree,
             commands::reset_prompt_tree_cache,
+            commands::invalidate_prompt_tree_cache,
             commands::get_instance_switch_history,
             commands::get_instance_audit_trail,
             commands::sync_instance_pid_and_quota,

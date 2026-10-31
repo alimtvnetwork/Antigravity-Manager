@@ -1,16 +1,28 @@
 # Changelog
 
+## [v4.282.0] - 2026-10-31
+
+### Fixed
+- **Running Status Detection Supremacy Over Transcript Tail Markers**: Resolved false idle states where actively generating or tool-executing conversations in Antigravity IDE (marked `CASCADE_RUN_STATUS_RUNNING` and `not_fully_idle = 1` in `conversation_summaries.db`) displayed as `IDLE now` with completed turns in Prompt Tree View and multi-instance UI; enforced affirmative database run status and live process supremacy in `src-tauri/src/modules/repo_db/tree_collect.rs` and `transcript.rs`, preventing intermediate planner completions or tool execution steps from falsely flipping active conversations to idle (Thanks to @aukgit)
+- **Live DevTools CDP Composer Queued Messages Harvester**: Added live in-memory composer queued messages harvesting via Chrome DevTools Protocol in `src-tauri/src/modules/instance/cdp_onboarding.rs` (`extract_queued_composer_messages_for_instance`), extracting queued prompt turns staged in the active IDE ("Queued Messages N Sends after agent finishes working") and rendering them immediately under the active conversation as `QUEUED` turns with full prompt preview text and FIFO queue status banners in `tree_node_conv.rs` (Thanks to @aukgit)
+- **FIFO Queue Review Invariant & False Queue Count Elimination**: Corrected `queuedPromptCount` in `src/components/instances/PromptTreeView/usePromptTreeData.ts` to strictly return 0 when a conversation's prompts list is loaded and has 0 queued turns, preventing spurious `1 prompt(s) enqueued in FIFO queue for this conversation` banners and badges during prompt review; removed `"in_progress"` from queue status definitions in `src-tauri/src/modules/repo_db/tree_collect.rs` and `tree_node_conv.rs`, properly classifying active execution as running rather than queued (Thanks to @aukgit)
+- **Rerun Prompt Text Preservation & Preview Accuracy**: Preserved the original task prompt text and preview in `src/components/instances/PromptTreeView/DetailHeader.tsx` during rerun enqueue operations; updated action message toasts and optimistic tree turns to display the actual task prompt summary rather than internal nudge strings, eliminating misleading `("Is it finished?")` previews (Thanks to @aukgit)
+- **Active Prompt In-Flight TTL Extension & Status Persistence**: Extended stale in-flight cleanup TTL in `src-tauri/src/modules/repo_db/tree_phases.rs` from 120s to 3600s for dispatched and queued prompts, eliminating premature status wipe while long tasks execute; updated `enqueue_prompt_for_instance` in `src-tauri/src/modules/repo_db/agy.rs` to persist status as `enqueued_ide`, keeping enqueued turns visible across all tree and instance views (Thanks to @aukgit)
+- **Native Cache Invalidation Command Registration**: Registered `invalidate_prompt_tree_cache` in `src-tauri/src/commands/instance.rs` and `src-tauri/src/lib/run.rs`, completely resolving `E9001: Command invalidate_prompt_tree_cache not found` frontend warnings; broadened `isInstanceCompatible` in `src/components/instances/PromptTreeView/usePromptTreeData.ts` and `tree_node_conv.rs` to support multi-instance alias matching across numeric and named instance prefixes (Thanks to @aukgit)
+
+---
+
 ## [v4.281.2] - 2026-10-31
 
 ### Added
-- Synchronize prompts, skills, AI scripts, and coding guidelines
+- Synchronize prompts, skills, AI scripts, and coding guidelines (Thanks to @aukgit)
 
 ---
 
 ## [v4.281.1] - 2026-10-31
 
 ### Added
-- Synchronize prompts, skills, AI scripts, and coding guidelines
+- Synchronize prompts, skills, AI scripts, and coding guidelines (Thanks to @aukgit)
 
 ---
 
@@ -1651,6 +1663,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.282.0 (2026-10-31)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+
     *   **v4.281.0 (2026-10-31)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.

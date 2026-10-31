@@ -972,6 +972,11 @@ pub async fn get_project_conversation_tree(
 }
 
 #[tauri::command]
+pub async fn invalidate_prompt_tree_cache(instance_id: Option<String>) -> Result<String, String> {
+    reset_prompt_tree_cache(instance_id).await
+}
+
+#[tauri::command]
 pub async fn reset_prompt_tree_cache(instance_id: Option<String>) -> Result<String, String> {
     let id_clone = instance_id.clone();
     tokio::task::spawn_blocking(move || {

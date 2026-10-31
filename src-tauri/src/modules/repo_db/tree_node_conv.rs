@@ -90,7 +90,17 @@ pub(crate) fn is_instance_compatible(
         return true;
     }
     let is_inst_default = is_default_instance_match(inst_id);
-    is_proj_default && is_inst_default
+    if is_proj_default || is_inst_default {
+        return is_proj_default && is_inst_default;
+    }
+    let clean_inst = inst_id.trim().trim_start_matches('#');
+    let clean_proj = norm_proj_inst.trim().trim_start_matches('#');
+    let inst_prefix = clean_inst.split(&['-', '_', ' '][..]).next().unwrap_or("");
+    let proj_prefix = clean_proj.split(&['-', '_', ' '][..]).next().unwrap_or("");
+    if !inst_prefix.is_empty() && inst_prefix == proj_prefix {
+        return true;
+    }
+    false
 }
 
 /// Affirmative detection of empty, placeholder, or untitled conversations.
@@ -470,14 +480,18 @@ pub(crate) fn build_active_prompt_conv_nodes(
 
         if let Some(idx) = target_idx {
             let target_conv = &mut conv_nodes[idx];
-            const PENDING_STAGES: &[&str] = &["queued", "queue", "pending", "in_progress"];
-            const ACTIVE_STAGES: &[&str] = &["running", "dispatched", "in_flight"];
+            const PENDING_STAGES: &[&str] = &["queued", "queue", "pending", "enqueued_ide"];
+            const ACTIVE_STAGES: &[&str] = &["running", "dispatched", "in_flight", "in_progress"];
             let is_pending_stage = ap.status.has_any_word_ignore_case(PENDING_STAGES);
             let is_active_stage = ap.status.has_any_word_ignore_case(ACTIVE_STAGES);
             let is_relevant_status = is_pending_stage || is_active_stage;
 
             if is_relevant_status {
-                let is_fresh = (now - ap.updated_at) <= 600;
+                let is_fresh = if is_pending_stage {
+                    (now - ap.updated_at) <= 3600
+                } else {
+                    (now - ap.updated_at) <= 600
+                };
                 let is_alive_and_fresh = is_inst_alive && is_fresh;
                 let is_queued = is_pending_stage;
                 let is_ap_run = is_alive_and_fresh && is_active_stage;
@@ -812,6 +826,55 @@ pub(crate) fn build_active_prompt_conv_nodes(
             media_thumbnails: ap_media_thumbnails,
             prompts: vec![ap_turn],
         });
+    }
+
+    // Live DevTools CDP In-Memory Queued Composer Message Harvesting:
+    // If the instance process is active, query the IDE composer DOM via CDP to discover
+    // any messages queued behind an active task ("Queued Messages N") that have not yet
+    // been flushed to transcript.jsonl.
+    let is_any_alive = is_inst_alive || crate::modules::process::is_antigravity_running(None);
+    if is_any_alive {
+        let cdp_queued = crate::modules::instance::extract_queued_composer_messages_for_instance(
+            &proj.instance_id,
+        );
+        if !cdp_queued.is_empty() {
+            let active_conv_opt = conv_nodes
+                .iter_mut()
+                .find(|c| c.is_running)
+                .or_else(|| conv_nodes.first_mut());
+            if let Some(target_conv) = active_conv_opt {
+                for q_text in cdp_queued {
+                    let clean_text = q_text.trim();
+                    if clean_text.is_empty() {
+                        continue;
+                    }
+                    let already_exists = target_conv.prompts.iter().any(|p| {
+                        let p_trimmed = p.prompt_text.trim();
+                        p_trimmed == clean_text
+                            || (clean_text.len() >= 20 && p_trimmed.starts_with(&clean_text[..20]))
+                            || (p_trimmed.len() >= 20 && clean_text.starts_with(&p_trimmed[..20]))
+                    });
+                    if !already_exists {
+                        let turn_num = target_conv.prompts.len() + 1;
+                        let (preview_200w, _) = extract_prompt_words_preview(clean_text, word_cap);
+                        target_conv.prompts.push(AgmPromptTurnNode {
+                            turn_number: turn_num,
+                            step_index: target_conv.prompts.len(),
+                            prompt_text: clean_text.to_string(),
+                            preview_200w,
+                            status: "QUEUED".to_string(),
+                            is_running: false,
+                            is_queued: true,
+                            timestamp: chrono::Utc::now().to_rfc3339(),
+                            created_at: chrono::Utc::now().timestamp_millis(),
+                            media_paths: Vec::new(),
+                            media_thumbnails: Vec::new(),
+                        });
+                        target_conv.is_queued = true;
+                    }
+                }
+            }
+        }
     }
 }
 

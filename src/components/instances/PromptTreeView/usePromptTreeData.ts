@@ -230,7 +230,12 @@ export function queuedPromptCount(conv: { is_queued?: boolean; prompts?: Array<{
     if (fromTurns > 0) {
         return fromTurns;
     }
-    return conv.is_queued ? 1 : 0;
+    // If prompts array is hydrated and contains 0 queued turns, true queue count is 0.
+    // Only fall back to conv.is_queued when prompts have not yet been loaded.
+    if (!conv.prompts || conv.prompts.length === 0) {
+        return conv.is_queued ? 1 : 0;
+    }
+    return 0;
 }
 
 /** Keep conversation QUEUED when inspecting an older completed turn. */
@@ -372,7 +377,33 @@ export function isInstanceCompatible(
     }
     const isTargetDefault = isDefaultInstanceAlias(targetInstanceId);
     const isNodeDefault = isDefaultInstanceAlias(nodeInstanceId);
-    return isTargetDefault && isNodeDefault;
+    if (isTargetDefault || isNodeDefault) {
+        return isTargetDefault && isNodeDefault;
+    }
+    if (!targetInstanceId || targetInstanceId === 'all') {
+        return true;
+    }
+    if (!nodeInstanceId) {
+        return false;
+    }
+    const normNode = nodeInstanceId.trim().toLowerCase();
+    const normTarget = targetInstanceId.trim().toLowerCase();
+    if (normNode === normTarget) {
+        return true;
+    }
+    const cleanTarget = normTarget.replace(/^#\d+\s*/, '').trim();
+    const cleanNode = normNode.replace(/^#\d+\s*/, '').trim();
+    if (cleanTarget === cleanNode) {
+        return true;
+    }
+    if (cleanTarget && cleanNode) {
+        const targetParts = cleanTarget.split(/[-_]/);
+        const nodeParts = cleanNode.split(/[-_]/);
+        if (targetParts[0] && targetParts[0] === nodeParts[0]) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /**
