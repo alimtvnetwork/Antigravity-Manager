@@ -17,6 +17,7 @@ mod hashing;
 mod model;
 mod session_extract;
 mod session_scope;
+pub mod signature_validator;
 mod signatures;
 mod store;
 mod store_restore;
@@ -59,6 +60,7 @@ pub use session_extract::{
     extract_session_from_query_str, is_session_semantic_header, sanitize_session_id,
 };
 pub use session_scope::{EndSessionResult, SessionScope};
+pub use signature_validator::*;
 pub use signatures::{
     ensure_google_claude_thought_signature, ensure_raw_claude_thought_signature,
     is_claude_signature, is_likely_gemini_signature, is_real_signature,
@@ -66,8 +68,8 @@ pub use signatures::{
 };
 pub use store::ThinkingStore;
 pub use thought_parts::{
-    extract_think_tags, is_meaningful_thought, is_placeholder_thought, is_thought_part,
-    place_turn_signature,
+    extract_think_tags, heal_empty_thought_parts, is_meaningful_thought, is_placeholder_thought,
+    is_thought_part, place_turn_signature,
 };
 pub use turn_accumulator::TurnAccumulator;
 

@@ -38,7 +38,7 @@ fn test_antigravity_identity_injection_with_role() {
 
     let result = wrap_request(&body, "test-proj", "gemini-pro", None, None, None);
 
-    // 验证没有多余注入的 systemInstruction
+    // Verify there are no redundant injected systemInstructions
     assert!(result
         .get("request")
         .unwrap()
@@ -292,10 +292,10 @@ mod test_v4_fixes {
         let _config_lock = crate::proxy::config::TEST_CONFIG_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        // 验证 Claude 模型不会在根目录注入 thinking，而是注入到 generationConfig.thinkingConfig
-        // 并且 budget 默认为 16000
+        // Verify that the Claude model does not inject thinking in the root directory, but injects it into generationConfig.thinkingConfig
+        // And budget defaults to 16000
 
-        // 使用 Auto 模式避免干扰
+        // Use Auto mode to avoid distractions
         crate::proxy::config::update_thinking_budget_config(
             crate::proxy::config::ThinkingBudgetConfig {
                 mode: crate::proxy::config::ThinkingBudgetMode::Auto,
@@ -320,13 +320,13 @@ mod test_v4_fixes {
         );
         let req = result.get("request").unwrap();
 
-        // 1. 确保根目录没有 thinking
+        // 1. Make sure there is no thinking in the root directory
         assert!(
             req.get("thinking").is_none(),
             "Root level 'thinking' should NOT be present"
         );
 
-        // 2. 确保 generationConfig.thinkingConfig 存在
+        // 2. Make sure generationConfig.thinkingConfig exists
         let gen_config = req
             .get("generationConfig")
             .expect("generationConfig should be present");
@@ -334,7 +334,7 @@ mod test_v4_fixes {
             .get("thinkingConfig")
             .expect("thinkingConfig should be injected");
 
-        // 3. 验证 Claude 默认预算为 16384
+        // 3. Verify that Claude’s default budget is 16384
         let budget = thinking_config["thinkingBudget"]
             .as_u64()
             .expect("thinkingBudget should be a number");
@@ -353,7 +353,7 @@ mod test_v4_fixes {
         crate::proxy::config::update_thinking_budget_config(
             crate::proxy::config::ThinkingBudgetConfig::default(),
         );
-        // 验证 Gemini 模型注入默认预算 24576
+        // Verify Gemini model injects default budget 24576
         let body = json!({
             "model": "gemini-2.0-flash-thinking-exp",
             "contents": [{"role": "user", "parts": [{"text": "hi"}]}]

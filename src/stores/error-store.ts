@@ -306,6 +306,40 @@ interface ErrorStoreState {
   removeError: (id: string) => void;
 }
 
+export async function persistErrorToSpeedDb(err: CapturedError): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const entry = {
+    id: err.id,
+    error_code: err.code || 'E9001',
+    severity: err.level || 'error',
+    message: err.message || 'Unknown error',
+    stack_trace: err.stackTrace || err.backendStackTrace || null,
+    source: err.context?.source || (err as any).source || null,
+    trigger_action: err.triggerAction || err.context?.triggerAction || null,
+    metadata_json:
+      err.metadata || err.context?.metadata
+        ? JSON.stringify(err.metadata || err.context?.metadata)
+        : null,
+    created_at: Date.now(),
+  };
+
+  try {
+    const isTauri = !!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__;
+    if (isTauri) {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('log_client_error', { entry });
+    } else {
+      fetch('/api/errors/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entry }),
+      }).catch(() => {});
+    }
+  } catch {
+    // Best-effort SQLite persistence; never re-trigger error capture on logger failure
+  }
+}
+
 export const useErrorStore = create<ErrorStoreState>((set, get) => ({
   selectedError: null,
   isModalOpen: false,
@@ -324,6 +358,7 @@ export const useErrorStore = create<ErrorStoreState>((set, get) => ({
       errorQueue: [captured, ...state.errorQueue],
       currentQueueIndex: 0,
     }));
+    persistErrorToSpeedDb(captured);
     return captured;
   },
 
@@ -345,6 +380,7 @@ export const useErrorStore = create<ErrorStoreState>((set, get) => ({
       errorQueue: [captured, ...state.errorQueue],
       currentQueueIndex: 0,
     }));
+    persistErrorToSpeedDb(captured);
     return captured;
   },
 
@@ -354,6 +390,7 @@ export const useErrorStore = create<ErrorStoreState>((set, get) => ({
     set((state) => ({
       recentErrors: [captured, ...state.recentErrors].slice(0, 50),
     }));
+    persistErrorToSpeedDb(captured);
     return captured;
   },
 

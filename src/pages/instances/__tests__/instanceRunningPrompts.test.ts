@@ -14,6 +14,8 @@
 import {
     isNodeOwnedByInstance,
     isDefaultOwned,
+    isConversationOwnedByInstance,
+    isConversationGenuinelyRunning,
 } from '../instancePageUtils';
 import {
     isGhostConversation,
@@ -107,8 +109,9 @@ function sortInstanceProjects(
     return [...instanceProjects].sort((a, b) => {
         const isARunning = Boolean(instIsRunning) && Boolean(a.is_running);
         const isBRunning = Boolean(instIsRunning) && Boolean(b.is_running);
-        if (isARunning && !isBRunning) return -1;
-        if (isBRunning && !isARunning) return 1;
+        if (isARunning !== isBRunning) {
+            return isARunning ? -1 : 1;
+        }
         const aLatest = Math.max(0, ...(a.conversations || []).map((c) => new Date(c.last_modified).getTime() || 0));
         const bLatest = Math.max(0, ...(b.conversations || []).map((c) => new Date(c.last_modified).getTime() || 0));
         if (bLatest !== aLatest) return bLatest - aLatest;
@@ -124,19 +127,23 @@ function checkHasActiveTask(
     inst: { is_running?: boolean; config: { id: string; is_default?: boolean; seq_num?: number } },
     runningTreeNodes: AgmProjectTreeNode[]
 ): boolean {
-    return (
-        Boolean(inst.is_running) &&
-        runningTreeNodes.some((node) => {
-            const isInstanceMatch = isNodeOwnedByInstance(node, inst.config);
-            const hasGenuineRunningConv = (node.conversations || []).some(
-                (c) =>
-                    Boolean(c.is_running) &&
-                    !isGhostConversation(c) &&
-                    !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
-            );
-            return isInstanceMatch && Boolean(node.is_running) && hasGenuineRunningConv;
-        })
-    );
+    const isInstanceRunning = Boolean(inst.is_running);
+    if (!isInstanceRunning) {
+        return false;
+    }
+    return runningTreeNodes.some((node) => {
+        const isNodeRunning = Boolean(node.is_running);
+        if (!isNodeRunning) {
+            return false;
+        }
+        const isInstanceMatch = isNodeOwnedByInstance(node, inst.config);
+        if (!isInstanceMatch) {
+            return false;
+        }
+        return (node.conversations || []).some((c) =>
+            isConversationGenuinelyRunning(c, inst.config, node.instance_seq_num)
+        );
+    });
 }
 
 // ===========================================================================
@@ -204,6 +211,30 @@ test('isNodeOwnedByInstance: rejects node with empty or whitespace instance_id',
     const defaultCfg = { id: 'default', is_default: true };
     assertFalse(isNodeOwnedByInstance(makeProject({ instance_id: '' }), defaultCfg));
     assertFalse(isNodeOwnedByInstance(makeProject({ instance_id: '   ' }), defaultCfg));
+});
+
+test('isConversationOwnedByInstance: default instance rejects empty/null/whitespace conversation instance_id', () => {
+    const defaultCfg = { id: 'default', is_default: true, seq_num: 1 };
+    assertFalse(isConversationOwnedByInstance('', defaultCfg));
+    assertFalse(isConversationOwnedByInstance(null, defaultCfg));
+    assertFalse(isConversationOwnedByInstance(undefined, defaultCfg));
+    assertFalse(isConversationOwnedByInstance('   ', defaultCfg));
+});
+
+test('isConversationOwnedByInstance: default instance matches default and __default__ aliases', () => {
+    const defaultCfg = { id: 'default', is_default: true, seq_num: 1 };
+    assertTrue(isConversationOwnedByInstance('default', defaultCfg));
+    assertTrue(isConversationOwnedByInstance('__default__', defaultCfg));
+    assertFalse(isConversationOwnedByInstance('cloned-worker-8159', defaultCfg));
+});
+
+test('isConversationOwnedByInstance: cloned instance rejects default aliases and matches exact ID or seq_num', () => {
+    const cloneCfg = { id: 'cloned-worker-8159', is_default: false, seq_num: 2 };
+    assertFalse(isConversationOwnedByInstance('default', cloneCfg));
+    assertFalse(isConversationOwnedByInstance('__default__', cloneCfg));
+    assertTrue(isConversationOwnedByInstance('cloned-worker-8159', cloneCfg));
+    assertTrue(isConversationOwnedByInstance('other-id', cloneCfg, 2));
+    assertFalse(isConversationOwnedByInstance('other-id', cloneCfg, 3));
 });
 
 // ===========================================================================
@@ -459,17 +490,45 @@ test('hasActiveTask: correctly resolves active task for cloned instance with mat
     assertTrue(checkHasActiveTask(cloneInst, [cloneNode]));
 });
 
+test('hasActiveTask: Idle Supremacy - idle instance never falsely reports another instance\'s running prompt', () => {
+    const idleDefaultInst = {
+        is_running: true,
+        config: { id: 'default', is_default: true, seq_num: 1 },
+    };
+    const activeCloneInst = {
+        is_running: true,
+        config: { id: 'clone-worker-8159', is_default: false, seq_num: 2 },
+    };
+    const cloneRunningNode = makeProject({
+        instance_id: 'clone-worker-8159',
+        instance_seq_num: 2,
+        is_running: true,
+        conversations: [
+            makeConversation({
+                instance_id: 'clone-worker-8159',
+                instance_seq_num: 2,
+                is_running: true,
+                title: 'Clone heavy compile',
+                prompt_word_count: 8,
+                prompt_preview_200w: 'Heavy compilation task in progress',
+            }),
+        ],
+    });
+    assertFalse(checkHasActiveTask(idleDefaultInst, [cloneRunningNode]));
+    assertTrue(checkHasActiveTask(activeCloneInst, [cloneRunningNode]));
+});
+
 // ===========================================================================
 // Test Group 4: Prompt Status Identification & Ghost Filtering
 // ===========================================================================
 
 test('isGhostConversation: identifies untitled empty conversations as ghosts', () => {
-    assertTrue(isGhostConversation(makeConversation({ title: 'Untitled', prompt_word_count: 0, prompt_preview_200w: '' })));
-    assertTrue(isGhostConversation(makeConversation({ title: 'untitled conversation', prompt_word_count: 0, prompt_preview_200w: '' })));
-    assertTrue(isGhostConversation(makeConversation({ title: 'New Conversation', prompt_word_count: 0, prompt_preview_200w: '' })));
-    assertTrue(isGhostConversation(makeConversation({ title: 'chat', prompt_word_count: 0, prompt_preview_200w: '' })));
-    assertTrue(isGhostConversation(makeConversation({ title: 'conversation-1', prompt_word_count: 0, prompt_preview_200w: '' })));
-    assertTrue(isGhostConversation(makeConversation({ title: '', prompt_word_count: 0, prompt_preview_200w: '' })));
+    assertTrue(isGhostConversation(makeConversation({ title: 'Untitled', prompt_word_count: 0, prompt_preview_200w: '', is_running: false, status: 'IDLE' })));
+    assertTrue(isGhostConversation(makeConversation({ title: 'untitled conversation', prompt_word_count: 0, prompt_preview_200w: '', is_running: false, status: 'IDLE' })));
+    assertTrue(isGhostConversation(makeConversation({ title: 'New Conversation', prompt_word_count: 0, prompt_preview_200w: '', is_running: false, status: 'IDLE' })));
+    assertTrue(isGhostConversation(makeConversation({ title: 'chat', prompt_word_count: 0, prompt_preview_200w: '', is_running: false, status: 'IDLE' })));
+    assertTrue(isGhostConversation(makeConversation({ title: 'conversation-1', prompt_word_count: 0, prompt_preview_200w: '', is_running: false, status: 'IDLE' })));
+    assertTrue(isGhostConversation(makeConversation({ title: '', prompt_word_count: 0, prompt_preview_200w: '', is_running: false, status: 'IDLE' })));
 });
 
 test('isGhostConversation: short_id matching title with 0 words is identified as ghost', () => {
@@ -478,6 +537,8 @@ test('isGhostConversation: short_id matching title with 0 words is identified as
         title: '8A7B6C5D',
         prompt_word_count: 0,
         prompt_preview_200w: '',
+        is_running: false,
+        status: 'IDLE',
     });
     assertTrue(isGhostConversation(conv));
 });
@@ -487,17 +548,22 @@ test('isGhostConversation: conversation with words or preview is NOT a ghost', (
         title: 'Untitled',
         prompt_word_count: 5,
         prompt_preview_200w: 'Some prompt words',
+        is_running: false,
+        status: 'IDLE',
     })));
     assertFalse(isGhostConversation(makeConversation({
         title: 'Fix issue',
         prompt_word_count: 0,
         prompt_preview_200w: '',
+        is_running: false,
+        status: 'IDLE',
     })));
 });
 
 test('isStaleOrEmptyConversation: running conversation with content is exempt', () => {
     const runningWithContent = makeConversation({
         is_running: true,
+        status: 'RUNNING',
         title: 'New conversation',
         prompt_word_count: 15,
         prompt_preview_200w: 'Working on implementation...',
@@ -508,6 +574,7 @@ test('isStaleOrEmptyConversation: running conversation with content is exempt', 
 test('isStaleOrEmptyConversation: idle conversation with untitled name is marked stale/empty', () => {
     const idleUntitled = makeConversation({
         is_running: false,
+        status: 'IDLE',
         title: 'New conversation',
         prompt_word_count: 15,
         prompt_preview_200w: 'Some past prompt',

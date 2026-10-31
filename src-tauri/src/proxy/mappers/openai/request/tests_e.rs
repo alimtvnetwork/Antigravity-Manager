@@ -8,10 +8,10 @@ fn test_multi_turn_responses_preserves_historical_signature_prefix() {
     let sig_round_1 = "s1_".to_string() + &"a".repeat(60);
     let sig_round_2 = "s2_".to_string() + &"b".repeat(60);
 
-    // 缓存第 1 轮工具的专属签名
+    // Caching exclusive signatures for Round 1 tools
     crate::proxy::SignatureCache::global().cache_tool_signature("call_1", sig_round_1.clone());
 
-    // 模拟第 2 轮刚完成，产生了会话级别的最新签名 sig_round_2 (通过 previous_response_id)
+    // Simulation round 2 has just completed, producing the latest signature at the session level sig_round_2 (via previous_response_id)
     let prev_resp_id = format!("resp-prev-{}", uuid::Uuid::new_v4());
     crate::proxy::SignatureCache::global().cache_session_signature(
         &prev_resp_id,
@@ -19,13 +19,13 @@ fn test_multi_turn_responses_preserves_historical_signature_prefix() {
         3,
     );
 
-    // 构造第 3 轮请求：包含历史第 1 轮、第 2 轮的完整上下文
+    // Constructing round 3 requests: full context with historical rounds 1, 2
     let req = OpenAIRequest {
         model: "gemini-3.8-flash-high".to_string(),
         messages: vec![
             OpenAIMessage {
                 role: "user".to_string(),
-                content: Some(OpenAIContent::String("第 1 轮指令".to_string())),
+                content: Some(OpenAIContent::String("Round 1 of instructions".to_string())),
                 ..Default::default()
             },
             OpenAIMessage {
@@ -76,7 +76,7 @@ fn test_multi_turn_responses_preserves_historical_signature_prefix() {
             },
             OpenAIMessage {
                 role: "user".to_string(),
-                content: Some(OpenAIContent::String("第 3 轮指令".to_string())),
+                content: Some(OpenAIContent::String("Round 3 of instructions".to_string())),
                 ..Default::default()
             },
         ],
@@ -95,19 +95,31 @@ fn test_multi_turn_responses_preserves_historical_signature_prefix() {
 
     let contents = result["request"]["contents"].as_array().unwrap();
 
-    // 验证：第 1 轮 model
+    // Validation: Round 1 model
     let model_1_parts = contents[1]["parts"].as_array().unwrap();
-    assert_eq!(model_1_parts[0]["thought"], true, "第 1 轮首位必须是思考块");
+    assert_eq!(
+        model_1_parts[0]["thought"], true,
+        "The first place in round 1 must be a thinking block"
+    );
     let sig_1 = model_1_parts[0]["thoughtSignature"].as_str().unwrap();
-    // 核心断言：历史第 1 轮绝不能被最新一轮的签名 sig_round_2 覆盖！
-    assert_ne!(sig_1, sig_round_2, "历史第 1 轮绝不能被最新签名覆盖");
+    // Core assertion: historical round 1 must not be overwritten by the latest round signature sig_round_2!
+    assert_ne!(
+        sig_1, sig_round_2,
+        "Historical Round 1 must never be overwritten by the latest signature"
+    );
 
-    // 验证：最新一条 model（第 2 轮）
+    // Verification: latest model (round 2)
     let model_2_parts = contents[3]["parts"].as_array().unwrap();
-    assert_eq!(model_2_parts[0]["thought"], true, "第 2 轮首位必须是思考块");
+    assert_eq!(
+        model_2_parts[0]["thought"], true,
+        "The first place in round 2 must be a thinking block"
+    );
     let sig_2 = model_2_parts[0]["thoughtSignature"].as_str().unwrap();
-    // 最新一条 model 应当正确采纳 prev_resp_id 的签名
-    assert_eq!(sig_2, sig_round_2, "最新一条 model 应当正确继承上一轮签名");
+    // The latest model should correctly adopt the signature of prev_resp_id
+    assert_eq!(
+        sig_2, sig_round_2,
+        "The latest model should correctly inherit the previous round of signatures"
+    );
 }
 
 #[test]
@@ -117,7 +129,7 @@ fn test_transform_openai_request_preserves_command_with_description() {
         messages: vec![
             OpenAIMessage {
                 role: "user".to_string(),
-                content: Some(OpenAIContent::String("执行命令".to_string())),
+                content: Some(OpenAIContent::String("execute command".to_string())),
                 ..Default::default()
             },
             OpenAIMessage {
@@ -155,7 +167,7 @@ fn test_transform_openai_request_preserves_command_with_description() {
         transform_openai_request(&req, "test-proj", "gemini-3.8-flash-high", None);
     let contents = result["request"]["contents"].as_array().unwrap();
 
-    // 验证 assistant 的 functionCall.args 中的 command 绝对未被剔除
+    // Verify that command in assistant's functionCall.args is definitely not eliminated
     let model_parts = contents[1]["parts"].as_array().unwrap();
     let fc = model_parts
         .iter()
@@ -164,13 +176,16 @@ fn test_transform_openai_request_preserves_command_with_description() {
     let args = &fc["functionCall"]["args"];
     assert_eq!(
         args["command"], "git checkout main",
-        "command 参数必须完好保留！"
+        "The command parameters must be kept intact!"
     );
     assert_eq!(
         args["description"], "Run: git checkout main",
-        "description 参数必须完好保留！"
+        "The description parameter must be kept intact!"
     );
-    assert_eq!(args["shell"], "default", "shell 参数必须完好保留！");
+    assert_eq!(
+        args["shell"], "default",
+        "Shell parameters must be kept intact!"
+    );
 }
 
 #[test]
@@ -180,7 +195,7 @@ fn test_transform_openai_request_handles_colliding_tool_call_ids() {
         messages: vec![
             OpenAIMessage {
                 role: "user".to_string(),
-                content: Some(OpenAIContent::String("修改文件".to_string())),
+                content: Some(OpenAIContent::String("Modify files".to_string())),
                 ..Default::default()
             },
             OpenAIMessage {
@@ -235,22 +250,22 @@ fn test_transform_openai_request_handles_colliding_tool_call_ids() {
         transform_openai_request(&req, "test-proj", "gemini-3.8-flash-high", None);
     let contents = result["request"]["contents"].as_array().unwrap();
 
-    // 验证第 1 轮工具响应的名字为 edit_file，绝不能被后续同 ID 的 run_command 覆盖
+    // Verify that the name of the first round of tool response is edit_file and must not be overwritten by subsequent run_command with the same ID.
     let tool_resp_1 = contents[2]["parts"][0]["functionResponse"]["name"]
         .as_str()
         .unwrap();
     assert_eq!(
         tool_resp_1, "edit_file",
-        "第 1 轮工具响应必须匹配其调用时的 edit_file 工具名"
+        "Round 1 tool response must match the edit_file tool name when it was called"
     );
 
-    // 验证第 2 轮工具响应的名字为 run_command
+    // Verify that the name of the round 2 tool response is run_command
     let tool_resp_2 = contents[4]["parts"][0]["functionResponse"]["name"]
         .as_str()
         .unwrap();
     assert_eq!(
         tool_resp_2, "run_command",
-        "第 2 轮工具响应必须匹配其调用时的 run_command 工具名"
+        "Round 2 tool response must match the run_command tool name when it was called"
     );
 }
 
@@ -297,7 +312,7 @@ fn test_tool_result_multimodal_image_extraction_and_passthrough() {
     let contents = result["request"]["contents"].as_array().unwrap();
     let tool_turn_parts = contents[2]["parts"].as_array().unwrap();
 
-    // 验证同时存在 functionResponse 和 inlineData 两个 parts
+    // Verify that both functionResponse and inlineData parts exist
     assert_eq!(tool_turn_parts.len(), 2);
     assert!(tool_turn_parts[0].get("functionResponse").is_some());
     assert!(tool_turn_parts[1].get("inlineData").is_some());
@@ -306,7 +321,7 @@ fn test_tool_result_multimodal_image_extraction_and_passthrough() {
     assert_eq!(inline_data["mimeType"], "image/png");
     assert_eq!(inline_data["data"], fake_b64);
 
-    // 验证文本中的 base64 已被替换为摘要说明，防止 functionResponse 体积膨胀
+    // Base64 in the verification text has been replaced with a summary description to prevent functionResponse from bloating
     let func_res_str = tool_turn_parts[0]["functionResponse"]["response"]["result"]
         .as_str()
         .unwrap();
@@ -330,7 +345,7 @@ fn test_function_declarations_schema_sanitization() {
                 "description": "A complex tool\nwith multi-line\r\ndescriptions",
                 "parameters": {
                     "type": "object"
-                    // 故意省略 properties
+                    // properties intentionally omitted
                 }
             }
         })]),
@@ -342,13 +357,13 @@ fn test_function_declarations_schema_sanitization() {
     let func_decls = tools[0]["functionDeclarations"].as_array().unwrap();
     let decl = &func_decls[0];
 
-    // 验证 description 保持原始格式透传
+    // Verify description maintains original format for transparent transmission
     assert_eq!(
         decl["description"],
         "A complex tool\nwith multi-line\r\ndescriptions"
     );
 
-    // 验证 parameters 保证包含 OBJECT 和 properties: {}
+    // Verify that parameters contain OBJECT and properties: {}
     assert_eq!(decl["parameters"]["type"], "OBJECT");
     assert_eq!(decl["parameters"]["properties"], json!({}));
 }
@@ -377,7 +392,7 @@ fn test_openai_tool_call_retrieves_signature_from_signature_cache() {
                         name: "bash".to_string(),
                         arguments: "{}".to_string(),
                     }),
-                    signature: None, // 客户端未带签名 (标准 OpenAI 协议)
+                    signature: None, // Client is not signed (standard OpenAI protocol)
                     ..Default::default()
                 }]),
                 ..Default::default()
@@ -396,7 +411,7 @@ fn test_openai_tool_call_retrieves_signature_from_signature_cache() {
         transform_openai_request(&req, "test-proj", "gemini-3.8-flash-tiered", None);
     let contents = result["request"]["contents"].as_array().unwrap();
 
-    // 查找 model 轮次中的 functionCall 部件
+    // Find the functionCall component in the model round
     let model_msg = contents
         .iter()
         .find(|c| c["role"] == "model")

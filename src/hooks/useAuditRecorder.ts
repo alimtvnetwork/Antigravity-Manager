@@ -28,7 +28,7 @@ import {
 
 const SOURCE = 'useAuditRecorder';
 const SCROLL_THROTTLE_MS = 2000;
-const MAX_DESC_LEN = 80;
+const MAX_DESC_LEN = 100;
 /** Frames kept per interaction: enough to name the UI call path, cheap to parse. */
 const STACK_FRAME_LIMIT = 8;
 
@@ -45,7 +45,7 @@ function currentRoute(): string {
 /** Climbs to nearest interactive element or falls back to original target */
 function findInteractiveTarget(el: Element | null): HTMLElement | null {
     if (!el) return null;
-    const interactive = el.closest('button, a, input, select, textarea, [role="button"]');
+    const interactive = el.closest('button, a, input, select, textarea, [role="button"], [role="tab"], [role="menuitem"], [role="switch"], [role="checkbox"]');
     return (interactive as HTMLElement) || (el as HTMLElement);
 }
 
@@ -78,21 +78,191 @@ function extractStackTrace(): { callerInfo: string; stackTrace: string; stackFra
     }
 }
 
-/** Compact, secret-free description of an element: `button#save.primary`. */
+/** Clean and format human text snippet (max 32 chars) */
+function extractCleanText(el: Element | null): string {
+    if (!el) return '';
+    const raw = (el.textContent || '').trim().replace(/\s+/g, ' ');
+    if (!raw) return '';
+    // Ignore pure numbers or massive blocks
+    if (raw.length > 32) return `${raw.slice(0, 30)}...`;
+    return raw;
+}
+
+/** Check if class name is just Tailwind utility noise */
+function isUtilityClassName(cls: string): boolean {
+    if (!cls) return true;
+    const utilities = /^(grid|group|truncate|flex|inline|block|relative|absolute|fixed|w-|h-|p-|m-|text-|bg-|border-|rounded|shadow-|overflow-|transition-|cursor-|select-|space-|gap-|col-|row-|items-|justify-|self-|shrink|grow|opacity-)/;
+    return utilities.test(cls);
+}
+
+export interface SemanticInteractionDetails {
+    methodName: string;
+    cleanMethodLabel: string;
+    stepSummary: string;
+    elementHierarchy: string[];
+    tag: string;
+    text?: string;
+    title?: string;
+    ariaLabel?: string;
+    container?: string;
+    uiName?: string;
+    uiId?: string;
+}
+
+/**
+ * Resolves human-meaningful labels, step breadcrumbs, and containers for an interaction
+ */
+function resolveSemanticInteraction(el: Element | null, trigger: AuditTrigger): SemanticInteractionDetails {
+    const rawTarget = el as HTMLElement | null;
+    const interactive = findInteractiveTarget(el);
+    const target = interactive || rawTarget;
+    const tag = (target?.tagName || rawTarget?.tagName || 'div').toLowerCase();
+    const route = currentRoute();
+
+    // 1. Explicit attributes
+    const explicitMethod = target?.closest?.(`[${AUDIT_ATTR_METHOD}]`)?.getAttribute(AUDIT_ATTR_METHOD);
+    const uiName = target?.getAttribute('data-ui-name') || target?.closest?.('[data-ui-name]')?.getAttribute('data-ui-name') || undefined;
+    const uiId = target?.getAttribute('data-ui-id') || target?.closest?.('[data-ui-id]')?.getAttribute('data-ui-id') || undefined;
+    const title = target?.getAttribute('title') || rawTarget?.getAttribute('title') || target?.closest?.('[title]')?.getAttribute('title') || undefined;
+    const ariaLabel = target?.getAttribute('aria-label') || rawTarget?.getAttribute('aria-label') || target?.closest?.('[aria-label]')?.getAttribute('aria-label') || undefined;
+
+    // 2. Visible text
+    const text = extractCleanText(rawTarget) || extractCleanText(target) || undefined;
+
+    // 3. Container & domain identification
+    const instanceCard = target?.closest?.('[data-instance-id]') || rawTarget?.closest?.('[data-instance-id]');
+    const instanceId = instanceCard?.getAttribute('data-instance-id') || undefined;
+    const instanceHeader = instanceCard?.querySelector('h3, h4, .font-bold')?.textContent?.trim();
+    const instanceName = instanceHeader ? instanceHeader.split(/\s+/).slice(0, 3).join(' ') : (instanceId ? `#${instanceId}` : undefined);
+
+    const projectContainer = target?.closest?.('[data-project-name]') || rawTarget?.closest?.('[data-project-name]');
+    const projectName = projectContainer?.getAttribute('data-project-name') || undefined;
+
+    const modalContainer = target?.closest?.('[role="dialog"], [data-modal], .modal');
+    const modalTitle = modalContainer?.querySelector('h2, h3, .font-semibold, .font-bold')?.textContent?.trim()?.slice(0, 30);
+
+    const isFleetTable = Boolean(target?.closest?.('table') && (target?.closest?.('.fleet-table') || route === '/instances'));
+    const isNavbar = Boolean(target?.closest?.('nav, header'));
+
+    // Determine container label
+    let container = 'Workspace Area';
+    if (modalTitle) {
+        container = `Modal: ${modalTitle}`;
+    } else if (instanceName) {
+        container = `Instance Card: ${instanceName}`;
+    } else if (isNavbar) {
+        container = 'Navigation Bar';
+    } else if (isFleetTable) {
+        container = 'Shared Cluster / Fleet Nodes';
+    } else if (route === '/instances') {
+        container = 'Instances Grid';
+    }
+
+    // 4. Resolve clean target name
+    let cleanTargetName = '';
+    if (uiName) {
+        cleanTargetName = uiName
+            .replace(/-(btn|tab|menu|card|item|view)$/, '')
+            .replace(/-/g, ' ')
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+    } else if (title && title.length <= 40) {
+        cleanTargetName = title;
+    } else if (ariaLabel && ariaLabel.length <= 40) {
+        cleanTargetName = ariaLabel;
+    } else if (text && text.length <= 30 && !isUtilityClassName(text)) {
+        cleanTargetName = `"${text}"`;
+    } else if (projectName) {
+        cleanTargetName = `Project "${projectName}"`;
+    } else if (instanceName) {
+        cleanTargetName = `Instance "${instanceName}"`;
+    } else if (tag === 'button') {
+        cleanTargetName = title || ariaLabel || (text ? `"${text}" Button` : 'Action Button');
+    } else if (tag === 'a') {
+        cleanTargetName = text ? `Link "${text}"` : 'Navigation Link';
+    } else if (tag === 'input' || tag === 'select' || tag === 'textarea') {
+        cleanTargetName = `${tag.toUpperCase()} Field`;
+    } else {
+        cleanTargetName = container;
+    }
+
+    // 5. Build method name and clean method label
+    let methodName = explicitMethod || '';
+    let cleanMethodLabel = '';
+    const actionVerb = trigger === 'click' ? 'Click' : trigger === 'input' ? 'Input' : 'Action';
+
+    if (!methodName) {
+        if (uiName) {
+            methodName = `${trigger}:${uiName}`;
+            cleanMethodLabel = `${actionVerb}: ${cleanTargetName}`;
+        } else if (title && title.length <= 35) {
+            methodName = `${trigger}:button("${title}")`;
+            cleanMethodLabel = `${actionVerb}: "${title}"`;
+        } else if (ariaLabel && ariaLabel.length <= 35) {
+            methodName = `${trigger}:button("${ariaLabel}")`;
+            cleanMethodLabel = `${actionVerb}: "${ariaLabel}"`;
+        } else if (text && text.length <= 25 && !isUtilityClassName(text)) {
+            methodName = `${trigger}:"${text}"`;
+            cleanMethodLabel = `${actionVerb}: "${text}"`;
+        } else if (instanceName) {
+            methodName = `${trigger}:instance-card("${instanceName}")`;
+            cleanMethodLabel = `${actionVerb}: Instance "${instanceName}"`;
+        } else if (route === '/instances') {
+            methodName = `${trigger}:instances-grid-area`;
+            cleanMethodLabel = `${actionVerb}: Instances Grid Area`;
+        } else {
+            methodName = `${trigger}:${cleanTargetName.toLowerCase().replace(/\s+/g, '-')}`;
+            cleanMethodLabel = `${actionVerb}: ${cleanTargetName}`;
+        }
+    } else {
+        cleanMethodLabel = methodName
+            .replace(/^(handle|on)/, '')
+            .replace(/([A-Z])/g, ' $1')
+            .trim();
+    }
+
+    // 6. Build execution breadcrumb steps hierarchy
+    const elementHierarchy: string[] = [`Route: ${route}`];
+    if (container && !elementHierarchy.includes(container)) {
+        elementHierarchy.push(container);
+    }
+    if (projectName && !elementHierarchy.includes(`Project: ${projectName}`)) {
+        elementHierarchy.push(`Project: ${projectName}`);
+    }
+    elementHierarchy.push(`${tag.toUpperCase()}: ${cleanTargetName}`);
+
+    // 7. Full human step summary sentence
+    let stepSummary = `User ${trigger}ed ${cleanTargetName} on ${route}`;
+    if (instanceName) {
+        stepSummary = `User ${trigger}ed ${cleanTargetName} in Instance "${instanceName}" on ${route}`;
+    } else if (container && container !== 'Workspace Area') {
+        stepSummary = `User ${trigger}ed ${cleanTargetName} in ${container} on ${route}`;
+    }
+
+    return {
+        methodName,
+        cleanMethodLabel,
+        stepSummary,
+        elementHierarchy,
+        tag,
+        text,
+        title,
+        ariaLabel,
+        container,
+        uiName,
+        uiId,
+    };
+}
+
+/** Compact, secret-free description of an element for uiTarget */
 function describeElement(el: Element | null): string {
     const target = findInteractiveTarget(el);
     if (!target) return 'unknown';
-    const tag = target.tagName.toLowerCase();
-    const id = target.id ? `#${target.id}` : '';
-    const firstClass = target.className && typeof target.className === 'string'
-        ? target.className.trim().split(/\s+/)[0]
-        : '';
-    const cls = firstClass ? `.${firstClass}` : '';
-    const label = target.getAttribute('aria-label');
-    const text = !label && (tag === 'button' || tag === 'a' || target.getAttribute('role') === 'button')
-        ? (target.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 24)
-        : '';
-    const desc = `${tag}${id}${cls}${label ? `[aria:${label.slice(0, 24)}]` : ''}${text ? `("${text}")` : ''}`;
+    const semantic = resolveSemanticInteraction(el, 'click');
+    const uiPrefix = semantic.uiName ? `[${semantic.uiName}] ` : '';
+    const id = target.id ? `#${target.id}` : (semantic.uiId ? `[${semantic.uiId}]` : '');
+    const cleanLabel = semantic.title || semantic.ariaLabel || semantic.text;
+    const labelDesc = cleanLabel ? `("${cleanLabel.slice(0, 24)}")` : '';
+    const desc = `${uiPrefix}${semantic.tag}${id}${labelDesc}`;
     return desc.slice(0, MAX_DESC_LEN);
 }
 
@@ -103,19 +273,13 @@ function componentOf(el: Element | null): string {
     return tagged?.getAttribute(AUDIT_ATTR_COMPONENT) || 'unknown';
 }
 
-/** Handler name: opt-in attribute wins, otherwise an inferred descriptor. */
-function methodOf(el: Element | null, trigger: AuditTrigger): string {
-    const target = findInteractiveTarget(el);
-    const tagged = target?.closest?.(`[${AUDIT_ATTR_METHOD}]`);
-    const explicit = tagged?.getAttribute(AUDIT_ATTR_METHOD);
-    if (explicit) return explicit;
-    return `${trigger}:${describeElement(target)}`;
-}
-
 /** `route | component | element` per the backend ui_target convention. */
 function uiTargetOf(el: Element | null): string {
     const target = findInteractiveTarget(el);
-    return `${currentRoute()} | ${componentOf(target)} | ${describeElement(target)}`;
+    const semantic = resolveSemanticInteraction(el, 'click');
+    const comp = componentOf(target);
+    const effectiveComp = comp !== 'unknown' ? comp : semantic.container;
+    return `${currentRoute()} | ${effectiveComp} | ${describeElement(target)}`;
 }
 
 function trackHookError(error: unknown, triggerAction: string, context?: Record<string, unknown>): void {
@@ -165,15 +329,16 @@ export function useAuditRecorder(): void {
         const handleClick = (event: MouseEvent) => {
             try {
                 if (!isRecordingActive()) return;
-                const targetEl = (event.target as HTMLElement)?.closest?.('button, a, input, select, textarea, [role="button"]') || (event.target as HTMLElement | null);
-                const explicitMethod = targetEl?.closest?.(`[${AUDIT_ATTR_METHOD}]`)?.getAttribute(AUDIT_ATTR_METHOD);
+                const rawEl = event.target as HTMLElement | null;
+                const targetEl = rawEl?.closest?.('button, a, input, select, textarea, [role="button"]') || rawEl;
+                const semantic = resolveSemanticInteraction(rawEl, 'click');
                 const { callerInfo, stackTrace, stackFrames } = extractStackTrace();
-                const methodName = explicitMethod || methodOf(targetEl, 'click');
+                const methodName = semantic.methodName;
 
                 report({
                     actor: actorOf(event),
                     methodName,
-                    uiTarget: uiTargetOf(targetEl),
+                    uiTarget: uiTargetOf(rawEl),
                     trigger: 'click',
                     params: {
                         caller: callerInfo,
@@ -185,10 +350,17 @@ export function useAuditRecorder(): void {
                             callerInfo,
                             stackTrace,
                         },
+                        stepSummary: semantic.stepSummary,
+                        cleanMethodLabel: semantic.cleanMethodLabel,
+                        elementHierarchy: semantic.elementHierarchy,
+                        container: semantic.container,
+                        uiName: semantic.uiName || undefined,
+                        uiId: semantic.uiId || undefined,
                         button: event.button,
-                        tag: targetEl?.tagName?.toLowerCase(),
-                        ariaLabel: targetEl?.getAttribute?.('aria-label') || undefined,
-                        textSnippet: (targetEl?.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 24) || undefined,
+                        tag: semantic.tag,
+                        title: semantic.title || undefined,
+                        ariaLabel: semantic.ariaLabel || undefined,
+                        textSnippet: semantic.text || undefined,
                         href: targetEl instanceof HTMLAnchorElement ? targetEl.href : undefined,
                         route: currentRoute(),
                     },
@@ -204,16 +376,17 @@ export function useAuditRecorder(): void {
         const handleInputCommit = (event: Event) => {
             try {
                 if (!isRecordingActive()) return;
-                const targetEl = (event.target as HTMLElement)?.closest?.('input, select, textarea') || (event.target as HTMLElement | null);
+                const rawEl = event.target as HTMLElement | null;
+                const targetEl = rawEl?.closest?.('input, select, textarea') || rawEl;
+                const semantic = resolveSemanticInteraction(rawEl, 'input');
                 const isPassword = targetEl instanceof HTMLInputElement && targetEl.type === 'password';
                 const { callerInfo, stackTrace, stackFrames } = extractStackTrace();
-                const explicitMethod = targetEl?.closest?.(`[${AUDIT_ATTR_METHOD}]`)?.getAttribute(AUDIT_ATTR_METHOD);
-                const methodName = explicitMethod || methodOf(targetEl, 'input');
+                const methodName = semantic.methodName;
 
                 report({
                     actor: actorOf(event),
                     methodName,
-                    uiTarget: uiTargetOf(targetEl),
+                    uiTarget: uiTargetOf(rawEl),
                     trigger: 'input',
                     params: {
                         caller: callerInfo,
@@ -225,7 +398,15 @@ export function useAuditRecorder(): void {
                             callerInfo,
                             stackTrace,
                         },
-                        tag: targetEl?.tagName?.toLowerCase(),
+                        stepSummary: semantic.stepSummary,
+                        cleanMethodLabel: semantic.cleanMethodLabel,
+                        elementHierarchy: semantic.elementHierarchy,
+                        container: semantic.container,
+                        uiName: semantic.uiName || undefined,
+                        uiId: semantic.uiId || undefined,
+                        tag: semantic.tag,
+                        title: semantic.title || undefined,
+                        ariaLabel: semantic.ariaLabel || undefined,
                         inputType: targetEl instanceof HTMLInputElement ? targetEl.type : undefined,
                         // Values are NEVER captured (secrets). Length only,
                         // and not even that for password fields.
@@ -251,15 +432,20 @@ export function useAuditRecorder(): void {
                 const now = Date.now();
                 if (!immediate && now - lastScrollReport.current < SCROLL_THROTTLE_MS) return;
                 lastScrollReport.current = now;
+                const route = currentRoute();
                 report({
                     actor: 'user',
-                    methodName: `scroll:${currentRoute()}`,
-                    uiTarget: `${currentRoute()} | unknown | window`,
+                    methodName: `scroll:${route}`,
+                    uiTarget: `${route} | window | scroll`,
                     trigger: 'scroll',
                     params: {
                         scrollX: window.scrollX,
                         scrollY: window.scrollY,
-                        route: currentRoute(),
+                        route,
+                        stepSummary: `User scrolled the ${route} page`,
+                        cleanMethodLabel: `Scroll: ${route} Page`,
+                        elementHierarchy: [`Route: ${route}`, 'Window Viewport Scroll'],
+                        container: 'Window Viewport',
                     },
                     result: 'ok',
                 });

@@ -212,6 +212,10 @@ pub(crate) fn setup_app(
     modules::auto_switcher::start_auto_switcher();
     info!("Auto profile switcher daemon initialized.");
 
+    // Re-arm any post-switch prompt resume persisted before an app restart (RC-7)
+    modules::instance::rearm_persisted_resumes();
+    info!("Persisted post-switch resume re-arm check completed.");
+
     // Start periodic conversation cleanup daemon (1-hour ticker)
     modules::agy_cleaner::start_cleanup_daemon();
     info!("Conversation cleanup daemon initialized.");
@@ -297,6 +301,9 @@ pub(crate) fn run_headless() {
         std::thread::spawn(|| {
             crate::modules::process::discover_and_persist_initial_ide_info();
         });
+
+        // Initialize databases and verify Split-DB migration state
+        init_databases();
 
         // Load config
         match modules::config::load_app_config() {
@@ -445,10 +452,14 @@ pub(crate) fn run_headless() {
         tokio::signal::ctrl_c().await.ok();
         info!("Headless mode shutting down");
     });
-    return;
 }
 
 pub(crate) fn init_databases() {
+    // 0. Auto check and run Split-DB migration to PascalCase schemas (<10ms fast boot check)
+    if let Err(e) = modules::db_migration::check_and_run_migrations() {
+        error!("Failed to check and run database migration: {}", e);
+    }
+
     // Initialize token stats database
     if let Err(e) = modules::token_stats::init_db() {
         error!("Failed to initialize token stats database: {}", e);

@@ -11,17 +11,21 @@ use antigravity_tools_lib::modules::cli::{
 mod account_cmds;
 mod account_mgmt;
 mod cache_cmds;
+mod clean_versions_cmds;
 mod common;
 mod compact_cmds;
+mod db_cmds;
 mod doctor_cmds;
 mod email_arms_a;
 mod email_arms_b;
 mod email_cmds;
 mod email_dispatch;
+mod error_cmds;
 mod fleet_cmds;
 mod green_cmds;
 mod help_tables;
 mod help_text;
+mod improvements_cmds;
 mod install_cmds;
 mod instance_cmds;
 mod instance_dispatch;
@@ -93,7 +97,13 @@ fn main() {
     };
 
     match subcommand.as_str() {
-        "status" => crate::status_cmds::cmd_status(&cmd_args),
+        "db" | "database" => {
+            if let Err(err) = crate::db_cmds::handle_db_command(&cmd_args) {
+                eprintln!("[ERROR] {}", err);
+                std::process::exit(1);
+            }
+        }
+        "status" | "whoami" => crate::status_cmds::cmd_status(&cmd_args),
         "balance" | "bal" | "credits" | "credit" | "status/credits" | "quota" => {
             crate::quota_cmds::dispatch_quota_domain_from_args(&cmd_args);
         }
@@ -116,13 +126,22 @@ fn main() {
         "instances" | "instance" | "intrance" | "intrances" | "profile" | "profiles" => {
             crate::instance_cmds::dispatch_instance_domain_from_args(&cmd_args);
         }
-        "ls" => {
+        "ide" | "ides" => {
+            antigravity_tools_lib::modules::cli::handle_ide_subcommand(&cmd_args);
+        }
+        "ls" | "list" => {
             if cmd_args
                 .first()
                 .map(|s| s == "prompts" || s == "prompt")
                 .unwrap_or(false)
             {
                 crate::prompt_cmds::dispatch_prompt_domain("list", &cmd_args[1..]);
+            } else if cmd_args
+                .first()
+                .map(|s| s == "accounts" || s == "account" || s == "acc")
+                .unwrap_or(false)
+            {
+                crate::quota_cmds::dispatch_quota_domain("list", &cmd_args[1..]);
             } else {
                 crate::instance_cmds::dispatch_instance_domain("list", &cmd_args);
             }
@@ -199,8 +218,8 @@ fn main() {
         "is-low-credit-for-switch" | "is-low-credit" | "ilc" => {
             crate::switch_check_cmds::cmd_is_low_credit_for_switch(&cmd_args);
         }
-        "which-prompts-running" | "wpr" => {
-            crate::prompt_cmds::dispatch_prompt_domain("running", &cmd_args)
+        "which-prompts-running" => {
+            crate::running_prompts_cmds::cmd_running_prompts(&cmd_args);
         }
         "prompts" => crate::prompt_cmds::dispatch_prompt_domain_from_args(&cmd_args),
         "prompt" => {
@@ -226,13 +245,13 @@ fn main() {
             crate::prompt_cmds::dispatch_prompt_domain("copy", &cmd_args);
         }
         "backup-running-prompts" | "brp" | "backup-prompts" | "backup" | "backpack" => {
-            crate::prompt_cmds::dispatch_prompt_domain("backup", &cmd_args);
+            crate::running_backup_cmds::cmd_backup_running_prompts(&cmd_args);
         }
         "queue-scheduler" | "queue_scheduler" | "scheduler" | "qs" => {
             crate::scheduler_cmds::cmd_queue_scheduler(&cmd_args);
         }
         "restore-running-prompts" | "rrp" | "restore-prompts" | "restore" => {
-            crate::prompt_cmds::dispatch_prompt_domain("restore", &cmd_args);
+            crate::running_backup_cmds::cmd_restore_running_prompts(&cmd_args);
         }
         "export-compact" | "compact-export" | "ec" => {
             crate::compact_cmds::cmd_export_compact(&cmd_args);
@@ -257,9 +276,6 @@ fn main() {
                 crate::compact_cmds::cmd_export_compact(&cmd_args);
             }
         }
-        "running-prompts" => {
-            crate::prompt_cmds::dispatch_prompt_domain("running", &cmd_args);
-        }
         "running-projects" => {
             crate::green_cmds::cmd_running_projects(&cmd_args);
         }
@@ -269,7 +285,7 @@ fn main() {
         "shutdown-until-green" | "sug" => {
             crate::green_cmds::cmd_shutdown_until_green(&cmd_args);
         }
-        "broadcast-email" => {
+        "broadcast-email" | "notifications" | "notification" => {
             crate::email_cmds::cmd_broadcast_email(&cmd_args);
         }
         "telegram" => {
@@ -293,12 +309,8 @@ fn main() {
         "query" | "search" | "find" => {
             crate::prompt_mgmt::cmd_prompts_query(&cmd_args);
         }
-        "active" | "running" => {
-            if cmd_args.is_empty() {
-                crate::prompt_cmds::dispatch_prompt_domain("tree", &[]);
-            } else {
-                crate::misc_cmds::cmd_agy(&cmd_args);
-            }
+        "active" | "running" | "running-prompts" | "wpr" => {
+            crate::running_prompts_cmds::cmd_running_prompts(&cmd_args);
         }
         "queues" | "queue" | "enqueue" | "qe" => {
             crate::prompt_cmds::dispatch_prompt_domain("queue", &cmd_args);
@@ -317,12 +329,27 @@ fn main() {
             crate::system_cmds::dispatch_system_domain("db-stats", &cmd_args)
         }
         "vacuum" => crate::system_cmds::dispatch_system_domain("vacuum", &cmd_args),
+        "paths" | "dirs" | "path" => crate::system_cmds::cmd_system_paths(&cmd_args),
         "ip-list" => crate::security_cmds::dispatch_security_domain("ip-list", &cmd_args),
         "ip-block" => crate::security_cmds::dispatch_security_domain("ip-block", &cmd_args),
         "ip-unblock" => crate::security_cmds::dispatch_security_domain("ip-unblock", &cmd_args),
         "sync" => crate::proxy_cmds::cmd_sync(&cmd_args),
         "pull" => crate::proxy_cmds::cmd_pull(&cmd_args),
         "clean" | "purge" => crate::misc_cmds::cmd_clean(&cmd_args),
+        "clean-other-versions" | "clean_other_versions" | "ov" => {
+            crate::clean_versions_cmds::cmd_clean_other_versions(&cmd_args)
+        }
+        "versions" => {
+            if cmd_args
+                .first()
+                .map(|s| s == "clean" || s == "purge")
+                .unwrap_or(false)
+            {
+                crate::clean_versions_cmds::cmd_clean_other_versions(&cmd_args[1..]);
+            } else {
+                crate::clean_versions_cmds::cmd_clean_other_versions(&cmd_args);
+            }
+        }
         "prune" | "pr" | "clear-cache" | "cache-clear" => {
             crate::cache_cmds::cmd_clear_cache(&cmd_args)
         }
@@ -340,6 +367,17 @@ fn main() {
         | "failed-commands-count"
         | "fcc" => {
             crate::misc_cmds::cmd_failed_commands(&cmd_args);
+        }
+        "errors" | "error" | "err" => {
+            crate::error_cmds::dispatch_errors_domain(&cmd_args);
+        }
+        "improvements" | "improvement" | "improve" => {
+            crate::improvements_cmds::dispatch_improvements_domain(&cmd_args);
+        }
+        "next10" | "next-10" => {
+            let mut forward = vec!["next".to_string()];
+            forward.extend(cmd_args);
+            crate::improvements_cmds::dispatch_improvements_domain(&forward);
         }
         "clear" => {
             if cmd_args

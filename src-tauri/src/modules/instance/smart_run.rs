@@ -2,14 +2,23 @@
 use super::*;
 use std::path::PathBuf;
 
-/// Smart ensure instance is running:
+/// Ensure running result with cold start telemetry
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EnsureRunningResult {
+    pub is_running: bool,
+    pub pid: Option<u32>,
+    pub was_cold_started: bool,
+    pub stabilization_ms: u64,
+}
+
+/// Smart ensure instance is running with detailed cold-start telemetry:
 /// Checks process cache and OS PID table. If already running, reuses without reopening.
-/// If not running or cached PID is closed, launches instance, waits 800ms, invalidates cache,
-/// force refreshes scan, verifies the newly spawned PID, and caches it.
-pub fn ensure_instance_running_smart(
+/// If not running or cached PID is closed, launches instance and executes an adaptive
+/// stabilization ladder (polling up to 5 seconds at 250ms intervals) until the process is alive.
+pub fn ensure_instance_running_smart_detailed(
     instance_id: &str,
     workspace_path: Option<&str>,
-) -> Result<(bool, Option<u32>), crate::error::AppError> {
+) -> Result<EnsureRunningResult, crate::error::AppError> {
     let canonical_id = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
     let (is_running, primary_pid, pids) = is_instance_process_running_smart(&canonical_id);
     if is_running {
@@ -18,7 +27,12 @@ pub fn ensure_instance_running_smart(
             instance_id, canonical_id, primary_pid
         ));
         focus_running_instance(&pids, workspace_path);
-        return Ok((true, primary_pid));
+        return Ok(EnsureRunningResult {
+            is_running: true,
+            pid: primary_pid,
+            was_cold_started: false,
+            stabilization_ms: 0,
+        });
     }
 
     crate::modules::logger::log_info(&format!(
@@ -32,12 +46,61 @@ pub fn ensure_instance_running_smart(
         launch_instance(&canonical_id)?;
     }
 
-    std::thread::sleep(std::time::Duration::from_millis(800));
-    invalidate_instance_process_cache(&canonical_id);
-    force_refresh_process_cache();
-    let (is_now_running, new_pid, _) = is_instance_process_running_smart(&canonical_id);
+    // Adaptive 5-second process stabilization ladder (polling every 250ms up to 5,000ms)
+    let start_time = std::time::Instant::now();
+    let max_duration = std::time::Duration::from_millis(5000);
+    let poll_interval = std::time::Duration::from_millis(250);
 
-    Ok((is_now_running, new_pid))
+    let mut is_now_running = false;
+    let mut new_pid = None;
+    let mut verified_pids = Vec::new();
+
+    while start_time.elapsed() < max_duration {
+        std::thread::sleep(poll_interval);
+        invalidate_instance_process_cache(&canonical_id);
+        force_refresh_process_cache();
+        let (running, pid, pids) = is_instance_process_running_smart(&canonical_id);
+        if running {
+            is_now_running = true;
+            new_pid = pid;
+            verified_pids = pids;
+            break;
+        }
+    }
+
+    let elapsed_ms = start_time.elapsed().as_millis() as u64;
+
+    if is_now_running {
+        crate::modules::logger::log_info(&format!(
+            "[ColdStartLadder] Instance '{}' cold-started and stabilized in {}ms (PID: {:?})",
+            canonical_id, elapsed_ms, new_pid
+        ));
+        focus_running_instance(&verified_pids, workspace_path);
+    } else {
+        crate::modules::logger::log_warn(&format!(
+            "[ColdStartLadder] Instance '{}' cold launch stabilization timed out after {}ms",
+            canonical_id, elapsed_ms
+        ));
+    }
+
+    Ok(EnsureRunningResult {
+        is_running: is_now_running,
+        pid: new_pid,
+        was_cold_started: true,
+        stabilization_ms: elapsed_ms,
+    })
+}
+
+/// Smart ensure instance is running:
+/// Checks process cache and OS PID table. If already running, reuses without reopening.
+/// If not running or cached PID is closed, launches instance and executes an adaptive
+/// stabilization ladder (polling up to 5 seconds at 250ms intervals) until the process is alive.
+pub fn ensure_instance_running_smart(
+    instance_id: &str,
+    workspace_path: Option<&str>,
+) -> Result<(bool, Option<u32>), crate::error::AppError> {
+    let res = ensure_instance_running_smart_detailed(instance_id, workspace_path)?;
+    Ok((res.is_running, res.pid))
 }
 
 /// Focus an already running instance window, or launch it if not running

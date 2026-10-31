@@ -24,7 +24,7 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
     const [showMetadata, setShowMetadata] = useState(true);
     const [copiedCard, setCopiedCard] = useState<string | null>(null);
 
-    // 日志存储与维护配置状态
+    // Log storage and maintenance configuration status
     const [showLogSettings, setShowLogSettings] = useState(false);
     const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
     const [isSavingConfig, setIsSavingConfig] = useState(false);
@@ -346,11 +346,11 @@ export const ProxyMonitor: React.FC<ProxyMonitorProps> = ({ className }) => {
 
             <ModalDialog
                 isOpen={isClearCacheModalOpen}
-                title={t('settings.advanced.clear_logs_title', { defaultValue: '清理日志缓存确认' })}
-                message={t('settings.advanced.clear_logs_msg', { defaultValue: '确定要清理所有日志缓存文件吗？这不会影响历史请求记录和账号数据。' })}
+                title={t('settings.advanced.clear_logs_title', { defaultValue: 'Clear log cache confirmation' })}
+                message={t('settings.advanced.clear_logs_msg', { defaultValue: 'Are you sure you want to clear all log cache files? This will not affect historical request records and account data.' })}
                 type="confirm"
-                confirmText={t('common.clear', { defaultValue: '清理' })}
-                cancelText={t('common.cancel', { defaultValue: '取消' })}
+                confirmText={t('common.clear', { defaultValue: 'clean up' })}
+                cancelText={t('common.cancel', { defaultValue: 'Cancel' })}
                 isDestructive={true}
                 onConfirm={handleClearCache}
                 onCancel={() => setIsClearCacheModalOpen(false)}

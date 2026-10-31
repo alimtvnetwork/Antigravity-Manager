@@ -1,5 +1,5 @@
-// Stream 收集器 - 将 SSE 流转换为完整的 JSON 响应
-// 用于非 Stream 请求的自动转换
+// Stream Collector - Converts SSE streams into full JSON responses
+// Automatic conversion for non-Stream requests
 
 use super::models::*;
 use bytes::Bytes;
@@ -7,14 +7,14 @@ use futures::StreamExt;
 use serde_json::{json, Value};
 use std::io;
 
-/// SSE 事件类型
+/// SSE event types
 #[derive(Debug, Clone)]
 struct SseEvent {
     event_type: String,
     data: Value,
 }
 
-/// 解析 SSE 行
+/// Parse SSE lines
 fn parse_sse_line(line: &str) -> Option<(String, String)> {
     if let Some(colon_pos) = line.find(':') {
         let key = &line[..colon_pos];
@@ -25,10 +25,10 @@ fn parse_sse_line(line: &str) -> Option<(String, String)> {
     }
 }
 
-/// 将 SSE Stream 收集为完整的 Claude Response
+/// Collect SSE Stream into complete Claude Response
 ///
-/// 此函数接收一个 SSE 字节流，解析所有事件，并重建完整的 ClaudeResponse 对象。
-/// 这使得非 Stream 客户端可以透明地享受 Stream 模式的配额优势。
+/// This function receives an SSE byte stream, parses all events, and reconstructs the complete ClaudeResponse object.
+/// This allows non-Stream clients to transparently enjoy the quota benefits of Stream mode.
 pub async fn collect_stream_to_json<S>(mut stream: S) -> Result<ClaudeResponse, String>
 where
     S: futures::Stream<Item = Result<Bytes, io::Error>> + Unpin,
@@ -37,14 +37,14 @@ where
     let mut current_event_type = String::new();
     let mut current_data = String::new();
 
-    // 1. 收集所有 SSE 事件
+    // 1. Collect all SSE events
     while let Some(chunk_result) = stream.next().await {
         let chunk = chunk_result.map_err(|e| format!("Stream error: {}", e))?;
         let text = String::from_utf8_lossy(&chunk);
 
         for line in text.lines() {
             if line.is_empty() {
-                // 空行表示事件结束
+                // A blank line indicates the end of the event
                 if !current_data.is_empty() {
                     if let Ok(data) = serde_json::from_str::<Value>(&current_data) {
                         events.push(SseEvent {
@@ -65,7 +65,7 @@ where
         }
     }
 
-    // 2. 重建 ClaudeResponse
+    // 2. Rebuild ClaudeResponse
     let mut response = ClaudeResponse {
         id: "msg_unknown".to_string(),
         type_: "message".to_string(),
@@ -83,7 +83,7 @@ where
         },
     };
 
-    // 用于累积内容块
+    // for cumulative content blocks
     let mut current_text = String::new();
     let mut current_thinking = String::new();
     let mut current_signature: Option<String> = None;
@@ -93,7 +93,7 @@ where
     for event in events {
         match event.event_type.as_str() {
             "message_start" => {
-                // 提取基本信息
+                // Extract basic information
                 if let Some(message) = event.data.get("message") {
                     if let Some(id) = message.get("id").and_then(|v| v.as_str()) {
                         response.id = id.to_string();
@@ -171,7 +171,7 @@ where
             }
 
             "content_block_stop" => {
-                // 完成当前块
+                // Complete current block
                 if !current_text.is_empty() {
                     response.content.push(ContentBlock::Text {
                         text: current_text.clone(),
@@ -185,7 +185,7 @@ where
                     });
                     current_thinking.clear();
                 } else if let Some(tool_use) = current_tool_use.take() {
-                    // 构建 tool_use 块
+                    // Build tool_use block
                     let id = tool_use
                         .get("id")
                         .and_then(|v| v.as_str())
@@ -227,12 +227,12 @@ where
             }
 
             "message_stop" => {
-                // Stream 结束
+                // Stream end
                 break;
             }
 
             "error" => {
-                // 错误事件
+                // error event
                 let error_data = event.data.get("error").unwrap_or(&event.data);
                 let message = error_data
                     .get("message")
@@ -242,7 +242,7 @@ where
             }
 
             _ => {
-                // 忽略未知事件类型
+                // Ignore unknown event types
             }
         }
     }
@@ -264,7 +264,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_collect_simple_text_response() {
-        // 模拟一个简单的文本响应 SSE 流
+        // Simulate a simple text response SSE stream
         let sse_data = vec![
             "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_123\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-3-5-sonnet\",\"content\":[],\"stop_reason\":null,\"usage\":{\"input_tokens\":10,\"output_tokens\":0}}}\n\n",
             "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n",
@@ -298,10 +298,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_collect_thinking_response_with_signature() {
-        // 模拟一个包含 Thinking Block 和签名的 SSE 流
+        // Simulate an SSE flow containing Thinking Blocks and signatures
         let sse_data = vec![
             "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_think\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-3-7-sonnet\",\"content\":[],\"stop_reason\":null,\"usage\":{\"input_tokens\":10,\"output_tokens\":0}}}\n\n",
-            // content_block_start 中包含 signature
+            // content_block_start contains signature
             "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\", \"signature\": \"sig_123456\"}}\n\n",
             "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"I am \"}}\n\n",
             "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"thinking\"}}\n\n",
@@ -328,7 +328,7 @@ mod tests {
         } = &response.content[0]
         {
             assert_eq!(thinking, "I am thinking");
-            // 验证签名是否被正确提取
+            // Verify that the signature was extracted correctly
             assert_eq!(signature.as_deref(), Some("sig_123456"));
         } else {
             panic!("Expected Thinking block");
@@ -337,7 +337,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_collect_thinking_response_with_signature_delta() {
-        // 模拟 Anthropic 官方标准的 signature_delta 独立增量事件流
+        // Simulate Anthropic's official standard signature_delta independent incremental event stream
         let sse_data = vec![
             "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_think\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-3-7-sonnet\",\"content\":[],\"stop_reason\":null,\"usage\":{\"input_tokens\":10,\"output_tokens\":0}}}\n\n",
             "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\"}}\n\n",
@@ -373,7 +373,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_collect_empty_stream_fallback() {
-        // [FIX #3359] 模拟仅包含 message_start 和 message_stop 的空内容流（如单点探测请求）
+        // [FIX #3359] Simulate an empty content stream containing only message_start and message_stop (such as a single point probe request)
         let sse_data = vec![
             "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_empty\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"gemini-3.7-flash\",\"content\":[],\"stop_reason\":null,\"usage\":{\"input_tokens\":1,\"output_tokens\":0}}}\n\n",
             "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":0}}\n\n",

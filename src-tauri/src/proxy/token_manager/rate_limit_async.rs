@@ -1,4 +1,4 @@
-//! 限流异步标记：fast/async 标记路径与持久化。
+//! Current-limited asynchronous tags: fast/async tag paths and persistence.
 
 use super::helpers::classify_rate_limit_reason;
 use super::helpers::truncate_reason;
@@ -63,11 +63,14 @@ impl TokenManager {
             .fetch_and_lock_with_realtime_quota(email, reason, model_to_track.map(str::to_string))
             .await
         {
-            tracing::info!("账号 {} 已使用实时配额精确锁定", email);
+            tracing::info!(
+                "Account {} has been precisely locked using real-time quotas",
+                email
+            );
             return;
         }
         if self.set_precise_lockout(&account_id, reason, model_to_track.map(str::to_string)) {
-            tracing::info!("账号 {} 已使用本地缓存配额锁定", account_id);
+            tracing::info!("Account {} is locked using local cache quota", account_id);
         }
     }
 
@@ -118,12 +121,12 @@ impl TokenManager {
         model: Option<&str>,
         parser_mode: TrackerParserMode,
     ) {
-        // 关键门禁 1：仅对真正的上游 429 (配额耗尽/速率限制) 和 529 (Overloaded) 记录限流；500/503/404 等绝对不打入冷却池！
+        // Key gate 1: Only record current limit for real upstream 429 (quota exhaustion/rate limit) and 529 (Overloaded); 500/503/404, etc. will never enter the cooling pool!
         if status != 429 && status != 529 {
             return;
         }
 
-        // 关键门禁 2：内部错误文字（All accounts limited / No accounts available / Token pool is empty 等）严禁递归自锁！
+        // Key access control 2: Internal error text (All accounts limited / No accounts available / Token pool is empty, etc.) Recursive self-locking is strictly prohibited!
         let lower_err = error_body.to_lowercase();
         if lower_err.contains("all accounts limited")
             || lower_err.contains("no accounts available")
@@ -177,15 +180,18 @@ impl TokenManager {
             .fetch_and_lock_with_realtime_quota(email, reason, model_to_track.map(str::to_string))
             .await
         {
-            tracing::info!("账号 {} 已使用实时配额精确锁定", email);
+            tracing::info!(
+                "Account {} has been precisely locked using real-time quotas",
+                email
+            );
             return;
         }
         if self.set_precise_lockout(&account_id, reason, model_to_track.map(str::to_string)) {
-            tracing::info!("账号 {} 已使用本地缓存配额锁定", account_id);
+            tracing::info!("Account {} is locked using local cache quota", account_id);
             return;
         }
 
-        tracing::warn!("账号 {} 无法获取配额刷新时间,使用指数退避策略", account_id);
+        tracing::warn!("Account {} cannot obtain the quota refresh time and uses exponential backoff strategy.", account_id);
         self.record_rate_limit_atomic(
             &account_id,
             status,

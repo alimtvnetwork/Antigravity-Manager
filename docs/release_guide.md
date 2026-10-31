@@ -1,35 +1,35 @@
-# Antigravity Tools 发版操作指南 (Release SOP)
+# Antigravity Tools Release Operation Guide (Release SOP)
 
-发版详细规程。提交门禁与发版红线以根目录 `AGENTS.md` 为准。
+Detailed release procedures. The red line for submission access control and release is based on the root directory `AGENTS.md`.
 
 ---
 
-## 一、流程概览
+## 1. Process Overview
 
 ```text
-[通道 A: 正式版发布]
-Pre-flight ─► checkout main ─► npm run bump <patch|minor> ─► 补充日志 ─► git push origin main ─► 打 Tag vX.Y.Z ─► 自动发布 Latest Release
+[Channel A: Official version released]
+Pre-flight ─► checkout main ─► npm run bump <patch|minor> ─► Supplementary log ─► git push origin main ─► Tag vX.Y.Z ─► Automatically release Latest Release
 
-[通道 B: Beta 预发布]
-Pre-flight ─► checkout beta ─► npm run bump beta ──────────► 补充日志 ─► git push origin beta ─► 打 Tag vX.Y.Z-beta.N ─► 自动发布 Pre-release (隔离无感)
+[Channel B: Beta Pre-release]
+Pre-flight ─► checkout beta ─► npm run bump beta ──────────► Supplementary log ─► git push origin beta ─► Tag vX.Y.Z-beta.N ─► Automatically release Pre-release (no sense of isolation)
 ```
 
-> **通道隔离与维护者协作原则**：
-> - **正式版通道 (Main)**：`main` 为**绝对纯净正式打版分支**，仅发布纯数字正式版本（如 `v4.7.14`），流水线严格拦截任何带 `-` 的预发标签。
-> - **预览版通道 (Beta)**：`beta` 为**独立预发布打版分支**，所有预发测试版本（如 `v4.7.14-beta.1`、`-cleaned` 等）在此提交并由 `beta` 触发独立构建。预发布产物自动标记为 Pre-release 且绝不打 Latest，完全不影响正式版主用户更新。
-> - **新更改优先暂存验证 (Staging on Beta First)**：凡涉及新功能、重大重构或高风险修复，**必须主动询问维护者**是否先在 `beta` 分支进行修改与验证。待验证稳定（或发布 Beta 预览版内测确认）后，方可合并进入 `main`。
+> **Principles of channel isolation and maintainer collaboration**:
+> - **Official version channel (Main)**: `main` is the **absolutely pure official versioning branch**. Only purely digital official versions (such as `v4.7.14`) are released. The pipeline strictly intercepts any pre-release tags with `-`.
+> - **Preview channel (Beta)**: `beta` is the **independent pre-release versioning branch**. All pre-release test versions (such as `v4.7.14-beta.1`, `-cleaned`, etc.) are submitted here and are triggered by `beta` to independently build. Pre-release products are automatically marked as Pre-release and never hit Latest, which does not affect official moderator user updates at all.
+> - **Staging on Beta First**: If new features, major refactorings or high-risk fixes are involved, **must proactively ask the maintainer** whether to modify and verify on the `beta` branch first. It can be merged into `main` only after it is verified to be stable (or the beta preview version is released for internal testing).
 
 ---
 
-## 二、操作步骤
+## 2. Operation steps
 
-### 第 0 步：发版前预检 (Pre-flight)
+### Step 0: Pre-flight (Pre-flight)
 
-确保工作区干净，且**对将被标记的提交**执行与 CI 完全一致的预检命令：
+Make sure the workspace is clean and execute the exact same preflight command as CI on the commits that will be flagged:
 
 ```bash
 git checkout main && git pull origin main
-git status          # 应显示 nothing to commit, working tree clean
+git status # should show nothing to commit, working tree clean
 
 cd src-tauri
 cargo fmt -- --check
@@ -38,117 +38,117 @@ cd ..
 npm run build
 ```
 
-> CI 门禁已全量覆盖 `main` 与 `beta` 分支。正式发布前确保在 `main` 预检通过，Beta 预发前确保在 `beta` 预检通过。
+> CI access control has fully covered the `main` and `beta` branches. Make sure to pass the `main` pre-flight before official release, and make sure to pass the `beta` pre-flight before beta pre-release.
 
-### 第 1 步：版本号原子同步
+### Step 1: Atomic synchronization of version numbers
 
-`scripts/bump-version.mjs` 一键同步全仓库版本号并生成 CHANGELOG 骨架：
+`scripts/bump-version.mjs` synchronizes the version number of the entire warehouse with one click and generates a CHANGELOG skeleton:
 
-| 场景 | 命令 | 示例 |
+| Scenario | Command | Example |
 | --- | --- | --- |
-| 补丁（Bugfix / 性能） | `npm run bump patch` | 4.7.13 → 4.7.14 |
-| 次版本（新增特性） | `npm run bump minor` | 4.7.13 → 4.8.0 |
-| 主版本（破坏性变更） | `npm run bump major` | 4.7.13 → 5.0.0 |
-| 预发布递增 | `npm run bump beta` | 4.7.13 → 4.7.14-beta.1（beta.1 → beta.2） |
-| 指定衍生版本 | `npm run bump 4.7.14-cleaned` | 同基线双版本（`-beta` / `-cleaned` / `-rc`） |
-| 指定任意合法 SemVer | `npm run bump 4.8.0` | — |
+| Patches (Bugfix/Performance) | `npm run bump patch` | 4.7.13 → 4.7.14 |
+| Minor version (new features) | `npm run bump minor` | 4.7.13 → 4.8.0 |
+| Major version (breaking changes) | `npm run bump major` | 4.7.13 → 5.0.0 |
+| pre-release bump | `npm run bump beta` | 4.7.13 → 4.7.14-beta.1 (beta.1 → beta.2) |
+| Specify the derived version | `npm run bump 4.7.14-cleaned` | Dual versions with the same baseline (`-beta` / `-cleaned` / `-rc`) |
+| Specify any valid SemVer | `npm run bump 4.8.0` | — |
 
-**可选参数**：`--dry-run` 仅演练、不写盘；`--commit` 自动生成 `chore(release): bump version to ...` 提交。
+**Optional parameters**: `--dry-run` only drills and does not write to disk; `--commit` automatically generates `chore(release): bump version to...` ​​submission.
 
-**同步范围**：`package.json`、`package-lock.json`（根版本镜像，两处）、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock`、`src-tauri/tauri.conf.json`、`Casks/antigravity-tools.rb`、`README.md`、`README_EN.md`、`src/components/layout/MiniView.tsx`、`src/pages/Settings.tsx`、`CHANGELOG.md`、`CHANGELOG_EN.md`。
+**Synchronization scope**: `package.json`, `package-lock.json` (root version mirror, two places), `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, `Casks/anti gravity-tools.rb`, `README.md`, `README_EN.md`, `src/components/layout/MiniView.tsx`, `src/pages/Settings.tsx`, `CHANGELOG.md`, `CHANGELOG_EN.md`.
 
-> 版本串匹配采用**结构锚定**而非精确匹配当前版本号：`package-lock.json` 按字段位置锚定，README 按 `(v数字…)` / `Version-数字…-blue` 形态锚定。这样即使历史轮次（如预发布跳过 README）造成版本串滞后，下一轮同步仍能正确命中。
+> Version string matching uses **structure anchoring** instead of exact matching of the current version number: `package-lock.json` is anchored by field position, and README is anchored by `(v number...)` / `Version-number...-blue` form. In this way, even if the version string lags due to historical rounds (such as skipping README in pre-release), the next round of synchronization can still hit the target correctly.
 
-**内置防呆**：目标版本必须严格高于当前版本，否则红色拦截，杜绝版本回退。
+**Built-in foolproof**: The target version must be strictly higher than the current version, otherwise it will be intercepted in red to prevent version rollback.
 
-**预发布版本号形态**：`npm run bump beta` 生成 `X.Y.Z-beta.N`（首次为 `beta.1`，后续递增为 `beta.2`）。该版本串同时决定脚本插入的 CHANGELOG 骨架标题与后续 Tag 名，**三者必须完全一致**（详见第 2 步提示与第 4 步）。
+**Pre-release version number form**: `npm run bump beta` generates `X.Y.Z-beta.N` (the first time is `beta.1`, and subsequent increments are `beta.2`). This version string also determines the CHANGELOG skeleton title and subsequent Tag name inserted by the script. The three must be completely consistent (see the tips in step 2 and step 4 for details).
 
-### 第 2 步：回溯提交与补充更新日志
+### Step 2: Backtrack Commit and Supplementary Update Log
 
-在填写更新日志前，**必须以 Git 提交历史与已合入 PR 为客观事实依据进行完整回溯**，严防遗漏贡献者署名或 Issue 关联：
+Before filling in the change log, **a complete traceback must be conducted based on the objective facts of Git submission history and merged PR** to prevent missing contributor signatures or issue associations:
 
 ```bash
-# 1. 扫描上个版本以来的全部提交、Author 与 Co-Authored-By 署名
+# 1. Scan all submissions, Author and Co-Authored-By signatures since the previous version
 git log $(git describe --tags --abbrev=0)..HEAD --format="Commit: %h | %an <%ae> | %s%n%(trailers:key=Co-Authored-By)"
 
-# 2. 列出在此期间合并的 PR 与关联 Issue
+# 2. List the PRs and associated issues merged during this period
 gh pr list --state merged --limit 20
 ```
 
-根据盘点结果，在脚本插入的版本骨架中填写核心亮点：
+Based on the inventory results, fill in the core highlights in the version skeleton inserted by the script:
 
-- **强制关联 Issue / PR**：条目标题必须包含对应的来源单号（如 `(PR #3504)` 或 `(Fixes #3499, #3501)`）；
-- **强制行内致谢归一**：致谢统一且严格标注为 `(Thanks to @aukgit)`，严禁包含任何其他 GitHub 用户 handle (`@...`)，确保 Release 页面的 Contributors 列表严格仅展示 aukgit；
-- **格式示例**：
+- **Mandatory association Issue / PR**: The entry title must contain the corresponding source number (such as `(PR #3504)` or `(Fixes #3499, #3501)`);
+- **Force in-line acknowledgments to be unified**: Acknowledgments are unified and strictly marked as `(Thanks to @aukgit)`, and any other GitHub user handle (`@...`) is strictly prohibited. Ensure that the Contributors list on the Release page strictly only displays aukgit;
+- **Format Example**:
 ```markdown
-*   **版本演进**:
+* **Version evolution**:
     *   **v4.7.14 (2026-09-23)**:
-        -   **[核心分类] 功能重构与优化 (PR #3504)**:
-            -   **功能详述**: 核心实现说明。
-        -   **[核心分类] 核心更新与优化 (Fixes #3508, Thanks to @aukgit)**:
-            -   **功能详述**: 核心实现说明。
+        - **[Core Category] Functional Refactoring and Optimization (PR #3504)**:
+            - **Function Details**: Core implementation description.
+        - **[Core Category] Core updates and optimizations (Fixes #3508, Thanks to @aukgit)**:
+            - **Function Details**: Core implementation description.
 ```
 
-> 1. **标题必须与 Tag 逐字符一致**：流水线用 `awk` 以 tag 名（`github.ref_name`，含 `v` 前缀）匹配 CHANGELOG 标题行，**`v` 前缀与完整预发布后缀都要一字不差**。`npm run bump beta` 自增出的版本号形如 `X.Y.Z-beta.1`，因此 Tag 应为 `vX.Y.Z-beta.1`（而非 `vX.Y.Z-beta`），标题也须写成 `**vX.Y.Z-beta.1 (日期)**`。不匹配时正文会静默退化为占位文案 `See the assets to download this version and install.`。
-> 2. 已设置 `generateReleaseNotes: false`，避免 GitHub 自动提取提交历史生成非 aukgit 的 Contributors 列表。
-> 3. **测试版不进入 README**：Tag 含 `-` 的预发布 / 衍生版本（`-beta` / `-cleaned` / `-rc` 等）**只在 `changelog.md` 记录**，不得写入任何 README 的版本号、Shields 徽章或「最新版本」段落。README 始终只反映最新**正式版**。`bump-version.mjs` 已内置该判定：预发布版本自动跳过两个 README，仅同步其余版本配置文件。
-> 4. **贡献者致谢归一**：致谢统一以 `(Thanks to @aukgit)` 标注。Release 页面的 Contributors 头像列表严格只展示 aukgit。
-> 5. **正式版发版强制同步双语 README 更新日志**：发布正式版时，除了更新 `changelog.md`（及 `changelog_en.md`），还必须同步将最新正式版的重要更新摘要更新至 `readme.md`（`## 📝 更新日志`）与 `readme_en.md`（`## 📝 Changelog`），严禁仅更新 changelog 而遗漏 README 首页的最新版本说明。
+> 1. **The title must be consistent character by character with the Tag**: The pipeline uses `awk` to match the CHANGELOG title line with the tag name (`github.ref_name`, including the `v` prefix), and the **`v` prefix and the complete pre-release suffix must be word-for-word**. The version number added by `npm run bump beta` is in the shape of `X.Y.Z-beta.1`, so the Tag should be `vX.Y.Z-beta.1` (not `vX.Y.Z-beta`), and the title must also be written as `**vX.Y.Z-beta.1 (date)**`. If there is no match, the main text will silently degenerate into the placeholder copy `See the assets to download this version and install.`.
+> 2. `generateReleaseNotes: false` has been set to prevent GitHub from automatically extracting the submission history to generate a non-aukgit Contributors list.
+> 3. **Beta versions do not enter the README**: Tags containing pre-release/derivative versions with `-` (`-beta` / `-cleaned` / `-rc`, etc.) **are only recorded in `changelog.md`**, and no version number, Shields badge or "latest version" paragraph of any README is allowed. README always reflects only the latest **official version**. `bump-version.mjs` has this judgment built in: the pre-release version automatically skips the two READMEs and only synchronizes the remaining version configuration files.
+> 4. **Contributor acknowledgments are unified**: Acknowledgments are unified with `(Thanks to @aukgit)`. The Contributors avatar list on the Release page strictly only displays aukgit.
+> 5. **The official version release is forced to synchronize the bilingual README update log**: When releasing the official version, in addition to updating `changelog.md` (and `changelog_en.md`), the important update summary of the latest official version must also be synchronized to `readme.md` (`## 📝 Update log`) and `readme_en.md` (`## 📝 Changelog`). Only updating the changelog is strictly prohibited. The latest version instructions on the README homepage are missing.
 
-### 第 3 步：提交并推送目标分支
+### Step 3: Commit and push the target branch
 
 ```bash
-# 正式版：提交并推送到 main 分支
+# Official version: Submit and push to main branch
 git checkout main
 git add -A
 git commit -m "chore(release): bump version to 4.7.14 and update changelog"
 git push origin main
 
-# Beta 预发版：提交并推送到 beta 分支（严禁推到 main，保持 main 纯净）
+# Beta pre-release version: submit and push to beta branch (it is strictly prohibited to push to main, keep main pure)
 git checkout beta
 git add -A
 git commit -m "chore(release): bump version to 4.7.14-beta.1 and update changelog"
 git push origin beta
 ```
 
-### 第 4 步：打 Tag 并推送
+### Step 4: Tag and push
 
 ```bash
-# 正式版：从 main 打纯数字 Tag（触发正式发布，更新 Latest）
+# Official version: Create a pure digital tag from main (trigger official release, update Latest)
 git tag v4.7.14
 git push origin v4.7.14
 
-# Beta 预发版：从 beta 打预发布 Tag（触发隔离构建，不更新 Latest）
+# Beta pre-release version: Tag pre-release from beta (triggers isolation build, does not update Latest)
 git tag v4.7.14-beta.1
 git push origin v4.7.14-beta.1
 ```
 
-> Tag 串必须与 CHANGELOG 中该版本的标题**逐字符相同**（`v` 前缀 + 完整预发布后缀），否则 Release 正文会退化为占位文案。
+> The Tag string must be **character-for-character identical** to the title of this release in CHANGELOG (`v` prefix + full pre-release suffix), otherwise the Release body will degenerate into placeholder copy.
 
-**分支与标签严格门禁**：流水线内置分支与标签匹配断言。
-- 带有 `-` 的预发布 Tag 若打在 `main` 独有提交上，流水线立即拦截阻断，拒绝构建与发布；
-- 不带 `-` 的正式版 Tag 若打在 `beta` 独有提交上，流水线立即拦截阻断。
-- 预发布版本自动降级为 NSIS、不更新 Latest、不更新正式用户的 `updater.json`，主用户客户端绝不受任何影响。
+**Strict access control for branches and labels**: The pipeline has built-in branch and label matching assertions.
+- If the pre-release tag with `-` is placed on the `main` unique submission, the pipeline will immediately block it and refuse to build and release;
+- If the official version of Tag without `-` is placed on a `beta` unique submission, the pipeline will immediately intercept it.
+- The pre-release version is automatically downgraded to NSIS, Latest is not updated, and the `updater.json` of official users is not updated. The main user client will not be affected in any way.
 
-### 第 5 步：验收
+### Step 5: Acceptance
 
-推送 Tag 后流水线自动接管，无需人工干预：
+After pushing the Tag, the pipeline automatically takes over without manual intervention:
 
-1. **进度**：仓库 `Actions` 页的 `Release` 工作流；
-2. **构建矩阵**：Windows（`.msi` / NSIS `.exe`）、macOS（`.dmg`，Apple Silicon 与 Intel 双架构）、Linux（`.AppImage` / `.deb` / `.rpm`）、Docker 多架构镜像推送 Docker Hub；产出 `updater.json`（配置 `TAURI_SIGNING_PRIVATE_KEY` 时含签名）；
-3. **验收**：约 10~15 分钟后在 `Releases` 页确认 `Antigravity Tools vX.Y.Z` 及附件齐全。
+1. **Progress**: `Release` workflow of the warehouse `Actions` page;
+2. **Build matrix**: Windows (`.msi` / NSIS `.exe`), macOS (`.dmg`, Apple Silicon and Intel dual architecture), Linux (`.AppImage` / `.deb` / `.rpm`), Docker multi-architecture image push to Docker Hub; output `updater.json` (configuration `TAURI_SIGNING_PRIVATE_KEY` including signature);
+3. **Acceptance**: After about 10~15 minutes, confirm that `Antigravity Tools vX.Y.Z` and accessories are complete on the `Releases` page.
 
 ---
 
-## 三、异常与救急
+## 3. Abnormalities and emergencies
 
-### 1. 删除误打的 Tag
+### 1. Delete accidentally typed Tags
 
 ```bash
 git tag -d v4.7.14
 git push origin :refs/tags/v4.7.14
 ```
 
-### 2. 防呆保护报错
+### 2. Fool-proof protection error reporting
 
-报错 `✗ 错误: 防呆保护生效：目标版本号 [...] 必须严格高于当前版本号 [...]！` 说明目标版本小于或等于当前版本。版本号必须严格单调递增，请传入更高版本（如 `npm run bump patch`）。
+Error `✗ Error: Foolproof protection is in effect: the target version number [...] must be strictly higher than the current version number [...]! ` Indicates that the target version is less than or equal to the current version. The version number must strictly increase monotonically, please pass in a higher version (such as `npm run bump patch`).

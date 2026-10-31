@@ -76,7 +76,7 @@ impl TurnAccumulator {
             );
             self.function_call_count += 1;
 
-            // 核心演进：全面转战因果伪哈希 ID！首位强制存入确定性 synthetic ID，客户端 real_id 紧随其后作为元数据兜底
+            // Core Evolution: Fully switch to causal pseudo-hash ID! The first one is forced to store the deterministic synthetic ID, and the client real_id is followed as metadata.
             if !self.tool_ids.iter().any(|x| x == &synthetic) {
                 self.tool_ids.push(synthetic.clone());
             }

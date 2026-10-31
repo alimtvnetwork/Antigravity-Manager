@@ -1,6 +1,6 @@
 // Content part builders (split from request.rs).
-// Claude 请求转换 (Claude → Gemini v1internal)
-// 对应 transformClaudeRequestIn
+// Claude requested conversion (Claude → Gemini v1internal)
+// Corresponds to transformClaudeRequestIn
 
 use super::super::models::*;
 use crate::proxy::mappers::signature_store::get_thought_signature; // Deprecated, kept for fallback
@@ -14,7 +14,7 @@ use super::messages::reorder_gemini_parts;
 use super::thinking::{clean_system_prompt_text, is_gemini_client_billing_metadata};
 use super::transform::TransformTiming;
 
-/// 构建 System Instruction (支持动态身份映射与 Prompt 隔离)
+/// Build System Instruction (support dynamic identity mapping and Prompt isolation)
 pub(crate) fn build_system_instruction(
     system: &Option<SystemPrompt>,
     model_name: &str,
@@ -22,8 +22,8 @@ pub(crate) fn build_system_instruction(
 ) -> Option<Value> {
     let mut parts = Vec::new();
 
-    // 不注入官方 Antigravity 身份：客户端自带 system prompt 时原样透传。
-    // 全局提示词仍做清洗 + 换行隔离，避免 Markdown 粘连；身份文本若混入则由 clean_system_prompt_text 剥掉。
+    // Do not inject the official Antigravity identity: transparently transmit the client's own system prompt as it is.
+    // The global prompt words are still cleaned and separated by line breaks to avoid Markdown adhesion; if the identity text is mixed in, it will be stripped off by clean_system_prompt_text.
     let global_prompt_config = crate::proxy::config::get_global_system_prompt();
     if global_prompt_config.enabled && !global_prompt_config.content.trim().is_empty() {
         let cleaned = clean_system_prompt_text(&global_prompt_config.content);
@@ -32,11 +32,11 @@ pub(crate) fn build_system_instruction(
         }
     }
 
-    // 添加用户的系统提示词
+    // Add user's system prompt word
     if let Some(sys) = system {
         match sys {
             SystemPrompt::String(text) => {
-                // [Issue #3452] 过滤 Claude Desktop 注入的单行计费元数据，防止与大量工具组合时触发 Google 上游 429 RESOURCE_EXHAUSTED
+                // [Issue #3452] Filter single-line billing metadata injected by Claude Desktop to prevent triggering Google upstream 429 RESOURCE_EXHAUSTED when combined with a large number of tools
                 if !is_gemini_client_billing_metadata(model_name, text) {
                     let norm = normalize_claude_client_identity(text);
                     let cleaned = clean_system_prompt_text(norm);
@@ -48,7 +48,7 @@ pub(crate) fn build_system_instruction(
             SystemPrompt::Array(blocks) => {
                 for block in blocks {
                     if block.block_type == "text" {
-                        // [Issue #3452] 过滤 Claude Desktop 注入的单行计费元数据
+                        // [Issue #3452] Filter single-line billing metadata injected by Claude Desktop
                         if is_gemini_client_billing_metadata(model_name, &block.text) {
                             continue;
                         }
@@ -65,7 +65,7 @@ pub(crate) fn build_system_instruction(
         }
     }
 
-    // 3. 添加提取出来的 role == "system" 消息
+    // 3. Add the extracted role == "system" message
     for extra_text in extra_system_messages {
         if is_gemini_client_billing_metadata(model_name, extra_text) {
             continue;
@@ -180,7 +180,7 @@ pub(crate) fn build_google_content(
     }))
 }
 
-/// 构建 Contents (Messages)
+/// Build Contents (Messages)
 pub(crate) fn build_google_contents(
     messages: &[Message],
     claude_req: &ClaudeRequest,
@@ -199,7 +199,7 @@ pub(crate) fn build_google_contents(
     // Track pending tool_use IDs for recovery
     let mut pending_tool_use_ids: Vec<String> = Vec::new();
 
-    // [NEW] 用于识别并过滤 Claude Code 重复回显的任务指令
+    // [NEW] Task instructions for identifying and filtering repeated echoes of Claude Code
     let mut last_user_task_text_normalized: Option<String> = None;
     let mut previous_was_tool_result = false;
 
@@ -252,7 +252,7 @@ pub(crate) fn build_google_contents(
     // Corrupted signature issues proved we cannot fake thinking blocks.
     // Instead we rely on should_disable_thinking_due_to_history to prevent this state.
 
-    // 思考回填：仅在开启思考且非 Gemini < 3 模型时恢复思维块与签名
+    // Thought backfill: Only restore thought blocks and signatures when thinking is enabled and not Gemini < 3 models
     let should_finalize_thinking =
         is_thinking_enabled && !crate::proxy::model_specs::is_gemini_under_v3(mapped_model);
 
@@ -307,7 +307,7 @@ pub(crate) fn merge_adjacent_roles(mut contents: Vec<Value>) -> Vec<Value> {
     merged
 }
 
-/// 构建 Tools
+/// Build Tools
 
 /// Fallback message when a tool result is empty (prevents model hallucination).
 pub(crate) fn empty_tool_result_fallback(merged_content: &str, is_error: Option<bool>) -> String {

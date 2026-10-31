@@ -21,7 +21,7 @@ export function useAccountRowState(props: AccountRowContentProps) {
     const { config } = useConfigStore();
     const validationBlockedLabel = getValidationBlockedStatusLabel(account.validation_blocked_reason, t);
 
-    // 自定义标签编辑状态
+    // Custom label editing status
     const [isEditingLabel, setIsEditingLabel] = useState(false);
     const [labelInput, setLabelInput] = useState(account.custom_label || '');
     const [showInstanceMenu, setShowInstanceMenu] = useState(false);

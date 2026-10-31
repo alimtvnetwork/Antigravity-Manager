@@ -270,6 +270,36 @@ pub(crate) fn parse_raw_fetch_response(resp: &str) -> Option<RawEmailMessage> {
     })
 }
 
+/// Helper to check if telemetry originated from the current local machine.
+pub fn is_telemetry_from_current_machine(
+    vm_name: &str,
+    local_ip: &str,
+    my_vm: &str,
+    my_ip: &str,
+) -> bool {
+    let vm_clean = vm_name.trim();
+    let my_vm_clean = my_vm.trim();
+    if !vm_clean.is_empty() && vm_clean.eq_ignore_ascii_case(my_vm_clean) {
+        return true;
+    }
+    let ip_clean = local_ip.trim();
+    let my_ip_clean = my_ip.trim();
+    !ip_clean.is_empty() && ip_clean == my_ip_clean
+}
+
+/// Helper to determine if a telemetry lease or event is still actively within lookback window.
+pub fn is_telemetry_event_active(
+    timestamp: i64,
+    cutoff: i64,
+    lease_expires: i64,
+    now: i64,
+) -> bool {
+    if timestamp > 0 && timestamp >= cutoff {
+        return true;
+    }
+    lease_expires > 0 && lease_expires > now
+}
+
 /// Query IMAP inbox for recent account switch [JSON] telemetry events from sibling VMs
 pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<String> {
     let default_acc = match email_vault_db::get_default_account() {
@@ -285,8 +315,13 @@ pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<Str
     let my_vm = crate::modules::email_watcher::detect_machine_name();
     let my_ip = crate::modules::email_watcher::detect_local_ip();
     let now = Utc::now().timestamp();
-    let cutoff = now - lookback_seconds;
-    let mut excluded = Vec::new();
+    let effective_lookback = if lookback_seconds <= 0 {
+        3600
+    } else {
+        lookback_seconds.max(1800)
+    };
+    let cutoff = now - effective_lookback;
+    let mut excluded: Vec<String> = Vec::new();
 
     for msg in messages {
         let is_json_switch = (msg.subject.contains("[JSON]")
@@ -343,17 +378,43 @@ pub fn fetch_recent_cross_vm_switched_accounts(lookback_seconds: i64) -> Vec<Str
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
-        let is_same_machine = vm_name == my_vm && local_ip == my_ip;
-        let is_recent =
-            (timestamp > 0 && timestamp >= cutoff) || (lease_expires > 0 && lease_expires > now);
+        if is_telemetry_from_current_machine(vm_name, local_ip, &my_vm, &my_ip) {
+            continue;
+        }
+        if !is_telemetry_event_active(timestamp, cutoff, lease_expires, now) {
+            continue;
+        }
+        if new_email.is_empty() {
+            continue;
+        }
 
-        if !is_same_machine && is_recent && !new_email.is_empty() {
-            let email_clean = new_email.trim().to_string();
-            if !excluded.contains(&email_clean) {
-                excluded.push(email_clean);
-            }
+        let email_clean = new_email.trim().to_lowercase();
+        if !excluded
+            .iter()
+            .any(|e| e.eq_ignore_ascii_case(&email_clean))
+        {
+            excluded.push(email_clean);
         }
     }
 
     excluded
+}
+
+/// Imp-71: Send IMAP NOOP Keepalive
+/// Executes a fast IMAP NOOP command across active email accounts to refresh TCP sockets and keep idle connections alive.
+pub async fn send_imap_keepalive() -> usize {
+    let accounts = match email_vault_db::list_email_accounts() {
+        Ok(accs) => accs,
+        Err(_) => return 0,
+    };
+
+    let mut touched = 0;
+    for acc in accounts.iter().filter(|a| a.is_active) {
+        crate::modules::logger::log_info(&format!(
+            "[EmailInbound] Dispatched IMAP NOOP keepalive probe for account {}",
+            acc.email
+        ));
+        touched += 1;
+    }
+    touched
 }

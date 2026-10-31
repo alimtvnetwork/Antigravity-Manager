@@ -21,8 +21,8 @@ fn extract_cwd_from_env_block() {
     assert_eq!(extract_cwd(None), None);
     assert_eq!(extract_cwd(Some(&json!({"input":[]}))), None);
 
-    // codex-connector #435 P2:Windows 路径反斜杠不能被翻倍(遍历 Value 取反转义原文,
-    // 不能先序列化整个请求)。json! 里 "C:\\Users\\me\\repo" = 实际单反斜杠路径。
+    // codex-connector #435 P2: Windows path backslashes cannot be doubled (traverse Value to get the unescaped original text,
+    // The entire request cannot be serialized first). json! in "C:\\Users\\me\\repo" = actual single backslash path.
     let win = json!({
         "input": [{"type":"message","role":"user","content":"<environment_context>\n  <cwd>C:\\Users\\me\\repo</cwd>\n</environment_context>"}]
     });
@@ -34,19 +34,19 @@ fn extract_cwd_from_env_block() {
 
 #[test]
 fn trailing_whitespace_anchor_is_repaired_to_file_bytes() {
-    // 文件 context 行无尾随空格;patch 的 context 行带尾随空格 → 应被对齐成文件真实字节。
+    // File context lines have no trailing spaces; patch context lines with trailing spaces → should be aligned to actual file bytes.
     let (dir, name) = tmp_file("a.txt", "fn main() {\n    let x = 1;\n    let y = 2;\n}\n");
     let cwd = dir.path().to_str().unwrap();
-    // patch: 在 `let x = 1;` 后加一行;context 带尾随空格(模型常见错)。
+    // patch: add a line after `let x = 1;`; context with trailing spaces (common model error).
     let v4a = format!(
         "*** Begin Patch\n*** Update File: {name}\n    let x = 1;   \n+    let z = 9;\n    let y = 2;\n*** End Patch\n"
     );
     let (out, reps) = preflight_repair(&v4a, Some(cwd));
     assert!(
         out.contains("    let x = 1;\n"),
-        "尾随空格应被对齐掉:\n{out}"
+        "Trailing spaces should be aligned:\n {out}"
     );
-    assert!(out.contains("+    let z = 9;"), "新增行保留");
+    assert!(out.contains("+    let z = 9;"), "Keep new rows");
     assert_eq!(reps[0].kind, "repaired", "{:?}", reps);
 }
 
@@ -59,18 +59,18 @@ fn exact_match_left_clean() {
     );
     let (out, reps) = preflight_repair(&v4a, Some(cwd));
     assert_eq!(reps[0].kind, "clean");
-    assert_eq!(out, v4a, "精确匹配不改一字节");
+    assert_eq!(out, v4a, "Exact match without changing one byte");
 }
 
 #[test]
 fn ambiguous_match_is_skipped_not_guessed() {
-    // 锚点 ` x` 在文件里多处出现 → 歧义 → 放行不猜。
+    // The anchor point `x` appears in many places in the file → ambiguity → let it go without guessing.
     let (dir, name) = tmp_file("c.txt", "x\nx\nx\n");
     let cwd = dir.path().to_str().unwrap();
     let v4a = format!("*** Begin Patch\n*** Update File: {name}\n x   \n+added\n*** End Patch\n");
     let (out, reps) = preflight_repair(&v4a, Some(cwd));
     assert!(reps[0].kind.starts_with("skipped"), "{:?}", reps);
-    assert_eq!(out, v4a, "歧义不改");
+    assert_eq!(out, v4a, "Ambiguity remains unchanged");
 }
 
 #[test]
@@ -95,14 +95,14 @@ fn unreadable_file_passes_through() {
 
 #[test]
 fn envelope_added_when_model_omits_begin_end() {
-    // 真机 seq230 形态:只有 Add File + 内容,无 Begin/End。
+    // Real machine seq230 form: only Add File + content, no Begin/End.
     let body = "*** Add File: outputs/x.md\n+# Title\n+body\n";
     let (out, rep) = ensure_v4a_envelope(body);
     assert!(out.starts_with("*** Begin Patch\n"), "{out}");
     assert!(out.trim_end().ends_with("*** End Patch"), "{out}");
     assert!(
         out.contains("+# Title") && out.contains("+body"),
-        "内容不丢"
+        "No content is lost"
     );
     assert!(rep.is_some());
 }
@@ -111,55 +111,65 @@ fn envelope_added_when_model_omits_begin_end() {
 fn envelope_only_end_added() {
     let body = "*** Begin Patch\n*** Add File: x\n+a\n";
     let (out, rep) = ensure_v4a_envelope(body);
-    assert_eq!(out.matches("*** Begin Patch").count(), 1, "不重复加 Begin");
+    assert_eq!(
+        out.matches("*** Begin Patch").count(),
+        1,
+        "Do not add Begin repeatedly"
+    );
     assert!(out.trim_end().ends_with("*** End Patch"));
     assert!(rep.unwrap().detail.contains("End Patch"));
 }
 
 #[test]
 fn envelope_prefixed_end_stripped_for_code_file() {
-    // MOC-268(用户拍板「按文件类型剥」):**仅 `+*** End Patch`**(Add 行误前缀)在代码/结构化配置文件
-    // 里(裸 `*** End Patch` 不可能是合法源码末行)剥前缀规整成裸终止符,不追加、零残留、零内容丢失。
+    // MOC-268 (User Agreed "Strip by File Type"): **Only `+*** End Patch`** (Add line error prefix) in code/structured configuration files
+    // Here (the bare `*** End Patch` cannot be the last line of the legal source code), the prefix is stripped and transformed into a bare terminator, with no appending, zero residue, and zero content loss.
     for path in ["x.rs", "c.json", "s.toml", "w.vue"] {
         let body = format!("*** Begin Patch\n*** Add File: {path}\n+a\n+b\n+*** End Patch");
         let (out, rep) = ensure_v4a_envelope(&body);
         assert!(
             out.trim_end().ends_with("\n*** End Patch"),
-            "代码文件应剥成裸终止符 ({path}):\n{out}"
+            "Code files should be stripped to bare terminators ( {path} ):\n {out}"
         );
         assert!(
             !out.contains("+*** End Patch"),
-            "不应残留带前缀终止符 ({path}):\n{out}"
+            "Prefixed terminators should not remain ( {path} ):\n {out}"
         );
         assert_eq!(
             out.matches("*** End Patch").count(),
             1,
-            "只一个终止符 ({path}):\n{out}"
+            "Only one terminator ( {path} ):\n {out}"
         );
-        assert!(rep.unwrap().detail.contains("剥误加前缀"), "{path}");
+        assert!(
+            rep.unwrap()
+                .detail
+                .contains("Stripping and adding prefix by mistake"),
+            "{path}"
+        );
     }
 }
 
 #[test]
 fn envelope_deletion_or_context_end_line_not_stripped() {
     // MOC-268(chatgpt-codex-connector review):` *** End Patch`(context)/ `-*** End Patch`(deletion)
-    // 是**合法 Update hunk 行**(如模型用 Update 删文件里残留的 *** End Patch),**绝不能当终止符剥**
-    // (剥 `-` = 静默丢弃删除)。这俩末行 → 正常补真终止符、hunk 行**原样保留**。即便目标是代码文件。
+    // It is a ** legal Update hunk line ** (for example, the model uses Update to delete the *** End Patch remaining in the file), and ** must not be used as a terminator strip**
+    // (stripping `-` = silently discard removal). The last two lines → the normal completion terminator, the hunk line are **left as is**. Even if the target is a code file.
     for last in ["-*** End Patch", " *** End Patch"] {
         let body = format!("*** Begin Patch\n*** Update File: src/foo.rs\n keep\n{last}");
         let (out, rep) = ensure_v4a_envelope(&body);
         assert!(
             out.contains(last),
-            "合法 hunk 行 {last:?} 必须原样保留(不剥=不丢删除):\n{out}"
+            "The legal hunk line {last:?} must be retained as is (no stripping = no deletion without loss):\n {out}"
         );
         assert!(
             out.trim_end().ends_with("\n*** End Patch"),
-            "应正常补真终止符 ({last:?}):\n{out}"
+            "The terminator ( {last:?} ) should be complemented normally:\n {out}"
         );
         let r = rep.unwrap();
         assert!(
-            r.detail.contains("End Patch") && !r.detail.contains("剥误加前缀"),
-            "走正常 append、非剥 ({last:?}):{}",
+            r.detail.contains("End Patch")
+                && !r.detail.contains("Stripping and adding prefix by mistake"),
+            "Normal append, non-stripping ( {last:?} ): {}",
             r.detail
         );
     }
@@ -167,20 +177,23 @@ fn envelope_deletion_or_context_end_line_not_stripped() {
 
 #[test]
 fn envelope_prefixed_end_left_incomplete_for_doc_file() {
-    // MOC-268(silent-failure review):文档/文本/未知类型里裸 `*** End Patch` **可能是正文末行**(本仓
-    // V4A 文档就有这串字)→ 歧义不猜:既不剥(免删正文)也不追加(免残留)→ 不补全留 incomplete。
+    // MOC-268 (silent-failure review): Document/Text/Unknown Type `*** End Patch` **may be the last line of the text** (this warehouse
+    // The V4A document has this string of words) → Don’t guess the ambiguity: neither stripping (avoiding deletion of the text) nor appending (avoiding residue) → leaving incomplete without completion.
     for path in ["notes.md", "readme.txt", "data"] {
         let body =
             format!("*** Begin Patch\n*** Add File: {path}\n+How to end a patch:\n+*** End Patch");
         let (out, rep) = ensure_v4a_envelope(&body);
-        assert_eq!(out, body, "文档文件歧义末行应原样保留 ({path}):\n{out}");
+        assert_eq!(
+            out, body,
+            "Document file ambiguity last line should be left intact ( {path} ):\n {out}"
+        );
         assert!(
             out.trim_end().ends_with("+*** End Patch"),
-            "正文行应保留不删 ({path}):\n{out}"
+            "The text line should be left undeleted ( {path} ):\n {out}"
         );
         assert!(
             !out.trim_end().ends_with("\n*** End Patch"),
-            "不应追加裸终止符 ({path}):\n{out}"
+            "The naked terminator ( {path} ) should not be appended:\n {out}"
         );
         assert_eq!(
             rep.unwrap().kind,
@@ -192,19 +205,22 @@ fn envelope_prefixed_end_left_incomplete_for_doc_file() {
 
 #[test]
 fn envelope_prefixed_end_not_stripped_for_update_even_code() {
-    // MOC-268(chatgpt-codex-connector review):`*** Update File:` 的 `+*** End Patch` 是**新增行**
-    // (可能往代码文件的字符串/fixture 里加这串字),不是 Add File 的误前缀终止符 → **即便目标是代码
-    // 文件也不剥**(剥了=丢新增),走歧义 → 留 incomplete。剥仅限末操作是 Add File。
+    // MOC-268 (chatgpt-codex-connector review): `*** Update File:` of `+*** End Patch` is **new line**
+    // (Maybe add this string of words to the string/fixture of the code file), it is not the wrong prefix terminator of Add File → **Even if the target is code
+    // The file is not stripped** (stripped = lost and added), leaving ambiguity → leaving incomplete. The last operation to strip is Add File.
     let body = "*** Begin Patch\n*** Update File: src/foo.rs\n keep\n+*** End Patch".to_string();
     let (out, rep) = ensure_v4a_envelope(&body);
-    assert_eq!(out, body, "Update 的 +*** End Patch 不应被剥/动:\n{out}");
+    assert_eq!(
+        out, body,
+        "Update's +*** End Patch should not be stripped/touched:\n {out}"
+    );
     assert!(
         out.trim_end().ends_with("+*** End Patch"),
-        "新增行应保留:\n{out}"
+        "The new row should be retained:\n {out}"
     );
     assert!(
         !out.trim_end().ends_with("\n*** End Patch"),
-        "不应追加裸终止符:\n{out}"
+        "No naked terminator should be appended:\n {out}"
     );
     assert_eq!(rep.unwrap().kind, "skipped:ambiguous_prefixed_end");
 }
@@ -219,16 +235,16 @@ fn envelope_complete_untouched() {
 
 #[test]
 fn envelope_not_added_to_nonpatch_or_leading_prose() {
-    // 非 patch 体不碰
+    // Non-patch bodies are not touched
     let (o1, r1) = ensure_v4a_envelope("just some text\nno ops here\n");
     assert_eq!(o1, "just some text\nno ops here\n");
     assert!(r1.is_none());
-    // 缺 Begin 且首个非空行不是操作行(有前导散文)→ 不安全,不补 Begin
+    // Begin is missing and the first non-blank line is not an operation line (with leading prose) → Unsafe, Begin is not added
     let prose = "here is my patch:\n*** Add File: x\n+a\n*** End Patch\n";
     let (o2, _r2) = ensure_v4a_envelope(prose);
     assert!(
         !o2.starts_with("*** Begin Patch"),
-        "有前导散文不应贸然补 Begin"
+        "Prose that has a lead should not be filled in hastily. Begin"
     );
 }
 
@@ -236,14 +252,17 @@ fn envelope_not_added_to_nonpatch_or_leading_prose() {
 fn strip_trailing_at_double_sided_to_single() {
     let v4a = "*** Begin Patch\n*** Update File: x\n@@ def f(): @@\n-a\n+b\n*** End Patch\n";
     let (out, reps) = strip_trailing_at(v4a);
-    assert!(out.contains("@@ def f():\n"), "应去尾部 @@:\n{out}");
+    assert!(
+        out.contains("@@ def f():\n"),
+        "The tail should be removed @@:\n {out}"
+    );
     assert!(!out.contains("@@ def f(): @@"));
     assert_eq!(reps.len(), 1);
 }
 
 #[test]
 fn strip_trailing_at_keeps_bare_and_single() {
-    // 裸 @@(section 分隔)+ 单边 @@ 都不动
+    // Naked @@ (section separation) + single side @@ does not move
     let v4a = "*** Update File: x\n@@\n@@ class Foo\n-a\n+b\n";
     let (out, reps) = strip_trailing_at(v4a);
     assert_eq!(out, v4a);
@@ -346,58 +365,63 @@ fn recover_empty_move_to_delete_add() {
     assert!(out.contains("*** Add File: new.md"), "{out}");
     assert!(
         out.contains("+line1") && out.contains("+line2"),
-        "复制原内容:\n{out}"
+        "Copy original content:\n {out}"
     );
-    assert!(!out.contains("*** Move to:"), "Move 已被替换");
+    assert!(!out.contains("*** Move to:"), "Move has been replaced");
     assert_eq!(reps[0].kind, "repaired");
 }
 
 #[test]
 fn recover_empty_move_with_hunk_untouched() {
-    // Update+Move 但**有** hunk(rename + 内容改)→ 不碰(prompt 允许)。
+    // Update+Move but **has** hunk (rename + content change) → no touch (prompt allows).
     let (dir, name) = tmp_file("old2.md", "a\n");
     let cwd = dir.path().to_str().unwrap();
     let v4a = format!(
         "*** Begin Patch\n*** Update File: {name}\n*** Move to: new2.md\n-a\n+b\n*** End Patch\n"
     );
     let (out, reps) = recover_empty_move(&v4a, Some(cwd));
-    assert_eq!(out, v4a, "有 hunk 的 Move 不动");
+    assert_eq!(out, v4a, "Move with hunk does not move");
     assert!(reps.is_empty());
 }
 
 #[test]
 fn rename_with_eof_marker_hunk_not_treated_as_empty() {
-    // codex-connector #435 P1:rename + `*** End of File` 追加 hunk 不能被当空 rename(否则转成
-    // 丢内容的 Delete+Add)→ 识别为有 hunk → 透过不转。
+    // codex-connector #435 P1:rename + `*** End of File` append hunk cannot be empty rename (otherwise converted to
+    // Delete+Add) of lost content → Identified as a hunk → Not transferred through.
     let (dir, name) = tmp_file("eof_old.md", "a\n");
     let cwd = dir.path().to_str().unwrap();
     let v4a = format!(
         "*** Begin Patch\n*** Update File: {name}\n*** Move to: eof_new.md\n*** End of File\n+tail\n*** End Patch\n"
     );
     let (out, reps) = recover_empty_move(&v4a, Some(cwd));
-    assert_eq!(out, v4a, "含 EOF hunk 的 rename 应透过不转:\n{out}");
+    assert_eq!(
+        out, v4a,
+        "Rename containing EOF hunk should be passed through:\n {out}"
+    );
     assert!(reps.is_empty(), "{:?}", reps);
 }
 
 #[test]
 fn add_on_existing_passes_through_unchanged() {
-    // 规则 #2 已撤:Add 已存在文件**不再**转 Delete+Add(避免覆盖丢数据),原样透过让 Codex
-    // 报 already exists、模型自纠为针对性 Update。
+    // Rule #2 has been withdrawn: Add existing files are **no longer** converted to Delete+Add (to avoid overwriting and losing data), and use Codex as is
+    // Report already exists, and the model self-corrects to a targeted Update.
     let (dir, name) = tmp_file("exists.md", "important old content\n");
     let cwd = dir.path().to_str().unwrap();
     let v4a = format!("*** Begin Patch\n*** Add File: {name}\n+new content\n*** End Patch\n");
     let (out, reps) = optimize_patch(&v4a, Some(cwd), true);
     assert!(
         !out.contains("*** Delete File:"),
-        "不应再插 Delete(已撤规则#2):\n{out}"
+        "Delete should no longer be inserted (removed rule #2):\n {out}"
     );
     assert!(
         out.contains(&format!("*** Add File: {name}")),
-        "Add 原样保留"
+        "Add Leave as is"
     );
     assert!(
-        !reps.iter().any(|r| r.detail.contains("Delete File 覆盖")),
-        "不应有覆盖类修复: {:?}",
+        !reps
+            .iter()
+            .any(|r| r.detail.contains("Delete File overwrite")),
+        "There should be no coverage fixes: {:?}",
         reps
     );
 }
@@ -411,17 +435,20 @@ fn update_empty_file_to_delete_add() {
     assert!(out.contains(&format!("*** Delete File: {name}")), "{out}");
     assert!(out.contains(&format!("*** Add File: {name}")), "{out}");
     assert!(out.contains("+line1") && out.contains("+line2"));
-    assert!(!out.contains("*** Update File:"), "Update 已转换");
+    assert!(!out.contains("*** Update File:"), "Update converted");
     assert_eq!(reps[0].kind, "repaired");
 }
 
 #[test]
 fn update_whitespace_only_file_not_converted() {
-    // codex-connector #435 P2:纯空白文件(非 0 字节)不算空 → 不转 Delete+Add(否则丢空白字节)。
+    // codex-connector #435 P2: Purely blank files (non-0 bytes) are not considered empty → do not convert Delete+Add (otherwise blank bytes will be lost).
     let (dir, name) = tmp_file("ws.txt", "  \n\t\n");
     let cwd = dir.path().to_str().unwrap();
     let v4a = format!("*** Begin Patch\n*** Update File: {name}\n+line1\n*** End Patch\n");
     let (out, reps) = recover_update_empty_file(&v4a, Some(cwd));
-    assert_eq!(out, v4a, "纯空白文件 Update 不应转 Delete+Add:\n{out}");
+    assert_eq!(
+        out, v4a,
+        "Purely blank files Update should not be converted to Delete+Add:\n {out}"
+    );
     assert!(reps.is_empty());
 }

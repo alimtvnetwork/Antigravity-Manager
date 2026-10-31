@@ -41,6 +41,7 @@ pub struct CliContext {
     pub prefix: Option<String>,
     pub suffix: Option<String>,
     pub fifo: bool,
+    pub local_only: bool,
     pub positional_args: Vec<String>,
 }
 
@@ -94,6 +95,9 @@ impl CliContext {
                 }
                 "--dry-run" => {
                     ctx.dry_run = true;
+                }
+                "--local" | "--no-daemon" => {
+                    ctx.local_only = true;
                 }
                 arg if !arg.starts_with('-') => {
                     ctx.positional_args.push(arg.to_string());

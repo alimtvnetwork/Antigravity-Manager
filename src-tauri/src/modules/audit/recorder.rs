@@ -26,6 +26,22 @@ pub(crate) fn relative_frame_location(raw: &str) -> String {
     normalized
 }
 
+pub(crate) fn is_ignored_audit_frame(function_name: &str) -> bool {
+    function_name.contains("audit::recorder")
+        || function_name.contains("record_ignored")
+        || function_name.contains("std::backtrace")
+        || function_name.contains("backtrace::")
+        || function_name.contains("backtrace_rs")
+        || function_name.contains("std::panicking")
+        || function_name.contains("std::thread")
+        || function_name.contains("core::ops::function")
+        || function_name.contains("core::panic")
+        || function_name.contains("BaseThreadInitThunk")
+        || function_name.contains("RtlUserThreadStart")
+        || function_name.contains("test::__rust_begin_short_backtrace")
+        || function_name.contains("test::run_test")
+}
+
 /// Parse a `Backtrace` display into the first `limit` function + file pairs,
 /// skipping the audit recorder itself.
 pub(crate) fn caller_frames_from_backtrace(text: &str, limit: usize) -> Vec<(String, String)> {
@@ -37,11 +53,7 @@ pub(crate) fn caller_frames_from_backtrace(text: &str, limit: usize) -> Vec<(Str
             let Some(function_name) = pending_function.take() else {
                 continue;
             };
-            if function_name.contains("audit::recorder")
-                || function_name.contains("record_ignored")
-                || function_name.contains("std::backtrace")
-                || function_name.contains("backtrace::")
-            {
+            if is_ignored_audit_frame(&function_name) {
                 continue;
             }
             frames.push((function_name, relative_frame_location(location)));
@@ -55,7 +67,20 @@ pub(crate) fn caller_frames_from_backtrace(text: &str, limit: usize) -> Vec<(Str
                 .split_once(':')
                 .map(|(_, rest)| rest.trim())
                 .unwrap_or(trimmed);
+            if let Some(prev_fn) = pending_function.take() {
+                if !is_ignored_audit_frame(&prev_fn) {
+                    frames.push((prev_fn, "native".to_string()));
+                    if frames.len() == limit {
+                        break;
+                    }
+                }
+            }
             pending_function = Some(function_name.to_string());
+        }
+    }
+    if let Some(last_fn) = pending_function {
+        if !is_ignored_audit_frame(&last_fn) && frames.len() < limit {
+            frames.push((last_fn, "native".to_string()));
         }
     }
     frames
@@ -101,12 +126,14 @@ fn attach_caller_frames(params: Option<serde_json::Value>, frames: &[(String, St
         if already_has_frames {
             return value.to_string();
         }
-        let listed: Vec<serde_json::Value> = frames
-            .iter()
-            .take(PARAMS_FRAME_LIMIT)
-            .map(|(function_name, location)| frame_json(function_name, location))
-            .collect();
-        object.insert("stack_frames".to_string(), serde_json::Value::Array(listed));
+        if !frames.is_empty() {
+            let listed: Vec<serde_json::Value> = frames
+                .iter()
+                .take(PARAMS_FRAME_LIMIT)
+                .map(|(function_name, location)| frame_json(function_name, location))
+                .collect();
+            object.insert("stack_frames".to_string(), serde_json::Value::Array(listed));
+        }
     }
     value.to_string()
 }
@@ -257,20 +284,21 @@ pub fn record_interaction(input: RecordInteractionInput) -> AppResult<RecordInte
             id: None,
         });
     }
-    let result = input.result.trim().to_lowercase();
-    validate_result(&result)?;
-    let method_name = input.method_name.trim();
-    if method_name.is_empty() {
-        return Err(AppError::Unknown(
-            "ui audit record requires a non-empty method_name".to_string(),
-        ));
-    }
-    let route = input.route.trim();
-    if route.is_empty() {
-        return Err(AppError::Unknown(
-            "ui audit record requires a non-empty route".to_string(),
-        ));
-    }
+    let result_raw = input.result.trim().to_lowercase();
+    let result = if result_raw.is_empty() {
+        "ok".to_string()
+    } else {
+        validate_result(&result_raw)?;
+        result_raw
+    };
+    let method_name_raw = input.method_name.trim();
+    let method_name = if method_name_raw.is_empty() {
+        "unknown"
+    } else {
+        method_name_raw
+    };
+    let route_raw = input.route.trim();
+    let route = if route_raw.is_empty() { "/" } else { route_raw };
     let ui_target = format_ui_target(
         route,
         input.component.as_deref(),
@@ -323,6 +351,7 @@ pub fn list_recorded(limit: u32) -> AppResult<Vec<InteractionEntry>> {
 
 /// Convenience helper for CLI / backend callers: appends an entry directly to `ui_audit.db`
 /// when the recorder is active.
+#[track_caller]
 pub fn record_if_active(
     actor: &str,
     trigger: &str,
@@ -335,7 +364,16 @@ pub fn record_if_active(
     if !is_recording() {
         return;
     }
-    let caller_frames = capture_caller_frames();
+    let caller = std::panic::Location::caller();
+    let caller_file = relative_frame_location(caller.file());
+    let caller_loc = format!("{}:{}", caller_file, caller.line());
+    let mut caller_frames = capture_caller_frames();
+    if !caller_frames
+        .iter()
+        .any(|(f, l)| l.contains(&caller_file) || f.contains(method_name))
+    {
+        caller_frames.insert(0, (method_name.to_string(), caller_loc));
+    }
     let stack_trace = resolve_stack_trace(&params, &caller_frames);
     // Justification: best-effort audit recording from CLI/backend paths; must not abort primary operation.
     crate::error::record_ignored(
@@ -429,5 +467,31 @@ mod tests {
         assert!(injected.contains("\"one\""));
         assert!(injected.contains("\"two\""));
         assert!(!injected.contains("\"three\""));
+        // Empty frames must never inject an empty array into params
+        let empty_injected = attach_caller_frames(None, &[]);
+        assert!(!empty_injected.contains("\"stack_frames\""));
+    }
+
+    #[test]
+    fn caller_frames_retains_native_symbols_when_at_line_absent() {
+        let sample = "\
+   0: agm_ui::modules::auto_switcher::rotation::execute_rotation\n\
+   1: agm_ui::modules::auto_switcher::rotation::check_and_rotate\n\
+             at D:/work/antigravity-manager/src-tauri/src/modules/auto_switcher/rotation.rs:175:9\n";
+        let frames = caller_frames_from_backtrace(sample, 2);
+        assert_eq!(frames.len(), 2);
+        assert_eq!(
+            frames[0].0,
+            "agm_ui::modules::auto_switcher::rotation::execute_rotation"
+        );
+        assert_eq!(frames[0].1, "native");
+        assert_eq!(
+            frames[1].0,
+            "agm_ui::modules::auto_switcher::rotation::check_and_rotate"
+        );
+        assert_eq!(
+            frames[1].1,
+            "src-tauri/src/modules/auto_switcher/rotation.rs:175:9"
+        );
     }
 }

@@ -1,14 +1,22 @@
 import type { InstanceActionType } from '../../components/instances/InstanceTable';
-import type { AgmProjectTreeNode } from '../../components/instances/PromptTreeViewModal';
+import type { AgmConversationNode, AgmProjectTreeNode } from '../../components/instances/PromptTreeView/types';
+import { isGhostConversation } from '../../components/instances/PromptTreeView/conversationGuards';
 
 export { type InstanceActionType };
 
 export function truncatePath(fullPath?: string | null): string {
-    if (!fullPath) return '';
+    if (!fullPath) {
+        return '';
+    }
+    const hasContent = fullPath.length > 0;
+    if (!hasContent) {
+        return '';
+    }
     const isWindows = fullPath.includes('\\') || /^[a-zA-Z]:/.test(fullPath);
     const sep = isWindows ? '\\' : '/';
     const parts = fullPath.split(/[\\/]/).filter(Boolean);
-    if (parts.length === 0) return fullPath;
+    const hasParts = parts.length > 0;
+    if (!hasParts) return fullPath;
     return `...${sep}${parts[parts.length - 1]}`;
 }
 
@@ -35,38 +43,108 @@ export function getActionLabel(action: InstanceActionType): string {
     }
 }
 
+export const DEFAULT_INSTANCE_ID = 'default';
+export const DEFAULT_INSTANCE_ALIAS = '__default__';
+
 export function isDefaultOwned(nodeInstId: string | undefined | null, cfgId: string): boolean {
-    if (!nodeInstId || nodeInstId.trim() === '') {
+    const hasNodeInstId = Boolean(nodeInstId && nodeInstId.trim().length > 0);
+    if (!hasNodeInstId) {
         return false;
     }
-    const isDefaultAlias = nodeInstId === 'default' || nodeInstId === '__default__';
-    const isIdMatch = Boolean(cfgId) && nodeInstId === cfgId;
-    return isDefaultAlias || isIdMatch;
+    const isIdMatch = Boolean(cfgId && nodeInstId === cfgId);
+    if (isIdMatch) {
+        return true;
+    }
+    const isDefaultAlias = nodeInstId === DEFAULT_INSTANCE_ID || nodeInstId === DEFAULT_INSTANCE_ALIAS;
+    return isDefaultAlias;
 }
 
 export const isNodeOwnedByInstance = (
     node: AgmProjectTreeNode,
     instConfig: { id: string; is_default?: boolean; seq_num?: number }
 ): boolean => {
-    if (!node.instance_id || node.instance_id.trim() === '') {
+    const hasNodeInstId = Boolean(node.instance_id && node.instance_id.trim().length > 0);
+    if (!hasNodeInstId) {
         return false;
     }
-    const isDefaultInstance = instConfig.is_default || instConfig.id === 'default';
+    const isExactIdMatch = node.instance_id === instConfig.id;
+    if (isExactIdMatch) {
+        return true;
+    }
+    const isDefaultId = instConfig.id === DEFAULT_INSTANCE_ID || instConfig.id === DEFAULT_INSTANCE_ALIAS;
+    const isDefaultInstance = Boolean(instConfig.is_default) || isDefaultId;
     if (isDefaultInstance) {
         return isDefaultOwned(node.instance_id, instConfig.id);
     }
-    if (node.instance_id === 'default' || node.instance_id === '__default__') {
+    const isNodeDefaultAlias = node.instance_id === DEFAULT_INSTANCE_ID || node.instance_id === DEFAULT_INSTANCE_ALIAS;
+    if (isNodeDefaultAlias) {
         return false;
     }
-    if (node.instance_id === instConfig.id) {
-        return true;
-    }
-    const hasSeqNum = typeof instConfig.seq_num === 'number' && instConfig.seq_num > 1;
-    if (hasSeqNum && node.instance_seq_num === instConfig.seq_num) {
+    const isValidSeqNum = typeof instConfig.seq_num === 'number' && instConfig.seq_num > 1;
+    const hasMatchingSeqNum = isValidSeqNum && node.instance_seq_num === instConfig.seq_num;
+    if (hasMatchingSeqNum) {
         return true;
     }
     return false;
 };
+
+export function isConversationOwnedByInstance(
+    convInstId: string | undefined | null,
+    instConfig: { id: string; is_default?: boolean; seq_num?: number },
+    convInstSeqNum?: number
+): boolean {
+    const hasConvInstId = Boolean(convInstId && convInstId.trim().length > 0);
+    if (!hasConvInstId) {
+        return false;
+    }
+    const isExactIdMatch = convInstId === instConfig.id;
+    if (isExactIdMatch) {
+        return true;
+    }
+    const isValidSeqNum = typeof instConfig.seq_num === 'number' && instConfig.seq_num > 1;
+    const hasMatchingSeqNum = isValidSeqNum && convInstSeqNum === instConfig.seq_num;
+    if (hasMatchingSeqNum) {
+        return true;
+    }
+    const isDefaultId = instConfig.id === DEFAULT_INSTANCE_ID || instConfig.id === DEFAULT_INSTANCE_ALIAS;
+    const isDefaultInst = Boolean(instConfig.is_default) || isDefaultId;
+    if (isDefaultInst) {
+        return isDefaultOwned(convInstId, instConfig.id);
+    }
+    const isConvDefaultAlias = convInstId === DEFAULT_INSTANCE_ID || convInstId === DEFAULT_INSTANCE_ALIAS;
+    if (isConvDefaultAlias) {
+        return false;
+    }
+    return false;
+}
+
+export function isConversationGenuinelyRunning(
+    conv: AgmConversationNode,
+    instConfig: { id: string; is_default?: boolean; seq_num?: number },
+    fallbackSeqNum?: number
+): boolean {
+    const isConvRunning = Boolean(conv.is_running);
+    if (!isConvRunning) {
+        return false;
+    }
+    const seqNum = conv.instance_seq_num ?? fallbackSeqNum;
+    const isOwned = isConversationOwnedByInstance(conv.instance_id, instConfig, seqNum);
+    if (!isOwned) {
+        return false;
+    }
+    const isGhost = isGhostConversation(conv);
+    if (isGhost) {
+        return false;
+    }
+    const hasWordCount = conv.prompt_word_count > 0;
+    const previewText = conv.prompt_preview_200w?.trim() ?? '';
+    const hasPreviewContent = previewText.length > 0;
+    const hasPromptContent = hasWordCount || hasPreviewContent;
+    if (!hasPromptContent) {
+        return false;
+    }
+    return true;
+}
 
 export interface InstanceTheme {
     name: string;

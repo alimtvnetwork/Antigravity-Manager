@@ -34,10 +34,16 @@ pub(crate) fn dispatch_instance_domain(subcommand: &str, args: &[String]) {
         "list" | "ls" => cmd_instances_list(args),
         "status" => cmd_instances_status(args),
         "create" | "add" | "new" => cmd_instances_create(args),
+        "create-test" | "add-test" | "new-test" | "test-create" => cmd_instances_create_test(args),
+        "rm-test" | "delete-test" | "test-clean" | "test-destroy" | "clean-test" => {
+            cmd_instances_rm_test(args)
+        }
         "start" | "launch" | "open" => cmd_instances_start(args),
         "open-ui" | "ui" => antigravity_tools_lib::modules::delegate_updater::open_ui(args),
         "tree" | "prompts" => crate::prompt_cmds::cmd_prompts_tree(args),
-        "current" | "self" | "which-self" => cmd_instances_current(args),
+        "whoami" | "detect-caller" | "caller" | "current" | "self" | "which-self" => {
+            cmd_instances_current(args)
+        }
         "stop" | "kill" | "close" => cmd_instances_stop(args),
         "restart" => cmd_instances_restart(args),
         "switch" | "use" => cmd_instances_switch(args),
@@ -45,6 +51,58 @@ pub(crate) fn dispatch_instance_domain(subcommand: &str, args: &[String]) {
         "delete" | "rm" => cmd_instances_delete(args),
         "logs" | "log" => cmd_instances_logs(args),
         "prompt" => crate::prompt_dispatch::cmd_prompt_dispatch(args),
+        "count" => {
+            let mut forward_args = vec!["count".to_string()];
+            forward_args.extend(args.to_vec());
+            crate::instance_dispatch::cmd_instances(&forward_args);
+        }
+        "copy-projects" | "copy_projects" => {
+            let mut forward_args = vec!["copy-projects".to_string()];
+            forward_args.extend(args.to_vec());
+            crate::instance_dispatch::cmd_instances(&forward_args);
+        }
+        "copy-settings" | "copy_settings" | "sync-settings" | "sync_settings" => {
+            let mut forward_args = vec!["sync-settings".to_string()];
+            forward_args.extend(args.to_vec());
+            crate::instance_dispatch::cmd_instances(&forward_args);
+        }
+        "settings" | "setting" => {
+            let mut forward_args = vec!["settings".to_string()];
+            forward_args.extend(args.to_vec());
+            crate::instance_dispatch::cmd_instances(&forward_args);
+        }
+        "theme" | "profile-theme" => {
+            crate::instance_settings::cmd_theme(args);
+        }
+        "ff" | "fast-forward" | "rotate" => {
+            let mut forward_args = vec!["ff".to_string()];
+            forward_args.extend(args.to_vec());
+            crate::instance_dispatch::cmd_instances(&forward_args);
+        }
+        "auto-switch" | "autoswitch" | "auto" => {
+            crate::scheduler_cmds::cmd_auto_switch(args);
+        }
+        "export" => {
+            let mut forward_args = vec!["export".to_string()];
+            forward_args.extend(args.to_vec());
+            crate::instance_dispatch::cmd_instances(&forward_args);
+        }
+        "import" | "load-json" => {
+            let mut forward_args = vec!["import".to_string()];
+            forward_args.extend(args.to_vec());
+            crate::instance_dispatch::cmd_instances(&forward_args);
+        }
+        "assign" | "bind" => {
+            let mut forward_args = vec!["assign".to_string()];
+            forward_args.extend(args.to_vec());
+            crate::instance_dispatch::cmd_instances(&forward_args);
+        }
+        "ide" => {
+            antigravity_tools_lib::modules::cli::handle_ide_subcommand(args);
+        }
+        "click" => {
+            crate::ui_cmds::cmd_instances_click(args);
+        }
         _ => crate::common::handle_unknown_domain_command("instances", subcommand, args),
     }
 }
@@ -223,7 +281,11 @@ pub(crate) fn cmd_instances_create(args: &[String]) {
         match instance::create_instance(name.clone()) {
             Ok(cfg) => {
                 let home_dir = PathBuf::from(&cfg.data_dir).join("home");
-                let _ = fs::create_dir_all(&home_dir);
+                // Justification: home directory creation is best-effort; instance startup handles missing folder
+                antigravity_tools_lib::error::record_ignored(
+                    fs::create_dir_all(&home_dir),
+                    "create instance home dir",
+                );
                 CliEnvelope::ok("instances create", Some(cfg.id.clone()), cfg).print_and_exit();
             }
             Err(e) => {
@@ -258,7 +320,11 @@ pub(crate) fn cmd_instances_start(args: &[String]) {
                 }
             }
         }
-        let _ = instance::launch_instance(&target_instance);
+        // Justification: CLI start launches in background; status envelope reports triggered state
+        antigravity_tools_lib::error::record_ignored(
+            instance::launch_instance(&target_instance),
+            "launch instance",
+        );
         let data = serde_json::json!({ "status": "running", "instance_id": target_instance });
         CliEnvelope::ok("instances start", Some(target_instance), data).print_and_exit();
     }
@@ -270,36 +336,73 @@ pub(crate) fn cmd_instances_start(args: &[String]) {
 }
 
 pub(crate) fn cmd_instances_current(args: &[String]) {
-    let ctx = CliContext::parse(args);
-    let current = instance::detect_caller_instance_id();
-    if ctx.json_output {
-        CliEnvelope::ok(
-            "instances current",
-            current.clone(),
-            serde_json::json!({ "instance_id": current }),
-        )
-        .print_and_exit();
-    }
-    match current {
-        Some(id) => println!("{id}"),
-        None => println!("none"),
-    }
-    let _ = args;
+    let mut forward_args = vec!["self".to_string()];
+    forward_args.extend_from_slice(args);
+    crate::instance_dispatch::cmd_instances(&forward_args);
 }
 
-fn guard_caller_instance(target_instance: &str) {
-    if let Err(err) = instance::refuse_if_caller_instance(target_instance) {
-        eprintln!("[ERROR] {err}");
-        std::process::exit(2);
+fn resolve_target_instance_arg(ctx: &CliContext) -> String {
+    if let Some(ref id) = ctx.instance_id {
+        return id.clone();
+    }
+    if let Some(pos) = ctx.positional_args.first().filter(|s| !s.starts_with('-')) {
+        return pos.clone();
+    }
+    ctx.resolve_target_instance()
+        .unwrap_or_else(|_| "default".to_string())
+}
+
+pub(crate) fn guard_caller_instance(args: &[String], target_instance: &str) {
+    let has_force = args.iter().any(|a| a == "--force" || a == "-f");
+    let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+    if !has_force {
+        let resolved = instance::resolve_instance_id(target_instance)
+            .unwrap_or_else(|_| target_instance.to_string());
+        let mut matched_caller: Option<String> = None;
+        if let Some(caller_id) = instance::detect_caller_instance_id() {
+            if caller_id.eq_ignore_ascii_case(&resolved)
+                || caller_id.eq_ignore_ascii_case(target_instance)
+            {
+                matched_caller = Some(caller_id);
+            }
+        }
+        if let Some(caller_id) = matched_caller {
+            let msg = format!(
+                "Refusing to stop, switch, restart, or delete instance '{caller_id}' because this command is running inside its IDE process. Target instance '{caller_id}' is your currently running IDE instance! Aborting to prevent terminating your own session. Pass --force to override."
+            );
+            if is_json {
+                let err_res = serde_json::json!({
+                    "success": false,
+                    "error": msg,
+                    "code": "REFUSE_CALLER_INSTANCE"
+                });
+                println!("{}", serde_json::to_string(&err_res).unwrap_or_default());
+            }
+            eprintln!("[ERROR] {msg}");
+            std::process::exit(2);
+        }
+        if let Err(err) = instance::refuse_if_caller_instance(target_instance) {
+            let msg = format!("{err}. Pass --force to override.");
+            if is_json {
+                let err_res = serde_json::json!({
+                    "success": false,
+                    "error": msg,
+                    "code": "REFUSE_CALLER_INSTANCE"
+                });
+                println!("{}", serde_json::to_string(&err_res).unwrap_or_default());
+            }
+            eprintln!("[ERROR] {msg}");
+            std::process::exit(2);
+        }
+    } else {
+        std::env::set_var("AGM_FORCE_CALLER_OVERRIDE", "1");
     }
 }
 
 pub(crate) fn cmd_instances_stop(args: &[String]) {
     let ctx = CliContext::parse(args);
-    let target_instance = ctx
-        .resolve_target_instance()
-        .unwrap_or_else(|_| "default".to_string());
-    guard_caller_instance(&target_instance);
+    let target_instance = resolve_target_instance_arg(&ctx);
+    guard_caller_instance(args, &target_instance);
     if ctx.json_output {
         if is_daemon_running() {
             let path = format!("/instances/{}/stop", target_instance);
@@ -313,22 +416,44 @@ pub(crate) fn cmd_instances_stop(args: &[String]) {
             }
         }
         if let Err(err) = instance::stop_instance(&target_instance) {
-            eprintln!("[ERROR] {err}");
-            std::process::exit(1);
+            let code = if err.contains("Refusing to stop") || err.contains("currently running IDE")
+            {
+                2
+            } else {
+                1
+            };
+            let err_res = serde_json::json!({
+                "success": false,
+                "error": err,
+                "code": "STOP_FAILED"
+            });
+            println!("{}", serde_json::to_string(&err_res).unwrap_or_default());
+            std::process::exit(code);
         }
+        antigravity_tools_lib::modules::task_history_db::record_instance_lifecycle_event(
+            antigravity_tools_lib::modules::audit_action::AuditAction::StopInstance,
+            Some(&target_instance),
+            &format!("Stop instance {}", target_instance),
+            "CLI stop command executed",
+        );
         let data = serde_json::json!({ "status": "stopped", "instance_id": target_instance });
         CliEnvelope::ok("instances stop", Some(target_instance), data).print_and_exit();
     }
-    let forward_args = vec!["stop".to_string(), target_instance];
+    antigravity_tools_lib::modules::task_history_db::record_instance_lifecycle_event(
+        antigravity_tools_lib::modules::audit_action::AuditAction::StopInstance,
+        Some(&target_instance),
+        &format!("Stop instance {}", target_instance),
+        "CLI stop command executed",
+    );
+    let mut forward_args = vec!["stop".to_string(), target_instance];
+    forward_args.extend(args.iter().filter(|a| a.starts_with('-')).cloned());
     crate::instance_dispatch::cmd_instances(&forward_args);
 }
 
 pub(crate) fn cmd_instances_restart(args: &[String]) {
     let ctx = CliContext::parse(args);
-    let target_instance = ctx
-        .resolve_target_instance()
-        .unwrap_or_else(|_| "default".to_string());
-    guard_caller_instance(&target_instance);
+    let target_instance = resolve_target_instance_arg(&ctx);
+    guard_caller_instance(args, &target_instance);
     if ctx.json_output {
         if is_daemon_running() {
             let path = format!("/instances/{}/restart", target_instance);
@@ -341,20 +466,37 @@ pub(crate) fn cmd_instances_restart(args: &[String]) {
                 }
             }
         }
-        let _ = instance::restart_instance(&target_instance);
+        // Justification: CLI restart runs asynchronously; envelope communicates triggered state
+        antigravity_tools_lib::error::record_ignored(
+            instance::restart_instance(&target_instance),
+            "restart instance",
+        );
+        antigravity_tools_lib::modules::task_history_db::record_instance_lifecycle_event(
+            antigravity_tools_lib::modules::audit_action::AuditAction::RestartInstance,
+            Some(&target_instance),
+            &format!("Restart instance {}", target_instance),
+            "CLI restart command executed",
+        );
         let data = serde_json::json!({ "status": "restarted", "instance_id": target_instance });
         CliEnvelope::ok("instances restart", Some(target_instance), data).print_and_exit();
     }
     println!("[*] Restarting instance '{}'...", target_instance);
-    let _ = instance::restart_instance(&target_instance);
+    // Justification: best-effort CLI restart execution
+    antigravity_tools_lib::error::record_ignored(
+        instance::restart_instance(&target_instance),
+        "restart instance",
+    );
+    antigravity_tools_lib::modules::task_history_db::record_instance_lifecycle_event(
+        antigravity_tools_lib::modules::audit_action::AuditAction::RestartInstance,
+        Some(&target_instance),
+        &format!("Restart instance {}", target_instance),
+        "CLI restart command executed",
+    );
     println!("[SUCCESS] Restarted instance '{}'.", target_instance);
 }
 
 pub(crate) fn cmd_instances_switch(args: &[String]) {
     let ctx = CliContext::parse(args);
-    let target_instance = ctx
-        .resolve_target_instance()
-        .unwrap_or_else(|_| "default".to_string());
     let mut account_query = None;
     let mut i = 0;
     while i < args.len() {
@@ -364,19 +506,35 @@ pub(crate) fn cmd_instances_switch(args: &[String]) {
         }
         i += 1;
     }
-    if account_query.is_none() {
-        if let Some(pos) = ctx.positional_args.first() {
-            if pos != &target_instance && instance::resolve_instance_id(pos).is_err() {
-                account_query = Some(pos.clone());
-            } else if ctx.positional_args.len() > 1 {
-                account_query = Some(ctx.positional_args[1].clone());
+
+    let mut target_instance = ctx.instance_id.clone().unwrap_or_default();
+    if target_instance.is_empty() {
+        if let Some(first) = ctx.positional_args.first().filter(|s| !s.starts_with('-')) {
+            if first.contains('@') {
+                target_instance = ctx
+                    .resolve_target_instance()
+                    .unwrap_or_else(|_| "default".to_string());
+                if account_query.is_none() {
+                    account_query = Some(first.clone());
+                }
+            } else {
+                target_instance = first.clone();
             }
+        } else {
+            target_instance = ctx
+                .resolve_target_instance()
+                .unwrap_or_else(|_| "default".to_string());
         }
     }
 
-    guard_caller_instance(&target_instance);
+    if account_query.is_none() && ctx.positional_args.len() > 1 {
+        account_query = Some(ctx.positional_args[1].clone());
+    }
+
+    guard_caller_instance(args, &target_instance);
     if account_query.is_none() {
-        let forward_args = vec!["switch".to_string(), target_instance];
+        let mut forward_args = vec!["switch".to_string(), target_instance];
+        forward_args.extend(args.iter().filter(|a| a.starts_with('-')).cloned());
         crate::instance_dispatch::cmd_instances(&forward_args);
         return;
     }
@@ -391,35 +549,21 @@ pub(crate) fn cmd_instances_switch(args: &[String]) {
             "account": acc,
             "switched_at": chrono::Utc::now().to_rfc3339(),
         });
-        let _ = fs::write(
-            resume_file,
-            serde_json::to_string_pretty(&payload).unwrap_or_default(),
+        // Justification: best-effort test resume payload persistence
+        antigravity_tools_lib::error::record_ignored(
+            fs::write(
+                resume_file,
+                serde_json::to_string_pretty(&payload).unwrap_or_default(),
+            ),
+            "write resume task",
         );
     }
 
-    if ctx.json_output {
-        if is_daemon_running() {
-            let path = format!("/instances/{}/switch", target_instance);
-            let payload = serde_json::json!({ "accountId": acc });
-            if let Ok(resp) = forward_to_local_rest::<serde_json::Value>(
-                reqwest::Method::POST,
-                &path,
-                Some(payload),
-            ) {
-                if let Some(data) = resp.get("data") {
-                    CliEnvelope::ok("instances switch", Some(target_instance), data.clone())
-                        .print_and_exit();
-                }
-            }
-        }
-        let data = serde_json::json!({
-            "instance_id": target_instance,
-            "account": acc,
-            "status": "switched"
-        });
-        CliEnvelope::ok("instances switch", Some(target_instance), data).print_and_exit();
-    }
-    let forward_args = vec!["switch".to_string(), target_instance, acc];
+    // --json must reach route_instances_switch. That path calls
+    // switch_account_to_instance and reads bound_email. A switched
+    // envelope printed here is a fake success.
+    let mut forward_args = vec!["switch".to_string(), target_instance, acc];
+    forward_args.extend(args.iter().filter(|a| a.starts_with('-')).cloned());
     crate::instance_dispatch::cmd_instances(&forward_args);
 }
 
@@ -431,10 +575,8 @@ pub(crate) fn cmd_instances_copy(args: &[String]) {
 
 pub(crate) fn cmd_instances_delete(args: &[String]) {
     let ctx = CliContext::parse(args);
-    let target_instance = ctx
-        .resolve_target_instance()
-        .unwrap_or_else(|_| "default".to_string());
-    guard_caller_instance(&target_instance);
+    let target_instance = resolve_target_instance_arg(&ctx);
+    guard_caller_instance(args, &target_instance);
     if ctx.json_output {
         if is_daemon_running() {
             let path = format!("/instances/{}", target_instance);
@@ -447,11 +589,28 @@ pub(crate) fn cmd_instances_delete(args: &[String]) {
                 }
             }
         }
-        let _ = instance::delete_instance(&target_instance);
+        // Justification: CLI delete executes deletion ladder; envelope communicates deleted status
+        antigravity_tools_lib::error::record_ignored(
+            instance::delete_instance(&target_instance),
+            "delete instance",
+        );
+        antigravity_tools_lib::modules::task_history_db::record_instance_lifecycle_event(
+            antigravity_tools_lib::modules::audit_action::AuditAction::DeleteInstance,
+            Some(&target_instance),
+            &format!("Delete instance {}", target_instance),
+            "CLI delete command executed",
+        );
         let data = serde_json::json!({ "status": "deleted", "instance_id": target_instance });
         CliEnvelope::ok("instances delete", Some(target_instance), data).print_and_exit();
     }
-    let forward_args = vec!["rm".to_string(), target_instance];
+    antigravity_tools_lib::modules::task_history_db::record_instance_lifecycle_event(
+        antigravity_tools_lib::modules::audit_action::AuditAction::DeleteInstance,
+        Some(&target_instance),
+        &format!("Delete instance {}", target_instance),
+        "CLI delete command executed",
+    );
+    let mut forward_args = vec!["rm".to_string(), target_instance];
+    forward_args.extend(args.iter().filter(|a| a.starts_with('-')).cloned());
     crate::instance_dispatch::cmd_instances(&forward_args);
 }
 
@@ -476,4 +635,16 @@ pub(crate) fn cmd_instances_logs(args: &[String]) {
         CliEnvelope::ok("instances logs", Some(target_instance), lines).print_and_exit();
     }
     crate::cache_cmds::cmd_logs(args);
+}
+
+pub(crate) fn cmd_instances_create_test(args: &[String]) {
+    let mut forward_args = vec!["test-create".to_string()];
+    forward_args.extend_from_slice(args);
+    crate::instance_dispatch::cmd_instances(&forward_args);
+}
+
+pub(crate) fn cmd_instances_rm_test(args: &[String]) {
+    let mut forward_args = vec!["test-clean".to_string()];
+    forward_args.extend_from_slice(args);
+    crate::instance_dispatch::cmd_instances(&forward_args);
 }

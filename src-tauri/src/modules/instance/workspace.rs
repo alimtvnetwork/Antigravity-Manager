@@ -80,14 +80,29 @@ pub fn get_instance_workspace_folders(instance_id: &str, data_dir: &str) -> Vec<
 
 /// Resolve workspace roots for an instance by its ID
 pub fn get_instance_workspace_paths(instance_id: &str) -> Vec<String> {
-    let registry = load_registry().unwrap_or_default();
+    let registry = match load_registry() {
+        Ok(reg) => reg,
+        Err(e) => {
+            tracing::warn!("instance workspace registry unavailable: {e}");
+            Default::default()
+        }
+    };
+    let inst_norm = if instance_id.is_empty() || instance_id == "__default__" {
+        "default"
+    } else {
+        instance_id
+    };
     let data_dir = registry
         .instances
         .iter()
-        .find(|i| i.id == instance_id)
+        .find(|i| {
+            i.id == instance_id
+                || i.id == inst_norm
+                || (inst_norm == "default" && (i.id == "default" || i.id == "__default__"))
+        })
         .map(|i| i.data_dir.as_str())
         .unwrap_or("");
-    get_instance_workspace_folders(instance_id, data_dir)
+    get_instance_workspace_folders(inst_norm, data_dir)
 }
 
 /// Restore and re-inject prompts for a freshly restarted instance
@@ -138,31 +153,104 @@ pub(crate) fn push_backed_up_prompts_after_channel(instance_id: &str) -> usize {
         "[INSTANCE_SWITCH:STAGE_5_RESTORE] Post-launch delay elapsed for instance '{instance_id}'"
     ));
     crate::modules::instance::wait_for_instance_prompt_channel(instance_id);
+    // RC-1: re-run the incomplete-prompt sweep for the target instance so
+    // prompts that never completed before the switch (any age) are in
+    // 'backed_up' before the restore + dispatch below reads them.
+    if let Err(err) =
+        crate::modules::repo_db::backup::sweep_incomplete_prompts_for_instance(instance_id)
+    {
+        crate::modules::logger::log_error(&format!(
+            "[INSTANCE_SWITCH:STAGE_5_RESTORE] Incomplete-prompt sweep failed for '{instance_id}': {err}"
+        ));
+    }
     let before = crate::modules::repo_db::count_backed_up_prompts(instance_id);
-    // Rehydrate the snapshot first. A failed agy push leaves the row backed_up.
-    // Justification: backup rows are the snapshot; a failed read leaves the active_prompts row for dispatch
-    crate::error::record_ignored(
-        crate::modules::backup_prompts_db::restore_running_prompts_for_instance(
-            Some(instance_id),
-            false,
-            None,
-        ),
-        "restore running prompts from backup after relaunch",
-    );
-    let dispatched = match crate::modules::repo_db::dispatch_running_prompts(instance_id) {
-        Ok(count) => count,
+    // Sweep and reattribute any orphaned backups before restoring
+    if let Ok(conn) = crate::modules::backup_prompts_db::connect_backup_db(None) {
+        // Justification: sweep orphaned prompt backups to target instance on channel ready; failure logged
+        crate::error::record_ignored(
+            crate::modules::backup_prompts_db::sweep_and_reattribute_orphaned_backups(
+                &conn,
+                instance_id,
+            )
+            .map_err(|e| e.to_string()),
+            "sweep_and_reattribute_orphaned_backups in push_backed_up_prompts_after_channel",
+        );
+    }
+    // Rehydrate the snapshot first with scoped-restore fallback: if target instance
+    // finds 0 records, it falls back to unrestored records under other instances.
+    // The outcome counts are real (RC-3): a failed restore or dispatch is
+    // logged with its counts here, never presented as success.
+    let backup_dispatched = match crate::modules::backup_prompts_db::restore_running_prompts_scoped_with_fallback_with_outcome(
+        instance_id,
+        false,
+        None,
+    ) {
+        Ok((_records, outcome)) => {
+            crate::modules::logger::log_info(&format!(
+                "[INSTANCE_SWITCH:STAGE_5_RESTORE] Restore outcome for '{instance_id}': {} restored, {} dispatched, {} failed, {} skipped-live{}",
+                outcome.restored_count,
+                outcome.dispatched_count,
+                outcome.failed_count,
+                outcome.skipped_live,
+                outcome
+                    .last_error
+                    .as_deref()
+                    .map(|e| format!(" (last error: {e})"))
+                    .unwrap_or_default()
+            ));
+            outcome.dispatched_count
+        }
         Err(err) => {
             crate::modules::logger::log_error(&format!(
-                "[INSTANCE_SWITCH:STAGE_5_RESTORE] Dispatch failed for '{instance_id}': {err}"
+                "[INSTANCE_SWITCH:STAGE_5_RESTORE] Backup restore failed for '{instance_id}': {err}"
             ));
             0
         }
     };
+    // Single-prompt resume (user decision, 2026-10-24): after a switch or
+    // fast-forward, only the most recently active backed-up prompt is
+    // re-dispatched; every other backed-up prompt stays backed up.
+    // has_auto_resume=false suppresses the dispatch entirely — the restore
+    // bookkeeping above still runs so backups stay consistent.
+    let auto_resume_enabled = match crate::modules::config::load_app_config() {
+        Ok(cfg) => cfg.auto_profile_switcher.has_auto_resume,
+        Err(err) => {
+            crate::modules::logger::log_warn(&format!(
+                "[INSTANCE_SWITCH:STAGE_5_RESTORE] Could not load app config ({err}); assuming auto-resume enabled"
+            ));
+            true
+        }
+    };
+    let dispatched = if auto_resume_enabled {
+        match crate::modules::repo_db::dispatch_single_latest_prompt(instance_id) {
+            Ok(count) => count,
+            Err(err) => {
+                crate::modules::logger::log_error(&format!(
+                    "[INSTANCE_SWITCH:STAGE_5_RESTORE] Single-prompt dispatch failed for '{instance_id}': {err}"
+                ));
+                0
+            }
+        }
+    } else {
+        crate::modules::logger::log_info(&format!(
+            "[INSTANCE_SWITCH:STAGE_5_RESTORE] Auto-resume disabled (has_auto_resume=false) for '{instance_id}'; leaving backed-up prompt(s) undispatched"
+        ));
+        0
+    };
     let after = crate::modules::repo_db::count_backed_up_prompts(instance_id);
-    let pushed = dispatched.max(before.saturating_sub(after));
+    let pushed = dispatched.max(backup_dispatched);
     crate::modules::logger::log_info(&format!(
         "[INSTANCE_SWITCH:STAGE_5_RESTORE] Re-pushed {pushed} prompt(s) for instance '{instance_id}' ({before} backed up before, {after} still backed up)"
     ));
+    crate::modules::scheduler::notify_prompt_queue();
+    let inst_clone = instance_id.to_string();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::error::record_ignored(
+            crate::modules::repo_db::check_and_dispatch_enqueued_prompts(Some(&inst_clone)),
+            "post-switch restore immediate queue dispatch probe",
+        );
+        // Justification: Best-effort immediate dispatch probe; background scheduler will retry if probe fails.
+    });
     pushed
 }
 

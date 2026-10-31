@@ -1,40 +1,40 @@
 use super::*;
 
-/// 实验性功能配置 (Feature Flags)
+/// Experimental feature configuration (Feature Flags)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExperimentalConfig {
-    /// 启用双层签名缓存 (Signature Cache)
+    /// Enable double-layer signature cache (Signature Cache)
     #[serde(default = "default_true")]
     pub enable_signature_cache: bool,
 
-    /// 启用工具循环自动恢复 (Tool Loop Recovery)
+    /// Enable automatic tool loop recovery (Tool Loop Recovery)
     #[serde(default = "default_true")]
     pub enable_tool_loop_recovery: bool,
 
-    /// 启用跨模型兼容性检查 (Cross-Model Checks)
+    /// Enable cross-model compatibility checks (Cross-Model Checks)
     #[serde(default = "default_true")]
     pub enable_cross_model_checks: bool,
 
-    /// 启用上下文用量缩放 (Context Usage Scaling)
-    /// 激进模式: 缩放用量并激活自动压缩以突破 200k 限制
-    /// 默认关闭以保持透明度,让客户端能触发原生压缩指令
+    /// Enable Context Usage Scaling
+    /// Aggressive mode: Scale usage and activate automatic compression to exceed the 200k limit
+    /// Turned off by default to maintain transparency and allow clients to trigger native compression commands
     #[serde(default = "default_false")]
     pub enable_usage_scaling: bool,
 
-    /// 压缩级别 (Compression Level)
+    /// Compression Level
     /// disabled, low, medium, high
     #[serde(default = "default_compression_level")]
     pub compression_level: String,
 
-    /// 上下文压缩阈值 L1 (Tool Trimming)
+    /// Context compression threshold L1 (Tool Trimming)
     #[serde(default = "default_threshold_l1")]
     pub context_compression_threshold_l1: f32,
 
-    /// 上下文压缩阈值 L2 (Thinking Compression)
+    /// Context compression threshold L2 (Thinking Compression)
     #[serde(default = "default_threshold_l2")]
     pub context_compression_threshold_l2: f32,
 
-    /// 上下文压缩阈值 L3 (Fork + Summary)
+    /// Context compression threshold L3 (Fork + Summary)
     #[serde(default = "default_threshold_l3")]
     pub context_compression_threshold_l3: f32,
 
@@ -323,14 +323,14 @@ impl Default for DebugLoggingConfig {
     }
 }
 
-/// IP 黑名单配置
+/// IP blacklist configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IpBlacklistConfig {
-    /// 是否启用黑名单
+    /// Whether to enable blacklist
     #[serde(default)]
     pub enabled: bool,
 
-    /// 自定义封禁消息
+    /// Custom ban message
     #[serde(default = "default_block_message")]
     pub block_message: String,
 }
@@ -348,14 +348,14 @@ pub(crate) fn default_block_message() -> String {
     "Access denied".to_string()
 }
 
-/// IP 白名单配置
+/// IP whitelist configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IpWhitelistConfig {
-    /// 是否启用白名单模式 (启用后只允许白名单IP访问)
+    /// Whether to enable whitelist mode (only whitelist IP access is allowed after enabling)
     #[serde(default)]
     pub enabled: bool,
 
-    /// 白名单优先模式 (白名单IP跳过黑名单检查)
+    /// Whitelist priority mode (whitelist IP skips blacklist check)
     #[serde(default = "default_true")]
     pub whitelist_priority: bool,
 }
@@ -369,14 +369,14 @@ impl Default for IpWhitelistConfig {
     }
 }
 
-/// 安全监控配置
+/// Security monitoring configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecurityMonitorConfig {
-    /// IP 黑名单配置
+    /// IP blacklist configuration
     #[serde(default)]
     pub blacklist: IpBlacklistConfig,
 
-    /// IP 白名单配置
+    /// IP whitelist configuration
     #[serde(default)]
     pub whitelist: IpWhitelistConfig,
 }
@@ -390,7 +390,7 @@ impl Default for SecurityMonitorConfig {
     }
 }
 
-/// 图片任务调度配置
+/// Image task scheduling configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImageSchedulerConfig {
     #[serde(default = "default_image_per_account_concurrency")]

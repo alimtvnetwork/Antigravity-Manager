@@ -1,21 +1,21 @@
 // Hunk repair (split from apply_patch_preflight.rs).
 use super::cwd::anchor_probe;
 use super::read::read_patch_file;
-// apply_patch **pre-flight 自动修复**:在把 V4A patch 发给 Codex apply 之前,读目标文件比对,
-// 自动对齐**安全**的上下文失配(尾随空格 / 首尾空白差异),消灭 V4A 头号失败
+// apply_patch **pre-flight automatic repair**: Before sending the V4A patch to Codex apply, read the target file for comparison.
+// Automatically align **safe** context mismatch (trailing spaces / leading and trailing whitespace differences), eliminating the number one failure of V4A
 // `apply_patch verification failed: Failed to find expected lines`。
 //
-// ## 为什么需要
-// 弱一点的 chat 模型(非 OpenAI)在大文件上常无法逐字节复刻 `Update File` 的 context/删除行
-// (尾随空格、缩进、记忆偏差)→ Codex 找不到锚点 → apply 失败 → 模型整文件重写,浪费时间和 token。
-// 实测真机报错(rollout 地面真相)正是这类。
+// ## Why is it needed?
+// Weaker chat models (non-OpenAI) are often unable to reproduce the context/delete lines of `Update File` byte-by-byte on large files.
+// (Trailing spaces, indentation, memory deviation) → Codex cannot find the anchor point → apply fails → the entire model file is rewritten, wasting time and tokens.
+// The error reported by the actual machine (rollout ground truth) is exactly this type.
 //
-// ## 安全边界(绝不损坏文件 —— 对齐用户「不做破坏性降级」硬规则)
-// - **只动锚点**:`Update File` 里的 context(空格前缀)/ 删除(`-`)行。`+新增` 行**绝不改动**。
-// - **只在唯一匹配时修**:锚点块在文件里按「忽略尾随空格 / 首尾空白」找候选,**恰好一个**位置才对齐;
-//   0 个(模型真改错内容)或 ≥2 个(歧义)一律**原样放行**,交给 Codex parse_patch 暴露真坏,绝不靠猜。
-// - **Add File / Delete File 不碰**(无锚点,不涉及匹配)。读不到文件 / 无 cwd → 原样放行。
-// - 每条修复 / 放行都记进 apply-patch 诊断页,可审计。
+// ## Safety boundary (never damage files - align users with the hard rule of "no destructive downgrades")
+// - **Move anchor point only**: context(space prefix)/ delete (`-`) line in `Update File`. `+New` lines **never change**.
+// - **Only fix when there is a unique match**: The anchor block is found in the file by "Ignore trailing spaces/leading and trailing blanks" to find candidates, and **exactly one** position will be aligned;
+//   0 (the model is really wrong) or ≥2 (ambiguous) will be **released as is** and handed over to Codex parse_patch to expose the real bad, never rely on guessing.
+// - **Add File / Delete File does not touch** (no anchor, no matching involved). Unable to read file / no cwd → release as is.
+// - Each repair/release is recorded in the apply-patch diagnostic page and can be audited.
 
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
@@ -24,19 +24,19 @@ use std::sync::{Mutex, OnceLock};
 use crate::proxy::adapters::apply_patch_preflight::Repair;
 use serde_json::Value;
 
-/// 一条 pre-flight 处理记录(给诊断页 / 日志)。
+/// A record of pre-flight processing (for diagnostic pages/logs).
 
-/// [MOC-263 P0] 在 `file[floor..]` 里找从 `anchors[0]` 起、能**唯一**匹配的最长连续块。
-/// 锚点用「忽略尾随空格」比较(段内字节漂移留给后续 repair_hunk 对齐)。返回 `(块长 = 匹配的锚点数,
-/// 文件起点)`。最长且唯一 → Some;最长的非空匹配若 >1 处(歧义)→ None(更短只会更歧义);全 0 → None。
+/// [MOC-263 P0] Find the longest consecutive block in `file[floor..]` that can be uniquely matched starting from `anchors[0]`.
+/// Anchors are compared using "ignore trailing spaces" (intra-segment byte drift is left for subsequent repair_hunk alignment). Return `(block length = number of matching anchors,
+/// File starting point)`. The longest and unique → Some; the longest non-empty match if >1 (ambiguous) → None (shorter will only be more ambiguous); all 0 → None.
 fn longest_unique_block(anchors: &[&str], file: &[&str], floor: usize) -> Option<(usize, usize)> {
     if anchors.is_empty() || floor >= file.len() {
         return None;
     }
-    // [MOC-263 P1] 段首锚点必须在 `file[floor..]` **全局唯一**,否则该段起点歧义 —— 同一行在别处也出现时,
-    // 贪心最长块会靠更长块的"唯一性"选中**无关的更早区域**(file 有旧 `A/B/C` 块 + 真实 `A/B…gap…C/D`
-    // 区,body `A/-B/ C/-D` 被切成旧块的 hunk → 从错块删 B),而不切分时本会安全失败。起点不唯一 = 切分
-    // 非唯一确定 → bail,原样透过交模型自纠(chatgpt-codex-connector review;不猜不丢)。
+    // [MOC-263 P1] The first anchor point of the paragraph must be in `file[floor..]` **globally unique**, otherwise the starting point of the paragraph is ambiguous - when the same line also appears elsewhere,
+    // Greedy longest block will rely on the "uniqueness" of the longer block to select **irrelevant earlier areas** (file has old `A/B/C` blocks + real `A/B…gap…C/D`
+    // Area, body `A/-B/ C/-D` was cut into the old block hunk → delete B) from the wrong block, which would have failed safely without splitting. The starting point is not unique = segmentation
+    // Non-unique determination → bail, self-corrected through cross-model as is (chatgpt-codex-connector review; don’t guess, don’t lose).
     let first = anchors[0].trim_end();
     if file[floor..]
         .iter()
@@ -62,20 +62,20 @@ fn longest_unique_block(anchors: &[&str], file: &[&str], floor: usize) -> Option
         }
         match hits.len() {
             1 => return Some((len, hits[0])),
-            0 => continue,    // 太长(跨越文件里的跳变)→ 缩短再试
-            _ => return None, // 最长非空匹配即歧义 → 放弃(不猜不丢)
+            0 => continue, // Too long (spanning a jump in the file) → shorten and try again
+            _ => return None, // The longest non-empty match is ambiguity → give up (no guessing, no losing)
         }
     }
     None
 }
 
-/// [MOC-263 P0] 把**无 `@@`** 的 Update body 按文件真实位置切成多个 hunk。
+/// [MOC-263 P0] Split the Update body without `@@`** into multiple hunks according to the real location of the file.
 ///
-/// 真机最主要 apply 失败因(phase-1 seg1/seg3):模型把多个**不连续**编辑组拼进一个 Update File 块、
-/// 漏写 `@@` 分隔 → applier 把整块当一段连续上下文匹配 → `Failed to find expected lines`。
-/// 这里按锚点(context/delete)序列贪心切成**有序、不重叠、各自唯一匹配**的 N 段(每段 = 从上一段
-/// 之后起、唯一匹配的最长连续锚点块),`+` 新增行随相邻段保留。仅 **N≥2 且每段都能唯一定位**时返回
-/// `Some`;单段 / 任一段歧义或无法定位 → `None`(调用方原样透过,不猜不丢)。调用方用裸 `@@` 串接各段。
+/// The main reason for apply failure on real machines (phase-1 seg1/seg3): the model combines multiple **discontinuous** editing groups into one Update File block,
+/// Missing `@@` delimitation → applier Matches the whole block as a continuous context → `Failed to find expected lines`.
+/// Here, according to the anchor point (context/delete) sequence, it is greedily cut into N segments that are ordered, non-overlapping, and each uniquely matching** (each segment = from the previous segment
+/// Starting from the longest consecutive anchor point block that only matches), `+` new lines are retained along with adjacent segments. Only returned if **N≥2 and each segment can be uniquely positioned**
+/// `Some`; single paragraph / any paragraph is ambiguous or cannot be located → `None` (the caller passes it through as it is, no guessing, no loss). The caller uses bare `@@` to concatenate the segments.
 fn segment_no_at_body<'a>(body: &[&'a str], file: &[&str]) -> Option<Vec<Vec<&'a str>>> {
     let anchors: Vec<(usize, &str)> = body
         .iter()
@@ -90,8 +90,8 @@ fn segment_no_at_body<'a>(body: &[&'a str], file: &[&str]) -> Option<Vec<Vec<&'a
     }
     let anchor_contents: Vec<&str> = anchors.iter().map(|(_, c)| *c).collect();
 
-    // 贪心分段:每段 = 从 floor 起唯一匹配的最长连续锚点块。
-    // 记 (anchor_start, anchor_end_excl, file_start, file_end_excl);floor 单调推进保证有序不重叠。
+    // Greedy segmentation: each segment = uniquely matched longest continuous anchor block starting from floor.
+    // Note (anchor_start, anchor_end_excl, file_start, file_end_excl); floor monotonically advances to ensure ordering and non-overlapping.
     let mut raw: Vec<(usize, usize, usize, usize)> = Vec::new();
     let mut ai = 0usize;
     let mut floor = 0usize;
@@ -102,9 +102,9 @@ fn segment_no_at_body<'a>(body: &[&'a str], file: &[&str]) -> Option<Vec<Vec<&'a
         floor = pos + len;
     }
 
-    // 合并相邻段:段间 file 间隙若**全空行**(模型漏写文件里的空行)→ 同一 hunk,不在此切,
-    // 交 repair_hunk 的 EP-1 blank-tolerant 处理(否则会把空行漂移误切成两段,破坏既有行为)。
-    // 只在间隙含**非空行**(真·不连续编辑区域)时才保留为独立段。
+    // Merge adjacent segments: If the file gap between segments is **all blank lines** (the model misses the blank lines in the file) → the same hunk, it is not cut here.
+    // Handle repair_hunk's EP-1 blank-tolerant processing (otherwise, the blank line drift will be mistakenly cut into two segments, destroying the existing behavior).
+    // Only remain as independent segments if the gap contains **non-empty lines** (true · non-continuous editing area).
     let mut groups: Vec<(usize, usize, usize, usize)> = Vec::new();
     for g in raw {
         if let Some(last) = groups.last_mut() {
@@ -118,17 +118,17 @@ fn segment_no_at_body<'a>(body: &[&'a str], file: &[&str]) -> Option<Vec<Vec<&'a
         groups.push(g);
     }
     if groups.len() < 2 {
-        return None; // 单段(或全因空行间隙合并成单段)→ 没必要切,交回常规路径
+        return None; // Single segment (or merged into a single segment due to blank line gaps) → No need to cut, return to the regular path
     }
 
-    // [MOC-263 P0 安全防护] 段间「浮动 `+` 插入行」落点歧义 → 一律 bail。
-    // 若前段末锚点与后段首锚点之间存在**任何** `+` 新增行,该 `+` 的落点都无法从 V4A 唯一确定 ——
-    // 它可能是前段末尾的插入,也可能是模型写给后段的「引入行」;段间隔着非空内容时两种落点是文件里
-    // 不同位置,猜错就是**静默错误 apply**(违反不猜不丢)。**关键**:即便前段末锚点是 `-` 删除也不安全
-    // (chatgpt-codex-connector review 指出的混合 replace+insert:`-return 1`/`+return 42`/`+@memoize`/
-    // ` def beta():` —— `+return 42` 是替换、`+@memoize` 却是给后段的引入行,二者无法区分)→ 不做
-    // "前段有删除就放行"的豁免,只要 gap 里有 `+` 就放弃整次分段、原样透过(交模型自纠)。
-    // 纯删除 / 纯上下文的多区(gap 无 `+`)仍安全切。
+    // [MOC-263 P0 Security Protection] Inter-segment "floating `+` insert line" placement ambiguity → always bail.
+    // If there is **any** `+` new line between the last anchor point of the previous paragraph and the first anchor point of the following paragraph, the placement point of the `+` cannot be uniquely determined from V4A——
+    // It may be an insertion at the end of the previous paragraph, or it may be an "introduction line" written by the model to the subsequent paragraph; when the paragraphs are separated by non-empty content, the two placement points are in the file.
+    // Different positions, guessing wrong is a **silent error apply** (violation, no guessing, no loss). **Key**: Even if the anchor point at the end of the previous paragraph is `-`, it is not safe to delete it
+    // (chatgpt-codex-connector review points out a mix of replace+insert:`-return 1`/`+return 42`/`+@memoize`/
+    // ` def beta():` —— `+return 42` is a replacement, `+@memoize` is an introduction line for the later paragraph, the two are indistinguishable)→ Do not do it
+    // The exemption of "let it pass if the previous segment is deleted", as long as there is `+` in the gap, the entire segmentation will be abandoned and passed through as it is (subject to model self-correction).
+    // Pure deletion / pure context multi-region (gap without `+`) is still safe.
     for gi in 0..groups.len() - 1 {
         let last_anchor_line = anchors[groups[gi].1 - 1].0;
         let next_anchor_line = anchors[groups[gi + 1].0].0;
@@ -140,8 +140,8 @@ fn segment_no_at_body<'a>(body: &[&'a str], file: &[&str]) -> Option<Vec<Vec<&'a
         }
     }
 
-    // 段 g 的 body 行区间:首段含开头前导行(body[0..首锚点]);其余段从其首锚点起,
-    // 到下一段首锚点止 → 段内 / 段后的 `+` 行随**前**段保留。
+    // The body line interval of segment g: the first paragraph includes the leading line (body[0..first anchor point]); the remaining paragraphs start from their first anchor point,
+    // Ending at the first anchor point of the next paragraph → `+` lines within/after the paragraph are retained with the **previous** paragraph.
     let mut subhunks: Vec<Vec<&'a str>> = Vec::new();
     for gi in 0..groups.len() {
         let line_start = if gi == 0 { 0 } else { anchors[groups[gi].0].0 };
@@ -155,8 +155,8 @@ fn segment_no_at_body<'a>(body: &[&'a str], file: &[&str]) -> Option<Vec<Vec<&'a
     Some(subhunks)
 }
 
-/// 修复一个 `Update File` section 的 body。`path` 是 patch 里的(相对)路径。
-/// `cwd` 是当前请求 cwd(primary hint),读盘经 [`read_patch_file`] 再按候选历史解析(MOC-263)。
+/// Fix the body of an `Update File` section. `path` is the (relative) path in patch.
+/// `cwd` is the current request cwd (primary hint), read the disk through [`read_patch_file`] and then analyze the candidate history (MOC-263).
 pub(crate) fn repair_update_section(
     path: &str,
     body: &[&str],
@@ -169,19 +169,21 @@ pub(crate) fn repair_update_section(
             Repair {
                 file: path.to_owned(),
                 kind: "skipped:unreadable".to_owned(),
-                detail: format!("读不到文件 {path}(候选 cwd 均无)→ 原样放行"),
+                detail: format!(
+                    "Unable to read file {path} (no candidate cwd exists) → release as is"
+                ),
             },
         );
     };
     let file_lines: Vec<&str> = content.lines().collect();
 
-    // [MOC-263 P0] body 无 `@@` 但含多个不连续编辑组(模型漏写 `@@` 分隔)→ 自动按文件位置切段、
-    // 用裸 `@@` 串接,使 applier 把各段当独立 hunk 定位(否则整块当一段连续上下文必失配)。
-    // 仅唯一可分段时才动;单段 / 歧义 → 保持原 body 交常规路径。
+    // [MOC-263 P0] body has no `@@` but contains multiple discontinuous editing groups (the model omits `@@` separation) → automatically cuts into segments according to the file position,
+    // Use naked `@@` to concatenate, so that the applier will position each segment as an independent hunk (otherwise the whole block will be mismatched as a continuous context).
+    // Only move if the only one is segmentable; single segment / ambiguity → keep the original body intersection regular path.
     let mut split_owned: Vec<&str> = Vec::new();
-    // 用**列 0** `@@`(不 trim_start)判断是否已有 hunk 分隔,与下方实际分割器(`l.starts_with("@@")`)
-    // 一致 —— 否则 context 行 ` @@ ...`(前导空格、内容以 @@ 开头,如 markdown/diff 文本)会被误当分隔符、
-    // 错误禁用自动切分,而分割器又不切它 → 仍失败(chatgpt-codex-connector review)。
+    // Use **column 0** `@@` (without trim_start) to determine whether there is hunk separation, and compare it with the actual splitter below (`l.starts_with("@@")`)
+    // Consistent - otherwise context lines `@@ ...` (leading spaces, content starting with @@, such as markdown/diff text) will be mistaken for delimiters,
+    // Error disabling automatic splitting and the splitter doesn't cut it → still fails (chatgpt-codex-connector review).
     let did_split = if !body.iter().any(|l| l.starts_with("@@")) {
         match segment_no_at_body(body, &file_lines) {
             Some(subhunks) => {
@@ -200,7 +202,7 @@ pub(crate) fn repair_update_section(
     };
     let effective_body: &[&str] = if did_split { &split_owned } else { body };
 
-    // 把 body 切成 hunk(按 `@@` 行分段;`@@` 行本身保留、不参与锚点匹配)。
+    // Cut the body into hunks (segmented by `@@` lines; `@@` lines themselves are retained and do not participate in anchor point matching).
     let mut new_body: Vec<String> = Vec::with_capacity(effective_body.len());
     let mut repaired_hunks = 0;
     let mut clean_hunks = 0;
@@ -261,9 +263,9 @@ pub(crate) fn repair_update_section(
         "skipped:no_unique_match"
     };
     let detail = format!(
-        "{}hunk: 修复 {repaired_hunks} / 本就匹配 {clean_hunks} / 放行 {}{}",
+        "{} hunk: Repair {repaired_hunks} / Already match {clean_hunks} / Release {} {}",
         if did_split {
-            "多 hunk 无 @@ 分隔 → 自动按文件位置切段插裸 @@; "
+            "Multiple hunk without @@ separation → automatically cut into segments according to file location @@;"
         } else {
             ""
         },
@@ -285,71 +287,71 @@ pub(crate) fn repair_update_section(
 }
 
 enum HunkOutcome {
-    /// 锚点精确匹配文件,无需改。
+    /// The anchor point matches the file exactly and does not need to be modified.
     Clean,
-    /// 锚点对齐成文件真实字节后的整个 hunk(含原样的 `+` 行)。
+    /// The anchor is aligned to the entire hunk (including the original `+` line) after the actual bytes of the file.
     Repaired(Vec<String>),
-    /// 未修(0 或多个匹配),附原因。
+    /// Not fixed (0 or more matches), with reason.
     Skipped(String),
 }
 
-/// 修一个 hunk:锚点 = context(空格前缀)+ 删除(`-`)行的**内容**(去前缀),按序应是文件里的
-/// 连续块。精确匹配→Clean;否则按「忽略尾随空格 / 首尾空白」找候选,唯一→对齐,否则放行。
+/// Fix a hunk: anchor point = context (space prefix) + delete the **content** (remove the prefix) of the (`-`) line, which should be in the file in order
+/// Continuous blocks. Exact match→Clean; otherwise press "Ignore trailing spaces/leading and trailing blanks" to find candidates, unique→Align, otherwise let go.
 fn repair_hunk(hunk: &[&str], file_lines: &[&str]) -> HunkOutcome {
-    // 锚点行在 hunk 里的下标 + 内容(去单字符前缀)。
+    // The index + content of the anchor line in hunk (removing the single-character prefix).
     let anchors: Vec<(usize, &str)> = hunk
         .iter()
         .enumerate()
         .filter_map(|(idx, l)| match l.chars().next() {
             Some(' ') => Some((idx, &l[1..])),
             Some('-') => Some((idx, &l[1..])),
-            _ => None, // '+' 新增行 / 空行 / 其它不作锚点
+            _ => None, // '+' new line/blank line/others not used as anchor points
         })
         .collect();
     if anchors.is_empty() {
-        return HunkOutcome::Clean; // 纯新增,无锚点
+        return HunkOutcome::Clean; // Pure new addition, no anchor point
     }
     let anchor_contents: Vec<&str> = anchors.iter().map(|(_, c)| *c).collect();
 
-    // 精确匹配:文件里存在连续块完全等于锚点内容 → 无需修(Codex 自己能找到)。
+    // Exact match: There are consecutive blocks in the file that are exactly equal to the anchor content → no need to modify (Codex can find it by itself).
     if !find_block(file_lines, &anchor_contents, |a, b| a == b).is_empty() {
         return HunkOutcome::Clean;
     }
 
-    // 模糊匹配:逐行「忽略尾随空格」相等;仍 0 个再退「首尾空白都忽略」。
+    // Fuzzy matching: line by line "ignore trailing spaces" are equal; still 0 and then return "ignore both leading and trailing spaces".
     let mut matches = find_block(file_lines, &anchor_contents, |a, b| {
         a.trim_end() == b.trim_end()
     });
-    let mut mode = "尾随空格";
+    let mut mode = "Trailing spaces";
     if matches.is_empty() {
         matches = find_block(file_lines, &anchor_contents, |a, b| a.trim() == b.trim());
-        mode = "首尾空白";
+        mode = "Blank space at first and last";
     }
     match matches.len() {
         1 => {
             let pos = matches[0];
-            // 把锚点行对齐成文件真实字节(保留 hunk 里 +/- /空格 的交错与 `+` 行)。
+            // Align anchor lines to actual file bytes (preserving +/- /space interleaving and `+` lines in hunks).
             let mut fixed: Vec<String> = hunk.iter().map(|l| (*l).to_owned()).collect();
             for (k, (idx, _)) in anchors.iter().enumerate() {
-                let prefix = hunk[*idx].chars().next().unwrap(); // ' ' 或 '-'
+                let prefix = hunk[*idx].chars().next().unwrap(); // ' ' or '-'
                 let file_line = file_lines[pos + k];
                 fixed[*idx] = format!("{prefix}{file_line}");
             }
             HunkOutcome::Repaired(fixed)
         }
-        n if n > 1 => HunkOutcome::Skipped(format!("{mode}下 {n} 处匹配(歧义)")),
-        // 0 连续匹配 → 试「忽略空行差异」(EP-1:模型漏/多写空行致整块失配)。锚点**非空行**序列
-        // 在文件里唯一定位(允许文件该区间含模型漏写的空行),命中则用文件真实区间(含空行 + 字节)
-        // 重建锚点,`+` 插入行保持原位。0/多处仍放行(不猜)。
+        n if n > 1 => HunkOutcome::Skipped(format!("Matches {n} under {mode} (ambiguity)")),
+        // 0 Continuous matching → Try "Ignore blank line differences" (EP-1: The model misses/writes more blank lines, causing the entire block to mismatch). Anchor ** non-blank line ** sequence
+        // Unique positioning in the file (allowing this section of the file to contain blank lines missed by the model), if hit, use the real section of the file (containing blank lines + bytes)
+        // Rebuild the anchor point, `+` and the inserted row remains in place. 0/Many places are still allowed (no guessing).
         _ => {
-            // blank-tolerant 重建会丢弃空白锚点行、改用文件空行 → 无法忠实表达「删除一个空行」的 `-`
-            // (会被静默转成 context = 该删没删)。若 hunk 含空白行删除,放弃 blank-tolerant、透过(不猜)。
+            // blank-tolerant rebuild will discard blank anchor lines and use file blank lines instead → `-` cannot faithfully express "remove a blank line"
+            // (It will be silently converted into context = should be deleted or not). If hunk contains blank lines, delete them, discard blank-tolerant, and pass (no guessing).
             let has_blank_deletion = hunk
                 .iter()
                 .any(|l| l.starts_with('-') && l[1..].trim().is_empty());
             if has_blank_deletion {
                 return HunkOutcome::Skipped(
-                    "含空白行删除,blank-tolerant 不安全 → 放行".to_owned(),
+                    "Delete lines containing blanks, blank-tolerant is unsafe → release".to_owned(),
                 );
             }
             let regions = find_regions_blank_tolerant(file_lines, &anchor_contents);
@@ -358,15 +360,15 @@ fn repair_hunk(hunk: &[&str], file_lines: &[&str]) -> HunkOutcome {
                     let (s, e) = regions[0];
                     HunkOutcome::Repaired(rebuild_hunk_with_region(hunk, &file_lines[s..e]))
                 }
-                0 => HunkOutcome::Skipped("锚点在文件中 0 匹配(疑模型改错内容)".to_owned()),
-                n => HunkOutcome::Skipped(format!("忽略空行下 {n} 处匹配(歧义)")),
+                0 => HunkOutcome::Skipped("The anchor point has 0 matches in the file (suspected model correction content)".to_owned()),
+                n => HunkOutcome::Skipped(format!("Ignore matches at {n} under empty lines (ambiguity)")),
             }
         }
     }
 }
 
-/// EP-1 辅助:在 `file_lines` 里找锚点**非空行**序列能唯一定位的区间(允许文件区间内含模型漏写的
-/// 空行,但不允许有额外的非空行)。返回所有匹配区间 `[start, end)`(end 为最后一个匹配非空行的下一位)。
+/// EP-1 Auxiliary: Find the interval in `file_lines` that can be uniquely positioned by the anchor **non-empty line** sequence (allowing the file interval to contain missing data from the model)
+/// Blank lines, but no additional non-blank lines allowed). Returns all matching intervals `[start, end)` (end is the next bit of the last matching non-empty line).
 fn find_regions_blank_tolerant(
     file_lines: &[&str],
     anchor_contents: &[&str],
@@ -394,14 +396,14 @@ fn find_regions_blank_tolerant(
             }
             let fl = file_lines[fi];
             if fl.trim().is_empty() {
-                fi += 1; // 跳过文件空行(模型可能漏写)
+                fi += 1; // Skip empty lines in the file (the model may miss writing)
                 continue;
             }
             if fl.trim_end() == nb[ai] {
                 ai += 1;
                 fi += 1;
             } else {
-                ok = false; // 出现额外非空行 → 此 start 不匹配
+                ok = false; // Extra non-empty lines appear → this start does not match
                 break;
             }
         }
@@ -412,22 +414,22 @@ fn find_regions_blank_tolerant(
     regions
 }
 
-/// EP-1 辅助:用文件真实区间 `region`(含空行)重建 hunk —— 锚点(context/`-`)对齐成文件字节、
-/// 补回模型漏写的文件空行(作 context),`+` 插入行按 hunk 原序保持。模型自带的空白锚点行丢弃
-/// (改用文件的空行,避免重复)。
+/// EP-1 Auxiliary: Rebuild hunk using the file's real range `region` (including blank lines) - anchor point (context/`-`) aligned into file bytes,
+/// Fill in the blank lines in the file that the model misses (used as context), `+` and insert lines in the original order of hunk. The blank anchor lines that come with the model are discarded
+/// (Use blank lines of the file instead to avoid duplication).
 fn rebuild_hunk_with_region(hunk: &[&str], region: &[&str]) -> Vec<String> {
     let mut out = Vec::new();
-    let mut fi = 0usize; // region 游标
+    let mut fi = 0usize; // region cursor
     for &hl in hunk {
         match hl.chars().next() {
-            Some('+') => out.push(hl.to_owned()), // 插入行原样保位
+            Some('+') => out.push(hl.to_owned()), // Keep inserted rows in place
             Some(' ') | Some('-') => {
                 let prefix = hl.chars().next().unwrap();
                 let content = &hl[1..];
                 if content.trim().is_empty() {
-                    continue; // 模型的空锚点行丢弃,用文件空行
+                    continue; // Empty anchor lines of the model are discarded and empty lines of the file are used.
                 }
-                // 先补回文件里模型漏写的空行(作 context)
+                // First fill in the blank lines that the model missed in the file (called context)
                 while fi < region.len() && region[fi].trim().is_empty() {
                     out.push(format!(" {}", region[fi]));
                     fi += 1;
@@ -439,14 +441,14 @@ fn rebuild_hunk_with_region(hunk: &[&str], region: &[&str]) -> Vec<String> {
                     out.push(hl.to_owned());
                 }
             }
-            _ => {} // 无前缀空行等丢弃,用文件空行
+            _ => {} // Empty lines without prefix are discarded, and empty lines in the file are used.
         }
     }
     out
 }
 
-/// 在 `file_lines` 里找所有起点 `i`,使 `file_lines[i..i+anchor.len()]` 与 `anchor` 逐行 `eq` 为真。
-/// 返回所有匹配起点。
+/// Find all starting points `i` in `file_lines`, make `file_lines[i..i+anchor.len()]` and `anchor` line by line `eq` true.
+/// Returns all matching starting points.
 fn find_block<F: Fn(&str, &str) -> bool>(
     file_lines: &[&str],
     anchor: &[&str],
@@ -464,7 +466,7 @@ fn find_block<F: Fn(&str, &str) -> bool>(
     hits
 }
 
-/// 把 patch 路径解析到绝对路径。绝对路径原样;相对路径对 `cwd` 拼接。
+/// Resolve the patch path to an absolute path. Absolute paths as-is; relative paths concatenated with `cwd`.
 pub(crate) fn resolve_path(path: &str, cwd: &str) -> PathBuf {
     let p = Path::new(path);
     if p.is_absolute() {

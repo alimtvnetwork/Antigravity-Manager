@@ -15,15 +15,21 @@ export interface SshGitmapStatus {
 }
 
 export interface SshNodeRecord {
+    id?: string;
     alias: string;
     ip_address: string;
+    host?: string;
     port: number;
     username: string;
     os: string;
     auth_method: string;
-    key_path: string;
+    key_path: string | null;
     has_encrypted_password: boolean;
+    has_password?: boolean;
     encrypted_password_preview?: string;
+    encryption_algo?: string;
+    source?: string;
+    last_status?: string;
 }
 
 export interface SaveSshNodeRsaPayload {
@@ -39,23 +45,29 @@ export interface SaveSshNodeRsaPayload {
 export interface ClusterInstanceBalanceItem {
     machine_alias: string;
     ip_address: string;
+    machine_ip?: string;
     is_local: boolean;
     online: boolean;
     instance_id: string;
     instance_name: string;
     running: boolean;
-    pid: number | null;
+    pid?: number | null;
     bound_email: string | null;
-    tier: string | null;
-    quota_4h_pct: number | null;
-    quota_weekly_pct: number | null;
-    last_updated: string;
+    tier?: string | null;
+    quota_4h_pct?: number | null;
+    quota_weekly_pct?: number | null;
+    last_updated?: string;
     error?: string | null;
+    error_message?: string | null;
+    latency_ms?: number | null;
+    status_label?: string;
+    active_model?: string;
 }
 
 export interface RemotePromptDispatchPayload {
     node_alias: string;
     instance_target: string;
+    instance_name?: string;
     prompt_text: string;
     conversation_id?: string | null;
 }
@@ -63,11 +75,14 @@ export interface RemotePromptDispatchPayload {
 export interface RemotePromptDispatchResult {
     node_alias: string;
     instance_target: string;
+    instance_name?: string;
     success: boolean;
     command_executed: string;
     stdout: string;
     stderr: string;
     duration_ms: number;
+    message?: string;
+    dispatch_route?: string;
 }
 
 export interface NodeSyncStats {
@@ -203,7 +218,17 @@ export const sshService = {
     async listSshNodes(): Promise<SshNodeRecord[]> {
         try {
             const nodes = await invoke<SshNodeRecord[]>('list_ssh_nodes');
-            return Array.isArray(nodes) ? nodes : [];
+            return Array.isArray(nodes)
+                ? nodes.map((n) => ({
+                      ...n,
+                      ip_address: n.ip_address || (n as any).host || '',
+                      host: (n as any).host || n.ip_address || '',
+                      has_encrypted_password:
+                          n.has_encrypted_password !== undefined
+                              ? Boolean(n.has_encrypted_password)
+                              : Boolean((n as any).has_password),
+                  }))
+                : [];
         } catch (error) {
             useErrorStore.getState().trackWarning(error, {
                 source: 'sshService.listSshNodes',
@@ -269,6 +294,22 @@ export const sshService = {
         }
     },
 
+    async resetSshCluster(): Promise<SshNodeRecord[]> {
+        try {
+            return await invoke<SshNodeRecord[]>('reset_ssh_cluster');
+        } catch (err) {
+            useErrorStore.getState().captureError(err, {
+                source: 'sshService.resetSshCluster',
+                triggerAction: 'reset_ssh_cluster',
+            });
+            throw err;
+        }
+    },
+
+    async resetClusterNodes(): Promise<SshNodeRecord[]> {
+        return await this.resetSshCluster();
+    },
+
     async deployEncryptedSshBundle(targetAliases?: string[]): Promise<MeshDeploySummary> {
         try {
             return await invoke<MeshDeploySummary>('deploy_encrypted_ssh_bundle', {
@@ -288,7 +329,19 @@ export const sshService = {
         try {
             const items = await invoke<ClusterInstanceBalanceItem[]>('get_cluster_instances_and_balances');
             if (Array.isArray(items)) {
-                return items;
+                return items.map((raw) => {
+                    const item = { ...raw };
+                    item.ip_address = item.ip_address || (item as any).machine_ip || '';
+                    if (item.online === undefined) {
+                        item.online = Boolean(item.running);
+                    }
+                    if (item.bound_email && typeof item.bound_email === 'string') {
+                        item.bound_email = item.bound_email
+                            .replace(/\$\{adminUser\}/g, 'Administrator')
+                            .replace(/\$\{linuxUser\}/g, 'root');
+                    }
+                    return item;
+                });
             }
             return [];
         } catch (primaryError) {
@@ -320,7 +373,12 @@ export const sshService = {
                 const nowIso = new Date().toISOString();
                 return instances.map((inst): ClusterInstanceBalanceItem => {
                     const cfg = inst?.config || inst || {};
-                    const boundEmail = cfg.bound_email || null;
+                    let boundEmail = cfg.bound_email || null;
+                    if (boundEmail && typeof boundEmail === 'string') {
+                        boundEmail = boundEmail
+                            .replace(/\$\{adminUser\}/g, 'Administrator')
+                            .replace(/\$\{linuxUser\}/g, 'root');
+                    }
                     const boundAcc =
                         (cfg.bound_account_id && accountById.get(String(cfg.bound_account_id))) ||
                         (boundEmail && accountByEmail.get(String(boundEmail).toLowerCase())) ||
@@ -337,6 +395,7 @@ export const sshService = {
                     return {
                         machine_alias: 'local',
                         ip_address: '127.0.0.1',
+                        machine_ip: '127.0.0.1',
                         is_local: true,
                         online: true,
                         instance_id: String(cfg.id || 'default'),
@@ -349,6 +408,8 @@ export const sshService = {
                         quota_weekly_pct: pctWeekly,
                         last_updated: nowIso,
                         error: null,
+                        error_message: null,
+                        latency_ms: 0,
                     };
                 });
             } catch (fallbackError) {
@@ -387,7 +448,7 @@ export const sshService = {
                 stderr?: string;
                 duration_ms?: number | string;
                 success?: boolean;
-            }>('test_ssh_node_connection', { idOrAlias: alias });
+            }>('test_ssh_node_connection', { idOrAlias: alias, id_or_alias: alias });
             const duration = Number(result?.duration_ms ?? 0);
             return {
                 node_alias: result?.alias || alias,

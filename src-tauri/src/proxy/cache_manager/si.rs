@@ -1,7 +1,7 @@
 use super::*;
 
 impl CacheManager {
-    /// 创建新的 CacheManager
+    /// Create a new CacheManager
     pub fn new() -> Self {
         Self {
             si_cache: DashMap::new(),
@@ -15,23 +15,23 @@ impl CacheManager {
 
     // ===== Shared Utilities =====
 
-    /// SHA256 快速哈希
+    /// SHA256 fast hash
     pub(crate) fn sha256_hex(data: &[u8]) -> String {
         let mut hasher = Sha256::new();
         hasher.update(data);
         format!("{:x}", hasher.finalize())
     }
 
-    /// 检查 Instant 是否已过期
+    /// Check if Instant has expired
     pub(crate) fn is_expired(timestamp: Instant, ttl: Duration) -> bool {
         timestamp.elapsed() > ttl
     }
 
     // ===== Layer 1: System Instruction Cache =====
 
-    /// 查找已缓存的 sanitized system instruction
+    /// Find cached sanitized system instructions
     ///
-    /// 返回 Some(sanitized_text) 如果缓存有效，否则 None
+    /// Returns Some(sanitized_text) if cache is valid, otherwise None
     pub fn lookup_si(&self, raw_hash: &str) -> Option<String> {
         if let Ok(mut stats) = self.si_stats.write() {
             stats.0 += 1; // total
@@ -91,7 +91,7 @@ impl CacheManager {
         None
     }
 
-    /// 存入 Layer 1: raw → sanitized
+    /// Save to Layer 1: raw → sanitized
     pub fn cache_si(&self, raw_hash: String, sanitized_text: String) {
         let entry = SiCacheEntry {
             sanitized_text,
@@ -105,7 +105,7 @@ impl CacheManager {
             &raw_hash[..raw_hash.len().min(16)]
         );
 
-        // LRU 淘汰: 超出限制时清除过期条目
+        // LRU eviction: purge expired entries when limit exceeded
         if self.si_cache.len() > SI_CACHE_LIMIT {
             let before = self.si_cache.len();
             self.si_cache
@@ -122,7 +122,7 @@ impl CacheManager {
         }
     }
 
-    /// 计算 Layer 1 key: SHA256(raw instructions text)
+    /// Calculate Layer 1 key: SHA256(raw instructions text)
     pub fn compute_si_key(raw_instructions: &str) -> String {
         Self::sha256_hex(raw_instructions.as_bytes())
     }

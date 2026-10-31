@@ -22,34 +22,106 @@ pub fn is_generated_node_alias(alias: &str) -> bool {
 
 /// True when `alias` addresses the machine running this bot.
 pub fn is_current_machine(alias: &str) -> bool {
-    let alias = alias.trim();
-    if alias.eq_ignore_ascii_case("local") || alias.eq_ignore_ascii_case("localhost") {
+    let target = alias.trim();
+    if target.is_empty() {
+        return false;
+    }
+    if target.eq_ignore_ascii_case("local") || target.eq_ignore_ascii_case("localhost") {
         return true;
     }
-    let fleet = super::open_shot::local_machine_label();
-    if alias.eq_ignore_ascii_case(fleet.trim()) {
-        return true;
-    }
+
     let detected = crate::modules::email_watcher::detect_machine_name();
-    alias.eq_ignore_ascii_case(detected.trim())
+    if !detected.is_empty() && target.eq_ignore_ascii_case(detected.trim()) {
+        return true;
+    }
+
+    let fleet = super::open_shot::local_machine_label();
+    if !fleet.is_empty() && target.eq_ignore_ascii_case(fleet.trim()) {
+        return true;
+    }
+
+    let local_ip = crate::modules::email_watcher::detect_local_ip();
+    if !local_ip.is_empty() && target.eq_ignore_ascii_case(&local_ip) {
+        return true;
+    }
+
+    if let Some((t_alias, t_ip)) = target.split_once('|') {
+        if is_current_machine(t_alias) || is_current_machine(t_ip) {
+            return true;
+        }
+    }
+
+    // Hit the 30-second in-memory cached cluster nodes to prevent sequential CLI spawns
+    let cluster_nodes = super::cluster::query_gitmap_cluster_nodes();
+    if let Some(matched_cluster) = cluster_nodes.iter().find(|n| {
+        target.eq_ignore_ascii_case(&n.alias)
+            || (!n.ip_address.is_empty() && target.eq_ignore_ascii_case(&n.ip_address))
+    }) {
+        if !local_ip.is_empty() && matched_cluster.ip_address.trim() == local_ip.trim() {
+            return true;
+        }
+        if !detected.is_empty()
+            && matched_cluster
+                .alias
+                .trim()
+                .eq_ignore_ascii_case(detected.trim())
+        {
+            return true;
+        }
+        return false;
+    }
+
+    false
 }
 
-/// Button label: `This machine` on this host, otherwise the cached proper name.
+/// Button label: includes alias, IP, and signal for complete multi-machine clarity.
 pub fn machine_button_text(alias: &str) -> String {
-    if is_current_machine(alias) {
-        "This machine".to_string()
+    let (node_alias, ip, signal) = super::cluster::resolve_node_network_info(alias);
+    let signal_short = if signal.contains("Direct") || signal.contains("100%") {
+        "100%"
+    } else if signal.contains("98%") || signal.contains("Online") || signal.contains("Mesh") {
+        "98%"
+    } else if signal.contains("Offline") || signal.contains("0%") {
+        "0%"
     } else {
-        display_name_for(alias)
+        "Active"
+    };
+    if is_current_machine(alias) {
+        if ip != "Unknown IP" && !ip.is_empty() {
+            format!("This machine ({node_alias} \u{2022} {ip} \u{2022} \u{1F4F6} {signal_short})")
+        } else {
+            format!("This machine ({node_alias} \u{2022} \u{1F4F6} {signal_short})")
+        }
+    } else if ip != "Unknown IP" && !ip.is_empty() {
+        format!("{node_alias} ({ip} \u{2022} \u{1F4F6} {signal_short})")
+    } else {
+        format!("{node_alias} (\u{1F4F6} {signal_short})")
     }
 }
 
-/// HTML header. The current machine uses the green circle; others use the desktop mark.
+/// HTML header: clear with alias, IP, and signal where the prompt is going.
 pub fn machine_header_html(alias: &str) -> String {
-    if is_current_machine(alias) {
-        "\u{1F7E2} <b>This machine</b>".to_string()
+    let is_current = is_current_machine(alias);
+    let (node_alias, ip, signal) = super::cluster::resolve_node_network_info(alias);
+    let signal_label = if signal.starts_with("Signal:") || signal.starts_with("\u{1F4F6}") {
+        signal
     } else {
-        let name = escape_html(&display_name_for(alias));
-        format!("\u{1F5A5}\u{FE0F} <b>{name}</b>")
+        format!("Signal: {signal}")
+    };
+    if is_current {
+        format!(
+            "\u{1F7E2} <b>This machine</b> [<code>{}</code> \u{2022} <code>{}</code> \u{2022} \u{1F4F6} {}]",
+            escape_html(&node_alias),
+            escape_html(&ip),
+            escape_html(&signal_label)
+        )
+    } else {
+        format!(
+            "\u{1F5A5}\u{FE0F} <b>Remote node: {}</b> [<code>{}</code> \u{2022} \u{1F4F6} {}]",
+            escape_html(&node_alias),
+            escape_html(&ip),
+            escape_html(&signal_label)
+        )
     }
 }
 
@@ -68,12 +140,17 @@ pub fn button_json(text: &str, callback_data: &str, style: Option<&str>) -> Valu
 
 /// Proper name for `alias`. Non-generated aliases skip GitMap. Generated aliases
 /// reuse SQLite until the refresh window elapses, then query GitMap once.
+/// Proper name for `alias`. Non-generated aliases skip GitMap. Generated aliases
+/// or "none" reuse SQLite until the refresh window elapses, then query GitMap once.
 pub fn display_name_for(alias: &str) -> String {
     let alias = alias.trim();
     if alias.is_empty() {
         return String::new();
     }
-    if !is_generated_node_alias(alias) {
+    if alias.contains("(collected from gitmap)") {
+        return alias.to_string();
+    }
+    if !alias.eq_ignore_ascii_case("none") && !is_generated_node_alias(alias) {
         remember(alias, alias);
         return alias.to_string();
     }
@@ -119,7 +196,10 @@ fn refresh_window_secs() -> i64 {
 
 fn fallback_name(alias: &str) -> String {
     let detected = crate::modules::email_watcher::detect_machine_name();
-    if !detected.trim().is_empty() && !is_generated_node_alias(&detected) {
+    if !detected.trim().is_empty()
+        && !is_generated_node_alias(&detected)
+        && !detected.eq_ignore_ascii_case("none")
+    {
         detected
     } else {
         alias.to_string()
@@ -127,36 +207,78 @@ fn fallback_name(alias: &str) -> String {
 }
 
 fn pick_better_alias(requested: &str, items: &[SshNodeExportItem]) -> Option<String> {
-    let exact = items
-        .iter()
-        .find(|item| item.alias.eq_ignore_ascii_case(requested));
-    if let Some(item) = exact {
-        if !is_generated_node_alias(&item.alias) && !item.alias.trim().is_empty() {
-            return Some(item.alias.clone());
+    let req_clean = requested.trim();
+
+    // 1. Direct match: if requested is a non-generated, non-none alias matching an item
+    if !req_clean.is_empty()
+        && !req_clean.eq_ignore_ascii_case("none")
+        && !is_generated_node_alias(req_clean)
+    {
+        if let Some(item) = items
+            .iter()
+            .find(|i| i.alias.eq_ignore_ascii_case(req_clean))
+        {
+            return Some(format!("{} (collected from gitmap)", item.alias));
         }
     }
-    if !is_generated_node_alias(requested) {
-        return None;
+
+    // 2. Local IP resolution: if requested is "none", empty, or auto-generated Node-*,
+    // resolve machine's local IP (e.g. 192.168.1.3) against GitMap node configs.
+    let local_ip = crate::modules::email_watcher::detect_local_ip();
+    if !local_ip.is_empty() && local_ip != "127.0.0.1" && local_ip != "Unknown IP" {
+        if let Some(item) = items.iter().find(|i| {
+            !i.alias.trim().is_empty()
+                && !i.alias.eq_ignore_ascii_case("none")
+                && !is_generated_node_alias(&i.alias)
+                && i.ip_address.trim() == local_ip.trim()
+        }) {
+            return Some(format!("{} (collected from gitmap)", item.alias));
+        }
     }
-    let ip = exact
-        .map(|item| item.ip_address.trim())
-        .filter(|ip| !ip.is_empty());
-    let Some(ip) = ip else {
-        return None;
-    };
-    items.iter().find_map(|item| {
-        if item.alias.trim().is_empty() || is_generated_node_alias(&item.alias) {
-            return None;
+
+    // 3. Match requested as an explicit IP
+    if !req_clean.is_empty() && !req_clean.eq_ignore_ascii_case("none") {
+        if let Some(item) = items.iter().find(|i| {
+            !i.alias.trim().is_empty()
+                && !i.alias.eq_ignore_ascii_case("none")
+                && !is_generated_node_alias(&i.alias)
+                && i.ip_address.trim().eq_ignore_ascii_case(req_clean)
+        }) {
+            return Some(format!("{} (collected from gitmap)", item.alias));
         }
-        if item.ip_address.eq_ignore_ascii_case(ip) {
-            Some(item.alias.clone())
-        } else {
-            None
-        }
-    })
+    }
+
+    None
 }
 
 fn export_gitmap_nodes() -> Result<Vec<SshNodeExportItem>, String> {
+    // 1. Check user home ~/.gitmap/gitmap-ssh-nodes.json
+    if let Some(home) = dirs::home_dir() {
+        let p = home.join(".gitmap").join("gitmap-ssh-nodes.json");
+        if p.exists() {
+            if let Ok(content) = std::fs::read_to_string(&p) {
+                if let Ok(items) = parse_export_items(&content) {
+                    if !items.is_empty() {
+                        return Ok(items);
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Check repo working directory ./gitmap-ssh-nodes.json
+    let local_file = std::path::Path::new("gitmap-ssh-nodes.json");
+    if local_file.exists() {
+        if let Ok(content) = std::fs::read_to_string(local_file) {
+            if let Ok(items) = parse_export_items(&content) {
+                if !items.is_empty() {
+                    return Ok(items);
+                }
+            }
+        }
+    }
+
+    // 3. Fall back to CLI export
     let mut cmd = std::process::Command::new("gitmap");
     #[cfg(target_os = "windows")]
     {

@@ -72,38 +72,52 @@ pub(crate) fn cmd_agy(args: &[String]) {
         .first()
         .map(|s| s.trim_start_matches('/').to_lowercase())
         .unwrap_or_else(|| "help".to_string());
-    let rt = tokio::runtime::Runtime::new().unwrap();
+    let rt = tokio::runtime::Runtime::new().expect("Failed to initialize tokio runtime");
     match sub.as_str() {
         "tree" => {
             let rest = if args.len() > 1 { &args[1..] } else { &[] };
             cmd_tree(rest);
         }
-        "active" | "running" => {
-            println!("{}", repo_db::format_tree_view_cli(200, true));
-            if let Ok(out) = std::process::Command::new("gitmap")
-                .args(["agy", "active"])
-                .output()
-            {
-                let stdout = String::from_utf8_lossy(&out.stdout);
-                if !stdout.trim().is_empty() {
-                    println!("\n[GitMap AGY Active Output]\n{}", stdout.trim());
+        "active" => {
+            let is_json = args.iter().any(|a| a == "--json" || a == "-j");
+            if is_json {
+                crate::running_prompts_cmds::cmd_running_prompts(&["--json".to_string()]);
+            } else {
+                println!("{}", repo_db::format_tree_view_cli(200, true));
+                if let Ok(out) = std::process::Command::new("gitmap")
+                    .args(["agy", "active"])
+                    .output()
+                {
+                    let stdout = String::from_utf8_lossy(&out.stdout);
+                    if !stdout.trim().is_empty() {
+                        println!("\n[GitMap AGY Active Output]\n{}", stdout.trim());
+                    }
                 }
             }
         }
-        "backup" | "backup-running-prompts" => {
-            let rest = if args.len() > 1 { &args[1..] } else { &[] };
-            crate::running_backup_cmds::cmd_backup_running_prompts(rest);
-            let _ = std::process::Command::new("gitmap")
-                .arg("backup-running-prompts")
-                .status();
-        }
-        "restore" | "restore-running-prompts" => {
-            let rest = if args.len() > 1 { &args[1..] } else { &[] };
-            crate::running_backup_cmds::cmd_restore_running_prompts(rest);
-        }
-        "running-prompts" => {
+        "running" | "running-prompts" => {
             let rest = if args.len() > 1 { &args[1..] } else { &[] };
             crate::running_prompts_cmds::cmd_running_prompts(rest);
+        }
+        "ff" | "fast-forward" | "smart-switch" => {
+            let rest = if args.len() > 1 { &args[1..] } else { &[] };
+            crate::instance_fastforward::cmd_fast_forward(rest);
+        }
+        "backup" | "backup-running-prompts" | "brp" => {
+            let rest = if args.len() > 1 { &args[1..] } else { &[] };
+            crate::running_backup_cmds::cmd_backup_running_prompts(rest);
+            // Justification: Best-effort delegation to gitmap CLI; failure is non-fatal if gitmap is not installed.
+            let _ = std::process::Command::new("gitmap")
+                .args(["agy", "running-prompts", "backup"])
+                .status();
+        }
+        "restore" | "restore-running-prompts" | "rrp" => {
+            let rest = if args.len() > 1 { &args[1..] } else { &[] };
+            crate::running_backup_cmds::cmd_restore_running_prompts(rest);
+            // Justification: Best-effort delegation to gitmap CLI; failure is non-fatal if gitmap is not installed.
+            let _ = std::process::Command::new("gitmap")
+                .args(["agy", "running-prompts", "restore"])
+                .status();
         }
         "fpug" | "finish-prompts-until-green" => {
             let rest = if args.len() > 1 { &args[1..] } else { &[] };
@@ -157,6 +171,9 @@ pub(crate) fn cmd_agy(args: &[String]) {
                 "  agm agy active                  List active running prompts & AGM tree view"
             );
             println!(
+                "  agm agy ff [instance]           Fast-forward switch to account with highest quota"
+            );
+            println!(
                 "  agm agy running-prompts [ls|backup|restore] Manage running storage prompts"
             );
             println!(
@@ -177,6 +194,7 @@ pub(crate) fn cmd_agy(args: &[String]) {
             );
             println!("\nGitMap AGY Direct Equivalents:");
             println!("  gitmap agy active");
+            println!("  gitmap agy ff");
             println!("  gitmap agy running-prompts ls | backup | restore");
             println!("  gitmap backup-running-prompts && gitmap restore-running-prompts");
             println!("  gitmap agy prompt -n read-all -t \"Read memory and continue\"");

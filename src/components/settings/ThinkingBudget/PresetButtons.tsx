@@ -58,7 +58,7 @@ export function PresetButtons({
                 >
                     {val === -1
                         ? t("proxy.config.thinking_budget.preset_adaptive", {
-                              defaultValue: "自适应 (-1)",
+                              defaultValue: "Adaptive (-1)",
                           })
                         : val.toLocaleString()}
                 </button>

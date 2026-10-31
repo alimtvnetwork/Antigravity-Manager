@@ -5,6 +5,7 @@ use super::text_utils::extract_clean_user_prompt;
 use chrono::Utc;
 use rusqlite::params;
 use rusqlite::Connection;
+use std::path::Path;
 
 /// Batch item for conversation sequence operations
 #[derive(Debug, Clone)]
@@ -267,6 +268,34 @@ pub(crate) fn ensure_conversation_sequence_in_conn(
     }
 }
 
+/// Query the sequence code for a conversation (formatted as "C{:03}") from `agm_conversation_sequences`.
+pub fn get_sequence_code_for_conversation(conv_id: &str) -> Option<String> {
+    let clean = conv_id.trim();
+    if clean.is_empty() {
+        return None;
+    }
+    if let Ok(conn) = super::schema::connect_db() {
+        get_sequence_code_in_conn(&conn, clean)
+    } else {
+        None
+    }
+}
+
+/// Query the sequence code for a conversation using an existing connection.
+pub fn get_sequence_code_in_conn(conn: &Connection, conv_id: &str) -> Option<String> {
+    let clean = conv_id.trim();
+    if clean.is_empty() {
+        return None;
+    }
+    conn.query_row(
+        "SELECT seq_id FROM agm_conversation_sequences WHERE conversation_id = ?1",
+        params![clean],
+        |row| row.get::<_, i64>(0),
+    )
+    .ok()
+    .map(|s| format!("C{:03}", s))
+}
+
 /// Extract clean user prompt up to `max_words` (e.g. 200 words) and return `(preview_text, total_word_count)`.
 /// Preserves line breaks (`\n`) and vertical paragraph gaps rather than flattening all text into a single line.
 pub fn extract_prompt_words_preview(raw_text: &str, max_words: usize) -> (String, usize) {
@@ -348,6 +377,341 @@ pub fn extract_prompt_tail_snippet(raw_text: &str, tail_word_count: usize) -> St
         let tail_slice = &meaningful_tokens[total - count..];
         tail_slice.join(" ")
     }
+}
+
+/// Helper to update conversation_summaries.db and conversations_fts.
+fn update_summaries_in_db(
+    db_path: &std::path::Path,
+    clean_title: &str,
+    now_iso: &str,
+    clean_cid: &str,
+) -> usize {
+    let Ok(conn) = Connection::open(db_path) else {
+        return 0;
+    };
+    // Justification: busy_timeout on summaries database is a nicety; continues with default if failed
+    crate::error::record_ignored(
+        conn.pragma_update(None, "busy_timeout", 5000),
+        "set busy_timeout on conversation_summaries.db",
+    );
+    // Justification: journal_mode WAL on summaries database is a performance optimization; continues with default if failed
+    crate::error::record_ignored(
+        conn.pragma_update(None, "journal_mode", "WAL"),
+        "set journal_mode WAL on conversation_summaries.db",
+    );
+
+    let mut count = conn
+        .execute(
+            "UPDATE conversation_summaries SET title = ?1, raw_summary = NULL, preview = ?1, last_modified_time = ?2 WHERE conversation_id = ?3",
+            params![clean_title, now_iso, clean_cid],
+        )
+        .or_else(|_| {
+            conn.execute(
+                "UPDATE conversation_summaries SET title = ?1, raw_summary = NULL, last_modified_time = ?2 WHERE conversation_id = ?3",
+                params![clean_title, now_iso, clean_cid],
+            )
+        })
+        .or_else(|_| {
+            conn.execute(
+                "UPDATE conversation_summaries SET title = ?1, preview = ?1, last_modified_time = ?2 WHERE conversation_id = ?3",
+                params![clean_title, now_iso, clean_cid],
+            )
+        })
+        .or_else(|_| {
+            conn.execute(
+                "UPDATE conversation_summaries SET title = ?1, raw_summary = NULL, preview = ?1 WHERE conversation_id = ?2",
+                params![clean_title, clean_cid],
+            )
+        })
+        .or_else(|_| {
+            conn.execute(
+                "UPDATE conversation_summaries SET title = ?1, raw_summary = NULL WHERE conversation_id = ?2",
+                params![clean_title, clean_cid],
+            )
+        })
+        .or_else(|_| {
+            conn.execute(
+                "UPDATE conversation_summaries SET title = ?1 WHERE conversation_id = ?2",
+                params![clean_title, clean_cid],
+            )
+        })
+        .unwrap_or(0);
+
+    if count == 0 {
+        let pattern = format!("%{}%", clean_cid);
+        count = conn
+            .execute(
+                "UPDATE conversation_summaries SET title = ?1, raw_summary = NULL, preview = ?1, last_modified_time = ?2 WHERE conversation_id LIKE ?3",
+                params![clean_title, now_iso, &pattern],
+            )
+            .or_else(|_| {
+                conn.execute(
+                    "UPDATE conversation_summaries SET title = ?1, raw_summary = NULL, last_modified_time = ?2 WHERE conversation_id LIKE ?3",
+                    params![clean_title, now_iso, &pattern],
+                )
+            })
+            .or_else(|_| {
+                conn.execute(
+                    "UPDATE conversation_summaries SET title = ?1, preview = ?1, last_modified_time = ?2 WHERE conversation_id LIKE ?3",
+                    params![clean_title, now_iso, &pattern],
+                )
+            })
+            .or_else(|_| {
+                conn.execute(
+                    "UPDATE conversation_summaries SET title = ?1 WHERE conversation_id LIKE ?2",
+                    params![clean_title, &pattern],
+                )
+            })
+            .unwrap_or(0);
+    }
+
+    // Also update conversations_fts virtual table if present
+    let fts_res = conn.execute(
+        "UPDATE conversations_fts SET title = ?1 WHERE conversation_id = ?2",
+        params![clean_title, clean_cid],
+    );
+    match fts_res {
+        Ok(fts_count) => {
+            if fts_count == 0 {
+                let pattern = format!("%{}%", clean_cid);
+                // Justification: updating conversations_fts via LIKE fallback is best-effort full-text sync
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE conversations_fts SET title = ?1 WHERE conversation_id LIKE ?2",
+                        params![clean_title, &pattern],
+                    ),
+                    "update title in conversations_fts like fallback",
+                );
+            }
+        }
+        Err(e) => {
+            // Justification: conversations_fts is an optional virtual table not present in all SQLite versions or databases
+            crate::error::record_ignored(
+                Err::<(), _>(e),
+                "update title in conversations_fts (table may not exist)",
+            );
+        }
+    }
+
+    count
+}
+
+/// Update conversation title across both instance conversation_summaries.db and AGM repo_prompts.db.
+/// Invalidates the prompt tree cache upon success.
+pub fn update_conversation_title(
+    instance_id: Option<&str>,
+    conversation_id: &str,
+    new_title: &str,
+) -> Result<(), crate::error::AppError> {
+    let clean_title = new_title.trim();
+    if clean_title.is_empty() {
+        return Err(crate::error::AppError::Config(
+            "Conversation title cannot be empty".to_string(),
+        ));
+    }
+    let clean_cid = conversation_id.trim();
+    if clean_cid.is_empty() {
+        return Err(crate::error::AppError::Config(
+            "Conversation ID cannot be empty".to_string(),
+        ));
+    }
+
+    let resolved_inst = instance_id
+        .filter(|s| !s.is_empty())
+        .map(|s| crate::modules::instance::resolve_instance_id(s).unwrap_or_else(|_| s.to_string()))
+        .unwrap_or_else(|| "default".to_string());
+
+    let mut updated_summaries_count = 0;
+
+    // 1. Locate instance's conversation_summaries.db and update
+    let candidate_dirs = super::gemini_dirs::gemini_dirs_for_instance(&resolved_inst);
+    let now_iso = Utc::now().to_rfc3339();
+
+    for dir in &candidate_dirs {
+        let db_candidates = [
+            dir.join("conversation_summaries.db"),
+            dir.join("antigravity").join("conversation_summaries.db"),
+        ];
+
+        for db_path in db_candidates {
+            if db_path.exists() {
+                updated_summaries_count +=
+                    update_summaries_in_db(&db_path, clean_title, &now_iso, clean_cid);
+            }
+        }
+    }
+
+    // Fallback: If 0 rows updated in the target instance dirs, scan across all candidate dirs
+    if updated_summaries_count == 0 {
+        for (_tag, dir) in super::gemini_dirs::gemini_dirs_tagged(None) {
+            let db_candidates = [
+                dir.join("conversation_summaries.db"),
+                dir.join("antigravity").join("conversation_summaries.db"),
+            ];
+            for db_path in db_candidates {
+                if db_path.exists() {
+                    let count = update_summaries_in_db(&db_path, clean_title, &now_iso, clean_cid);
+                    if count > 0 {
+                        updated_summaries_count += count;
+                        break;
+                    }
+                }
+            }
+            if updated_summaries_count > 0 {
+                break;
+            }
+        }
+    }
+
+    // 2. Open repo_prompts.db, execute: UPDATE agm_conversation_sequences SET title = ?1, updated_at = ?2 WHERE conversation_id = ?3
+    let now_ts = Utc::now().timestamp();
+    if let Ok(repo_conn) = super::schema::connect_db() {
+        // Justification: busy_timeout on repo_prompts.db is a nicety; continues with default if failed
+        crate::error::record_ignored(
+            repo_conn.pragma_update(None, "busy_timeout", 5000),
+            "set busy_timeout on repo_prompts.db",
+        );
+        // Justification: updating conversation sequence title is best-effort metadata synchronization
+        crate::error::record_ignored(
+            repo_conn.execute(
+                "UPDATE agm_conversation_sequences SET title = ?1, updated_at = ?2 WHERE conversation_id = ?3",
+                params![clean_title, now_ts, clean_cid],
+            ),
+            "update title in agm_conversation_sequences",
+        );
+        // Also update active_prompts if untitled
+        // Justification: updating active prompt preview is best-effort synchronization
+        crate::error::record_ignored(
+            repo_conn.execute(
+                "UPDATE active_prompts SET preview_raw = ?1, preview_clean = ?1 WHERE session_id = ?2 AND (preview_raw IS NULL OR preview_raw = '' OR preview_raw LIKE 'Untitled%')",
+                params![clean_title, clean_cid],
+            ),
+            "update active_prompts preview if untitled",
+        );
+    }
+
+    // 3. Synchronize title into Antigravity native annotations (<gemini_dir>/annotations/<conversation_id>.pbtxt)
+    // Antigravity IDE keeps a live filesystem watcher on annotations/ and reloads the title in the GUI immediately!
+    sync_title_to_antigravity_annotations(&candidate_dirs, clean_cid, clean_title);
+    let all_tagged_dirs: Vec<std::path::PathBuf> = super::gemini_dirs::gemini_dirs_tagged(None)
+        .into_iter()
+        .map(|(_, d)| d)
+        .collect();
+    sync_title_to_antigravity_annotations(&all_tagged_dirs, clean_cid, clean_title);
+
+    // 4. Update backup_prompts.db: UPDATE prompt_backups SET conversation_name = ?1 WHERE conversation_id = ?2
+    if let Ok(backup_conn) = crate::modules::backup_prompts_db::connect_backup_db(None) {
+        // Justification: updating conversation_name in backup_prompts.db is best-effort backup synchronization
+        crate::error::record_ignored(
+            backup_conn.execute(
+                "UPDATE prompt_backups SET conversation_name = ?1 WHERE conversation_id = ?2",
+                params![clean_title, clean_cid],
+            ),
+            "update conversation_name in prompt_backups",
+        );
+    }
+
+    // 5. Touch conversations/<conversation_id>.db to trigger fsnotify watcher in Antigravity language_server.exe
+    touch_conversation_db_files(&candidate_dirs, clean_cid);
+    touch_conversation_db_files(&all_tagged_dirs, clean_cid);
+
+    // 6. Invalidate prompt tree cache
+    super::tree::invalidate_prompt_tree_cache(Some(&resolved_inst));
+    if resolved_inst != "all" {
+        super::tree::invalidate_prompt_tree_cache(Some("all"));
+    }
+
+    Ok(())
+}
+
+/// Synchronize conversation title to Antigravity IDE annotations protobuf text file.
+/// Antigravity IDE maintains a live filesystem watcher on annotations/ and updates the title immediately in the IDE UI.
+pub fn sync_title_to_antigravity_annotations(
+    gemini_dirs: &[std::path::PathBuf],
+    conversation_id: &str,
+    new_title: &str,
+) {
+    let now_secs = chrono::Utc::now().timestamp();
+    for dir in gemini_dirs {
+        let annotations_dir = if dir.ends_with("antigravity") || dir.ends_with("antigravity-ide") {
+            dir.join("annotations")
+        } else {
+            dir.join("antigravity").join("annotations")
+        };
+
+        let direct_annotations = dir.join("annotations");
+        for target_dir in [annotations_dir, direct_annotations] {
+            if let Some(parent) = target_dir.parent() {
+                if !parent.exists() {
+                    continue;
+                }
+            }
+            // Justification: creating annotations dir is best-effort for title sync
+            crate::error::record_ignored(
+                std::fs::create_dir_all(&target_dir),
+                "create annotations dir for title sync",
+            );
+            let pbtxt_file = target_dir.join(format!("{}.pbtxt", conversation_id));
+
+            if pbtxt_file.exists() {
+                if let Ok(content) = std::fs::read_to_string(&pbtxt_file) {
+                    let re = regex::Regex::new(r#"title:\s*"[^"]*""#);
+                    let updated = match re {
+                        Ok(ref r) if r.is_match(&content) => r
+                            .replace(&content, format!("title:\"{}\"", new_title))
+                            .to_string(),
+                        _ => format!("title:\"{}\" {}", new_title, content),
+                    };
+                    // Justification: updating annotations file triggers IDE filesystem watcher for live rename
+                    crate::error::record_ignored(
+                        std::fs::write(&pbtxt_file, updated),
+                        "update conversation title in annotations pbtxt",
+                    );
+                }
+            } else {
+                let initial = format!(
+                    "title:\"{}\" last_user_view_time:{{seconds:{} nanos:0}}\n",
+                    new_title, now_secs
+                );
+                // Justification: creating annotations file triggers IDE filesystem watcher for live rename
+                crate::error::record_ignored(
+                    std::fs::write(&pbtxt_file, initial),
+                    "create conversation annotations pbtxt with title",
+                );
+            }
+        }
+    }
+}
+
+/// Touch conversations/<conversation_id>.db across candidate gemini directories
+/// to trigger fsnotify watcher in Antigravity's language_server.exe
+pub fn touch_conversation_db_files(gemini_dirs: &[std::path::PathBuf], conversation_id: &str) {
+    let now = std::time::SystemTime::now();
+    for dir in gemini_dirs {
+        let candidates = [
+            dir.join("conversations")
+                .join(format!("{}.db", conversation_id)),
+            dir.join("antigravity")
+                .join("conversations")
+                .join(format!("{}.db", conversation_id)),
+        ];
+        for path in candidates {
+            if path.exists() {
+                if let Ok(file) = std::fs::OpenOptions::new().write(true).open(&path) {
+                    let _ = file.set_modified(now);
+                }
+            }
+        }
+    }
+}
+
+#[inline]
+pub fn rename_conversation_dual_store(
+    instance_id: &str,
+    conversation_id: &str,
+    new_title: &str,
+) -> Result<(), crate::error::AppError> {
+    update_conversation_title(Some(instance_id), conversation_id, new_title)
 }
 
 #[cfg(test)]
@@ -452,5 +816,26 @@ mod tests {
         // Repeat batch to verify idempotency and metadata refresh
         let repeat = batch_ensure_sequences(&mut conn, &items).expect("repeat batch update");
         assert_eq!(repeat, vec![1, 2]);
+    }
+
+    #[test]
+    fn test_get_sequence_code_in_conn() {
+        let conn = Connection::open_in_memory().unwrap();
+        assert!(init_tables(&conn).is_ok());
+
+        assert!(get_sequence_code_in_conn(&conn, "nonexistent").is_none());
+        assert!(get_sequence_code_in_conn(&conn, "").is_none());
+
+        let seq_num = ensure_conversation_sequence_in_conn(
+            &conn,
+            "conv-seq-test-01",
+            "d:/work/test",
+            "Test Sequence",
+            "default",
+        );
+        assert_eq!(seq_num, 1);
+
+        let code = get_sequence_code_in_conn(&conn, "conv-seq-test-01");
+        assert_eq!(code, Some("C001".to_string()));
     }
 }

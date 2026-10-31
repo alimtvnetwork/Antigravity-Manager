@@ -7,6 +7,10 @@ use super::*;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutoSwitcherStatus {
     pub is_running: bool,
+    #[serde(default)]
+    pub is_enabled: bool,
+    #[serde(default)]
+    pub low_quota_threshold_percent: f64,
     pub active_instance_id: String,
     pub active_account_email: Option<String>,
     pub current_quota_percent: Option<f64>,

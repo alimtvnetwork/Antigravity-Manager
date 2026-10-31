@@ -169,8 +169,8 @@ pub fn migrate_config_value(v: &mut serde_json::Value) -> bool {
             modified = true;
         }
 
-        // 预设无后缀 3.6+ Flash 模型到 Tiered 自适应模型的默认映射规则
-        // 自动注入到用户的自定义模型列表中，用户可在 UI 界面查阅、删除或自定义修改保存；默认按此预设执行
+        // Default mapping rules from suffix-free 3.6+ Flash models to Tiered adaptive models
+        // Automatically injected into the user's custom model list, the user can view, delete or save customized modifications in the UI interface; by default, this preset is executed
         for (k, v) in [
             ("gemini-3.6-flash", "gemini-3.6-flash-tiered"),
             ("gemini-3.7-flash", "gemini-3.7-flash-tiered"),

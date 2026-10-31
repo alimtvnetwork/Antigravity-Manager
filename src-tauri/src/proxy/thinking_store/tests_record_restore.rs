@@ -141,17 +141,17 @@ fn tool_record_does_not_pollute_earlier_text_turns() {
         rec("**Inferring User's Intention**", "", Some("call_54421")),
     );
 
-    // Turn 0: "你好！" (pure text, no thought)
-    // Turn 1: "当然是真的！" (pure text, no thought)
+    // Turn 0: "Hello!" (pure text, no thought)
+    // Turn 1: "Of course it's true!" (pure text, no thought)
     // Turn 2: tool call "call_54421"
     let mut contents = vec![
         json!({
             "role": "model",
-            "parts": [{ "text": "你好！我是 JeikCode AI 编程助手。" }]
+            "parts": [{ "text": "Hello! I'm JeikCode AI programming assistant." }]
         }),
         json!({
             "role": "model",
-            "parts": [{ "text": "当然是真的！😄" }]
+            "parts": [{ "text": "Of course it's true! 😄" }]
         }),
         json!({
             "role": "model",
@@ -168,13 +168,13 @@ fn tool_record_does_not_pollute_earlier_text_turns() {
     assert_eq!(contents[0]["parts"].as_array().unwrap().len(), 1);
     assert_eq!(
         contents[0]["parts"][0]["text"],
-        "你好！我是 JeikCode AI 编程助手。"
+        "Hello! I'm JeikCode AI programming assistant."
     );
     assert!(contents[0]["parts"][0].get("thought").is_none());
 
     // Turn 1 must NOT have thinking injected
     assert_eq!(contents[1]["parts"].as_array().unwrap().len(), 1);
-    assert_eq!(contents[1]["parts"][0]["text"], "当然是真的！😄");
+    assert_eq!(contents[1]["parts"][0]["text"], "Of course it's true! 😄");
     assert!(contents[1]["parts"][0].get("thought").is_none());
 
     // Turn 2 MUST have thinking injected and matched with call_54421
@@ -190,10 +190,10 @@ fn tool_record_does_not_pollute_earlier_text_turns() {
 fn test_thinking_with_text_and_parallel_tools() {
     let store = ThinkingStore::new();
 
-    // Test Case 6: 有思考、有正文、有多工具并行出来
+    // Test Case 6: Thinking, text, and multiple tools in parallel
     let tool_ids = vec!["call_batch_1".to_string(), "call_batch_2".to_string()];
     let tool_names = vec!["read_file".to_string(), "grep_search".to_string()];
-    // 构造符合 Google 原生特征的假签名（Base64 解码后首字节 = protobuf tag 0x12）
+    // Construct a fake signature that conforms to Google's native characteristics (first byte after Base64 decoding = protobuf tag 0x12)
     let real_sig = {
         use base64::Engine;
         let mut raw = vec![0x12u8];
@@ -226,19 +226,19 @@ fn test_thinking_with_text_and_parallel_tools() {
     assert_eq!(restored, 1);
 
     let parts = contents[0]["parts"].as_array().unwrap();
-    // Index 0: thought block —— 保持纯净文本，铁律 I4：思考块绝不携带签名
+    // Index 0: thought block - Keep the text pure, iron rule I4: Thought blocks never carry signatures
     assert_eq!(parts[0]["thought"], true);
     assert_eq!(parts[0]["text"], "Parallel execution planned");
     assert!(parts[0].get("thoughtSignature").is_none());
 
-    // Index 1: 可见正文 = 该轮「第一个非思考 part」= 签名锚点
+    // Index 1: Visible text = "The first non-thinking part" of this round = Signature anchor point
     assert_eq!(parts[1]["text"], "I will read both files in parallel");
     assert_eq!(
         parts[1]["thoughtSignature"], real_sig,
         "Real signature must be restored onto the anchor (first non-thought part)"
     );
 
-    // Index 2 / 3: 工具调用不再盖章 —— 签名字段必须「缺席」，而不是空串
+    // Index 2 / 3: Tool calls are no longer stamped - the signature field must be "absent", not an empty string
     assert_eq!(parts[2]["functionCall"]["id"], "call_batch_1");
     assert!(parts[2].get("thoughtSignature").is_none());
     assert_eq!(parts[3]["functionCall"]["id"], "call_batch_2");

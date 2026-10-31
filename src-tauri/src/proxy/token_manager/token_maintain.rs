@@ -1,4 +1,4 @@
-//! Token 维护：过期刷新、project_id 解析（SingleFlight）。
+//! Token maintenance: expiration refresh, project_id resolution (SingleFlight).
 
 use super::ProxyToken;
 use super::TokenManager;
@@ -7,8 +7,8 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 impl TokenManager {
-    /// 3. [ENHANCED] 检查 token 是否过期（提前 300 秒/5分钟平滑刷新）。
-    /// 返回 true 表示继续主流程；返回 false 表示应进入下一次 attempt 循环。
+    /// 3. [ENHANCED] Check whether the token has expired (smoothly refreshed 300 seconds/5 minutes in advance).
+    /// Returning true means continuing the main process; returning false means entering the next attempt loop.
     pub(crate) async fn refresh_token_if_expired(
         &self,
         token: &mut ProxyToken,
@@ -18,11 +18,11 @@ impl TokenManager {
         attempted: &mut HashSet<String>,
         need_update_last_used: &mut Option<(String, std::time::Instant)>,
     ) -> bool {
-        // 3. [ENHANCED] 检查 token 是否过期（提前 300 秒/5分钟平滑刷新，保障高可用与并发重试）
+        // 3. [ENHANCED] Check whether the token has expired (smoothly refresh 300 seconds/5 minutes in advance to ensure high availability and concurrent retries)
         let now = chrono::Utc::now().timestamp();
         const TOKEN_REFRESH_BUFFER_SECS: i64 = 300;
         if now >= token.timestamp - TOKEN_REFRESH_BUFFER_SECS {
-            // [NEW] 双重检查锁定逻辑 (Double-Checked Locking)
+            // [NEW] Double-Checked Locking
             let refresh_mu = self
                 .refresh_locks
                 .entry(token.account_id.clone())
@@ -31,18 +31,21 @@ impl TokenManager {
 
             let _guard = refresh_mu.lock().await;
 
-            // 再次检查最新状态
+            // Check again for latest status
             let latest_token_opt = self.tokens.get(&token.account_id).map(|r| r.clone());
             if let Some(latest) = latest_token_opt {
                 if now < latest.timestamp - TOKEN_REFRESH_BUFFER_SECS {
                     *token = latest.clone();
-                    tracing::debug!("账号 {} 已由并发线程在循环中刷新，跳过", token.email);
-                } else {
                     tracing::debug!(
-                        "账号 {} 的 token 即将过期，正在执行主路径刷新...",
+                        "Account {} has been refreshed by a concurrent thread in a loop, skipped",
                         token.email
                     );
-                    // 调用 OAuth 刷新 token
+                } else {
+                    tracing::debug!(
+                        "The token of account {} is about to expire and the main path is being refreshed...",
+                        token.email
+                    );
+                    // Call OAuth to refresh token
                     match crate::modules::oauth::refresh_access_token(
                         &token.refresh_token,
                         Some(&token.account_id),
@@ -50,8 +53,8 @@ impl TokenManager {
                     .await
                     {
                         Ok(token_response) => {
-                            tracing::debug!("Token 刷新成功！");
-                            // 刷新成功后重置该账号的 invalid_grant 失败计数
+                            tracing::debug!("Token refreshed successfully!");
+                            // After the refresh is successful, the invalid_grant failure count of the account is reset.
                             self.invalid_grant_failures.remove(&token.account_id);
 
                             token.access_token = token_response.access_token.clone();
@@ -63,8 +66,8 @@ impl TokenManager {
                                 entry.expires_in = token.expires_in;
                                 entry.timestamp = token.timestamp;
                             }
-                            // [FIX] 写盘操作后台化：内存已更新，磁盘持久化 spawn 到 blocking 线程池
-                            // 避免在 get_token 的 5s 超时窗口内因磁盘 I/O 或锁争抢导致超时
+                            // [FIX] The disk writing operation is backgrounded: the memory has been updated, and the disk persistence is spawned to the blocking thread pool.
+                            // Avoid timeouts due to disk I/O or lock contention within the 5s timeout window of get_token
                             {
                                 let write_path = token.account_path.clone();
                                 let access_token = token_response.access_token.clone();
@@ -107,7 +110,7 @@ impl TokenManager {
                         }
                         Err(e) => {
                             tracing::error!(
-                                "Token 刷新失败 ({}): {}，尝试下一个账号",
+                                "Token refresh failed ( {} ): {} , try the next account",
                                 token.email,
                                 e
                             );
@@ -122,7 +125,7 @@ impl TokenManager {
                                 let current_fails = *fail_count;
                                 if current_fails >= 2 {
                                     tracing::error!(
-                                        "账号 {} 连续 {} 次确认为 invalid_grant，正式执行停用",
+                                        "Account {} has been confirmed as invalid_grant for {} consecutive times and is officially deactivated.",
                                         token.email,
                                         current_fails
                                     );
@@ -138,7 +141,7 @@ impl TokenManager {
                                     self.invalid_grant_failures.remove(&token.account_id);
                                 } else {
                                     tracing::warn!(
-                                            "账号 {} 首次确认为 invalid_grant (计数 {}/2)，暂不停用，跳过本次调度",
+                                            "Account {} is confirmed as invalid_grant for the first time (count {} /2). It will not be deactivated temporarily and this schedule will be skipped.",
                                             token.email,
                                             current_fails
                                         );
@@ -161,9 +164,9 @@ impl TokenManager {
         true
     }
 
-    /// 4. [ENHANCED] 确保有 project_id（SingleFlight 异步合并 + 锁保护 fetch 动作）。
+    /// 4. [ENHANCED] Make sure there is project_id (SingleFlight asynchronous merge + lock protected fetch action).
     pub(crate) async fn resolve_project_id(&self, token: &ProxyToken) -> String {
-        // 4. [ENHANCED] 确保有 project_id (使用锁保护 fetch 动作)
+        // 4. [ENHANCED] Make sure there is project_id (use lock to protect fetch action)
         let project_id = if let Some(pid) = &token.project_id {
             if pid.is_empty() {
                 None
@@ -176,13 +179,13 @@ impl TokenManager {
         let project_id = if let Some(pid) = project_id {
             pid
         } else {
-            // [NEW] 针对 fetch_project_id 实现基于 SingleFlight 的异步合并
-            // 1. 检查是否已有 inflight 请求
+            // [NEW] Implement SingleFlight-based asynchronous merge for fetch_project_id
+            // 1. Check if there is already an inflight request
             let (_rx, is_new) = {
                 if let Some(existing_rx) = self.load_code_assist_inflight.get(&token.account_id) {
                     (existing_rx.value().clone(), false)
                 } else {
-                    // 创建新的 inflight 频道
+                    // Create new inflight channel
                     let (_tx, rx) = tokio::sync::watch::channel(None);
                     self.load_code_assist_inflight
                         .insert(token.account_id.clone(), rx.clone());
@@ -191,8 +194,11 @@ impl TokenManager {
             };
 
             if is_new {
-                // 仅由“第一个发现者”执行真实请求
-                tracing::debug!("账号 {} 启动 [SingleFlight] ProjectID 探测...", token.email);
+                // Only real requests are performed by the "first finder"
+                tracing::debug!(
+                    "Account {} starts [SingleFlight] ProjectID detection...",
+                    token.email
+                );
 
                 let _result =
                     match crate::proxy::project_resolver::fetch_project_id(&token.access_token)
@@ -212,20 +218,20 @@ impl TokenManager {
                         Err(e) => Err(e),
                     };
 
-                // 广播结果并清理 inflight
+                // Broadcast results and clean up inflight
                 if let Some(_entry) = self.load_code_assist_inflight.get_mut(&token.account_id) {
-                    // 这里虽然是 rx，但在 Rust 中 watch 不需要 tx 也可以通过私有方式操作？
-                    // 修正：我们需要持有 tx。重新设计此处：使用 Mutex 或在 scope 外持有 tx。
-                    // 由于 DashMap 不能存不可克隆的 tx，我们改用 Mutex 保护的流程或直接在 if is_new 里执行
+                    // Although it is rx here, in Rust, watch can operate privately without tx?
+                    // Correction: We need to hold tx. Redesign here: use Mutex or hold tx outside scope.
+                    // Since DashMap cannot store tx that cannot be cloned, we instead use a Mutex-protected process or execute it directly in if is_new
                 }
 
-                // 【修正实现方案】: 对于 project_id 这种高频探测，仍然使用 refresh_mu 锁是最高效的，
-                // 但我们要加入“强制异步等待”逻辑。由于之前的 Mutex 已经是异步的，
-                // 我们只需确保 fetch_project_id 调用被包裹在锁内并且有 double-check。
-                // 之前的代码已经做到了这一点。
+                // [Corrected Implementation Plan]: For high-frequency detection such as project_id, it is most efficient to still use the refresh_mu lock.
+                // But we need to add "forced asynchronous waiting" logic. Since the previous Mutex was already asynchronous,
+                // We just need to make sure that the fetch_project_id call is wrapped in a lock and has a double-check.
+                // The previous code already did this.
 
-                // 为了完全对齐 agent-vibes 的 singleFlight 语义（即不仅是锁，还要有“结果复用”），
-                // 我将保留之前的逻辑但移除不必要的重复日志。
+                // In order to fully align with the singleFlight semantics of agent-vibes (i.e. not just locks, but also "result reuse"),
+                // I'll keep the previous logic but remove unnecessary duplicate logs.
 
                 let refresh_mu = self
                     .refresh_locks
@@ -247,7 +253,7 @@ impl TokenManager {
                                 if let Some(mut entry) = self.tokens.get_mut(&token.account_id) {
                                     entry.project_id = Some(pid.clone());
                                 }
-                                // [FIX] 写盘后台化：project_id 已写入内存，磁盘持久化不阻塞热路径
+                                // [FIX] Disk writing background: project_id has been written to memory, disk persistence does not block the hot path
                                 {
                                     let write_path = self
                                         .tokens
@@ -291,7 +297,7 @@ impl TokenManager {
                     _ => "bamboo-precept-lgxtn".to_string(),
                 }
             } else {
-                // 如果不是第一个，则等待结果 (虽然在 Mutex 模式下不需要 rx，但为了严谨性我们可以保留锁)
+                // If it's not the first one, wait for the result (although rx is not required in Mutex mode, we can keep the lock for strictness)
                 let refresh_mu = self
                     .refresh_locks
                     .get(&token.account_id)

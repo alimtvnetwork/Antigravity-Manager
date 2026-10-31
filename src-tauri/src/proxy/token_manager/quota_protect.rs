@@ -1,4 +1,4 @@
-//! 配额保护：触发 / 检查恢复 / 恢复配额保护。
+//! Quota Protection: Trigger/Check Recovery/Restore Quota Protection.
 
 use super::helpers::update_account_json;
 use super::TokenManager;
@@ -6,8 +6,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 impl TokenManager {
-    /// 触发配额保护，限制特定模型 (Issue #621)
-    /// 返回 true 如果发生了改变
+    /// Trigger quota protection to restrict specific models (Issue #621)
+    /// Returns true if a change has occurred
     pub(crate) async fn trigger_quota_protection(
         &self,
         account_json: &mut serde_json::Value,
@@ -17,14 +17,14 @@ impl TokenManager {
         threshold: i32,
         model_name: &str,
     ) -> Result<bool, String> {
-        // 1. 初始化 protected_models 数组（如果不存在）
+        // 1. Initialize the protected_models array (if it does not exist)
         if account_json.get("protected_models").is_none() {
             account_json["protected_models"] = serde_json::Value::Array(Vec::new());
         }
 
         let protected_models = account_json["protected_models"].as_array_mut().unwrap();
 
-        // 2. 检查是否已存在
+        // 2. Check if it already exists
         if !protected_models
             .iter()
             .any(|m| m.as_str() == Some(model_name))
@@ -32,14 +32,14 @@ impl TokenManager {
             protected_models.push(serde_json::Value::String(model_name.to_string()));
 
             tracing::info!(
-                "账号 {} 的模型 {} 因配额受限（{}% < {}%）已被加入保护列表",
+                "Model {} of account {} has been added to the protection list due to quota restrictions ( {} % < {} %)",
                 account_id,
                 model_name,
                 current_val,
                 threshold
             );
 
-            // 3. 写入磁盘
+            // 3. Write to disk
             let model_name_owned = model_name.to_string();
             update_account_json(account_path, move |latest| {
                 if latest
@@ -59,7 +59,7 @@ impl TokenManager {
             })
             .await?;
 
-            // [FIX] 触发 TokenManager 的账号重新加载信号，确保内存中的 protected_models 同步
+            // [FIX] Trigger TokenManager's account reload signal to ensure synchronization of protected_models in memory
             crate::proxy::server::trigger_account_reload(account_id);
 
             return Ok(true);
@@ -68,7 +68,7 @@ impl TokenManager {
         Ok(false)
     }
 
-    /// 检查并从账号级保护恢复（迁移至模型级，Issue #621）
+    /// Check and restore from account level protection (migrated to model level, Issue #621)
     pub(crate) async fn check_and_restore_quota(
         &self,
         account_json: &mut serde_json::Value,
@@ -76,10 +76,10 @@ impl TokenManager {
         quota: &serde_json::Value,
         config: &crate::models::QuotaProtectionConfig,
     ) -> bool {
-        // [兼容性] 如果该账号当前处于 proxy_disabled=true 且原因是 quota_protection，
-        // 我们将其 proxy_disabled 设为 false，但同时更新其 protected_models 列表。
+        // [Compatibility] If the account is currently proxy_disabled=true and the reason is quota_protection,
+        // We set its proxy_disabled to false, but also update its protected_models list.
         tracing::info!(
-            "正在迁移账号 {} 从全局配额保护模式至模型级保护模式",
+            "Migrating account {} from global quota protection mode to model-level protection mode",
             account_json
                 .get("email")
                 .and_then(|v| v.as_str())
@@ -145,11 +145,11 @@ impl TokenManager {
             "update_account_json",
         );
 
-        false // 返回 false 表示现在已可以尝试加载该账号（模型级过滤会在 get_token 时发生）
+        false // Returning false indicates that you can now try to load the account (model-level filtering will occur during get_token)
     }
 
-    /// 恢复特定模型的配额保护 (Issue #621)
-    /// 返回 true 如果发生了改变
+    /// Restore quota protection for specific models (Issue #621)
+    /// Returns true if a change has occurred
     pub(crate) async fn restore_quota_protection(
         &self,
         account_json: &mut serde_json::Value,
@@ -166,7 +166,7 @@ impl TokenManager {
 
             if arr.len() < original_len {
                 tracing::info!(
-                    "账号 {} 的模型 {} 配额已恢复，移出保护列表",
+                    "The quota of model {} of account {} has been restored and removed from the protection list",
                     account_id,
                     model_name
                 );
@@ -187,6 +187,6 @@ impl TokenManager {
         Ok(false)
     }
 
-    /// P2C 算法的候选池大小 - 从前 N 个最优候选中随机选择
+    /// Candidate pool size for P2C algorithm - randomly selected from the top N best candidates
     pub(crate) const P2C_POOL_SIZE: usize = 5;
 }

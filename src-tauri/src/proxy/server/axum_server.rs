@@ -49,8 +49,8 @@ impl AxumServer {
         self.upstream.rebuild_default_client(Some(new_config)).await;
         // Stale per-proxy clients may also be affected (e.g. fallback path)
         self.upstream.clear_client_cache();
-        // 全局共享客户端（token 刷新 / 配额刷新 / 项目解析 / zai / MCP 等）同样是按
-        // 构建时的代理配置定型的，必须一并失效，否则会带着旧代理继续跑。
+        // Global shared clients (token refresh/quota refresh/project analysis/zai/MCP, etc.) also press
+        // The agent configuration during construction is finalized and must be invalidated, otherwise it will continue to run with the old agent.
         crate::utils::http::invalidate_shared_clients();
         tracing::info!("Upstream proxy config hot-reloaded");
     }

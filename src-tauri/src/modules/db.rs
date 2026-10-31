@@ -155,8 +155,8 @@ pub fn inject_token(
 ) -> Result<String, String> {
     crate::modules::logger::log_info("Starting Token injection...");
 
-    // 如果使用的是本项目的内置 Client ID (antigravity_enterprise 实际上是标准版)
-    // 则强制关闭 GCP TOS 标志，以确保 IDE 使用标准 Client ID 进行刷新
+    // If you are using the built-in Client ID of this project (antigravity_enterprise is actually the standard version)
+    // force the GCP TOS flag to be turned off to ensure that the IDE uses the standard Client ID for refresh
     if let Some(key) = oauth_client_key {
         if key == "antigravity_enterprise" {
             if is_gcp_tos {
@@ -338,14 +338,14 @@ fn clear_enterprise_project_preference(conn: &Connection) -> Result<(), String> 
     Ok(())
 }
 
-/// 注入 Service Machine ID 到数据库，解决 VS Code 缓存指纹不匹配导致 Token 失效的问题
+/// Inject the Service Machine ID into the database to solve the problem of Token invalidation caused by VS Code cache fingerprint mismatch
 pub fn write_service_machine_id(
     db_path: &std::path::Path,
     service_machine_id: &str,
 ) -> Result<(), String> {
     let conn = Connection::open(db_path).map_err(|e| format!("Failed to open database: {}", e))?;
 
-    // 同 `inject_new_format`：热切号时应用仍在运行，忙等待避免瞬时锁竞争导致写入失败
+    // Same as `inject_new_format`: the application is still running when eager, busy waiting to avoid write failure caused by transient lock competition
     conn.busy_timeout(std::time::Duration::from_millis(2000))
         .map_err(|e| format!("Failed to set busy_timeout: {}", e))?;
 
@@ -374,13 +374,17 @@ pub fn sanitize_session(db_path: &std::path::Path) -> Result<(), String> {
         conn.busy_timeout(std::time::Duration::from_millis(2000)),
         "busy_timeout",
     );
+    // Imp-10: Keyring & Account Scrubbing on Clone
+    // Delete account, oauth, and token rows from cloned state.vscdb to eliminate session bleeding
     // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
     crate::error::record_ignored(
         conn.execute(
-            "DELETE FROM ItemTable WHERE key IN (?, ?)",
+            "DELETE FROM ItemTable WHERE key IN (?, ?, ?, ?) OR key LIKE 'authentication.session%' OR key LIKE 'accounts.%'",
             [
                 "antigravityUnifiedStateSync.oauthToken",
                 "antigravityUnifiedStateSync.userStatus",
+                "antigravity.auth.token",
+                "userDataSync.account",
             ],
         ),
         "db execute",

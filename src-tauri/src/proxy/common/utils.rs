@@ -1,4 +1,4 @@
-// 工具函数
+// Utility function
 
 pub fn generate_random_id() -> String {
     use rand::Rng;
@@ -9,8 +9,8 @@ pub fn generate_random_id() -> String {
         .collect()
 }
 
-/// 根据模型名称推测功能类型
-// 注意：此函数已弃用，请改用 mappers::common_utils::resolve_request_config
+/// Infer function type based on model name
+// NOTE: This function is deprecated, use mappers::common_utils::resolve_request_config instead
 pub fn _deprecated_infer_quota_group(model: &str) -> String {
     if model.to_lowercase().starts_with("claude") {
         "claude".to_string()
@@ -19,13 +19,13 @@ pub fn _deprecated_infer_quota_group(model: &str) -> String {
     }
 }
 
-/// 工具调用 ID 统一归一化处理。
+/// Tool call IDs are unified and normalized.
 ///
-/// 规范格式统一为以 `call_` 开头（如 `call_573077`）。
-/// 部分客户端（如 Antigravity IDE、VS Code 插件或某些中间代理）在回传时会丢失下划线
-/// 产生类似 `call573077` 的形式，导致与网关签名缓存与思考存储无法精确匹配。
+/// The standard format is unified to start with `call_` (such as `call_573077`).
+/// Some clients (such as Antigravity IDE, VS Code plug-in, or some intermediary proxies) lose underscores on postback
+/// Produces a form similar to `call573077`, resulting in an inability to accurately match the gateway signature cache and thinking storage.
 ///
-/// 本函数将 `call<digits>` 或丢失下划线的 call ID 规范化为统一的 `call_<digits>` 格式。
+/// This function normalizes `call<digits>` or call IDs missing underscores into a unified `call_<digits>` format.
 pub fn normalize_tool_id(id: &str) -> std::borrow::Cow<'_, str> {
     let trimmed = id.trim();
     if trimmed.starts_with("call") && !trimmed.starts_with("call_") && trimmed.len() > 4 {
@@ -45,7 +45,7 @@ mod tests {
 
     #[test]
     fn test_normalize_tool_id() {
-        // 丢失下划线的客户端数字/哈希 ID 统一归一化为 call_
+        // Client numbers/hash IDs that are missing underscores are normalized to call_
         assert_eq!(normalize_tool_id("call573077").as_ref(), "call_573077");
         assert_eq!(normalize_tool_id("call1599720").as_ref(), "call_1599720");
         assert_eq!(normalize_tool_id("call932369").as_ref(), "call_932369");
@@ -53,7 +53,7 @@ mod tests {
         assert_eq!(normalize_tool_id("call0123456").as_ref(), "call_0123456");
         assert_eq!(normalize_tool_id("calld4e5f6a1").as_ref(), "call_d4e5f6a1");
 
-        // 已符合规范的保持原样
+        // Already in compliance with specifications, remain as is
         assert_eq!(normalize_tool_id("call_573077").as_ref(), "call_573077");
         assert_eq!(
             normalize_tool_id("call_read_root_ada28549fe0e_0").as_ref(),
@@ -61,7 +61,7 @@ mod tests {
         );
         assert_eq!(normalize_tool_id("toolu_01Abc").as_ref(), "toolu_01Abc");
 
-        // 普通词汇或短 ID 不误判
+        // Common words or short IDs will not be misjudged
         assert_eq!(normalize_tool_id("call").as_ref(), "call");
         assert_eq!(normalize_tool_id("calling").as_ref(), "calling");
         assert_eq!(normalize_tool_id("callback").as_ref(), "callback");

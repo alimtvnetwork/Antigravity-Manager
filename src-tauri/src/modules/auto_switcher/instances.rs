@@ -31,6 +31,11 @@ pub fn is_instance_binding_stale_or_exhausted(
     target_model: &str,
     now_sec: i64,
 ) -> bool {
+    // If actively running, an instance's binding is NEVER stale or available for theft!
+    if is_running {
+        return false;
+    }
+
     let stale_timeout_secs = (stale_timeout_hours.clamp(1, 24) as i64) * 3600;
     let is_stale_time = inst.last_used > 0 && (now_sec - inst.last_used) > stale_timeout_secs;
 
@@ -42,6 +47,14 @@ pub fn is_instance_binding_stale_or_exhausted(
     // If bound account has 0% credits remaining (no credits), mark as not working / exhausted
     if let Some(ref acc_id) = inst.bound_account_id {
         if let Ok(acc) = account::load_account(acc_id) {
+            let q_4h = calculate_4h_window_quota(&acc, target_model).unwrap_or(100.0);
+            if q_4h <= 0.0 {
+                return true;
+            }
+        }
+    }
+    if let Some(ref email) = inst.bound_email {
+        if let Ok(Some(acc)) = account::get_account_by_email(email) {
             let q_4h = calculate_4h_window_quota(&acc, target_model).unwrap_or(100.0);
             if q_4h <= 0.0 {
                 return true;
@@ -62,6 +75,9 @@ pub fn get_active_in_use_account_ids() -> Vec<String> {
     let mut in_use = Vec::new();
     for inst in instances {
         let is_running = instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
+        if !is_running {
+            continue;
+        }
         if is_instance_binding_stale_or_exhausted(
             &inst,
             is_running,
@@ -71,28 +87,42 @@ pub fn get_active_in_use_account_ids() -> Vec<String> {
         ) {
             continue;
         }
-        let acc_id_opt = inst
-            .bound_account_id
-            .clone()
-            .or_else(|| account::get_current_account_id().ok().flatten());
-        if let Some(acc_id) = acc_id_opt {
-            if !in_use.contains(&acc_id) {
-                in_use.push(acc_id);
+        if let Some(ref acc_id) = inst.bound_account_id {
+            if !in_use.contains(acc_id) {
+                in_use.push(acc_id.clone());
+            }
+            if let Ok(acc) = account::load_account(acc_id) {
+                if !in_use.contains(&acc.email) {
+                    in_use.push(acc.email.clone());
+                }
+            }
+        }
+        if let Some(ref email) = inst.bound_email {
+            if !in_use.contains(email) {
+                in_use.push(email.clone());
+            }
+            if let Ok(Some(acc)) = account::get_account_by_email(email) {
+                if !in_use.contains(&acc.id) {
+                    in_use.push(acc.id.clone());
+                }
             }
         }
     }
     if let Ok(Some(current_id)) = account::get_current_account_id() {
-        if let Ok(cur_acc) = account::load_account(&current_id) {
-            let cur_q =
-                calculate_4h_window_quota(&cur_acc, &switcher_cfg.target_model).unwrap_or(100.0);
-            let is_cur_stale = cur_acc.last_used > 0
-                && (now_sec - cur_acc.last_used)
-                    > (switcher_cfg.stale_binding_timeout_hours.clamp(1, 24) as i64) * 3600;
-            if cur_q > 0.0 && !is_cur_stale && !in_use.contains(&current_id) {
+        let is_default_running = instance::is_instance_running("default", "", None);
+        if is_default_running {
+            if let Ok(cur_acc) = account::load_account(&current_id) {
+                let cur_q = calculate_4h_window_quota(&cur_acc, &switcher_cfg.target_model)
+                    .unwrap_or(100.0);
+                let is_cur_stale = cur_acc.last_used > 0
+                    && (now_sec - cur_acc.last_used)
+                        > (switcher_cfg.stale_binding_timeout_hours.clamp(1, 24) as i64) * 3600;
+                if cur_q > 0.0 && !is_cur_stale && !in_use.contains(&current_id) {
+                    in_use.push(current_id);
+                }
+            } else if !in_use.contains(&current_id) {
                 in_use.push(current_id);
             }
-        } else if !in_use.contains(&current_id) {
-            in_use.push(current_id);
         }
     }
     in_use
@@ -218,4 +248,44 @@ pub fn is_account_in_use_core(
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::InstanceConfig;
+
+    #[test]
+    fn test_running_instance_binding_is_never_stale_or_exhausted() {
+        let inst = InstanceConfig {
+            id: "test-running-inst".to_string(),
+            name: "Running Instance".to_string(),
+            data_dir: "/tmp/running".to_string(),
+            executable_path: None,
+            extensions_dir: None,
+            bound_account_id: Some("exhausted-acc".to_string()),
+            bound_email: None,
+            created_at: 100,
+            last_used: 100, // very old timestamp
+            is_default: false,
+            pid: None,
+            seq_num: Some(1),
+        };
+
+        // When is_running is true, it MUST return false immediately
+        let is_stale =
+            is_instance_binding_stale_or_exhausted(&inst, true, 6, "gemini-2.5-pro", 100_000);
+        assert!(
+            !is_stale,
+            "Actively running instance binding must never be considered stale or exhausted"
+        );
+
+        // When is_running is false and last_used is old, it returns true
+        let is_stale_stopped =
+            is_instance_binding_stale_or_exhausted(&inst, false, 6, "gemini-2.5-pro", 100_000);
+        assert!(
+            is_stale_stopped,
+            "Stopped instance with expired last_used must be considered stale"
+        );
+    }
 }

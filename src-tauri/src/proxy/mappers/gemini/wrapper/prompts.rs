@@ -7,10 +7,10 @@ use tracing::{debug, info};
 
 pub const INTERNAL_BACKGROUND_TASK: &str = "gemini-2.5-flash-lite";
 
-/// Layer-3 后台摘要请求的超时（秒）。
+/// Timeout in seconds for Layer-3 background digest requests.
 ///
-/// 上游客户端的默认超时是 600s，对"摘要整段对话"这种辅助任务过长 ——
-/// 一旦上游卡住，会长时间占住一个后台任务与连接。这里显式收紧到有界值。
+/// The default timeout of the upstream client is 600s, which is too long for auxiliary tasks such as "summarizing the entire conversation" -
+/// Once the upstream is stuck, a background task and connection will be occupied for a long time. This is explicitly tightened to bounded values.
 pub const SUMMARY_REQUEST_TIMEOUT_SECS: u64 = 180;
 pub const CONTEXT_SUMMARY_PROMPT: &str = r#"You are a context compression specialist. Your task is to create a structured XML snapshot of the conversation history.
 
@@ -134,13 +134,13 @@ pub(crate) async fn try_compress_gemini_with_summary(
         token_obj.as_ref(),
     );
 
-    // 走共享的辅助调用通道：复用主请求路径的客户端（含按账号代理池）、
-    // 端点顺序（Daily → Sandbox → Prod）、URL 形状与回退判定。
+    // Take the shared auxiliary call channel: the client that reuses the main request path (including the proxy pool by account),
+    // Endpoint order (Daily → Sandbox → Prod), URL shape and fallback decision.
     //
-    // 历史实现手写了
+    // History is written by hand
     // `{host}/v1internal/projects/{p}/locations/global/models/{m}:generateContent`
-    // 并把 host 硬编码为 sandbox —— 该形状在 daily / sandbox / prod 三个 host 上
-    // 一律返回 HTML 404，因此本函数从未成功过（后台 spawn，失败只打日志，表现为静默空转）。
+    // And hard-code the host as sandbox - this shape is on the three hosts daily / sandbox / prod
+    // Always returns HTML 404, so this function has never succeeded (spawn in the background, only logs on failure, showing silent idling).
     let gemini_response = upstream
         .call_v1_internal_auxiliary(
             "generateContent",
@@ -151,16 +151,16 @@ pub(crate) async fn try_compress_gemini_with_summary(
         )
         .await?;
 
-    // 上游返回的是 `{"response": {...}}` 包装体，必须先解包才能取到 candidates。
+    // The upstream returns the `{"response": {...} }` package, which must be unpacked before the candidates can be obtained.
     let unwrapped_summary = unwrap_response(&gemini_response);
 
-    // 只拼接「非思考 part」的文本。
+    // Only the text of the "non-thinking part" is spliced.
     //
-    // 实测（gemini-2.5-flash-lite，3/3）响应形如：
-    //   parts[0] = { "thought": true, "text": "" }   ← 空思考块，排在最前
-    //   parts[1] = { "text": "```xml\n<summary>…" }  ← 真正的摘要
-    // 因此不能取 `parts[0].text`（会得到空串，把空摘要当成功静默写回），
-    // 也不能只用 `parts[0]` —— 必须按 `thought` 标志过滤后拼接全部可见文本。
+    // The actual measured (gemini-2.5-flash-lite, 3/3) response is as follows:
+    //   parts[0] = { "thought": true, "text": "" } ← Empty thinking block, ranked first
+    //   parts[1] = { "text": "```xml <summary>…" } ← real summary
+    // Therefore, `parts[0].text` cannot be taken (an empty string will be obtained, and the empty summary will be silently written back as a success).
+    // You can't just use `parts[0]` - you must filter by the `thought` flag and then splice all visible text.
     let xml_summary = unwrapped_summary
         .get("candidates")
         .and_then(|c| c.get(0))

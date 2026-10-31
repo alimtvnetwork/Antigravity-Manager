@@ -25,13 +25,15 @@ export function TierBadge({ tier, size = 'sm', className }: TierBadgeProps) {
     if (isUltra) {
         return (
             <span
+                role="status"
+                aria-label={t('accounts.tier_ultra_label', 'Tier: Ultra')}
                 className={cn(
                     'inline-flex items-center font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-white cursor-default select-none',
                     sizeClasses,
                     className
                 )}
             >
-                <Gem className="w-2.5 h-2.5 fill-current shrink-0" />
+                <Gem className="w-2.5 h-2.5 fill-current shrink-0" aria-hidden="true" />
                 <span>{t('accounts.ultra', 'ULTRA')}</span>
             </span>
         );
@@ -40,13 +42,15 @@ export function TierBadge({ tier, size = 'sm', className }: TierBadgeProps) {
     if (isPro) {
         return (
             <span
+                role="status"
+                aria-label={t('accounts.tier_pro_label', 'Tier: Pro')}
                 className={cn(
                     'inline-flex items-center font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white cursor-default select-none',
                     sizeClasses,
                     className
                 )}
             >
-                <Diamond className="w-2.5 h-2.5 fill-current shrink-0" />
+                <Diamond className="w-2.5 h-2.5 fill-current shrink-0" aria-hidden="true" />
                 <span>{t('accounts.pro', 'PRO')}</span>
             </span>
         );
@@ -55,13 +59,15 @@ export function TierBadge({ tier, size = 'sm', className }: TierBadgeProps) {
     if (isFree) {
         return (
             <span
+                role="status"
+                aria-label={t('accounts.tier_free_label', 'Tier: Free')}
                 className={cn(
                     'inline-flex items-center font-bold bg-gray-100 dark:bg-[#40285e] text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-[#40285e] hover:bg-gray-200 dark:hover:bg-[#1a3d5c] transition-colors cursor-default select-none',
                     sizeClasses,
                     className
                 )}
             >
-                <Circle className="w-2.5 h-2.5 shrink-0" />
+                <Circle className="w-2.5 h-2.5 shrink-0" aria-hidden="true" />
                 <span>{t('accounts.free', 'FREE')}</span>
             </span>
         );
@@ -75,6 +81,8 @@ export function TierBadge({ tier, size = 'sm', className }: TierBadgeProps) {
 
     return (
         <span
+            role="status"
+            aria-label={t('accounts.tier_unknown_label', 'Tier: Unknown')}
             className={cn(
                 'inline-flex items-center justify-center font-bold bg-gray-100 dark:bg-[#40285e] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-[#40285e] cursor-help select-none',
                 unknownSizeClasses,

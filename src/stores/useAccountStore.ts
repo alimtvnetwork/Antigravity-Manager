@@ -9,7 +9,7 @@ interface AccountState {
     error: string | null;
 
     // Actions
-    fetchAccounts: () => Promise<void>;
+    fetchAccounts: (force?: boolean) => Promise<void>;
     fetchCurrentAccount: () => Promise<void>;
     addAccount: (email: string, refreshToken: string) => Promise<void>;
     deleteAccount: (accountId: string) => Promise<void>;
@@ -19,7 +19,7 @@ interface AccountState {
     refreshAllQuotas: () => Promise<accountService.RefreshStats>;
     reorderAccounts: (accountIds: string[]) => Promise<void>;
 
-    // 新增 actions
+    // Add actions
     startOAuthLogin: () => Promise<void>;
     completeOAuthLogin: () => Promise<void>;
     cancelOAuthLogin: () => Promise<void>;
@@ -32,7 +32,14 @@ interface AccountState {
     warmUpAccount: (accountId: string) => Promise<string>;
     updateAccountLabel: (accountId: string, label: string) => Promise<void>;
     updateAccountPriority: (accountId: string, priority: number) => Promise<void>;
+    toggleAccountDisabled: (accountId: string, disabled: boolean, reason?: string) => Promise<void>;
+    setAccountsDisabled: (accountIds: string[], disabled: boolean, reason?: string) => Promise<void>;
 }
+
+let inFlightFetchPromise: Promise<void> | null = null;
+let lastFetchTimestamp = 0;
+const FETCH_DEBOUNCE_MS = 30000;
+const BACKGROUND_THROTTLE_MS = 300000;
 
 export const useAccountStore = create<AccountState>((set, get) => ({
     accounts: [],
@@ -40,16 +47,31 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     loading: false,
     error: null,
 
-    fetchAccounts: async () => {
-        set({ loading: true, error: null });
-        try {
-            console.log('[Store] Fetching accounts...');
-            const accounts = await accountService.listAccounts();
-            set({ accounts, loading: false });
-        } catch (error) {
-            console.error('[Store] Fetch accounts failed:', error);
-            set({ error: String(error), loading: false });
+    fetchAccounts: async (force?: boolean) => {
+        const now = Date.now();
+        if (inFlightFetchPromise) {
+            return inFlightFetchPromise;
         }
+        const effectiveDebounce = (typeof document !== 'undefined' && document.hidden)
+            ? BACKGROUND_THROTTLE_MS
+            : FETCH_DEBOUNCE_MS;
+        if (!force && now - lastFetchTimestamp < effectiveDebounce && get().accounts.length > 0) {
+            return;
+        }
+        inFlightFetchPromise = (async () => {
+            set({ loading: true, error: null });
+            try {
+                const accounts = await accountService.listAccounts();
+                lastFetchTimestamp = Date.now();
+                set({ accounts, loading: false });
+            } catch (error) {
+                console.error('[Store] Fetch accounts failed:', error);
+                set({ error: String(error), loading: false });
+            } finally {
+                inFlightFetchPromise = null;
+            }
+        })();
+        return inFlightFetchPromise;
     },
 
     fetchCurrentAccount: async () => {
@@ -155,31 +177,31 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     },
 
     /**
-     * 重新排序账号列表
-     * 采用乐观更新策略：先更新本地状态再调用后端持久化，以提供流畅的拖拽体验
+     * Reorder account list
+     * Adopt an optimistic update strategy: update the local state first and then call back-end persistence to provide a smooth drag-and-drop experience
      */
     reorderAccounts: async (accountIds: string[]) => {
         const { accounts } = get();
 
-        // 创建 ID 到账号的映射
+        // Create an ID to account mapping
         const accountMap = new Map(accounts.map(acc => [acc.id, acc]));
 
-        // 按新顺序重建账号数组
+        // Rebuild the account array in new order
         const reorderedAccounts = accountIds
             .map(id => accountMap.get(id))
             .filter((acc): acc is Account => acc !== undefined);
 
-        // 添加未在新顺序中的账号（保持原有顺序）
+        // Add accounts not in the new order (keep the original order)
         const remainingAccounts = accounts.filter(acc => !accountIds.includes(acc.id));
         const finalAccounts = [...reorderedAccounts, ...remainingAccounts];
 
-        // 乐观更新本地状态
+        // Optimistically update local status
         set({ accounts: finalAccounts });
 
         try {
             await accountService.reorderAccounts(accountIds);
         } catch (error) {
-            // 后端失败时回滚到原始顺序
+            // Rollback to original order on backend failure
             console.error('[AccountStore] Reorder accounts failed:', error);
             set({ accounts });
             throw error;
@@ -323,7 +345,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     updateAccountLabel: async (accountId: string, label: string) => {
         try {
             await accountService.updateAccountLabel(accountId, label);
-            // 乐观更新本地状态
+            // Optimistically update local status
             const { accounts } = get();
             const updatedAccounts = accounts.map(acc =>
                 acc.id === accountId ? { ...acc, custom_label: label || undefined } : acc
@@ -331,6 +353,26 @@ export const useAccountStore = create<AccountState>((set, get) => ({
             set({ accounts: updatedAccounts });
         } catch (error) {
             console.error('[AccountStore] Update label failed:', error);
+            throw error;
+        }
+    },
+
+    toggleAccountDisabled: async (accountId: string, disabled: boolean, reason?: string) => {
+        try {
+            await accountService.toggleAccountDisabled(accountId, disabled, reason);
+            await get().fetchAccounts();
+        } catch (error) {
+            console.error('[AccountStore] Toggle account disabled failed:', error);
+            throw error;
+        }
+    },
+
+    setAccountsDisabled: async (accountIds: string[], disabled: boolean, reason?: string) => {
+        try {
+            await accountService.setAccountsDisabled(accountIds, disabled, reason);
+            await get().fetchAccounts();
+        } catch (error) {
+            console.error('[AccountStore] Set accounts disabled failed:', error);
             throw error;
         }
     },

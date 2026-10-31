@@ -8,11 +8,11 @@ export function ControlSourceSection(props: BudgetSectionProps) {
                 <div className="space-y-2">
                     <label className="text-xs font-semibold text-gray-800 dark:text-gray-200">
                         {t("proxy.config.thinking_budget.control_source_label", {
-                            defaultValue: "控制权归属 (Top-Level Authority)",
+                            defaultValue: "Top-Level Authority",
                         })}
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {/* 网关权威控制 */}
+                        {/* Gateway authoritative control */}
                         <button
                             type="button"
                             onClick={() => handleControlSourceChange("gateway")}
@@ -32,24 +32,24 @@ export function ControlSourceSection(props: BudgetSectionProps) {
                                         }`}
                                     />
                                     {t("proxy.config.thinking_budget.source_gateway", {
-                                        defaultValue: "网关权威控制",
+                                        defaultValue: "Gateway authoritative control",
                                     })}
                                 </span>
                                 <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
                                     {t("proxy.config.thinking_budget.recommended_tag", {
-                                        defaultValue: "首选 / 推荐",
+                                        defaultValue: "Preferred / Recommended",
                                     })}
                                 </span>
                             </div>
                             <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
                                 {t("proxy.config.thinking_budget.source_gateway_desc", {
                                     defaultValue:
-                                        "网关层统一掌控思维链预算与启发式档位，消除不同客户端参数差异，杜绝由于超额预算或格式不当引发的官方 400 报错。",
+                                        "The gateway layer uniformly controls the thinking chain budget and heuristic gears, eliminates parameter differences between different clients, and eliminates official 400 errors caused by excessive budgets or improper formats.",
                                 })}
                             </p>
                         </button>
 
-                        {/* 客户端直接控制 */}
+                        {/* Client direct control */}
                         <button
                             type="button"
                             onClick={() => handleControlSourceChange("client")}
@@ -69,26 +69,26 @@ export function ControlSourceSection(props: BudgetSectionProps) {
                                         }`}
                                     />
                                     {t("proxy.config.thinking_budget.source_client", {
-                                        defaultValue: "客户端直接控制",
+                                        defaultValue: "Client direct control",
                                     })}
                                 </span>
                                 <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60">
                                     {t("proxy.config.thinking_budget.danger_tag", {
-                                        defaultValue: "危险 / 不推荐",
+                                        defaultValue: "Danger / Not Recommended",
                                     })}
                                 </span>
                             </div>
                             <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
                                 {t("proxy.config.thinking_budget.source_client_desc", {
                                     defaultValue:
-                                        "归一化后直接提取客户端上送的预算并透传。若客户端未传则由上游自适应。不恰当的预算可能直接导致 Google 报错。",
+                                        "After normalization, the budget submitted by the client is directly extracted and transparently transmitted. If the client does not transmit it, the upstream will adapt it. Inappropriate budgets may directly lead to Google errors.",
                                 })}
                             </p>
                         </button>
                     </div>
                 </div>
 
-                {/* 客户端控制警示框 */}
+                {/* Client control alert box */}
                 {controlSource === "client" && (
                     <div className="p-3.5 bg-rose-50/80 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/40 rounded-xl text-xs text-rose-800 dark:text-rose-200 flex items-start gap-2.5">
                         <svg
@@ -107,13 +107,13 @@ export function ControlSourceSection(props: BudgetSectionProps) {
                         <div className="space-y-1 text-[11px] leading-relaxed">
                             <span className="font-semibold">
                                 {t("proxy.config.thinking_budget.client_warning_title", {
-                                    defaultValue: "危险警告：已切换为客户端直接控制",
+                                    defaultValue: "Danger warning: Switched to direct client control",
                                 })}
                             </span>
                             <p>
                                 {t("proxy.config.thinking_budget.client_warning_desc", {
                                     defaultValue:
-                                        "不同客户端插件（如 Cline, Roo, Cherry 等）上送的 thinking.budget_tokens 或 effort 各不相同。若客户端指定了超过 Google API 支持的数值（如 Flash 超过 24576、或 Pro 传入非标准数值），Google 将直接返回 400 Bad Request 错误中断生成。",
+                                        "The thinking.budget_tokens or effort sent by different client plug-ins (such as Cline, Roo, Cherry, etc.) are different. If the client specifies a value that exceeds the Google API support (such as Flash exceeding 24576, or Pro passing in a non-standard value), Google will directly return a 400 Bad Request error and interrupt the generation.",
                                 })}
                             </p>
                         </div>

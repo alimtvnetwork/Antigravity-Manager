@@ -1,6 +1,7 @@
 import {
   useErrorStore,
   recordClickEvent,
+  persistErrorToSpeedDb,
 } from '../stores/error-store';
 
 let isInitialized = false;
@@ -17,6 +18,15 @@ export function persistClientCrash(err: unknown, source: string): void {
       at: new Date().toISOString(),
     };
     localStorage.setItem(LAST_CLIENT_ERROR_KEY, JSON.stringify(payload));
+    persistErrorToSpeedDb({
+      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36),
+      code: 'E9001',
+      level: 'error',
+      message: errorObj.message,
+      stackTrace: errorObj.stack,
+      createdAt: new Date().toISOString(),
+      context: { source, triggerAction: 'persist_client_crash' },
+    });
   } catch (storageError) {
     useErrorStore.getState().trackWarning(storageError, {
       source: 'error-listener.persistClientCrash',
@@ -30,7 +40,8 @@ function isClipboardFocusError(reason: unknown): boolean {
     ? `${reason.message}\n${reason.stack ?? ''}`
     : String(reason ?? '');
   return text.includes('Document is not focused')
-    || text.includes("Failed to execute 'writeText'");
+    || text.includes("Failed to execute 'writeText'")
+    || text.includes("Failed to execute 'write'");
 }
 
 function replayPersistedClientError(): void {
@@ -40,10 +51,6 @@ function replayPersistedClientError(): void {
   }
   localStorage.removeItem(LAST_CLIENT_ERROR_KEY);
   if (isClipboardFocusError(raw)) {
-    useErrorStore.getState().trackWarning(new Error(raw), {
-      source: 'persisted-client-crash',
-      triggerAction: 'replay_clipboard_not_focused',
-    });
     return;
   }
   useErrorStore.getState().captureError(new Error(raw), {
@@ -143,10 +150,6 @@ function handleUnhandledRejection(event: PromiseRejectionEvent): void {
 
   if (isClipboardFocusError(reason)) {
     event.preventDefault();
-    useErrorStore.getState().trackWarning(reason, {
-      source: 'window.unhandledrejection',
-      triggerAction: 'clipboard_not_focused',
-    });
     return;
   }
 

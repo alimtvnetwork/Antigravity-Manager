@@ -8,9 +8,13 @@
 #![allow(dead_code)]
 
 pub mod agy;
+pub mod ascii_tree;
+pub mod attachment_hasher;
+pub mod attachment_mime;
 pub mod auto_resume;
 pub mod backup;
 pub mod clone_rows;
+pub mod depth_guard;
 pub mod detection;
 pub mod discovery;
 pub mod dispatch;
@@ -28,6 +32,8 @@ pub mod schema;
 pub mod sequences;
 pub mod sqlite_export;
 pub mod state;
+#[cfg(test)]
+pub mod tests;
 pub mod text_utils;
 pub mod transcript;
 pub mod tree;
@@ -38,13 +44,20 @@ pub mod tree_node_liveness;
 pub mod tree_nodes;
 pub mod tree_phases;
 pub mod tree_text;
+pub mod verification;
+
+pub use ascii_tree::*;
+pub use attachment_hasher::*;
+pub use attachment_mime::*;
+pub use depth_guard::*;
 
 // ---- models ----
 pub use models::{
     ActivePrompt, AgmConversationNode, AgmProjectTreeNode, AgmSequenceResolution,
-    AutoResumePromptInfo, AutoResumeResult, FailedCommandRecord, ProjectExecutionInfo,
-    ProjectLivenessEvaluation, PromptGoalHeartbeatConfig, PromptLivenessProbe, RunningProject,
-    SwitchPromptSnap, TranscriptInspection,
+    AutoResumePromptInfo, AutoResumeResult, FailedCommandRecord, ProjectAuditRationaleType,
+    ProjectExecutionInfo, ProjectLivenessEvaluation, PromptAuditCriteriaType,
+    PromptGoalHeartbeatConfig, PromptLivenessProbe, RunningProject, SwitchPromptSnap,
+    TranscriptInspection,
 };
 // ---- state ----
 pub use state::{get_dispatched_prompts_cache, get_memory_prompt, reset_dispatched_prompts_cache};
@@ -57,7 +70,8 @@ pub use failed_commands::{
 };
 // ---- detection ----
 pub use detection::{
-    detect_running_projects, extract_image_payload_or_path, live_prompt_text, resume_task_document,
+    detect_running_projects, extract_image_payload_or_path, extract_screenshot_id_token,
+    live_prompt_text, resume_task_document,
 };
 // ---- gemini_dirs ----
 pub use gemini_dirs::{gemini_dirs_for_instance, gemini_dirs_tagged, get_canonical_host_home};
@@ -69,7 +83,9 @@ pub use backup::{
     resend_queued_prompts_for_instance, verify_prompts_running, ResendQueuedOutcome,
 };
 // ---- dispatch ----
-pub use dispatch::{dispatch_running_prompts, parse_flexible_timestamp};
+pub use dispatch::{
+    dispatch_running_prompts, dispatch_single_latest_prompt, parse_flexible_timestamp,
+};
 // ---- liveness ----
 pub use liveness::is_prompt_running_for_project;
 // ---- queue ----
@@ -84,27 +100,34 @@ pub use project_queries::{
 };
 // ---- restore ----
 pub use restore::{
-    list_backed_up_prompts, restore_prompts_from_backup_json, switch_prompt_snapshot,
+    list_backed_up_prompts, restore_prompts_from_backup_json, restore_running_prompts,
+    switch_prompt_snapshot,
 };
 // ---- prompts_crud ----
-pub use prompts_crud::{insert_active_prompt, list_active_prompts, save_or_requeue_prompt};
+pub use prompts_crud::{
+    insert_active_prompt, list_active_prompts, save_or_requeue_prompt, update_prompt_status,
+};
 // ---- text_utils ----
 pub use text_utils::{
     extract_clean_user_prompt, extract_smart_prompt_summary, format_friendly_workspace_label,
-    get_git_branch_for_path, lookup_conversation_title,
+    get_git_branch_for_path, lookup_conversation_title, strip_internal_id_wrappers, StrExt,
 };
 // ---- agy ----
 pub use agy::{
-    copy_text_to_clipboard_sync, copy_to_system_clipboard, drain_next_queued_prompt_for_workspace,
-    enqueue_prompt_for_instance, send_prompt_now_for_instance, spawn_or_replace_prompt_via_agy,
-    spawn_prompt_via_agy, terminate_agy_workers_for_instance,
+    cancel_running_prompt_for_instance, copy_text_to_clipboard_sync, copy_to_system_clipboard,
+    drain_next_queued_prompt_for_workspace, enqueue_prompt_for_instance,
+    send_prompt_now_for_instance, spawn_or_replace_prompt_via_agy, spawn_prompt_via_agy,
+    terminate_agy_workers_for_instance, terminate_all_active_agy_workers, wipe_and_rescan_repo_db,
 };
 // ---- resend ----
 pub use resend::{resend_all_running_commands, resend_running_commands_for_instance};
 // ---- auto_resume ----
 pub use auto_resume::auto_resume_recent_prompts;
 // ---- sequences ----
-pub use sequences::{extract_prompt_tail_snippet, extract_prompt_words_preview};
+pub use sequences::{
+    extract_prompt_tail_snippet, extract_prompt_words_preview, get_sequence_code_for_conversation,
+    get_sequence_code_in_conn,
+};
 // ---- sqlite_export ----
 pub use sqlite_export::{
     export_prompt_tree_db_bytes, import_prompt_tree_db, import_prompt_tree_db_bytes,
@@ -133,6 +156,8 @@ pub use goal_heartbeat::{
 };
 // ---- clone_rows ----
 pub use clone_rows::clone_instance_repo_rows;
+// ---- verification ----
+pub use verification::*;
 
 // ---- pub(crate) items (internal cross-module + test access) ----
 pub(crate) use clone_rows::clone_repo_rows_on;

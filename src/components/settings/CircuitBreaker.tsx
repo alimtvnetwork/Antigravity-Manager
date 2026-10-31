@@ -63,7 +63,7 @@ export default function CircuitBreaker({
                 </div>
             </div>
 
-            {/* 零配额持续熔断开关 */}
+            {/* Zero quota continuous blow switch */}
             <div className="flex items-center justify-between p-3 bg-gray-50/50 dark:bg-base-200/50 rounded-xl border border-gray-100 dark:border-base-300/50">
                 <div className="space-y-0.5">
                     <div className="text-sm font-bold text-gray-900 dark:text-gray-100">

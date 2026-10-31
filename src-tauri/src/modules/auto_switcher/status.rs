@@ -72,6 +72,8 @@ pub fn get_status() -> AutoSwitcherStatus {
     let state = RUNTIME_STATE.lock().unwrap();
     AutoSwitcherStatus {
         is_running: state.is_running,
+        is_enabled: switcher_cfg.is_enabled,
+        low_quota_threshold_percent: switcher_cfg.low_quota_threshold_percent,
         active_instance_id: active_id,
         active_account_email: active_email,
         current_quota_percent: active_quota,

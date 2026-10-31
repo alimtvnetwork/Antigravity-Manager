@@ -2,7 +2,7 @@ use axum::http::HeaderMap;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-/// 从 URL Query 字符串中提取 session / conversation 标识符
+/// Extract session/conversation identifier from URL Query string
 pub fn extract_session_from_query_str(query: &str) -> Option<String> {
     for (k, v) in url::form_urlencoded::parse(query.as_bytes()) {
         let key = k.to_ascii_lowercase();
@@ -22,20 +22,20 @@ pub fn extract_session_from_query_str(query: &str) -> Option<String> {
     None
 }
 
-/// 全生态显式会话标识解析（包含 URL Query、Header 扩展与 Body 扩展）
+/// Full-ecological explicit session ID resolution (including URL Query, Header extension and Body extension)
 pub fn explicit_session_id_with_query(
     headers: &HeaderMap,
     body: Option<&Value>,
     query: Option<&str>,
 ) -> Option<String> {
-    // 1. 显式 URL Query 参数（最高优先级：用户配置 Base URL 直接挂载 ?session_id=win1）
+    // 1. Explicit URL Query parameters (highest priority: user configuration Base URL direct mount?session_id=win1)
     if let Some(q) = query {
         if let Some(sid) = extract_session_from_query_str(q) {
             return Some(sid);
         }
     }
 
-    // 2. 从反代请求头中抓取 URL Query (x-forwarded-uri, x-original-uri)
+    // 2. Grab URL Query (x-forwarded-uri, x-original-uri) from the reverse request header
     for uri_h in ["x-forwarded-uri", "x-original-uri"] {
         if let Some(raw_uri) = headers.get(uri_h).and_then(|h| h.to_str().ok()) {
             if let Some(pos) = raw_uri.find('?') {
@@ -46,7 +46,7 @@ pub fn explicit_session_id_with_query(
         }
     }
 
-    // 3. 从 Web 客户端 Referer 中嗅探 Query
+    // 3. Sniff the Query from the Web client Referer
     if let Some(referer) = headers.get("referer").and_then(|h| h.to_str().ok()) {
         if let Some(pos) = referer.find('?') {
             if let Some(sid) = extract_session_from_query_str(&referer[pos + 1..]) {
@@ -55,12 +55,12 @@ pub fn explicit_session_id_with_query(
         }
     }
 
-    // 4. 全生态 HTTP Headers：先精确名单，再通配 x-*-session-id / x-*-sessionid
+    // 4. Full ecological HTTP Headers: precise list first, then wildcard x-*-session-id / x-*-sessionid
     if let Some(sid) = session_id_from_headers(headers) {
         return Some(sid);
     }
 
-    // 5. JSON Body 及 Metadata 深度提取
+    // 5. JSON Body and Metadata in-depth extraction
     if let Some(body) = body {
         for field in [
             "session_id",
@@ -146,8 +146,8 @@ fn is_generic_x_session_id(name: &str) -> bool {
     name.eq_ignore_ascii_case(GENERIC_SESSION_HEADER)
 }
 
-/// 兼容 AtomCode / JeikCode / Cursor 等客户端自定义会话头：
-/// 优先 `x-*-session-id` / `x-*-sessionid`，其次通用 `x-session-id`。
+/// Compatible with client-side custom session headers such as AtomCode / JeikCode / Cursor:
+/// Priority is given to `x-*-session-id` / `x-*-sessionid`, followed by `x-session-id`.
 fn is_wildcard_session_header(name: &str) -> bool {
     let key = name.trim().to_ascii_lowercase().replace('_', "-");
     if key == "mcp-session-id" {
@@ -227,7 +227,7 @@ pub fn sanitize_session_id(raw: &str) -> String {
     }
 }
 
-/// 判断 HTTP Header 是否属于会话语义相关头（严格排除易变随机头如 x-request-id 等）
+/// Determine whether the HTTP Header is a session semantic related header (variable random headers such as x-request-id, etc. are strictly excluded)
 pub fn is_session_semantic_header(name: &str) -> bool {
     let key = name.trim().to_ascii_lowercase().replace('_', "-");
     if key == "mcp-session-id" {
@@ -270,7 +270,7 @@ pub fn is_session_semantic_header(name: &str) -> bool {
         && compact.ends_with("id")
 }
 
-/// 收集所有具有会话隔离语义的 HTTP Header（键按字典序保存在 BTreeMap 中）
+/// Collect all HTTP Headers with session isolation semantics (keys are stored in BTreeMap in lexicographic order)
 pub fn collect_session_semantic_headers(
     headers: &HeaderMap,
 ) -> std::collections::BTreeMap<String, String> {
@@ -292,7 +292,7 @@ pub fn collect_session_semantic_headers(
     map
 }
 
-/// 从 URL Query、代理跳转 Header (x-forwarded-uri, x-original-uri) 以及 Referer 中提取会话参数
+/// Extract session parameters from URL Query, proxy redirect header (x-forwarded-uri, x-original-uri) and referer
 pub fn extract_query_session_id(headers: &HeaderMap, query: Option<&str>) -> Option<String> {
     if let Some(q) = query {
         if let Some(sid) = extract_session_from_query_str(q) {
@@ -318,7 +318,7 @@ pub fn extract_query_session_id(headers: &HeaderMap, query: Option<&str>) -> Opt
     None
 }
 
-/// 从 JSON Body 及 metadata 中提取显式指定的会话字段
+/// Extract explicitly specified session fields from JSON Body and metadata
 pub fn extract_body_session_id(body: Option<&Value>) -> Option<String> {
     let body = body?;
     for field in [
@@ -355,10 +355,10 @@ pub fn extract_body_session_id(body: Option<&Value>) -> Option<String> {
     None
 }
 
-/// 3D 正交确定性会话混淆哈希生成：
-/// 1. 租户隔离 (Tenant Key)
-/// 2. 客户端显式会话语义头集合 (Sorted Session Headers + Query + Body)
-/// 3. 会话根锚点指纹 (Fallback Root User Prompt + Full System Prompt + Tools)
+/// 3D orthogonal deterministic session obfuscated hash generation:
+/// 1. Tenant Key
+/// 2. Client-side explicit session semantic header collection (Sorted Session Headers + Query + Body)
+/// 3. Session root anchor fingerprint (Fallback Root User Prompt + Full System Prompt + Tools)
 pub fn derive_blended_session_id(
     tenant: &str,
     session_headers: &std::collections::BTreeMap<String, String>,

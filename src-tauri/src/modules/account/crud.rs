@@ -3,12 +3,41 @@ pub use crate::models::{
     TokenData,
 };
 use crate::modules;
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::RwLock;
 use uuid::Uuid;
 
 use super::*;
+
+#[derive(Clone)]
+struct CachedAccountList {
+    accounts: Vec<Account>,
+    cached_at: i64,
+}
+
+static ACCOUNT_LIST_CACHE: Lazy<RwLock<Option<CachedAccountList>>> =
+    Lazy::new(|| RwLock::new(None));
+
+/// Invalidate the in-memory account list cache when accounts or indexes change
+pub fn invalidate_account_list_cache() {
+    if let Ok(mut guard) = ACCOUNT_LIST_CACHE.write() {
+        *guard = None;
+    }
+}
+
+/// Update an account in-place in the in-memory cache without dropping the entire list
+pub fn update_cached_account(account: &Account) {
+    if let Ok(mut guard) = ACCOUNT_LIST_CACHE.write() {
+        if let Some(ref mut cached) = *guard {
+            if let Some(existing) = cached.accounts.iter_mut().find(|a| a.id == account.id) {
+                *existing = account.clone();
+            }
+        }
+    }
+}
 
 /// Load account data
 pub fn load_account(account_id: &str) -> Result<Account, String> {
@@ -44,7 +73,10 @@ pub(crate) fn save_account_at_path(
         .map_err(|e| format!("failed_to_serialize_account_data: {}", e))?;
 
     crate::utils::fs::write_atomic(account_path, content.as_bytes())
-        .map_err(|e| format!("failed_to_save_account_file: {}", e))
+        .map_err(|e| format!("failed_to_save_account_file: {}", e))?;
+
+    update_cached_account(account);
+    Ok(())
 }
 
 /// Save account data (thread-safe and atomic)
@@ -60,11 +92,22 @@ pub fn update_account_priority(account_id: &str, priority: u8) -> Result<(), Str
     let _account_write = lock_account_file_updates()?;
     let mut account = load_account(account_id)?;
     account.priority = priority;
-    save_account(&account)
+    save_account(&account)?;
+    invalidate_account_list_cache();
+    Ok(())
 }
 
 /// List all accounts
 pub fn list_accounts() -> Result<Vec<Account>, String> {
+    let now = chrono::Utc::now().timestamp();
+    if let Ok(guard) = ACCOUNT_LIST_CACHE.read() {
+        if let Some(ref cached) = *guard {
+            if now - cached.cached_at < 30 {
+                return Ok(cached.accounts.clone());
+            }
+        }
+    }
+
     crate::modules::logger::log_info("Listing accounts...");
     let index = load_account_index()?;
     let mut accounts = Vec::new();
@@ -87,6 +130,14 @@ pub fn list_accounts() -> Result<Vec<Account>, String> {
     if let Err(error) = crate::modules::token_stats::populate_weekly_usage(&mut accounts) {
         tracing::warn!("Weekly token usage unavailable: {}", error);
     }
+
+    if let Ok(mut guard) = ACCOUNT_LIST_CACHE.write() {
+        *guard = Some(CachedAccountList {
+            accounts: accounts.clone(),
+            cached_at: now,
+        });
+    }
+
     Ok(accounts)
 }
 
@@ -132,6 +183,7 @@ pub fn add_account(
     }
 
     save_account_index(&index)?;
+    invalidate_account_list_cache();
 
     crate::modules::task_history_db::record(
         crate::modules::audit_action::AuditAction::AddAccount,
@@ -264,12 +316,34 @@ pub fn delete_account(account_id: &str) -> Result<(), String> {
     let account_path = accounts_dir.join(format!("{}.json", account_id));
 
     if account_path.exists() {
-        fs::remove_file(&account_path)
-            .map_err(|e| format!("failed_to_delete_account_file: {}", e))?;
+        let retry_delays = [
+            std::time::Duration::from_millis(25),
+            std::time::Duration::from_millis(50),
+            std::time::Duration::from_millis(100),
+        ];
+        let mut remove_res = fs::remove_file(&account_path);
+        for delay in retry_delays {
+            if remove_res.is_ok() {
+                break;
+            }
+            std::thread::sleep(delay);
+            remove_res = fs::remove_file(&account_path);
+        }
+
+        if let Err(e) = &remove_res {
+            tracing::warn!(
+                "[delete_account] Failed to delete account file {}: {}",
+                account_path.display(),
+                e
+            );
+            // Justification: best-effort cleanup; a leftover file is harmless
+            crate::error::record_ignored(remove_res, "remove_file");
+        }
     }
 
     // [FIX #1477] Trigger TokenManager cache cleanup signal
     crate::proxy::server::trigger_account_delete(account_id);
+    invalidate_account_list_cache();
 
     Ok(())
 }
@@ -308,7 +382,9 @@ pub fn delete_accounts(account_ids: &[String]) -> Result<(), String> {
         index.current_account_id = index.accounts.first().map(|s| s.id.clone());
     }
 
-    save_account_index(&index)
+    save_account_index(&index)?;
+    invalidate_account_list_cache();
+    Ok(())
 }
 
 /// Reorder account list
@@ -347,6 +423,84 @@ pub fn reorder_accounts(account_ids: &[String]) -> Result<(), String> {
         "Account order updated, {} accounts total",
         index.accounts.len()
     ));
+
+    save_account_index(&index)?;
+    invalidate_account_list_cache();
+    Ok(())
+}
+
+/// Toggle disabled status for an account (atomically updating account file and index summary)
+pub fn toggle_account_disabled(
+    account_id: &str,
+    disabled: bool,
+    reason: Option<&str>,
+) -> Result<(), String> {
+    let _lock = ACCOUNT_INDEX_LOCK
+        .lock()
+        .map_err(|e| format!("failed_to_acquire_lock: {}", e))?;
+
+    let mut account = load_account(account_id)?;
+    account.disabled = disabled;
+    account.disabled_reason = if disabled {
+        reason
+            .map(|s| s.to_string())
+            .or_else(|| Some("user_disabled".to_string()))
+    } else {
+        None
+    };
+    account.disabled_at = if disabled {
+        Some(chrono::Utc::now().timestamp())
+    } else {
+        None
+    };
+
+    save_account(&account)?;
+
+    // Atomically update index summary
+    let mut index = load_account_index()?;
+    if let Some(summary) = index.accounts.iter_mut().find(|a| a.id == account_id) {
+        summary.disabled = disabled;
+        save_account_index(&index)?;
+    }
+
+    Ok(())
+}
+
+/// Batch set disabled status for multiple accounts
+pub fn set_accounts_disabled(
+    account_ids: &[String],
+    disabled: bool,
+    reason: Option<&str>,
+) -> Result<(), String> {
+    let _lock = ACCOUNT_INDEX_LOCK
+        .lock()
+        .map_err(|e| format!("failed_to_acquire_lock: {}", e))?;
+
+    let mut index = load_account_index()?;
+    let now = chrono::Utc::now().timestamp();
+
+    for id in account_ids {
+        if let Ok(mut account) = load_account(id) {
+            account.disabled = disabled;
+            account.disabled_reason = if disabled {
+                reason
+                    .map(|s| s.to_string())
+                    .or_else(|| Some("user_disabled".to_string()))
+            } else {
+                None
+            };
+            account.disabled_at = if disabled { Some(now) } else { None };
+            // Justification: best-effort file update per account in batch; index update is atomic
+            crate::error::record_ignored(
+                save_account(&account),
+                "save_account in set_accounts_disabled",
+            );
+        }
+
+        if let Some(summary) = index.accounts.iter_mut().find(|a| &a.id == id) {
+            summary.disabled = disabled;
+        }
+    }
 
     save_account_index(&index)
 }

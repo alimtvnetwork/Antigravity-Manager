@@ -159,22 +159,27 @@ pub fn chunk_telegram_text(text: &str, max_chars: usize) -> Vec<String> {
     balanced_chunks
 }
 
-/// Helper to clamp prompt and clipboard text safely on UTF-8 char boundaries (<= 3,900 chars)
+/// Telegram Bot API `CopyTextButton.text` is 1–256 characters. Exceeding this
+/// rejects the entire inline keyboard (CSV and action buttons never attach).
+pub const TELEGRAM_COPY_TEXT_MAX: usize = 256;
+/// Soft cap for HTML message chunks (sendMessage), not copy_text.
+pub const TELEGRAM_MESSAGE_TEXT_MAX: usize = 3900;
+
+/// Clamp text on UTF-8 character boundaries. `max_chars` is a character count.
 pub fn clamp_telegram_copy_text(text: &str, max_chars: usize) -> String {
-    let limit = if max_chars == 0 || max_chars > 3900 {
-        3900
+    let limit = if max_chars == 0 {
+        TELEGRAM_MESSAGE_TEXT_MAX
     } else {
-        max_chars
+        max_chars.min(TELEGRAM_MESSAGE_TEXT_MAX)
     };
-    if text.len() <= limit {
-        text.to_string()
-    } else {
-        let mut end = limit.saturating_sub(3);
-        while end > 0 && !text.is_char_boundary(end) {
-            end -= 1;
-        }
-        format!("{}...", &text[..end])
+    let char_count = text.chars().count();
+    if char_count <= limit {
+        return text.to_string();
     }
+    let take = limit.saturating_sub(3);
+    let mut out: String = text.chars().take(take).collect();
+    out.push_str("...");
+    out
 }
 
 /// Sanitize unsupported HTML named entities (&nbsp;, &bull;) for Telegram HTML parse_mode.
@@ -185,25 +190,14 @@ pub fn sanitize_telegram_html_entities(text: &str) -> String {
 
 /// Build rich inline keyboard markup for Account Rotation (Switch) Alerts
 pub fn build_switch_alert_reply_markup(
-    instance_name: &str,
+    _instance_name: &str,
     _selected_email: &str,
-    target_4h: &str,
-    target_weekly: &str,
+    _target_4h: &str,
+    _target_weekly: &str,
     prompt_text: &str,
     asset_urls: &[String],
 ) -> serde_json::Value {
     let mut keyboard_rows: Vec<Vec<serde_json::Value>> = Vec::new();
-    let inst_label = if instance_name.trim().is_empty() {
-        "default"
-    } else {
-        instance_name.trim()
-    };
-
-    keyboard_rows.push(vec![json!({
-        "text": format!("🟢 {} | 4h: {} | Wk: {}", inst_label, target_4h, target_weekly),
-        "callback_data": "cmd:/balance"
-    })]);
-
     keyboard_rows.push(vec![
         json!({
             "text": "💰 Check Balance",
@@ -226,7 +220,7 @@ pub fn build_switch_alert_reply_markup(
         }),
     ]);
 
-    let clamped_text = clamp_telegram_copy_text(prompt_text, 3900);
+    let clamped_text = clamp_telegram_copy_text(prompt_text, TELEGRAM_COPY_TEXT_MAX);
     if !clamped_text.trim().is_empty() {
         keyboard_rows.push(vec![json!({
             "text": "📋 Copy Prompt",
@@ -241,7 +235,7 @@ pub fn build_switch_alert_reply_markup(
             for url in asset_urls {
                 composite.push_str(&format!("![image]({})\n", url));
             }
-            let clamped_composite = clamp_telegram_copy_text(&composite, 3900);
+            let clamped_composite = clamp_telegram_copy_text(&composite, TELEGRAM_COPY_TEXT_MAX);
             keyboard_rows.push(vec![json!({
                 "text": "🖼️ Copy Prompt + Images",
                 "copy_text": {
@@ -298,7 +292,7 @@ pub fn build_liveness_alert_reply_markup(
         }),
     ]);
 
-    let clamped_text = clamp_telegram_copy_text(prompt_text, 3900);
+    let clamped_text = clamp_telegram_copy_text(prompt_text, TELEGRAM_COPY_TEXT_MAX);
     if !clamped_text.trim().is_empty() {
         keyboard_rows.push(vec![json!({
             "text": "📋 Copy Prompt",
@@ -313,7 +307,7 @@ pub fn build_liveness_alert_reply_markup(
             for url in asset_urls {
                 composite.push_str(&format!("![image]({})\n", url));
             }
-            let clamped_composite = clamp_telegram_copy_text(&composite, 3900);
+            let clamped_composite = clamp_telegram_copy_text(&composite, TELEGRAM_COPY_TEXT_MAX);
             keyboard_rows.push(vec![json!({
                 "text": "🖼️ Copy Prompt + Images",
                 "copy_text": {
@@ -334,7 +328,7 @@ pub fn build_copy_prompt_reply_markup(
     asset_urls: &[String],
     dashboard_url: Option<&str>,
 ) -> serde_json::Value {
-    let clamped_text = clamp_telegram_copy_text(prompt_text, 3900);
+    let clamped_text = clamp_telegram_copy_text(prompt_text, TELEGRAM_COPY_TEXT_MAX);
     let mut keyboard_rows: Vec<Vec<serde_json::Value>> = Vec::new();
 
     if !clamped_text.trim().is_empty() {
@@ -351,7 +345,7 @@ pub fn build_copy_prompt_reply_markup(
             for url in asset_urls {
                 composite.push_str(&format!("![image]({})\n", url));
             }
-            let clamped_composite = clamp_telegram_copy_text(&composite, 3900);
+            let clamped_composite = clamp_telegram_copy_text(&composite, TELEGRAM_COPY_TEXT_MAX);
             keyboard_rows.push(vec![json!({
                 "text": "🖼️ Copy Prompt + Images",
                 "copy_text": {
@@ -379,6 +373,31 @@ pub fn build_copy_prompt_reply_markup(
     json!({
         "inline_keyboard": keyboard_rows
     })
+}
+
+static TELEGRAM_RATE_LIMITER: once_cell::sync::Lazy<tokio::sync::Mutex<(std::time::Instant, u32)>> =
+    once_cell::sync::Lazy::new(|| tokio::sync::Mutex::new((std::time::Instant::now(), 30)));
+
+/// Imp-69: Telegram Rate-Limited Queue Pacer
+/// Token bucket rate limiter preventing Telegram API 429 rate limit errors (max 30 req/sec globally).
+pub async fn pace_telegram_request() {
+    let mut guard = TELEGRAM_RATE_LIMITER.lock().await;
+    let now = std::time::Instant::now();
+    let elapsed = now.duration_since(guard.0);
+    if elapsed >= Duration::from_secs(1) {
+        guard.0 = now;
+        guard.1 = 30;
+    }
+    if guard.1 == 0 {
+        let sleep_duration = Duration::from_secs(1).saturating_sub(elapsed);
+        drop(guard);
+        tokio::time::sleep(sleep_duration).await;
+        let mut guard = TELEGRAM_RATE_LIMITER.lock().await;
+        guard.0 = std::time::Instant::now();
+        guard.1 = 29;
+    } else {
+        guard.1 -= 1;
+    }
 }
 
 /// Send a text message to a Telegram chat with optional reply markup (e.g. inline keyboard)
@@ -431,6 +450,7 @@ pub async fn send_telegram_message_with_markup(
             }
         }
 
+        pace_telegram_request().await;
         let resp = client.post(&url).json(&payload_html).send().await;
         match resp {
             Ok(r) if r.status().is_success() => continue,
@@ -653,6 +673,20 @@ pub fn format_running_duration(created_at: i64) -> String {
         let hours = elapsed / 3600;
         let mins = (elapsed % 3600) / 60;
         format!("(running {}h {}m)", hours, mins)
+    }
+}
+
+/// Truncate or clamp text to a maximum number of words.
+pub fn clamp_words(text: &str, max_words: usize) -> String {
+    let clean = text.trim();
+    if clean.is_empty() || max_words == 0 {
+        return clean.to_string();
+    }
+    let words: Vec<&str> = clean.split_whitespace().collect();
+    if words.len() <= max_words {
+        clean.to_string()
+    } else {
+        format!("{}...", words[..max_words].join(" "))
     }
 }
 

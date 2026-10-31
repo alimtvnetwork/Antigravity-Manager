@@ -49,7 +49,7 @@ pub async fn handle_detect_model(
     Json(response).into_response()
 }
 
-/// [Issue #3414] 从形如 "All accounts limited. Wait 29s." 或其他明确冷却提示中解析等待秒数
+/// [Issue #3414] Parse wait seconds from "All accounts limited. Wait 29s." or other explicit cooldown prompts
 pub fn extract_retry_after_seconds(error_text: &str) -> Option<u64> {
     if let Some(pos) = error_text.find("Wait ") {
         let rest = &error_text[pos + 5..];
@@ -64,7 +64,7 @@ pub fn extract_retry_after_seconds(error_text: &str) -> Option<u64> {
     None
 }
 
-/// [Issue #3414] 统一构造带有 X-Mapped-Model、可选 X-Account-Email 以及 Retry-After 的 HeaderMap
+/// [Issue #3414] Unified construction of HeaderMap with X-Mapped-Model, optional X-Account-Email and Retry-After
 pub fn build_token_error_headers<'a>(
     mapped_model: Option<&'a str>,
     account_email: Option<&'a str>,
@@ -91,7 +91,7 @@ pub fn build_token_error_headers<'a>(
     headers
 }
 
-/// 判断是否为模型不存在/不支持的错误
+/// Determine whether the model does not exist/is not supported.
 pub fn is_model_not_found_error(status: u16, body: &str) -> bool {
     if status == 404 {
         return true;
@@ -110,10 +110,10 @@ pub fn is_model_not_found_error(status: u16, body: &str) -> bool {
         || lower.contains("model is not available")
 }
 
-/// 深度解析、剥离前缀与反转义上游错误，返回 (上游原始纯文本消息, 结构化解析对象)
+/// Deep parsing, stripping prefixes and escaping upstream errors, returning (original plain text message from upstream, structured parsing object)
 pub fn parse_raw_upstream_error(error_text: &str) -> (String, serde_json::Value) {
     let trimmed = error_text.trim();
-    // 1. 剥离可能附带的外层 HTTP 前缀，如 "HTTP 400: "、"HTTP 500: "、"All accounts exhausted. Last error: "
+    // 1. Strip the outer HTTP prefix that may be attached, such as "HTTP 400: ", "HTTP 500: ", "All accounts exhausted. Last error: "
     let clean_str = if let Some(pos) = trimmed.find("HTTP ") {
         if let Some(colon_pos) = trimmed[pos..].find(": ") {
             trimmed[pos + colon_pos + 2..].trim()
@@ -126,9 +126,9 @@ pub fn parse_raw_upstream_error(error_text: &str) -> (String, serde_json::Value)
         trimmed
     };
 
-    // 2. 深度递归反转义解析 JSON
+    // 2. Deep recursive anti-escape parsing JSON
     let mut current_val: Option<serde_json::Value> = serde_json::from_str(clean_str).ok();
-    // 如果解析出来的还是 string 且看起来像 JSON，尝试二次/三次解析（处理被双重转义的情况）
+    // If the parsed string still looks like JSON, try double/triple parsing (to handle double-escaped situations)
     for _ in 0..3 {
         if let Some(serde_json::Value::String(ref s)) = current_val {
             let s_trim = s.trim();
@@ -144,7 +144,7 @@ pub fn parse_raw_upstream_error(error_text: &str) -> (String, serde_json::Value)
         break;
     }
 
-    // 3. 如果当前值是个 Object，且它某个字段（例如 "response" 或 "raw"）又是嵌套 JSON 字符串，递归解析内部
+    // 3. If the current value is an Object and one of its fields (such as "response" or "raw") is a nested JSON string, recursively parse the internal
     if let Some(mut parsed) = current_val {
         if let Some(obj) = parsed.as_object_mut() {
             for key in ["response", "raw", "error", "details", "message"] {
@@ -161,7 +161,7 @@ pub fn parse_raw_upstream_error(error_text: &str) -> (String, serde_json::Value)
             }
         }
 
-        // 从结构化对象中提取原生的 message
+        // Extract native message from structured object
         let raw_msg = if let Some(err_obj) = parsed.get("error") {
             if let Some(msg) = err_obj.get("message").and_then(|m| m.as_str()) {
                 msg.to_string()
@@ -203,7 +203,7 @@ pub(crate) fn map_status_code_to_gemini_status(status_code: u16) -> &'static str
     }
 }
 
-/// 格式化双轨制错误报文（四大标准协议原始字段散开 + 顶层/UI层不阉割双轨诊断）
+/// Formatted dual-track error message (the original fields of the four major standard protocols are spread out + the top/UI layer does not castrate dual-track diagnosis)
 pub fn build_dual_track_error(
     protocol: &str, // "claude", "openai", "responses", or "gemini"
     status_code: u16,
@@ -220,54 +220,58 @@ pub fn build_dual_track_error(
 
     let is_not_found = is_model_not_found_error(status_code, error_text);
 
-    // 1. 深度解析并反转义上游错误
+    // 1. Deeply parse and escape upstream errors
     let (raw_upstream_msg, parsed_upstream) = parse_raw_upstream_error(error_text);
 
     let (readable_prefix, diagnosis, suggestion, err_type, err_code) = if is_internal_limited {
         (
-            "【网关调度受限】".to_string(),
+            "[Gateway scheduling is limited]".to_string(),
             format!(
-                "网关本地账号池当前暂无可用账号或全部可用账号处于限流冷却中。调度详情: {}",
+                "There are currently no available accounts in the gateway's local account pool or all available accounts are in the throttling period. Scheduling details: {}",
                 error_text
             ),
-            "请等待冷却结束（参考等待秒数），或在网关中添加更多正常账号。".to_string(),
+            "Please wait for the cooldown to end (refer to the waiting seconds), or add more normal accounts to the gateway.".to_string(),
             "rate_limit_error",
             "all_accounts_limited",
         )
     } else if is_not_found {
         (
-                format!("【模型不存在】[{}]", model),
-                format!("模型 [{}] 在上游端点不存在，或当前绑定的账号暂未开通该模型的访问权限。", model),
-                "请核对模型名称，或在网关配置中的「自定义模型映射」将其重定向至可用模型（如 gemini-2.5-flash）。".to_string(),
+                format!("[Model does not exist] [ {} ]", model),
+                format!("The model [ {} ] does not exist on the upstream endpoint, or the currently bound account has not yet granted access to the model.", model),
+                "Please check the model name, or redirect it to an available model (such as gemini-2.5-flash) in \"Custom Model Mapping\" in the gateway configuration.".to_string(),
                 "invalid_request_error",
                 "model_not_found",
             )
     } else if status_code == 429 || status_code == 529 {
         (
-            format!("【上游限流 HTTP {}】", status_code),
-            format!("模型 [{}] 触发上游配额耗尽或频率限制。", model),
-            "请稍候自动恢复，或添加更多账号以分散并发请求。".to_string(),
+            format!("[Upstream current limit HTTP {} ]", status_code),
+            format!("Model [ {} ] triggers upstream quota exhaustion or frequency throttling.", model),
+            "Please wait for automatic recovery, or add more accounts to spread out concurrent requests.".to_string(),
             "rate_limit_error",
             "rate_limit_exceeded",
         )
     } else {
         (
-            format!("【上游错误 HTTP {}】", status_code),
-            format!("调用上游模型 [{}] 发生错误 (HTTP {})。", model, status_code),
-            "请参考 upstream_error 中的详细字段排查原因。".to_string(),
+            format!("[Upstream error HTTP {} ]", status_code),
+            format!(
+                "An error occurred calling upstream model [ {} ] (HTTP {} ).",
+                model, status_code
+            ),
+            "Please refer to the detailed fields in upstream_error to troubleshoot the cause."
+                .to_string(),
             "api_error",
             "upstream_error",
         )
     };
 
     let readable_message = format!(
-        "{} 网关诊断: {} 建议: {}",
+        "{} Gateway diagnostics: {} Recommendation: {}",
         readable_prefix, diagnosis, suggestion
     );
 
-    // 2. 确定散开到各自协议标准 message 字段的内容：
-    //    若是网关自身限制（无上游参与），则使用网关诊断文本；
-    //    若是上游发生的真实报错，100% 保持上游原始报错（raw_upstream_msg），绝不被网关硬编码覆盖！
+    // 2. Determine the content of the message fields spread out to the respective protocol standards:
+    //    If the gateway itself is restricted (no upstream participation), the gateway diagnostic text is used;
+    //    If it is a real error that occurs upstream, the original upstream error (raw_upstream_msg) will be kept 100% and will never be overwritten by the gateway hard coding!
     let effective_message = if is_internal_limited || raw_upstream_msg.trim().is_empty() {
         readable_message.clone()
     } else {
@@ -424,13 +428,13 @@ pub(crate) mod retry_after_tests {
         // 1. Claude
         let claude_res = build_dual_track_error("claude", 404, "gemini-not-exist", raw_err);
         assert_eq!(claude_res["type"], "error");
-        // 标准协议底层字段散开为上游原始 message
+        // The underlying fields of the standard protocol are spread out into the upstream original message
         assert_eq!(
             claude_res["error"]["message"],
             "models/gemini-not-exist is not found"
         );
         assert_eq!(claude_res["error"]["code"], "model_not_found");
-        // UI层双轨制诊断不阉割
+        // UI layer dual-track diagnosis is not castrated
         assert!(claude_res["error"]["gateway_error"]["diagnosis"].is_string());
         assert_eq!(claude_res["error"]["upstream_error"]["status"], 404);
         assert_eq!(
@@ -477,6 +481,6 @@ pub(crate) mod retry_after_tests {
         assert!(claude_res["error"]["message"]
             .as_str()
             .unwrap()
-            .contains("网关调度受限"));
+            .contains("Gateway scheduling is limited"));
     }
 }

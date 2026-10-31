@@ -458,7 +458,7 @@ async fn test_streaming_malformed_function_call_never_injects_hardcoded_online_p
         }
     }
 
-    // 验证绝对不会被注入任何臆测性的天气/联网假文本
+    // Verify that no speculative weather/internet fake text will be injected
     assert!(
         all_content.is_empty(),
         "Expected empty content, got: {}",

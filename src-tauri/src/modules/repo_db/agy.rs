@@ -1,6 +1,9 @@
 //! Repo DB: agy
 
-use super::detection::{extract_image_payload_or_path, resume_task_document};
+use super::detection::{
+    effective_image_uris, extract_image_payload_or_path, extract_image_uris_or_paths,
+    extract_screenshot_id_token, resume_task_document,
+};
 use super::models::ActivePrompt;
 use super::prompts_crud::save_or_requeue_prompt;
 use super::state::get_active_agy_workers;
@@ -25,14 +28,16 @@ fn truncate_utf8(value: &str, max_bytes: usize) -> &str {
     &value[..end]
 }
 
-/// `agy` resumes a conversation with `--conversation`. A synthetic `conv-` id means
-/// "start a new turn", and a project key (`name__instance`) is not a conversation id.
+/// `agy` resumes a conversation with `--conversation`.
+/// `conv-` ids are real conversation keys (IDE summaries and session rows).
+/// `new`, project keys, prompt ids (`p-`), and queue tokens are not.
 fn agy_conversation_id(session: &str) -> Option<&str> {
     let trimmed = session.trim();
+    let trimmed = trimmed.strip_prefix("prompt-").unwrap_or(trimmed);
     if trimmed.is_empty()
         || trimmed == "-"
-        || trimmed.starts_with("conv-")
         || trimmed.starts_with("proj-")
+        || trimmed == "new"
         || trimmed.starts_with("p-")
         || trimmed.starts_with("queued-")
     {
@@ -42,6 +47,13 @@ fn agy_conversation_id(session: &str) -> Option<&str> {
         return None;
     }
     Some(trimmed)
+}
+
+fn resumes_existing_conversation(session_id: Option<&str>) -> bool {
+    match session_id {
+        Some(session) => agy_conversation_id(session).is_some(),
+        None => false,
+    }
 }
 
 /// Terminate any active `agy` background worker processes scoped to `instance_id`
@@ -105,6 +117,37 @@ pub fn terminate_agy_workers_for_instance(instance_id: &str) -> usize {
     terminated
 }
 
+/// Terminate all active `agy` worker processes across all instances during application shutdown.
+pub fn terminate_all_active_agy_workers() -> usize {
+    let mut workers = match get_active_agy_workers().lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    if workers.is_empty() {
+        return 0;
+    }
+    let pids: Vec<sysinfo::Pid> = workers
+        .values()
+        .map(|&pid| sysinfo::Pid::from_u32(pid))
+        .collect();
+    let mut sys = sysinfo::System::new();
+    sys.refresh_processes_specifics(
+        sysinfo::ProcessesToUpdate::Some(&pids),
+        sysinfo::ProcessRefreshKind::new().with_exe(sysinfo::UpdateKind::OnlyIfNotSet),
+    );
+    let mut terminated = 0;
+    for (ws_key, pid) in workers.drain() {
+        if let Some(proc) = sys.process(sysinfo::Pid::from_u32(pid)) {
+            crate::modules::logger::log_info(&format!(
+                "[Shutdown] Terminating active agy worker (pid {pid}) for workspace {ws_key}"
+            ));
+            proc.kill();
+            terminated += 1;
+        }
+    }
+    terminated
+}
+
 /// Helper to spawn `agy` CLI to execute a prompt in a workspace.
 /// Uses `--conversation` (not `--resume`, which agy rejects) and `-p`.
 pub fn spawn_prompt_via_agy(prompt: &ActivePrompt) -> Result<(), String> {
@@ -118,15 +161,27 @@ pub fn spawn_or_replace_prompt_via_agy(
     prompt: &ActivePrompt,
     replace_existing: bool,
 ) -> Result<(), String> {
-    let ws_dir = PathBuf::from(&prompt.repo_path);
-    if !ws_dir.exists() {
-        let message = format!("workspace directory does not exist: '{}'", prompt.repo_path);
-        crate::modules::logger::log_warn(&format!("[RepoDB] {message}"));
-        return Err(message);
+    if std::env::var("AGM_SKIP_AGY_SPAWN").as_deref() == Ok("1") {
+        crate::modules::logger::log_info(&format!(
+            "[RepoDB] AGM_SKIP_AGY_SPAWN=1 set: skipped agy spawn for prompt '{}'",
+            prompt.id
+        ));
+        return Ok(());
     }
 
+    let ws_dir = if !prompt.repo_path.trim().is_empty() && Path::new(&prompt.repo_path).exists() {
+        PathBuf::from(&prompt.repo_path)
+    } else {
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    };
+
     let clean_prompt = extract_clean_user_prompt(&prompt.prompt_content);
-    if clean_prompt.trim().is_empty() {
+    let prompt_to_run = if clean_prompt.trim().is_empty() {
+        prompt.prompt_content.trim().to_string()
+    } else {
+        clean_prompt
+    };
+    if prompt_to_run.trim().is_empty() {
         let message = format!("prompt content for '{}' is empty", prompt.id);
         crate::modules::logger::log_warn(&format!("[RepoDB] {message}"));
         return Err(message);
@@ -178,7 +233,7 @@ pub fn spawn_or_replace_prompt_via_agy(
             }
         }
 
-        cmd.arg("-p").arg(truncate_utf8(&clean_prompt, 24000));
+        cmd.arg("-p").arg(truncate_utf8(&prompt_to_run, 24000));
 
         #[cfg(target_os = "windows")]
         {
@@ -237,7 +292,8 @@ pub fn spawn_or_replace_prompt_via_agy(
                         if status.success() {
                             let _ = crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
                                 &prompt.instance_id,
-                                &clean_prompt,
+                                &prompt_to_run,
+                                replace_existing,
                             );
                             return Ok(());
                         }
@@ -270,11 +326,12 @@ pub fn spawn_or_replace_prompt_via_agy(
                 let _ =
                     crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
                         &prompt.instance_id,
-                        &clean_prompt,
+                        &prompt_to_run,
+                        replace_existing,
                     );
                 crate::modules::logger::log_info(&format!(
                     "[RepoDB] Dispatched agy execution for prompt '{}' (PID: {:?}, inst: '{}') in '{}': {:.60}...",
-                    prompt.id, child_pid, prompt.instance_id, prompt.repo_path, clean_prompt
+                    prompt.id, child_pid, prompt.instance_id, prompt.repo_path, prompt_to_run
                 ));
 
                 let prompt_id = prompt.id.clone();
@@ -284,7 +341,7 @@ pub fn spawn_or_replace_prompt_via_agy(
                 let monitor_res = std::thread::Builder::new()
                     .name(format!("agy-monitor-{}", prompt_id))
                     .spawn(move || {
-                        let mut stderr_reader = child.stderr.take();
+                        let stderr_reader = child.stderr.take();
                         match child.wait() {
                             Ok(status) => {
                                 {
@@ -607,8 +664,77 @@ fn run_clipboard_helper_result(
     }
 }
 
+/// Preemptively cancel any currently running prompt/task for a specific instance.
+/// 1. Terminates headless agy background CLI worker processes.
+/// 2. Stops any running goal workers.
+/// 3. Signals cancellation via live DevTools CDP to running IDE (Stop Generating / Escape).
+/// 4. Cancels pending post-switch resume timers.
+/// 5. Marks in-flight prompts in SQLite `active_prompts` table as 'cancelled'.
+/// 6. Purges memory prompts map.
+pub fn cancel_running_prompt_for_instance(
+    instance_id: &str,
+    _repo_path: Option<&str>,
+) -> Result<bool, String> {
+    let clean_inst = if instance_id.trim().is_empty() || instance_id == "__default__" {
+        "default"
+    } else {
+        instance_id.trim()
+    };
+    let canonical_inst = crate::modules::instance::resolve_instance_id(clean_inst)
+        .unwrap_or_else(|_| clean_inst.to_string());
+
+    // 1. Terminate agy background CLI workers
+    let terminated_agy = terminate_agy_workers_for_instance(&canonical_inst);
+
+    // 2. Stop prompt goal workers
+    if let Ok(reg) = crate::modules::instance::load_registry() {
+        if let Some(inst) = reg.instances.iter().find(|i| i.id == canonical_inst) {
+            super::goal_heartbeat::stop_prompt_goal_workers_for_instance(
+                &canonical_inst,
+                &inst.data_dir,
+            );
+        }
+    }
+
+    // 3. Signal cancellation to IDE via CDP
+    let cdp_cancelled =
+        crate::modules::instance::cdp_onboarding::cancel_active_task_via_cdp_for_instance(
+            &canonical_inst,
+        );
+
+    // 4. Cancel pending post-switch resume timer
+    crate::modules::instance::cancel_post_switch_resume(&canonical_inst, "preempted by Send");
+
+    // 5. Update active_prompts SQLite table to 'cancelled'
+    let now = chrono::Utc::now().timestamp();
+    if let Ok(conn) = super::schema::connect_db() {
+        // Justification: best-effort SQLite prompt cancellation before immediate dispatch
+        crate::error::record_ignored(
+            conn.execute(
+                "UPDATE active_prompts SET status = 'cancelled', updated_at = ?1 \
+                 WHERE instance_id = ?2 AND status IN ('running', 'dispatched', 'in_flight')",
+                rusqlite::params![now, canonical_inst],
+            ),
+            "cancel in-flight active prompts in repo_prompts.db",
+        );
+    }
+
+    // 6. Purge memory prompts map
+    if let Ok(mut map) = super::state::get_memory_prompts_map().lock() {
+        map.retain(|_, p| p.instance_id != canonical_inst || p.status == "queued");
+    }
+
+    super::tree::invalidate_prompt_tree_cache(Some(&canonical_inst));
+    crate::modules::logger::log_info(&format!(
+        "[RepoDB] Preemptively cancelled running tasks for instance '{}' (agy workers terminated: {}, cdp cancelled: {})",
+        canonical_inst, terminated_agy, cdp_cancelled
+    ));
+    Ok(true)
+}
+
 /// Send a prompt immediately for a specific instance, verifying process liveness,
 /// caching PID, updating SQLite split DB, writing .antigravity_resume_task.json, and executing via agy.
+/// Direct execution invariant: immediately executes and bypasses queued scheduler items.
 pub fn send_prompt_now_for_instance(
     instance_id: &str,
     repo_path: &str,
@@ -616,7 +742,6 @@ pub fn send_prompt_now_for_instance(
     conversation_id: Option<&str>,
 ) -> Result<ActivePrompt, String> {
     crate::modules::instance::scan_and_cache_all_running_instances();
-    copy_to_system_clipboard(prompt_content);
 
     let clean_inst = if instance_id.trim().is_empty() || instance_id == "__default__" {
         "default"
@@ -626,15 +751,52 @@ pub fn send_prompt_now_for_instance(
     let canonical_inst = crate::modules::instance::resolve_instance_id(clean_inst)
         .unwrap_or_else(|_| clean_inst.to_string());
 
-    // 1. Ensure instance is running with smart process cache (reuses existing process without reopening)
-    if let Err(e) =
-        crate::modules::instance::ensure_instance_running_smart(&canonical_inst, Some(repo_path))
-    {
-        crate::modules::logger::log_warn(&format!(
-            "[RepoDB] ensure_instance_running_smart warning for '{}': {}",
-            canonical_inst, e
-        ));
+    // Preemption Invariant: "Send" must cancel whatever task is running right now so the new prompt executes immediately!
+    let _ = cancel_running_prompt_for_instance(&canonical_inst, Some(repo_path));
+    terminate_agy_workers_for_instance(&canonical_inst);
+    if let Ok(conn) = super::schema::connect_db() {
+        let now_cancel = Utc::now().timestamp();
+        crate::error::record_ignored(
+            conn.execute(
+                "UPDATE active_prompts SET status = 'cancelled', updated_at = ?1 \
+                 WHERE instance_id = ?2 AND status IN ('running', 'dispatched', 'in_flight')",
+                rusqlite::params![now_cancel, &canonical_inst],
+            ),
+            "cancel in-flight active prompts in repo_prompts.db before immediate dispatch",
+        );
     }
+
+    // 1. Ensure instance is running with smart process cache and adaptive cold-start stabilization
+    let was_cold_started =
+        match crate::modules::instance::smart_run::ensure_instance_running_smart_detailed(
+            &canonical_inst,
+            Some(repo_path),
+        ) {
+            Ok(res) => {
+                if res.was_cold_started {
+                    crate::modules::logger::log_info(&format!(
+                        "[ColdStartDispatch] Instance '{}' was cold-started (stabilized in {}ms, pid: {:?}). Waiting 1500ms settlement buffer for IDE window/extension initialization...",
+                        canonical_inst, res.stabilization_ms, res.pid
+                    ));
+                    std::thread::sleep(std::time::Duration::from_millis(1500));
+                    let (still_running, _, pids) =
+                        crate::modules::instance::is_instance_process_running_smart(
+                            &canonical_inst,
+                        );
+                    if still_running {
+                        crate::modules::instance::focus_running_instance(&pids, Some(repo_path));
+                    }
+                }
+                res.was_cold_started
+            }
+            Err(e) => {
+                crate::modules::logger::log_warn(&format!(
+                    "[RepoDB] ensure_instance_running_smart_detailed warning for '{}': {}",
+                    canonical_inst, e
+                ));
+                false
+            }
+        };
 
     // 2. Generate prompt ID and record in DB
     let prompt_id = format!("p-{}", &uuid::Uuid::new_v4().to_string()[..8]);
@@ -644,6 +806,32 @@ pub fn send_prompt_now_for_instance(
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "project".to_string());
     let now = Utc::now().timestamp();
+
+    let (extracted_img, img_paths) = extract_image_payload_or_path(prompt_content);
+    let mut initial_img = extracted_img.clone();
+    if initial_img.is_none() && !img_paths.is_empty() {
+        initial_img = Some(img_paths.join(";"));
+    }
+    if let Some(ss_token) = extract_screenshot_id_token(prompt_content) {
+        if let Some(ref cur) = initial_img {
+            if !cur.contains(&ss_token) {
+                initial_img = Some(format!("{};screenshot_id={}", cur, ss_token));
+            }
+        } else {
+            initial_img = Some(format!("screenshot_id={}", ss_token));
+        }
+    }
+
+    // Guard: Do not overwrite rich HTML/image clipboard primed by frontend when prompt has attached media or rich content
+    let has_rich_media = initial_img.is_some()
+        || !img_paths.is_empty()
+        || prompt_content.contains("![")
+        || prompt_content.contains("<img")
+        || prompt_content.contains("data:image/")
+        || prompt_content.contains("Attached Image");
+    if !has_rich_media {
+        copy_to_system_clipboard(prompt_content);
+    }
 
     let active_prompt = ActivePrompt {
         id: prompt_id,
@@ -656,7 +844,7 @@ pub fn send_prompt_now_for_instance(
         status: "running".to_string(),
         created_at: now,
         updated_at: now,
-        image_payload: None,
+        image_payload: initial_img,
     };
 
     save_or_requeue_prompt(&active_prompt)?;
@@ -665,11 +853,21 @@ pub fn send_prompt_now_for_instance(
     if !repo_path.trim().is_empty() {
         let ws_dir = PathBuf::from(repo_path);
         if ws_dir.exists() {
-            let (extracted_img, img_paths) = extract_image_payload_or_path(prompt_content);
-            let final_img = active_prompt.image_payload.clone().or(extracted_img);
+            let (extracted_uris, img_paths) = extract_image_uris_or_paths(prompt_content);
+            let final_uris =
+                effective_image_uris(active_prompt.image_payload.as_deref(), extracted_uris);
             let mut payload = resume_task_document(&active_prompt, "dispatched", now, &img_paths);
-            if final_img.is_some() {
-                payload["image_payload"] = serde_json::json!(final_img);
+            if !final_uris.is_empty() {
+                // Legacy single-string format for one URI; JSON array for many.
+                payload["image_payload"] = if final_uris.len() == 1 {
+                    serde_json::json!(final_uris[0].as_str())
+                } else {
+                    serde_json::json!(final_uris)
+                };
+            } else if !img_paths.is_empty() {
+                // Legacy fallback: paths-only prompts previously stored the
+                // joined paths in image_payload; preserve that behavior.
+                payload["image_payload"] = serde_json::json!(img_paths.join(";"));
             }
             let serialized = serde_json::to_string_pretty(&payload).unwrap_or_default();
             // Justification: resume snapshot is a convenience file; the agy dispatch result below is the authoritative outcome
@@ -688,45 +886,71 @@ pub fn send_prompt_now_for_instance(
         }
     }
 
-    // 4. Dispatch via agy CLI execution with direct CDP graceful degradation fallback.
-    // Explicit user Send/Rerun replaces any lingering agy worker for this workspace.
-    if let Err(spawn_err) = spawn_or_replace_prompt_via_agy(&active_prompt, true) {
-        tracing::warn!(
-            target: "repo_db",
-            prompt_id = %active_prompt.id,
-            instance_id = %canonical_inst,
-            repo_path = %repo_path,
-            error = %spawn_err,
-            "agy CLI dispatch failed; attempting direct CDP insertion fallback"
-        );
+    // 4. Dispatch: Prioritize live DevTools CDP submission if IDE is running, falling back to agy CLI.
+    let clean_prompt = extract_clean_user_prompt(prompt_content);
+    let fallback_prompt = if clean_prompt.trim().is_empty() {
+        prompt_content.trim()
+    } else {
+        clean_prompt.as_str()
+    };
 
-        // Fallback: Direct DevTools insertion into running Antigravity IDE
-        let clean_prompt = extract_clean_user_prompt(prompt_content);
-        let cdp_ok = crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
-            &canonical_inst,
-            &clean_prompt,
-        );
+    let mut dispatched_via_cdp = false;
+    let (is_running, _, pids) =
+        crate::modules::instance::is_instance_process_running_smart(&canonical_inst);
+    let target_is_new = conversation_id.map(str::trim) == Some("new");
+    if is_running {
+        crate::modules::instance::focus_running_instance(&pids, Some(repo_path));
+        let max_cdp_attempts = if was_cold_started { 3 } else { 1 };
+        for attempt in 1..=max_cdp_attempts {
+            if crate::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance_with_mode(
+                &canonical_inst,
+                fallback_prompt,
+                true,
+                target_is_new,
+            )
+            .is_ok()
+            {
+                dispatched_via_cdp = true;
+                break;
+            }
+            if attempt < max_cdp_attempts {
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
+        }
+    }
 
-        if cdp_ok {
-            crate::modules::logger::log_info(&format!(
-                "[RepoDB] Direct CDP fallback succeeded for prompt '{}' on instance '{}'",
-                active_prompt.id, canonical_inst
-            ));
-            crate::modules::audit::record_if_active(
-                "backend",
-                "repo_db",
-                "cdp_dispatch_fallback",
-                &format!("instance:{canonical_inst}"),
-                serde_json::json!({
-                    "promptId": active_prompt.id,
-                    "instanceId": canonical_inst,
-                    "repoPath": repo_path,
-                    "fallback": "cdp_direct",
-                }),
-                "ok",
-                "Prompt dispatched via live DevTools CDP fallback",
+    if dispatched_via_cdp {
+        crate::modules::logger::log_info(&format!(
+            "[RepoDB] Direct CDP dispatch succeeded for prompt '{}' on instance '{}' (cold-start: {})",
+            active_prompt.id, canonical_inst, was_cold_started
+        ));
+        crate::modules::audit::record_if_active(
+            "backend",
+            "repo_db",
+            "cdp_dispatch",
+            &format!("instance:{canonical_inst}"),
+            serde_json::json!({
+                "promptId": active_prompt.id,
+                "instanceId": canonical_inst,
+                "repoPath": repo_path,
+                "dispatch": "cdp_direct",
+                "coldStarted": was_cold_started,
+            }),
+            "ok",
+            "Prompt dispatched directly via live DevTools CDP into running IDE",
+        );
+    } else {
+        // Fallback: Dispatch via agy CLI execution.
+        // Explicit user Send/Rerun replaces any lingering agy worker for this workspace.
+        if let Err(spawn_err) = spawn_or_replace_prompt_via_agy(&active_prompt, true) {
+            tracing::warn!(
+                target: "repo_db",
+                prompt_id = %active_prompt.id,
+                instance_id = %canonical_inst,
+                repo_path = %repo_path,
+                error = %spawn_err,
+                "agy CLI dispatch failed and direct CDP was unavailable"
             );
-        } else {
             let focus_note = match crate::modules::instance::ensure_instance_running_for_dispatch(
                 &canonical_inst,
                 Some(repo_path),
@@ -735,15 +959,17 @@ pub fn send_prompt_now_for_instance(
                 Err(focus_err) => format!("IDE focus failed: {focus_err}"),
             };
             return Err(format!(
-                "{spawn_err}; direct CDP fallback failed; {focus_note}"
+                "{spawn_err}; direct CDP dispatch unavailable; {focus_note}"
+            ));
+        } else {
+            crate::modules::logger::log_info(&format!(
+                "[RepoDB] send_prompt_now_for_instance dispatched prompt '{}' for instance '{}' in '{}' (cold-start: {}) via agy CLI",
+                active_prompt.id, canonical_inst, repo_path, was_cold_started
             ));
         }
-    } else {
-        crate::modules::logger::log_info(&format!(
-            "[RepoDB] send_prompt_now_for_instance dispatched prompt '{}' for instance '{}' in '{}'",
-            active_prompt.id, canonical_inst, repo_path
-        ));
     }
+
+    invalidate_prompt_tree_cache(Some(&canonical_inst));
 
     Ok(active_prompt)
 }
@@ -756,11 +982,16 @@ pub fn enqueue_prompt_for_instance(
     prompt_content: &str,
     conversation_id: Option<&str>,
 ) -> Result<ActivePrompt, String> {
-    if extract_clean_user_prompt(prompt_content).trim().is_empty() {
+    let clean_prompt = extract_clean_user_prompt(prompt_content);
+    let prompt_to_check = if clean_prompt.trim().is_empty() {
+        prompt_content.trim()
+    } else {
+        clean_prompt.as_str()
+    };
+    if prompt_to_check.is_empty() {
         return Err("prompt content is empty".to_string());
     }
     crate::modules::instance::scan_and_cache_all_running_instances();
-    copy_to_system_clipboard(prompt_content);
 
     let clean_inst = if instance_id.trim().is_empty() || instance_id == "__default__" {
         "default"
@@ -770,13 +1001,47 @@ pub fn enqueue_prompt_for_instance(
     let canonical_inst = crate::modules::instance::resolve_instance_id(clean_inst)
         .unwrap_or_else(|_| clean_inst.to_string());
 
-    let prompt_id = format!("queued-{}", &uuid::Uuid::new_v4().to_string()[..8]);
+    static ENQUEUE_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let seq = ENQUEUE_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let now_ms = Utc::now().timestamp_millis();
+    let prompt_id = format!(
+        "queued-{:013}-{:04x}-{}",
+        now_ms,
+        seq % 0x10000,
+        &uuid::Uuid::new_v4().to_string()[..6]
+    );
     let clean_repo_name = Path::new(repo_path)
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "project".to_string());
     let now = Utc::now().timestamp();
+
+    let (extracted_img, img_paths) = extract_image_payload_or_path(prompt_content);
+    let mut initial_img = extracted_img.clone();
+    if initial_img.is_none() && !img_paths.is_empty() {
+        initial_img = Some(img_paths.join(";"));
+    }
+    if let Some(ss_token) = extract_screenshot_id_token(prompt_content) {
+        if let Some(ref cur) = initial_img {
+            if !cur.contains(&ss_token) {
+                initial_img = Some(format!("{};screenshot_id={}", cur, ss_token));
+            }
+        } else {
+            initial_img = Some(format!("screenshot_id={}", ss_token));
+        }
+    }
+
+    // Guard: Do not overwrite rich HTML/image clipboard primed by frontend when prompt has attached media or rich content
+    let has_rich_media = initial_img.is_some()
+        || !img_paths.is_empty()
+        || prompt_content.contains("![")
+        || prompt_content.contains("<img")
+        || prompt_content.contains("data:image/")
+        || prompt_content.contains("Attached Image");
+    if !has_rich_media {
+        copy_to_system_clipboard(prompt_content);
+    }
 
     let active_prompt = ActivePrompt {
         id: prompt_id,
@@ -789,7 +1054,7 @@ pub fn enqueue_prompt_for_instance(
         status: "queued".to_string(),
         created_at: now,
         updated_at: now,
-        image_payload: None,
+        image_payload: initial_img,
     };
 
     save_or_requeue_prompt(&active_prompt)?;
@@ -797,11 +1062,21 @@ pub fn enqueue_prompt_for_instance(
     if !repo_path.trim().is_empty() {
         let ws_dir = PathBuf::from(repo_path);
         if ws_dir.exists() {
-            let (extracted_img, img_paths) = extract_image_payload_or_path(prompt_content);
-            let final_img = active_prompt.image_payload.clone().or(extracted_img);
+            let (extracted_uris, img_paths) = extract_image_uris_or_paths(prompt_content);
+            let final_uris =
+                effective_image_uris(active_prompt.image_payload.as_deref(), extracted_uris);
             let mut payload = resume_task_document(&active_prompt, "queued", now, &img_paths);
-            if final_img.is_some() {
-                payload["image_payload"] = serde_json::json!(final_img);
+            if !final_uris.is_empty() {
+                // Legacy single-string format for one URI; JSON array for many.
+                payload["image_payload"] = if final_uris.len() == 1 {
+                    serde_json::json!(final_uris[0].as_str())
+                } else {
+                    serde_json::json!(final_uris)
+                };
+            } else if !img_paths.is_empty() {
+                // Legacy fallback: paths-only prompts previously stored the
+                // joined paths in image_payload; preserve that behavior.
+                payload["image_payload"] = serde_json::json!(img_paths.join(";"));
             }
             payload["auto_boot"] = serde_json::json!(false);
             let serialized = serde_json::to_string_pretty(&payload).unwrap_or_default();
@@ -833,6 +1108,8 @@ pub fn enqueue_prompt_for_instance(
     }
 
     invalidate_prompt_tree_cache(Some(&canonical_inst));
+
+    crate::modules::scheduler::notify_prompt_queue();
 
     crate::modules::logger::log_info(&format!(
         "[RepoDB] enqueue_prompt_for_instance recorded prompt '{}' for instance '{}' in '{}'",
@@ -891,10 +1168,13 @@ pub fn drain_next_queued_prompt_for_workspace(instance_id: &str, repo_path: &str
         return;
     };
 
-    if extract_clean_user_prompt(&prompt.prompt_content)
-        .trim()
-        .is_empty()
-    {
+    let clean_prompt = extract_clean_user_prompt(&prompt.prompt_content);
+    let prompt_to_check = if clean_prompt.trim().is_empty() {
+        prompt.prompt_content.trim()
+    } else {
+        clean_prompt.as_str()
+    };
+    if prompt_to_check.is_empty() {
         // Justification: purge corrupt empty queued prompt row so it cannot block the FIFO queue
         crate::error::record_ignored(
             conn.execute(
@@ -941,6 +1221,158 @@ pub fn drain_next_queued_prompt_for_workspace(instance_id: &str, repo_path: &str
     invalidate_prompt_tree_cache(Some(instance_id));
 }
 
+/// Completely wipe prompt tree tables (`prompt_tree_cache`, `active_prompts`, `running_projects`,
+/// `agm_conversation_sequences`, `agm_project_sequences`) in SQLite `repo_prompts.db`,
+/// re-run workspace storage detection and Antigravity core transcript discovery,
+/// and scan disk `transcript_full.jsonl` files fresh to completely regenerate the database and prompt tree.
+pub fn wipe_and_rescan_repo_db(instance_id: Option<&str>) -> Result<usize, String> {
+    let is_all = match instance_id {
+        None => true,
+        Some(id) => id.trim().is_empty() || id == "all",
+    };
+
+    if is_all {
+        terminate_all_active_agy_workers();
+    } else if let Some(raw_id) = instance_id {
+        terminate_agy_workers_for_instance(raw_id);
+    }
+
+    let conn = super::schema::connect_db()
+        .map_err(|e| format!("Failed to connect repo database for wipe: {e}"))?;
+
+    // Disable foreign keys temporarily during wipe to allow atomic clean deletion
+    conn.execute_batch("PRAGMA foreign_keys = OFF;")
+        .map_err(|e| format!("Failed to toggle foreign keys for wipe: {e}"))?;
+
+    if is_all {
+        conn.execute("DELETE FROM prompt_tree_cache", [])
+            .map_err(|e| format!("Failed to clear prompt_tree_cache: {e}"))?;
+        conn.execute("DELETE FROM active_prompts", [])
+            .map_err(|e| format!("Failed to clear active_prompts: {e}"))?;
+        conn.execute("DELETE FROM running_projects", [])
+            .map_err(|e| format!("Failed to clear running_projects: {e}"))?;
+        conn.execute("DELETE FROM agm_conversation_sequences", [])
+            .map_err(|e| format!("Failed to clear agm_conversation_sequences: {e}"))?;
+        conn.execute("DELETE FROM agm_project_sequences", [])
+            .map_err(|e| format!("Failed to clear agm_project_sequences: {e}"))?;
+        conn.execute("DELETE FROM media_vault", [])
+            .map_err(|e| format!("Failed to clear media_vault: {e}"))?;
+    } else {
+        let raw_id = instance_id.unwrap().trim();
+        let norm_id = crate::modules::instance::resolve_instance_id(raw_id)
+            .unwrap_or_else(|_| raw_id.to_string());
+        let pattern1 = format!("%:{}%", raw_id);
+        let pattern2 = format!("%:{}%", norm_id);
+
+        conn.execute(
+            "DELETE FROM prompt_tree_cache WHERE instance_id = ?1 OR instance_id = ?2 OR instance_id = 'all' OR cache_key LIKE ?3 OR cache_key LIKE ?4",
+            rusqlite::params![raw_id, &norm_id, pattern1, pattern2],
+        ).map_err(|e| format!("Failed to clear prompt_tree_cache for instance: {e}"))?;
+
+        conn.execute(
+            "DELETE FROM active_prompts WHERE instance_id = ?1 OR instance_id = ?2",
+            rusqlite::params![raw_id, &norm_id],
+        )
+        .map_err(|e| format!("Failed to clear active_prompts for instance: {e}"))?;
+
+        conn.execute(
+            "DELETE FROM running_projects WHERE instance_id = ?1 OR instance_id = ?2",
+            rusqlite::params![raw_id, &norm_id],
+        )
+        .map_err(|e| format!("Failed to clear running_projects for instance: {e}"))?;
+
+        conn.execute(
+            "DELETE FROM agm_conversation_sequences WHERE instance_id = ?1 OR instance_id = ?2",
+            rusqlite::params![raw_id, &norm_id],
+        )
+        .map_err(|e| format!("Failed to clear agm_conversation_sequences for instance: {e}"))?;
+
+        conn.execute(
+            "DELETE FROM agm_project_sequences WHERE instance_id = ?1 OR instance_id = ?2",
+            rusqlite::params![raw_id, &norm_id],
+        )
+        .map_err(|e| format!("Failed to clear agm_project_sequences for instance: {e}"))?;
+
+        // Note: media_vault is an immutable content-addressed cache keyed by sha256,
+        // without an instance_id column. It is intentionally preserved during per-instance resets.
+    }
+
+    if let Ok(mut map) = super::state::get_memory_prompts_map().lock() {
+        map.clear();
+    }
+    super::state::reset_dispatched_prompts_cache();
+
+    conn.execute_batch("PRAGMA foreign_keys = ON;")
+        .map_err(|e| format!("Failed to re-enable foreign keys: {e}"))?;
+
+    // Determine target instances to rescan
+    let registry = crate::modules::instance::load_registry().unwrap_or_default();
+    let target_instances: Vec<String> = if is_all {
+        let mut ids: Vec<String> = registry.instances.iter().map(|i| i.id.clone()).collect();
+        if !ids.iter().any(|id| id == "default" || id == "__default__") {
+            ids.insert(0, "default".to_string());
+        }
+        ids
+    } else {
+        vec![instance_id.unwrap().trim().to_string()]
+    };
+
+    // Re-run detection::detect_running_projects and discover_running_prompts_from_antigravity
+    for inst in &target_instances {
+        let _ = super::detection::detect_running_projects(inst);
+        let ag_prompts = super::discovery::discover_running_prompts_from_antigravity(inst);
+        for p in ag_prompts {
+            let _ = super::prompts_crud::save_or_requeue_prompt(&p);
+        }
+    }
+
+    // Completely rebuild the prompt tree and sequences by scanning disk transcript_full.jsonl
+    let tree_nodes = super::compute_project_conversation_tree(instance_id, 200, false);
+    let project_count = tree_nodes.len();
+    let conv_count: usize = tree_nodes.iter().map(|p| p.conversations.len()).sum();
+
+    // Cache the regenerated tree
+    let now = Utc::now().timestamp();
+    let inst_key = instance_id.unwrap_or("all");
+    let cache_key = format!(
+        "tree:v{}:{}:{}:{}",
+        env!("CARGO_PKG_VERSION"),
+        inst_key,
+        200,
+        false
+    );
+    if let Ok(json_str) = serde_json::to_string(&tree_nodes) {
+        crate::error::record_ignored(
+            conn.execute(
+                "INSERT INTO prompt_tree_cache (cache_key, instance_id, tree_json, project_count, conversation_count, updated_at, ttl_seconds)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, 120)
+                 ON CONFLICT(cache_key) DO UPDATE SET
+                    instance_id = excluded.instance_id,
+                    tree_json = excluded.tree_json,
+                    project_count = excluded.project_count,
+                    conversation_count = excluded.conversation_count,
+                    updated_at = excluded.updated_at,
+                    ttl_seconds = excluded.ttl_seconds",
+                rusqlite::params![
+                    &cache_key,
+                    inst_key,
+                    &json_str,
+                    project_count as i64,
+                    conv_count as i64,
+                    now,
+                ],
+            ),
+            "cache regenerated prompt tree",
+        );
+    }
+
+    crate::modules::logger::log_info(&format!(
+        "[RepoDB] wipe_and_rescan_repo_db completed for instance '{inst_key}': {project_count} projects, {conv_count} conversations regenerated from disk transcripts"
+    ));
+
+    Ok(project_count)
+}
+
 #[cfg(test)]
 mod agy_flag_tests {
     use super::agy_conversation_id;
@@ -949,12 +1381,28 @@ mod agy_flag_tests {
     fn conversation_flag_keeps_real_ids_and_skips_synthetic_keys() {
         assert_eq!(agy_conversation_id("cid-e2e-probe"), Some("cid-e2e-probe"));
         assert_eq!(agy_conversation_id("  abc  "), Some("abc"));
-        assert_eq!(agy_conversation_id("conv-11111111"), None);
+        assert_eq!(agy_conversation_id("conv-11111111"), Some("conv-11111111"));
+        assert_eq!(agy_conversation_id("conv-abc-456"), Some("conv-abc-456"));
         assert_eq!(agy_conversation_id("-"), None);
+        assert_eq!(
+            agy_conversation_id("prompt-bc221407-c445-415a-9034-b1179a550a79"),
+            Some("bc221407-c445-415a-9034-b1179a550a79")
+        );
+        assert_eq!(agy_conversation_id("new"), None);
         assert_eq!(agy_conversation_id("p-12345678"), None);
         assert_eq!(agy_conversation_id("queued-12345678"), None);
         assert_eq!(agy_conversation_id("repo__default"), None);
         assert_eq!(agy_conversation_id("C:/repo"), None);
         assert_eq!(agy_conversation_id(""), None);
+    }
+
+    #[test]
+    fn test_wipe_and_rescan_single_instance_does_not_fail() {
+        let res = super::wipe_and_rescan_repo_db(Some("test-nonexistent-instance"));
+        assert!(
+            res.is_ok(),
+            "Expected wipe_and_rescan_repo_db to succeed, got: {:?}",
+            res.err()
+        );
     }
 }

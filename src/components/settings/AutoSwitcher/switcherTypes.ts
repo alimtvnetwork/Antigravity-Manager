@@ -17,6 +17,7 @@ export const DEFAULT_CONFIG: AutoProfileSwitcherConfig = {
     auto_reopen_on_switch: true,
     watchdog_interval_seconds: 120,
     prompt_recency_threshold_seconds: 3600,
+    pid_refresh_seconds: 600,
     caution_interval_seconds: 60,
     critical_interval_seconds: 40,
     critical_threshold_percent: 12.0,
@@ -24,4 +25,5 @@ export const DEFAULT_CONFIG: AutoProfileSwitcherConfig = {
     ultra_tier_multiplier: 4.0,
     pro_tier_multiplier: 2.0,
     free_tier_multiplier: 1.0,
+    min_weekly_quota_percent: 15.0,
 };

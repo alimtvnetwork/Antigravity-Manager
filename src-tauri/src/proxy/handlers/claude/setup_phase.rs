@@ -33,8 +33,8 @@ pub(crate) async fn preprocess_request(
         axum::extract::Extension<crate::proxy::monitor::UpstreamRequestBodyHolder>,
     >,
 ) -> Result<SetupOutput, Response> {
-    // [FIX] 保存原始请求体的完整副本，用于日志记录
-    // 这确保了即使结构体定义遗漏字段，日志也能完整记录所有参数
+    // [FIX] Save a complete copy of the original request body for logging purposes
+    // This ensures that even if the structure definition misses fields, the log will fully record all parameters.
     let original_body = body.clone();
 
     tracing::debug!(
@@ -42,7 +42,7 @@ pub(crate) async fn preprocess_request(
         body.to_string().len()
     );
 
-    // 生成随机 Trace ID 用户追踪
+    // Generate random Trace ID user trace
     let trace_id: String =
         rand::Rng::sample_iter(rand::thread_rng(), &rand::distributions::Alphanumeric)
             .take(6)
@@ -52,7 +52,7 @@ pub(crate) async fn preprocess_request(
     let debug_cfg = state.debug_logging.read().await.clone();
 
     // [NEW] Detect Client Adapter
-    // 检查是否有匹配的客户端适配器（如 opencode）
+    // Check if there is a matching client adapter (such as opencode)
     let client_adapter = CLIENT_ADAPTERS
         .iter()
         .find(|a| a.matches(&headers))
@@ -70,7 +70,7 @@ pub(crate) async fn preprocess_request(
         zai.enabled && !matches!(zai.dispatch_mode, crate::proxy::ZaiDispatchMode::Off);
     let google_accounts = state.token_manager.len();
 
-    // [CRITICAL REFACTOR] 优先解析请求以获取模型信息(用于智能兜底判断)
+    // [CRITICAL REFACTOR] Prioritize parsing requests to obtain model information (used for intelligent judgment)
     let mut request: crate::proxy::mappers::claude::models::ClaudeRequest =
         match serde_json::from_value(body.clone()) {
             Ok(r) => r,
@@ -118,7 +118,7 @@ pub(crate) async fn preprocess_request(
 
     let raw_client_budget = request.thinking.as_ref().and_then(|t| t.budget_tokens);
 
-    // [USER RULE] 对于 Gemini >= 3 或显式指定档位的模型，进站阶段彻底忽略客户端思考与预算参数，绝不被客户端 1024 或 low 污染
+    // [USER RULE] For models with Gemini >= 3 or explicitly specified gears, the inbound phase completely ignores client thinking and budget parameters, and is never contaminated by client 1024 or low
     if is_client_control {
         if client_disabled {
             request.thinking = Some(crate::proxy::mappers::claude::models::ThinkingConfig {
@@ -128,7 +128,7 @@ pub(crate) async fn preprocess_request(
             });
         }
     } else if is_v3_or_above || is_explicit_tier_model {
-        // 无论客户端未提供 thinking，或者传了 disabled，只要是 3+ 或显式模型，强制矫正为 enabled，清理客户端 budget_tokens
+        // Regardless of whether the client does not provide thinking or passes disabled, as long as it is a 3+ or explicit model, it is forced to be corrected to enabled and the client budget_tokens are cleared.
         let effort_in_thinking = request.thinking.as_ref().and_then(|t| t.effort.clone());
         request.thinking = Some(crate::proxy::mappers::claude::models::ThinkingConfig {
             type_: "enabled".to_string(),
@@ -141,7 +141,7 @@ pub(crate) async fn preprocess_request(
         apply_thinking_hints(&mut request, &thinking_hint, &trace_id, temp_cap);
     }
 
-    // [USER RULE] 对显式指定档位或 Gemini >= 3 的思考模型，进站阶段彻底忽略客户端思考预算，绝不参与档位推断
+    // [USER RULE] For thinking models with explicitly specified gears or Gemini >= 3, the client thinking budget is completely ignored during the inbound phase and gear inference is never involved.
     let effective_budget_hint = if !is_client_control && (is_explicit_tier_model || is_v3_or_above)
     {
         None
@@ -176,8 +176,8 @@ pub(crate) async fn preprocess_request(
                 effort: effort_hint.clone(),
             });
         } else if is_client_control {
-            // [CRITICAL FIX] 客户端控制模式下，客户端未传数字预算（全缺省或仅传等级）
-            // 严禁保留 apply_variant 内部赋予的 spec.thinking_budget (4000)！保持真实客户端状态
+            // [CRITICAL FIX] In client control mode, the client does not transmit the digital budget (full default or only level)
+            // It is strictly forbidden to retain the spec.thinking_budget (4000) assigned internally by apply_variant! Maintain real client state
             if let Some(ref mut t) = request.thinking {
                 t.budget_tokens = None;
             }
@@ -189,13 +189,13 @@ pub(crate) async fn preprocess_request(
     }
 
     if debug_logger::is_enabled(&debug_cfg) {
-        // [FIX] 使用原始 body 副本记录日志，确保不丢失任何字段
+        // [FIX] Use original body copy for logging to ensure no fields are lost
         let original_payload = json!({
             "kind": "original_request",
             "protocol": "anthropic",
             "trace_id": trace_id,
             "original_model": request.model,
-            "request": crate::proxy::payload_audit::reorder_payload_fields(&original_body),  // 原始请求体（字段按关注度重排），不是结构体序列化
+            "request": crate::proxy::payload_audit::reorder_payload_fields(&original_body),  // Original request body (fields rearranged by attention), not structure serialization
         });
         debug_logger::write_debug_payload(
             &debug_cfg,
@@ -206,7 +206,7 @@ pub(crate) async fn preprocess_request(
         .await;
     }
 
-    // [Issue #703 Fix] 智能兜底判断:需要归一化模型名用于配额保护检查
+    // [Issue #703 Fix] Intelligent back-up judgment: normalized model names are required for quota protection checks
     let normalized_model =
         crate::proxy::common::model_mapping::normalize_to_standard_id(&request.model)
             .unwrap_or_else(|| request.model.clone());
@@ -219,14 +219,14 @@ pub(crate) async fn preprocess_request(
             crate::proxy::ZaiDispatchMode::Exclusive => true,
             crate::proxy::ZaiDispatchMode::Fallback => {
                 if google_accounts == 0 {
-                    // 没有 Google 账号,使用兜底
+                    // If you don’t have a Google account, use Qidian
                     tracing::info!(
                         "[{}] No Google accounts available, using fallback provider",
                         trace_id
                     );
                     true
                 } else {
-                    // [Issue #703 Fix] 智能判断:检查是否有可用的 Google 账号
+                    // [Issue #703 Fix] Intelligent judgment: check if there is an available Google account
                     let has_available = state
                         .token_manager
                         .has_available_account("claude", &normalized_model)
@@ -254,12 +254,12 @@ pub(crate) async fn preprocess_request(
     // [Stage 1 Timing] Initial session clean timing
     let clean_start = std::time::Instant::now();
 
-    // [CRITICAL FIX] 预先清理所有消息中的 cache_control 字段 (Issue #744)
-    // 必须在序列化之前处理，以确保 z.ai 和 Google Flow 都不受历史消息缓存标记干扰
+    // [CRITICAL FIX] Preemptively clean cache_control field in all messages (Issue #744)
+    // Must be processed before serialization to ensure that neither z.ai nor Google Flow interferes with historical message cache tags
     clean_cache_control_from_messages(&mut request.messages);
 
-    // [FIX #813] 合并连续的同角色消息 (Consecutive User Messages)
-    // 这对于 z.ai (Anthropic 直接转发) 路径至关重要，因为原始结构必须符合协议
+    // [FIX #813] Consecutive User Messages
+    // This is critical for the z.ai (Anthropic Direct Forwarding) path, as the original structure must comply with the protocol
     merge_consecutive_messages(&mut request.messages);
 
     // Get model family for signature validation
@@ -275,7 +275,7 @@ pub(crate) async fn preprocess_request(
         }
     };
 
-    // [CRITICAL FIX] 过滤并修复 Thinking 块签名 (Enhanced with family check)
+    // [CRITICAL FIX] Filter and fix Thinking block signature (Enhanced with family check)
     filter_invalid_thinking_blocks_with_family(&mut request.messages, target_family);
 
     // [FIX Prompt-Cache] Do NOT inject synthetic messages (close_tool_loop_for_thinking).
@@ -294,12 +294,12 @@ pub(crate) async fn preprocess_request(
     };
 
     if compression_level != "disabled" {
-        // [ACC-P RTK] Low, Medium, High 等级均对传入的工具返回日志执行静态 RTK 去噪折叠
+        // [ACC-P RTK] Low, Medium, High levels all perform static RTK denoising folding on incoming tool return logs
         for msg in &mut request.messages {
             crate::proxy::mappers::context_manager::ContextManager::clean_tool_message(msg);
         }
 
-        // [ACC-P Caveman] Medium, High 等级对除最近 4 条（~2轮）以外的旧对话常驻执行 Caveman 提纯
+        // [ACC-P Caveman] Medium, High levels Perform Caveman refinement on all old conversations except the last 4 (~2 rounds)
         if compression_level == "medium" || compression_level == "high" {
             let total_msgs = request.messages.len();
             let start_protection_idx = total_msgs.saturating_sub(4);
@@ -335,19 +335,19 @@ pub(crate) async fn preprocess_request(
         }
     }
 
-    // ===== [Issue #467 Fix] 拦截 Claude Code Warmup 请求 =====
-    // Claude Code 会每 10 秒发送一次 warmup 请求来保持连接热身，
-    // 这些请求会消耗大量配额。检测到 warmup 请求后直接返回模拟响应。
+    // ===== [Issue #467 Fix] Interception of Claude Code Warmup request =====
+    // Claude Code will send a warmup request every 10 seconds to keep the connection warmed up.
+    // These requests consume a large amount of quota. A simulated response is returned directly after detecting the warmup request.
     if is_warmup_request(&request) {
         tracing::info!(
-            "[{}] 🔥 拦截 Warmup 请求，返回模拟响应（节省配额）",
+            "[ {} ] 🔥 Intercept Warmup request and return simulated response (save quota)",
             trace_id
         );
         return Err(create_warmup_response(&request, request.stream));
     }
 
     if use_zai {
-        // 重新序列化修复后的请求体
+        // Reserialize the repaired request body
         let mut new_body = match serde_json::to_value(&request) {
             Ok(v) => v,
             Err(e) => {
@@ -376,10 +376,10 @@ pub(crate) async fn preprocess_request(
         );
     }
 
-    // Google Flow 继续使用 request 对象
-    // (后续代码不需要再次 filter_invalid_thinking_blocks)
+    // Google Flow continues to use the request object
+    // (Following code does not need to filter_invalid_thinking_blocks again)
 
-    // [NEW] 获取上下文控制配置
+    // [NEW] Get context control configuration
     let experimental = state.experimental.read().await;
     let scaling_enabled = experimental.enable_usage_scaling;
     let threshold_l1 = experimental.context_compression_threshold_l1;

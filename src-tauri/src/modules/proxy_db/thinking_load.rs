@@ -53,8 +53,8 @@ pub fn load_thinking_records(session_key: &str) -> Result<Vec<PersistedThinkingR
     Ok(result)
 }
 
-/// 根据 tool_id (因果伪哈希 ID 或原生 ID) 精准穿透点查历史思考
-/// 采用双轨索引极速点查 + 老数据自动静默自愈机制
+/// Thoughts on accurately penetrating and enumerating history based on tool_id (causal pseudo-hash ID or native ID)
+/// Adopt dual-track index for extremely fast enumeration + automatic silent self-healing mechanism for old data
 pub fn load_thinking_by_tool_id(
     session_key: &str,
     tool_id: &str,
@@ -71,7 +71,7 @@ pub fn load_thinking_by_tool_id(
     let conn = thinking_db()?;
 
     for candidate in candidate_ids {
-        // 1. Track 1 (Fastest Path): 优先按因果伪哈希 ID 走 idx_thinking_rec_causal 专属局部索引 (0.02ms 纳秒级命中)
+        // 1. Track 1 (Fastest Path): Prioritize the causal pseudo-hash ID idx_thinking_rec_causal exclusive local index (0.02ms nanosecond hit)
         let mut causal_stmt = conn
             .prepare_cached(
                 "SELECT id, fingerprint, thought, signature, tool_ids, tool_names, visible
@@ -97,7 +97,7 @@ pub fn load_thinking_by_tool_id(
             let tool_names: Vec<String> = serde_json::from_str(&tool_names_str).unwrap_or_default();
             let healed_sig = persist_signature(raw_signature.as_deref());
 
-            // 反向写回优化：若数据库中存储了损坏/非标准签名，命中后自愈并写回更新 SQLite
+            // Reverse writeback optimization: If a damaged/non-standard signature is stored in the database, it will self-heal after the hit and write back the updated SQLite
             if let Some(ref h_sig) = healed_sig {
                 if raw_signature.as_ref() != Some(h_sig) {
                     // Justification: in-place self-healing write-back is a cache repair; the healed value is returned to the caller
@@ -121,7 +121,7 @@ pub fn load_thinking_by_tool_id(
             }));
         }
 
-        // 2. Track 2 (Legacy Path): 兼容旧版 primary_tool_id (走 idx_thinking_rec_tool 索引点查)
+        // 2. Track 2 (Legacy Path): Compatible with the old version primary_tool_id (check the idx_thinking_rec_tool index)
         let mut primary_stmt = conn
             .prepare_cached(
                 "SELECT id, fingerprint, thought, signature, tool_ids, tool_names, visible
@@ -147,7 +147,7 @@ pub fn load_thinking_by_tool_id(
             let tool_names: Vec<String> = serde_json::from_str(&tool_names_str).unwrap_or_default();
             let healed_sig = persist_signature(raw_signature.as_deref());
 
-            // 3. Track 3 (In-Place Self-Healing): 若当前请求使用的是因果伪哈希 ID，顺手静默修复老数据
+            // 3. Track 3 (In-Place Self-Healing): If the current request uses a causal pseudo-hash ID, the old data can be repaired silently
             if is_synthetic_tool_id(candidate) {
                 // Justification: causal_tool_id backfill on a legacy record is a cache repair; the loaded record is returned regardless
                 crate::error::record_ignored(
@@ -181,7 +181,7 @@ pub fn load_thinking_by_tool_id(
             }));
         }
 
-        // 4. Track 4 (Fallback Path): 极端情况兼容最古老旧记录 (tool_ids 列表内模糊包含)
+        // 4. Track 4 (Fallback Path): Compatible with the oldest record in extreme cases (fuzzy inclusion in tool_ids list)
         let pattern = format!("%\"{}\"%", candidate);
         let mut fallback_stmt = conn
             .prepare_cached(
@@ -245,7 +245,7 @@ pub fn load_thinking_by_tool_id(
     Ok(None)
 }
 
-/// 根据 signature 精准穿透点查历史思考（利用 idx_thinking_rec_sig 索引）
+/// Accurately penetrate historical thinking based on signature (using idx_thinking_rec_sig index)
 pub fn load_thinking_by_signature(
     session_key: &str,
     signature: &str,
@@ -305,7 +305,7 @@ pub fn load_thinking_by_signature(
     }
 }
 
-/// 为 UI 展示层兜底提供：按会话查找最新记录中的权威签名 (支持带租户前缀的容错匹配)
+/// Provided for the UI presentation layer: Find the authoritative signature in the latest record by session (supports fault-tolerant matching with tenant prefix)
 pub fn lookup_latest_thinking_signature(session_id: &str) -> Option<String> {
     if session_id.trim().is_empty() {
         return None;
@@ -338,7 +338,7 @@ pub fn lookup_latest_thinking_signature(session_id: &str) -> Option<String> {
     healed
 }
 
-/// 为 UI 展示层兜底提供：按思考内容片段模糊查找权威签名
+/// Provide a bottom-up for the UI presentation layer: fuzzy search for authoritative signatures based on thought content fragments
 pub fn lookup_signature_by_thought_snippet(snippet: &str) -> Option<String> {
     let clean = snippet.trim();
     if clean.is_empty() {
@@ -371,7 +371,7 @@ pub fn lookup_signature_by_thought_snippet(snippet: &str) -> Option<String> {
     healed
 }
 
-/// 根据 fingerprint 精准穿透点查纯文本历史思考（利用 idx_thinking_rec_fp 索引）
+/// Check plain text historical thinking based on fingerprint precise penetration (using idx_thinking_rec_fp index)
 pub fn load_thinking_by_fingerprint(
     session_key: &str,
     fingerprint: &str,

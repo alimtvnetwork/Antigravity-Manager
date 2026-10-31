@@ -7,7 +7,7 @@ use crate::proxy::signature_cache::cacheentry::SignatureCache;
 use bytes::Bytes;
 use serde_json::{json, Value};
 
-/// Part 处理器
+/// Part Processor
 pub struct PartProcessor<'a> {
     pub(crate) state: &'a mut StreamingState,
 }
@@ -17,7 +17,7 @@ impl<'a> PartProcessor<'a> {
         Self { state }
     }
 
-    /// 处理单个 part
+    /// Process a single part
     pub fn process(&mut self, part: &GeminiPart) -> Vec<Bytes> {
         let mut chunks = Vec::new();
         // Gemini thought_signature is a base64 protobuf string (e.g. EiY... or EtY...)
@@ -25,9 +25,9 @@ impl<'a> PartProcessor<'a> {
         // into control characters, shrinks length below MIN_SIGNATURE_LENGTH, and breaks Gemini signature validation.
         let signature = part.thought_signature.clone();
 
-        // 1. FunctionCall 处理
+        // 1. FunctionCall processing
         if let Some(fc) = &part.function_call {
-            // 先处理 trailingSignature (B4/C3 场景)
+            // Process trailingSignature first (B4/C3 scenario)
             if self.state.has_trailing_signature() {
                 chunks.extend(self.state.end_block());
                 if let Some(trailing_sig) = self.state.trailing_signature.take() {
@@ -57,18 +57,18 @@ impl<'a> PartProcessor<'a> {
             return chunks;
         }
 
-        // 2. Text 处理
+        // 2. Text processing
         if let Some(text) = &part.text {
             if part.thought.unwrap_or(false) {
                 // Thinking
                 chunks.extend(self.process_thinking(text, signature));
             } else {
-                // 普通 Text
+                // Normal Text
                 chunks.extend(self.process_text(text, signature));
             }
         }
 
-        // 3. InlineData (Image) 处理
+        // 3. InlineData (Image) processing
         if let Some(img) = &part.inline_data {
             let mime_type = &img.mime_type;
             let data = &img.data;
@@ -81,11 +81,11 @@ impl<'a> PartProcessor<'a> {
         chunks
     }
 
-    /// 处理 Thinking
+    /// Dealing with Thinking
     fn process_thinking(&mut self, text: &str, signature: Option<String>) -> Vec<Bytes> {
         let mut chunks = Vec::new();
 
-        // 处理之前的 trailingSignature
+        // Processing previous trailingSignature
         if self.state.has_trailing_signature() {
             chunks.extend(self.state.end_block());
             if let Some(trailing_sig) = self.state.trailing_signature.take() {
@@ -109,7 +109,7 @@ impl<'a> PartProcessor<'a> {
             }
         }
 
-        // 开始或继续 thinking 块
+        // Start or continue thinking block
         if self.state.current_block_type() != BlockType::Thinking {
             chunks.extend(self.state.start_block(
                 BlockType::Thinking,
@@ -168,7 +168,7 @@ impl<'a> PartProcessor<'a> {
             );
         }
 
-        // 暂存签名 (for local block handling)
+        // Temporary signature (for local block handling)
         // If FIFO, we strictly follow the sequence. The default logic is effectively LIFO for a single turn
         // (store latest, consume at end).
         // For opencode, we just want to ensure we capture IT.

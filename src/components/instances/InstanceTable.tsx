@@ -4,7 +4,7 @@ import { cn } from '../../utils/cn';
 import { useAccountStore } from '../../stores/useAccountStore';
 import { useErrorStore } from '../../stores/error-store';
 import type { InstanceTableProps } from './table/instanceTableTypes';
-import { buildRowCellData, ProfileCell, QuotaCell, StatusCell, PathCell, ExePathCell } from './table/InstanceRowCells';
+import { buildRowCellData, ProfileCell, QuotaCell, StatusProcessEnvCell } from './table/InstanceRowCells';
 import { ActionsCell, MoreMenuPortal } from './table/InstanceRowActions';
 import { resolveDataDir } from './table/instanceTableUtils';
 
@@ -84,17 +84,15 @@ export default function InstanceTable({
     const moreMenuInstance = openMoreId ? instances.find((i) => i.config.id === openMoreId) : undefined;
 
     return (
-        <div className="w-full overflow-hidden rounded-[5px] border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-[#171025] shadow-xs">
-            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#40285e]">
-                <table className="w-full min-w-[780px] text-left text-xs">
+        <div className="w-full max-w-full overflow-hidden rounded-[5px] border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-[#171025] shadow-xs">
+            <div className="w-full max-w-full overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-[#40285e]">
+                <table className="w-full max-w-full table-fixed text-left text-xs">
                     <thead>
                         <tr className="border-b border-slate-200/90 dark:border-slate-800/90 bg-slate-50/80 dark:bg-[#090611] text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            <th className="px-2 py-1.5 min-w-[150px] max-w-[190px]">Profile & Account</th>
-                            <th className="px-2 py-1.5 min-w-[160px] max-w-[200px]">Model & Weekly Quota</th>
-                            <th className="px-2 py-1.5 min-w-[118px] max-w-[140px]">Status & PID</th>
-                            <th className="px-2 py-1.5 min-w-[220px] max-w-[280px]">Data · Executable</th>
-                            <th className="px-2 py-1.5 min-w-[180px] max-w-[220px]">Executable Path</th>
-                            <th className="px-2 py-1.5 text-right w-[130px]">Actions</th>
+                            <th className="px-2 py-1.5 w-[22%] min-w-[150px]">Profile & Account</th>
+                            <th className="px-2 py-1.5 w-[28%] min-w-[190px]">Model & Weekly Quota</th>
+                            <th className="px-2 py-1.5 w-[32%] min-w-[220px]">Status, Process & Environment</th>
+                            <th className="px-2 py-1.5 text-right w-[18%] min-w-[160px]">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="font-medium">
@@ -112,11 +110,11 @@ export default function InstanceTable({
                                 <tr
                                     key={inst.config.id}
                                     className={cn(
-                                        'group transition-colors duration-150 border-b border-slate-200/90 dark:border-slate-800/90 last:border-b-0',
+                                        'group transition-colors duration-300 ease-out border-b border-slate-200 dark:border-slate-800/90 last:border-b-0',
                                         data.isBusy && 'pointer-events-none select-none opacity-60',
                                         data.isActive
-                                            ? 'bg-sky-50/40 dark:bg-[#0a2338] hover:bg-sky-50/70 dark:hover:bg-[#0d2c46]'
-                                            : 'hover:bg-slate-50/80 dark:hover:bg-[#0d253a]/70'
+                                            ? 'bg-sky-100/70 dark:bg-[#0c2f4d] hover:bg-sky-100 dark:hover:bg-[#113d63] border-l-4 border-l-sky-500 shadow-xs'
+                                            : 'hover:bg-slate-100/90 dark:hover:bg-[#191e33] border-l-4 border-l-transparent'
                                     )}
                                 >
                                     <ProfileCell
@@ -127,23 +125,24 @@ export default function InstanceTable({
                                         onSetDefault={onSetDefault ? () => onSetDefault(inst.config.id) : undefined}
                                     />
                                     <QuotaCell data={data} />
-                                    <StatusCell inst={inst} data={data} />
-                                    <PathCell
+                                    <StatusProcessEnvCell
                                         inst={inst}
+                                        data={data}
                                         isCopied={copiedPathId === inst.config.id}
                                         onCopy={() => handleCopyPath(inst.config.id, resolveDataDir(inst))}
                                     />
-                                    <ExePathCell inst={inst} />
                                     <ActionsCell
                                         inst={inst}
                                         currentAction={data.currentAction}
                                         isBusy={data.isBusy}
                                         isMoreOpen={openMoreId === inst.config.id}
                                         onLaunch={() => onLaunch(inst.config.id)}
-                                        onStop={() => onStop(inst.config.id)}
+                                        onStop={() => onStop(inst.config.id, inst.pid ?? undefined)}
                                         onRestart={() => onRestart(inst.config.id)}
                                         onSwitch={() => onSwitch(inst.config.id)}
                                         onFastForward={() => onFastForward(inst.config.id)}
+                                        onOpenPromptTree={() => onOpenPromptTree(inst.config.id)}
+                                        onAudit={onAudit ? () => onAudit(inst.config.id, inst.config.name) : undefined}
                                         onToggleMore={(anchor) => handleToggleMore(inst.config.id, anchor)}
                                     />
                                 </tr>

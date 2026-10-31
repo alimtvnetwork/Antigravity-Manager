@@ -67,7 +67,7 @@ fn test_issue_3515_client_direct_control_disable_thinking() {
         .as_object()
         .expect("Should have generationConfig in request payload");
 
-    // 客户端直接控制模式显式关闭思考：彻底不填任何转出报文的谷歌思考块字段和预算
+    // The client directly controls the mode to explicitly turn off Thinking: completely do not fill in any Google Thinking block fields and budgets of the outbound messages.
     assert!(gen_config.get("thinkingConfig").is_none());
 }
 
@@ -89,7 +89,7 @@ fn test_client_direct_control_all_scenarios_for_gemini_38_flash_tiered() {
     }
     let _guard = ResetGuard;
 
-    // 场景 1: 客户端思考块全缺省（开关缺省就是默认开，预算留空交由上游自适应）
+    // Scenario 1: Client thinking blocks are all defaulted (the switch is enabled by default, and the budget is left blank and left to the upstream for adaptation)
     let req_default = OpenAIRequest {
         model: "gemini-3.8-flash-tiered".to_string(),
         messages: vec![OpenAIMessage {
@@ -108,7 +108,7 @@ fn test_client_direct_control_all_scenarios_for_gemini_38_flash_tiered() {
     assert!(tc1.get("thinkingBudget").is_none());
     assert!(tc1.get("thinkingLevel").is_none());
 
-    // 场景 2: 客户端仅传思考等级 low（等级透传，绝不脑补 budget，必须带上 includeThoughts: true）
+    // Scenario 2: The client only transmits the thinking level low (the level is transparently transmitted, and the budget is never supplemented, and includeThoughts: true must be included)
     let req_level = OpenAIRequest {
         model: "gemini-3.8-flash-tiered".to_string(),
         messages: vec![OpenAIMessage {
@@ -128,7 +128,7 @@ fn test_client_direct_control_all_scenarios_for_gemini_38_flash_tiered() {
     assert_eq!(tc2.get("thinkingLevel"), Some(&json!("LOW")));
     assert!(tc2.get("thinkingBudget").is_none());
 
-    // 场景 3: 客户端仅传预算 8192（忠实透传预算，绝不脑补等级，必须带上 includeThoughts: true）
+    // Scenario 3: The client only transmits the budget 8192 (the budget is transmitted faithfully and transparently, and the level is never inflated, and includeThoughts: true must be included)
     let req_budget = OpenAIRequest {
         model: "gemini-3.8-flash-tiered".to_string(),
         messages: vec![OpenAIMessage {
@@ -151,7 +151,7 @@ fn test_client_direct_control_all_scenarios_for_gemini_38_flash_tiered() {
     assert_eq!(tc3.get("includeThoughts"), Some(&json!(true)));
     assert_eq!(tc3.get("thinkingBudget"), Some(&json!(8192)));
     assert!(tc3.get("thinkingLevel").is_none());
-    // 且验证 maxOutputTokens 自动垫高保证 > budget
+    // And verify that maxOutputTokens automatically increases the guarantee > budget
     let max_out = res3["request"]["generationConfig"]["maxOutputTokens"]
         .as_i64()
         .unwrap();
@@ -199,7 +199,7 @@ fn test_issue_3515_gateway_control_preserves_medium_budget_when_client_budget_ze
         .expect("Should have generationConfig in request payload");
     let thinking_config = gen_config["thinkingConfig"].as_object().unwrap();
 
-    // 网关权威控制模式下，90% 用户行为保持不变，依然权威锁定 4000 预算
+    // In the gateway authoritative control mode, 90% of user behaviors remain unchanged, and the 4000 budget is still locked authoritatively.
     assert_eq!(thinking_config.get("thinkingBudget"), Some(&json!(4000)));
     assert_eq!(thinking_config.get("includeThoughts"), Some(&json!(true)));
 }

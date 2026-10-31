@@ -57,10 +57,10 @@ export function ErrorQueueBadge(): React.ReactNode {
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         className={cn(
-          "relative flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all duration-200 cursor-pointer text-xs",
+          "relative flex items-center gap-1.5 h-7 px-2 rounded-r-full transition-all duration-200 cursor-pointer text-xs",
           hasErrors
-            ? "bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 border border-rose-200/80 dark:border-rose-800/80 shadow-xs"
-            : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent"
+            ? "bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 font-semibold"
+            : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100 hover:bg-gray-200 dark:hover:bg-[#40285e]"
         )}
         title={
           hasErrors

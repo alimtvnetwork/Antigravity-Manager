@@ -1,6 +1,6 @@
 use super::*;
 
-/// 启动反代服务 (Tauri 命令)
+/// Start the anti-generation service (Tauri command)
 #[tauri::command]
 pub async fn start_proxy_service(
     config: ProxyConfig,
@@ -24,31 +24,31 @@ impl Drop for StartingGuard {
     }
 }
 
-/// 内部启动反代服务逻辑 (解耦版本)
+/// Internally start anti-generation service logic (decoupled version)
 pub async fn internal_start_proxy_service(
     config: ProxyConfig,
     state: &ProxyServiceState,
     integration: crate::modules::integration::SystemManager,
     cloudflared_state: Arc<crate::commands::cloudflared::CloudflaredState>,
 ) -> Result<ProxyStatus, String> {
-    // 1. 检查状态并加锁
+    // 1. Check status and lock
     {
         let instance_lock = state.instance.read().await;
         if instance_lock.is_some() {
-            return Err("服务已在运行中".to_string());
+            return Err("Service is already running".to_string());
         }
     }
 
-    // 2. 检查是否正在启动中 (防止死锁 & 并发启动)
+    // 2. Check whether it is starting (to prevent deadlock & concurrent startup)
     if state
         .starting
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
         .is_err()
     {
-        return Err("服务正在启动中，请稍候...".to_string());
+        return Err("The service is starting, please wait...".to_string());
     }
 
-    // 使用自定义 Drop guard 确保无论成功失败都会重置 starting 状态
+    // Use a custom Drop guard to ensure that the starting state is reset regardless of success or failure
     let _starting_guard = StartingGuard(state.starting.clone());
 
     // Ensure monitor exists
@@ -72,7 +72,7 @@ pub async fn internal_start_proxy_service(
 
     let _monitor = state.monitor.read().await.as_ref().unwrap().clone();
 
-    // 檢查並啟動管理服務器（如果尚未運行）
+    // Check and start the management server if it is not already running
     ensure_admin_server(
         config.clone(),
         state,
@@ -81,7 +81,7 @@ pub async fn internal_start_proxy_service(
     )
     .await?;
 
-    // 2. [FIX] 复用管理服务器的 Token 管理器 (单实例，解决热更新同步问题)
+    // 2. [FIX] Reuse the token manager of the management server (single instance to solve the problem of hot update synchronization)
     let token_manager = {
         let admin_lock = state.admin_server.read().await;
         admin_lock
@@ -92,20 +92,20 @@ pub async fn internal_start_proxy_service(
             .clone()
     };
 
-    // 同步配置到运行中的 TokenManager
+    // Synchronize configuration to running TokenManager
     token_manager.start_auto_cleanup().await;
     token_manager
         .update_sticky_config(config.scheduling.clone())
         .await;
 
-    // [NEW] 加载熔断配置 (从主配置加载)
+    // [NEW] Load circuit breaker configuration (loaded from main configuration)
     let app_config = crate::modules::config::load_app_config()
         .unwrap_or_else(|_| crate::models::AppConfig::new());
     token_manager
         .update_circuit_breaker_config(app_config.circuit_breaker)
         .await;
 
-    // 🆕 [FIX #820] 恢复固定账号模式设置
+    // 🆕 [FIX #820] Restore fixed account mode settings
     if let Some(ref account_id) = config.preferred_account_id {
         token_manager
             .set_preferred_account(Some(account_id.clone()))
@@ -113,14 +113,14 @@ pub async fn internal_start_proxy_service(
         tracing::info!("🔒 [FIX #820] Fixed account mode restored: {}", account_id);
     }
 
-    // 3. 加載賬號
+    // 3. Load account
     let active_accounts = token_manager.load_accounts().await.unwrap_or(0);
 
     if active_accounts == 0 {
         let zai_enabled = config.zai.enabled
             && !matches!(config.zai.dispatch_mode, crate::proxy::ZaiDispatchMode::Off);
         if !zai_enabled {
-            tracing::warn!("沒有可用賬號，反代邏輯將暫停，請通過管理界面添加。");
+            tracing::warn!("If there is no available account, the anti-generation logic will be suspended. Please add it through the management interface.");
             return Ok(ProxyStatus {
                 running: false,
                 port: config.port,
@@ -138,8 +138,8 @@ pub async fn internal_start_proxy_service(
         .axum_server
         .clone();
 
-    // 创建服务实例（逻辑启动）。不再保存假的 server_handle：
-    // 监听任务的真实句柄已由 AdminServerInstance 持有（见 ensure_admin_server）。
+    // Create a service instance (logical startup). No more saving fake server_handles:
+    // The real handle to the listening task is already held by AdminServerInstance (see ensure_admin_server).
     let instance = ProxyServiceInstance {
         config: config.clone(),
         token_manager: token_manager.clone(),
@@ -151,8 +151,8 @@ pub async fn internal_start_proxy_service(
 
     *instance_lock = Some(instance);
 
-    // 成功启动后，guard 在这里结束并重置 starting 是 OK 的
-    // 但其实我们可以直接手动掉，或者相信 guard
+    // After successful startup, it is OK for guard to end here and reset starting
+    // But in fact, we can directly turn it off manually, or trust guard
     Ok(ProxyStatus {
         running: true,
         port: config.port,
@@ -161,7 +161,7 @@ pub async fn internal_start_proxy_service(
     })
 }
 
-/// 确保管理服务器正在运行
+/// Make sure the management server is running
 pub async fn ensure_admin_server(
     config: ProxyConfig,
     state: &ProxyServiceState,
@@ -200,10 +200,10 @@ pub async fn ensure_admin_server(
         monitor_lock.as_ref().unwrap().clone()
     };
 
-    // 默认空 TokenManager 用于管理界面
+    // The default empty TokenManager is used for the management interface
     let app_data_dir = crate::modules::account::get_data_dir()?;
     let token_manager = Arc::new(TokenManager::new(app_data_dir));
-    // [NEW] 加载账号数据，否则管理界面统计为 0
+    // [NEW] Load account data, otherwise the management interface statistics will be 0
     // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
     crate::error::record_ignored(token_manager.load_accounts().await, "load_accounts");
 
@@ -229,7 +229,7 @@ pub async fn ensure_admin_server(
     .await
     {
         Ok((server, handle)) => (server, handle),
-        Err(e) => return Err(format!("启动管理服务器失败: {}", e)),
+        Err(e) => return Err(format!("Failed to start management server: {}", e)),
     };
 
     *admin_lock = Some(AdminServerInstance {
@@ -237,13 +237,13 @@ pub async fn ensure_admin_server(
         server_handle,
     });
 
-    // [NEW] 初始化全局 Thinking Budget 配置
+    // [NEW] Initialize global Thinking Budget configuration
     crate::proxy::update_thinking_budget_config(config.thinking_budget.clone());
-    // [NEW] 初始化全局系统提示词配置
+    // [NEW] Initialize global system prompt word configuration
     crate::proxy::update_global_system_prompt_config(config.global_system_prompt.clone());
-    // [NEW] 初始化全局图像思维模式配置
+    // [NEW] Initialize global image thinking mode configuration
     crate::proxy::update_image_thinking_mode(config.image_thinking_mode.clone());
-    // [NEW] 初始化全局压缩等级配置
+    // [NEW] Initialize global compression level configuration
     crate::proxy::config::update_global_compression_level(
         config.experimental.compression_level.clone(),
         config.experimental.enable_usage_scaling,
@@ -259,7 +259,7 @@ pub async fn ensure_admin_server(
     Ok(())
 }
 
-/// 停止反代服务
+/// Stop anti-generation service
 #[tauri::command]
 pub async fn stop_proxy_service(state: State<'_, ProxyServiceState>) -> Result<(), String> {
     let mut instance_lock = state.instance.write().await;
@@ -268,11 +268,11 @@ pub async fn stop_proxy_service(state: State<'_, ProxyServiceState>) -> Result<(
         return Ok(());
     }
 
-    // 停止 Axum 服务器 (仅逻辑停止，不杀死进程)
+    // Stop the Axum server (only logical stop, do not kill the process)
     if let Some(instance) = instance_lock.take() {
         instance.token_manager.abort_background_tasks().await;
         instance.axum_server.set_running(false).await;
-        // 已移除 instance.axum_server.stop() 调用，防止杀死 Admin Server
+        // The instance.axum_server.stop() call has been removed to prevent killing the Admin Server
     }
 
     Ok(())

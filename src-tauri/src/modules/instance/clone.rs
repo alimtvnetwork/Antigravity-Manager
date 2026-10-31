@@ -3,6 +3,23 @@ use super::*;
 use std::fs;
 use std::path::PathBuf;
 
+/// Real-time progress update emitted during deep instance cloning.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CloneProgressPayload {
+    /// Source instance identifier being cloned.
+    pub source_id: String,
+    /// Destination instance display name.
+    pub target_name: String,
+    /// Discrete stage identifier: "initializing" | "user_settings" | "sqlite_databases" | "workspace_storage" | "telemetry_sync" | "complete"
+    pub stage: String,
+    /// Numeric completion percentage (10, 30, 50, 75, 95, 100).
+    pub percentage: u8,
+    /// Human-readable description of current operation.
+    pub message: String,
+    /// Unix timestamp in milliseconds when stage began.
+    pub timestamp_ms: u64,
+}
+
 /// Copy/clone an existing profile with options (optionally copying open projects and recent paths)
 pub fn copy_instance_with_options(
     source_id: &str,
@@ -10,6 +27,31 @@ pub fn copy_instance_with_options(
     clone_mode: Option<&str>,
     copy_projects: bool,
 ) -> Result<InstanceConfig, String> {
+    copy_instance_with_progress(
+        source_id,
+        target_name,
+        clone_mode,
+        copy_projects,
+        |_, _, _| {},
+    )
+}
+
+/// Copy/clone an existing profile with real-time progress reporting across discrete stages.
+pub fn copy_instance_with_progress<F>(
+    source_id: &str,
+    target_name: String,
+    clone_mode: Option<&str>,
+    copy_projects: bool,
+    mut progress: F,
+) -> Result<InstanceConfig, String>
+where
+    F: FnMut(&str, u8, &str),
+{
+    progress(
+        "initializing",
+        10,
+        "Initializing clone environment and resolving target paths...",
+    );
     let resolved_source_id =
         resolve_instance_id(source_id).unwrap_or_else(|_| source_id.to_string());
     let registry = load_registry()?;
@@ -42,6 +84,11 @@ pub fn copy_instance_with_options(
 
     let has_src = src_path.exists();
     if has_src {
+        progress(
+            "user_settings",
+            30,
+            "Replicating user settings, keybindings, snippets, and security policies...",
+        );
         if is_profile_only {
             let user_settings_src = src_path.join("User");
             let has_user_dir = user_settings_src.exists();
@@ -71,6 +118,11 @@ pub fn copy_instance_with_options(
         }
 
         // Specifically ensure state.vscdb is cloned using safe_clone_sqlite_db
+        progress(
+            "sqlite_databases",
+            50,
+            "Safely cloning SQLite state databases and storage identifiers...",
+        );
         let src_vscdb = src_path
             .join("User")
             .join("globalStorage")
@@ -190,6 +242,26 @@ pub fn copy_instance_with_options(
             crate::error::record_ignored(
                 crate::modules::db::sanitize_session(&cloned_db),
                 "sanitize session db",
+            );
+
+            // Imp-09: Cloned Profile Synthetic UUID Generation
+            let fresh_device_profile = crate::modules::device::generate_profile();
+            let cloned_storage_path = dst_path
+                .join("User")
+                .join("globalStorage")
+                .join("storage.json");
+            // Justification: device-profile bookkeeping; the existing profile persists if this fails
+            crate::error::record_ignored(
+                crate::modules::device::write_profile(&cloned_storage_path, &fresh_device_profile),
+                "write fresh cloned device profile",
+            );
+            // Justification: device-identity bookkeeping; the existing identity persists if this fails
+            crate::error::record_ignored(
+                crate::modules::db::write_service_machine_id(
+                    &cloned_db,
+                    &fresh_device_profile.mac_machine_id,
+                ),
+                "write cloned service machine id",
             );
             if let Some(ref acc_id) = new_instance.bound_account_id {
                 if let Ok(acc) = crate::modules::account::load_account(acc_id) {
@@ -358,6 +430,11 @@ pub fn copy_instance_with_options(
         ));
     }
 
+    progress(
+        "workspace_storage",
+        75,
+        "Cloning workspace storage trees, open projects, and recent folders...",
+    );
     if copy_projects {
         // Justification: background detection; re-runs on the next refresh tick
         crate::error::record_ignored(
@@ -419,6 +496,11 @@ pub fn copy_instance_with_options(
         purge_recent_project_paths(&new_instance);
     }
 
+    progress(
+        "telemetry_sync",
+        95,
+        "Scrubbing hardware telemetry salts and enforcing IDE parity...",
+    );
     // Justification: post-clone hygiene; stale summaries are regenerated on demand
     crate::error::record_ignored(
         sanitize_cloned_instance_summaries(&new_instance.id),
@@ -431,5 +513,111 @@ pub fn copy_instance_with_options(
     );
     sync_instance_ide_parity(&new_instance.id).map_err(|e| e.to_string())?;
 
+    // Imp-64: Deep-Merge Telemetry Scrubbing
+    scrub_storage_json_telemetry(&dst_path, &new_instance.id);
+    if let Ok(dst_home) = get_instance_home_dir(&new_instance.id) {
+        scrub_storage_json_telemetry(&dst_home, &new_instance.id);
+    }
+
+    crate::modules::task_history_db::record(
+        crate::modules::audit_action::AuditAction::CloneInstance,
+        &source.id,
+        "ok",
+        &format!(
+            "Cloned instance '{}' into '{}'",
+            source.name, new_instance.name
+        ),
+        Some(&source.id),
+    );
+    crate::modules::task_history_db::record(
+        crate::modules::audit_action::AuditAction::CreateInstance,
+        &new_instance.id,
+        "ok",
+        &format!(
+            "Created instance '{}' by cloning '{}'",
+            new_instance.name, source.name
+        ),
+        Some(&new_instance.id),
+    );
+
+    progress("complete", 100, "Clone completed successfully.");
     Ok(new_instance)
+}
+
+/// Imp-64: Deep-Merge Telemetry Scrubbing
+/// Scrubs and regenerates machine-identifying telemetry keys in `storage.json`
+/// (`telemetry.machineId`, `telemetry.macMachineId`, `telemetry.devDeviceId`, `telemetry.sqmId`, `telemetry.sessionId`)
+/// so cloned profiles have completely isolated synthetic telemetry identities.
+pub fn scrub_storage_json_telemetry(dst_data_dir: &std::path::Path, instance_id: &str) {
+    let candidate_paths = [
+        dst_data_dir
+            .join("User")
+            .join("globalStorage")
+            .join("storage.json"),
+        dst_data_dir.join("globalStorage").join("storage.json"),
+        dst_data_dir.join("storage.json"),
+        dst_data_dir
+            .join("AppData")
+            .join("Roaming")
+            .join("Antigravity")
+            .join("User")
+            .join("globalStorage")
+            .join("storage.json"),
+    ];
+
+    for storage_path in &candidate_paths {
+        if !storage_path.exists() {
+            continue;
+        }
+
+        if let Ok(raw) = std::fs::read_to_string(storage_path) {
+            if let Ok(mut json) = serde_json::from_str::<serde_json::Value>(&raw) {
+                if let Some(obj) = json.as_object_mut() {
+                    use sha2::{Digest, Sha256};
+                    let machine_seed = format!("{}-machine-{}", instance_id, uuid::Uuid::new_v4());
+                    let mut hasher = Sha256::new();
+                    hasher.update(machine_seed.as_bytes());
+                    let new_machine_id = format!("{:x}", hasher.finalize());
+
+                    let mac_seed = format!("{}-mac-{}", instance_id, uuid::Uuid::new_v4());
+                    let mut mac_hasher = Sha256::new();
+                    mac_hasher.update(mac_seed.as_bytes());
+                    let new_mac_machine_id = format!("{:x}", mac_hasher.finalize());
+
+                    let new_dev_device_id = uuid::Uuid::new_v4().to_string();
+                    let new_sqm_id =
+                        format!("{{{}}}", uuid::Uuid::new_v4().to_string().to_uppercase());
+
+                    obj.insert(
+                        "telemetry.machineId".to_string(),
+                        serde_json::Value::String(new_machine_id),
+                    );
+                    obj.insert(
+                        "telemetry.macMachineId".to_string(),
+                        serde_json::Value::String(new_mac_machine_id),
+                    );
+                    obj.insert(
+                        "telemetry.devDeviceId".to_string(),
+                        serde_json::Value::String(new_dev_device_id),
+                    );
+                    obj.insert(
+                        "telemetry.sqmId".to_string(),
+                        serde_json::Value::String(new_sqm_id),
+                    );
+                    obj.insert(
+                        "telemetry.sessionId".to_string(),
+                        serde_json::Value::String(uuid::Uuid::new_v4().to_string()),
+                    );
+
+                    if let Ok(serialized) = serde_json::to_string_pretty(&json) {
+                        // Justification: best-effort telemetry scrubbing for cloned profile isolation
+                        crate::error::record_ignored(
+                            std::fs::write(storage_path, serialized),
+                            "scrub telemetry in storage.json",
+                        );
+                    }
+                }
+            }
+        }
+    }
 }

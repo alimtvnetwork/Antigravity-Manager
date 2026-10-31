@@ -201,7 +201,7 @@ impl SseParseAccumulator {
                 ) {
                     let idx = index as usize;
 
-                    // Tool use input delta (Anthropic 官方协议为 partial_json 增量)
+                    // Tool use input delta (Anthropic official protocol is partial_json delta)
                     let delta_json = delta
                         .get("partial_json")
                         .or_else(|| delta.get("input_json_delta"))

@@ -146,7 +146,7 @@ impl ContextManager {
                 tool_rounds.push(round);
             }
 
-            // 对保留下来的工具消息部分进行 RTK 日志降噪 (就地修改)
+            // RTK log noise reduction (in-place modification) for the retained tool message part
             for msg in contents.iter_mut() {
                 if let Some(parts) = msg.get_mut("parts").and_then(|p| p.as_array_mut()) {
                     for part in parts {

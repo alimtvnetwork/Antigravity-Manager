@@ -329,3 +329,73 @@ pub fn evaluate_account_period_status(
         below_threshold,
     })
 }
+
+/// Specifically evaluate Claude and 3P models quota percentage (0-100%) for an account.
+/// Evaluates both model-level entries and quota-group buckets (4h/5h rolling and weekly).
+pub fn calculate_claude_quota(account: &Account) -> Option<f64> {
+    let quota_data = account.quota.as_ref()?;
+    let mut min_pct: Option<f64> = None;
+
+    // 1. Direct Claude / Sonnet / Opus / Haiku model quotas
+    for m in &quota_data.models {
+        let n = m.name.to_lowercase();
+        if n.contains("claude") || n.contains("sonnet") || n.contains("opus") || n.contains("haiku")
+        {
+            let pct = m.percentage as f64;
+            min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
+        }
+    }
+
+    // 2. Claude and 3P quota_groups buckets (both short-window and weekly)
+    if let Some(ref groups) = quota_data.quota_groups {
+        for g in groups {
+            let gname = g.display_name.to_lowercase();
+            let is_claude_or_3p_group =
+                gname.contains("claude") || gname.contains("gpt") || gname.contains("3p");
+            if !is_claude_or_3p_group {
+                continue;
+            }
+
+            for b in &g.buckets {
+                if (0.0..=1.0).contains(&b.remaining_fraction) {
+                    let pct = (b.remaining_fraction * 100.0).round();
+                    min_pct = Some(min_pct.map_or(pct, |cur| cur.min(pct)));
+                }
+            }
+        }
+    }
+
+    min_pct
+}
+
+/// Check if an account is currently rate-limited or depleted for Claude models.
+/// Returns true if:
+/// 1. Claude model has an active live rate limit in `live_limited_models`.
+/// 2. Account-wide rate limit is active.
+/// 3. Claude quota is known and <= threshold_percent (default 15.0).
+pub fn is_account_claude_limited(account: &Account, threshold_percent: f64, now_sec: i64) -> bool {
+    // Check live rate limits for Claude or account-wide
+    for (model, status) in &account.live_limited_models {
+        if status.until > now_sec {
+            let m = model.trim().to_lowercase();
+            if m.is_empty()
+                || m.contains("claude")
+                || m.contains("sonnet")
+                || m.contains("opus")
+                || m.contains("haiku")
+                || m.contains("3p")
+            {
+                return true;
+            }
+        }
+    }
+
+    // Check calculated Claude quota
+    if let Some(claude_pct) = calculate_claude_quota(account) {
+        if claude_pct <= threshold_percent {
+            return true;
+        }
+    }
+
+    false
+}

@@ -28,9 +28,9 @@ export function useProxyStatus(appConfig: AppConfig | null): ProxyStatusState {
     const loadStatus = useCallback(async () => {
         try {
             const s = await invoke<ProxyStatus>('get_proxy_status');
-            // 如果后端返回 starting 或 busy，则在 UI 上表现为加载中
+            // If the backend returns starting or busy, it will appear as loading on the UI
             if (s.base_url === 'starting' || s.base_url === 'busy') {
-                // 如果当前已经是运行状态，不要被覆盖为 false
+                // If it is already running, do not overwrite it to false
                 setStatus(prev => ({ ...s, running: prev.running }));
             } else {
                 setStatus(s);
@@ -50,7 +50,7 @@ export function useProxyStatus(appConfig: AppConfig | null): ProxyStatusState {
             if (status.running) {
                 await invoke('stop_proxy_service');
             } else {
-                // 使用当前的 appConfig.proxy 启动
+                // Start using the current appConfig.proxy
                 await invoke('start_proxy_service', { config: appConfig.proxy });
             }
             await loadStatus();

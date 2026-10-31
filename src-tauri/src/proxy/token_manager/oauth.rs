@@ -1,9 +1,9 @@
-//! OAuth：授权码交换、用户信息、账号添加。
+//! OAuth: authorization code exchange, user information, account addition.
 
 use super::TokenManager;
 
 impl TokenManager {
-    /// 使用 Authorization Code 交换 Refresh Token (Web OAuth)
+    /// Use Authorization Code to exchange Refresh Token (Web OAuth)
     pub async fn exchange_code(&self, code: &str, redirect_uri: &str) -> Result<String, String> {
         crate::modules::oauth::exchange_code(code, redirect_uri)
             .await
@@ -13,37 +13,37 @@ impl TokenManager {
             })
     }
 
-    /// 获取 OAuth URL (支持自定义 Redirect URI)
+    /// Get OAuth URL (supports custom Redirect URI)
     pub fn get_oauth_url_with_redirect(&self, redirect_uri: &str, state: &str) -> String {
         crate::modules::oauth::get_auth_url(redirect_uri, state)
     }
 
-    /// 获取用户信息 (Email 等)
+    /// Get user information (Email, etc.)
     pub async fn get_user_info(
         &self,
         refresh_token: &str,
     ) -> Result<crate::modules::oauth::UserInfo, String> {
-        // 先获取 Access Token
+        // Get Access Token first
         let token = crate::modules::oauth::refresh_access_token(refresh_token, None)
             .await
-            .map_err(|e| format!("刷新 Access Token 失败: {}", e))?;
+            .map_err(|e| format!("Failed to refresh Access Token: {}", e))?;
 
         crate::modules::oauth::get_user_info(&token.access_token, None).await
     }
 
-    /// 添加新账号 (纯后端实现，不依赖 Tauri AppHandle)
+    /// Add new account (pure backend implementation, does not rely on Tauri AppHandle)
     pub async fn add_account(&self, email: &str, refresh_token: &str) -> Result<(), String> {
-        // 1. 获取 Access Token (验证 refresh_token 有效性)
+        // 1. Obtain Access Token (verify the validity of refresh_token)
         let token_info = crate::modules::oauth::refresh_access_token(refresh_token, None)
             .await
             .map_err(|e| format!("Invalid refresh token: {}", e))?;
 
-        // 2. 获取项目 ID (Project ID)
+        // 2. Get project ID
         let project_id = crate::proxy::project_resolver::fetch_project_id(&token_info.access_token)
             .await
             .unwrap_or_else(|_| "bamboo-precept-lgxtn".to_string()); // Fallback
 
-        // 3. 委托给 modules::account::add_account 处理 (包含文件写入、索引更新、锁)
+        // 3. Delegate processing to modules::account::add_account (including file writing, index update, and locking)
         let email_clone = email.to_string();
         let refresh_token_clone = refresh_token.to_string();
 
@@ -55,7 +55,7 @@ impl TokenManager {
                 Some(email_clone.clone()),
                 Some(project_id),
                 None,  // session_id
-                false, // 默认不开启
+                false, // Not enabled by default
                 token_info.id_token,
             )
             .with_oauth_client_key(token_info.oauth_client_key.clone());
@@ -66,7 +66,7 @@ impl TokenManager {
         .map_err(|e| format!("Task join error: {}", e))?
         .map_err(|e| format!("Failed to save account: {}", e))?;
 
-        // 4. 重新加载 (更新内存)
+        // 4. Reload (update memory)
         self.reload_all_accounts().await.map(|_| ())
     }
 }

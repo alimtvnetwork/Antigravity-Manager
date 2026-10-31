@@ -33,7 +33,7 @@ export function ProtocolsTab({
 }: ProtocolsTabProps) {
     const getPythonExample = (modelId: string) => {
         const port = status.running ? status.port : (config.proxy.port || DEFAULT_PROXY_PORT);
-        // 推荐使用 127.0.0.1 以避免部分环境 IPv6 解析延迟问题
+        // It is recommended to use 127.0.0.1 to avoid IPv6 resolution delay issues in some environments
         const baseUrl = `http://127.0.0.1:${port}/v1`;
         const apiKey = config.proxy.api_key || 'YOUR_API_KEY';
 
@@ -129,12 +129,12 @@ response = client.chat.completions.create(
 print(response.choices[0].message.content)`;
     };
 
-    // 在 filter 逻辑中，当选择 openai 协议时，允许显示所有模型
+    // In the filter logic, allow all models to be displayed when openai protocol is selected
     const filteredModels = useMemo(() => models.filter(model => {
         if (selectedProtocol === 'openai') {
             return true;
         }
-        // Anthropic 协议下隐藏不支持的图片模型
+        // Hide unsupported image models under the Anthropic protocol
         if (selectedProtocol === 'anthropic') {
             return !model.id.includes('image');
         }
@@ -162,7 +162,7 @@ print(response.choices[0].message.content)`;
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-0 lg:divide-x dark:divide-gray-700">
-                    {/* 左侧：模型列表 */}
+                    {/* Left: Model list */}
                     <div className="col-span-2 p-0">
                         <div className="overflow-x-auto">
                             <table className="table w-full">
@@ -204,7 +204,7 @@ print(response.choices[0].message.content)`;
                         </div>
                     </div>
 
-                    {/* 右侧：代码预览 */}
+                    {/* Right: code preview */}
                     <div className="col-span-1 bg-gray-900 text-blue-100 flex flex-col h-[400px] lg:h-auto">
                         <div className="p-3 border-b border-gray-800 flex items-center justify-between">
                             <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{t('proxy.multi_protocol.quick_integration')}</span>

@@ -537,3 +537,140 @@ Allowed work:
 
 **Why:** The protected sandboxes `cli-switch-proof-6857`, `test-cli-flow-1743`, `clone-from-default-4424`, and `new-empty-instance-4425` must survive every test run.
 
+---
+
+## Blind Prompt Injection Without Preemptive Cancellation on Send - TOTAL BAN
+
+Added 2026-10-21. Source: `.ai-memory/memory/learned/30-prompt-send-preemption-ide-title-sync-and-theme-polish.md`.
+
+Forbidden:
+- Calling `Input.insertText` and triggering Send while an agent is actively running without first triggering task cancellation. Antigravity IDE's composer natively queues turns when running; sending without preemption turns "Send" into an unintended "Enqueue".
+- Spawning a new prompt via `send_prompt_now` while leaving active `agy` worker child processes running.
+
+Allowed work:
+- Check if instance is running, invoke Cancel button or React Fiber `cancelInvocation()`, allow 250ms for UI state to settle to idle, terminate CLI workers, and only then insert text and submit prompt.
+
+**Why:** Send means cancel running execution and run right now. Without cancellation, the prompt is passively queued at the bottom of the conversation.
+
+---
+
+## Updating Conversation Title Without Setting raw_summary to NULL - TOTAL BAN
+
+Added 2026-10-21. Source: `.ai-memory/memory/learned/30-prompt-send-preemption-ide-title-sync-and-theme-polish.md`.
+
+Forbidden:
+- Executing `UPDATE conversation_summaries SET title = ?` while leaving `raw_summary` populated with the stale binary protobuf blob. Antigravity's Go Language Server (`language_server.exe`) prioritizes `raw_summary` over the `title` column, causing the IDE to permanently display the old title.
+
+Allowed work:
+- Always execute `UPDATE conversation_summaries SET title = ?1, raw_summary = NULL, last_modified_time = ?2 WHERE conversation_id = ?3`, synchronize `prompt_backups`, and touch `conversations/<id>.db` to trigger the `fsnotify` watcher.
+
+**Why:** Antigravity IDE ignores the SQLite `title` column unless `raw_summary` is NULL or empty.
+
+---
+
+## Positional Displacement on Card Hover - TOTAL BAN
+
+Added 2026-10-21. Source: `.ai-memory/memory/learned/30-prompt-send-preemption-ide-title-sync-and-theme-polish.md`.
+
+Forbidden:
+- Adding `hover:scale-*`, `hover:-translate-*`, or dynamic margin/padding adjustments to cards, rows, or list nodes on hover.
+- Shifting layout geometry or element positions on hover.
+
+Allowed work:
+- Strictly use CSS3 color, illumination, border, and contrast transitions (`transition: all 0.3s ease-in-out hover:brightness-105 hover:shadow-md`) with zero pixel displacement.
+
+**Why:** Positional movements cause sub-pixel rendering blur, visual jitter, and accidental mouse-leave events during navigation.
+
+---
+
+## Unportaled Hover Popovers Inside Scrollable Tables - TOTAL BAN
+
+Added 2026-10-21. Source: `.ai-memory/memory/learned/30-prompt-send-preemption-ide-title-sync-and-theme-polish.md`.
+
+Forbidden:
+- Rendering multi-row floating breakdown cards (such as the Scoreboard formula tooltip) with static `absolute` positioning inside scrollable `<td>` table containers or sticky headers.
+- Blindly using fixed upward thresholds (e.g. `rect.top >= 220`) for 300px+ height tooltips.
+
+Allowed work:
+- Portal floating breakdown tooltips directly to `document.body` via React `createPortal` with `fixed` coordinates and `z-[99999]`.
+- Default to downward rendering (`top = rect.bottom + 8`), only flipping upward when `spaceAbove >= 340px`.
+- Enforce `pointer-events-none` on the floating card.
+
+**Why:** Tooltips inside overflow-hidden scroll containers get clipped and become trapped behind sticky headers.
+
+---
+
+## Treating `agm instances switch --json` as Proof of a Bound-Email Change - TOTAL BAN
+
+Added 2026-10-29. Source: `.ai-memory/issues/66-instances-switch-json-fake-success.md`.
+
+Forbidden:
+- Using `"status": "switched"` from `agm instances switch … --json` as evidence the registry `bound_email` changed.
+- Exiting the JSON switch path with a hardcoded success envelope before `switch_account_to_instance` runs.
+
+Allowed work:
+- Run the non-JSON switch, then read `bound_email` from `agm instances ls`.
+- After a source fix, JSON must report the registry email or `success: false`.
+
+**Why:** The `--json` branch in `src-tauri/src/bin/agm/instance_cmds.rs` prints switched and never calls the real switch when local REST has no `data`. Live 2026-10-29 E2E reproduced the lie.
+
+---
+
+## Rewriting Skill Refs Into Attachments on Copy - TOTAL BAN
+
+Added 2026-10-29. Source: `.ai-memory/memory/learned/31-prompt-tree-copy-skill-refs-telegram-e2e-and-json-switch.md`.
+
+Forbidden:
+- Running `formatPromptWithAttachments` on `@[.agents/skills/…]` or `@[name](file;.agents/skills/…)` as if they were image files.
+- Calling `convertImageUriToBase64` on skill directory names.
+- Showing **Copied!** before `copyToClipboard` / `copyPromptWithRichImages` returns true.
+- Making the primary Prompt Tree Copy button a rich HTML + PNG write.
+
+Allowed work:
+- Primary Copy = verbatim `resolvePromptBody` via `copyToClipboard`, await, success only on true.
+- Extract attachments only when `isFileAttachmentTarget` (image/file extension, not `.agents/skills/`).
+- Rich HTML stays in the Copy dropdown.
+
+**Why:** GitMap skill-ref prompts were mutated into `Attachments:` blocks and the UI lied with Copied! while paste was empty or HTML. Fixed in `86877cf53`.
+
+---
+
+## Scoring Live GUI Against an Older Installed `agm-ui` Than HEAD - TOTAL BAN
+
+Added 2026-10-29. Source: `.ai-memory/memory/learned/31-prompt-tree-copy-skill-refs-telegram-e2e-and-json-switch.md`.
+
+Forbidden:
+- Declaring a frontend fix proven in the running window when `agm --version` / the installed `agm-ui` FileVersion is behind `git log -1`.
+- Treating `agm shot` (manager window only) as inbound `/screenshot` mosaic proof.
+
+Allowed work:
+- Prove TypeScript copy/attachment helpers with `npx tsx` against current source.
+- State clearly when Computer Use is `sidecar_unavailable` and the GUI was not clicked.
+
+**Why:** On 2026-10-29 HEAD was `86877cf53` while installed GUI stayed `v4.276.0`. Clicking Copy in that window would test the bug, not the fix.
+
+---
+
+## Force Tree Reset After Enqueue or Rerun Click - TOTAL BAN
+
+Added 2026-10-30. Source: `.ai-memory/issues/67-prompt-tree-enqueue-zero-after-click.md`.
+
+Forbidden:
+- Calling `loadTree(false, true)` or `reset_prompt_tree_cache` / `invalidate_prompt_tree_cache` immediately after Enqueue or Rerun.
+- Mutating `selectedConversation.prompts` in place without React `setState` / `patchPromptTreeSwrCache`.
+- Overlaying the selected completed turn's `is_queued` onto the conversation so later queued turns disappear.
+- Gating conversation `is_queued` on a 600s recency window in `tree_collect.rs`.
+- Falling back enqueue `session_id` / `conversationId` to the literal `current`.
+- Dispatching rerun rounds through `send_prompt_now`.
+
+Allowed work:
+- Optimistic inject of queued turns, then stop. 30s SWR merge via `mergeQueuedTurns` is enough.
+- `applySelectedTurnOverlay` keeps conversation QUEUED when any turn is queued.
+- Enqueue badge = `queuedPromptCount`. Rerun ×N = N `enqueue_prompt` calls.
+
+**Why:** Cursor already showed Queued Messages 2 while Prompt Tree stayed Enqueue 0 / IDLE 1h on completed turn 11. Fixed in `3f678d03a` (`v4.279.0`).
+
+---
+
+- Do not store a personal access token inside a git remote URL. Use SSH.
+- Do not commit Go coverage profiles or SQLite `-shm` and `-wal` sidecars.

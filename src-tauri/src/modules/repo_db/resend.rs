@@ -2,7 +2,7 @@
 
 use super::agy::spawn_or_replace_prompt_via_agy;
 use super::detection::extract_image_payload_or_path;
-use super::models::ActivePrompt;
+use super::models::{ActivePrompt, ProjectAuditRationaleType, PromptAuditCriteriaType};
 use super::schema::{connect_db, init_tables};
 use super::state::{get_dispatched_prompts_cache, reset_dispatched_prompts_cache};
 use super::tree::invalidate_prompt_tree_cache;
@@ -19,10 +19,51 @@ pub fn resend_all_running_commands(limit: usize) -> Result<Vec<ActivePrompt>, St
     resend_running_commands_for_instance(None, limit)
 }
 
+/// Maximum dispatch passes per resend call. A pass dispatches at most one
+/// prompt per repo (FIFO preserved inside the pass); prompts preserved in
+/// place for their workspace get another pass while progress is being made,
+/// so a restored queue drains within one call instead of waiting for the
+/// agy-exit drain alone (RC-4).
+const MAX_RESEND_PASSES: usize = 10;
+
 /// Resend and restore previous running/backed-up/queued commands scoped to an optional `instance_id`.
 /// Strictly filters to unrestored/backed-up/queued prompts, prioritizes the latest running prompts,
 /// and deduplicates against already dispatched prompts and workspace repositories.
+/// Runs bounded passes (see [`MAX_RESEND_PASSES`]) while each pass dispatches
+/// at least one prompt, until `limit` prompts have been resent in total.
 pub fn resend_running_commands_for_instance(
+    instance_id: Option<&str>,
+    limit: usize,
+) -> Result<Vec<ActivePrompt>, String> {
+    reset_dispatched_prompts_cache();
+    let mut resent_all = Vec::new();
+    for pass_index in 0..MAX_RESEND_PASSES {
+        let remaining = limit.saturating_sub(resent_all.len());
+        if pass_index > 0 && remaining == 0 {
+            break;
+        }
+        if pass_index > 0 {
+            crate::modules::logger::log_info(&format!(
+                "[RepoDB] Resend pass {} for instance '{}': {} prompt(s) dispatched so far, continuing queue drain",
+                pass_index + 1,
+                instance_id.unwrap_or("all"),
+                resent_all.len()
+            ));
+        }
+        let pass_resent = resend_single_pass(instance_id, remaining)?;
+        let is_progress = !pass_resent.is_empty();
+        resent_all.extend(pass_resent);
+        if !is_progress {
+            break;
+        }
+    }
+    Ok(resent_all)
+}
+
+/// Single dispatch pass over the resend candidates: at most one prompt per
+/// repo_path is dispatched; later prompts for the same repo are preserved in
+/// place as `queued` for a subsequent pass or the agy-exit drain.
+fn resend_single_pass(
     instance_id: Option<&str>,
     limit: usize,
 ) -> Result<Vec<ActivePrompt>, String> {
@@ -33,7 +74,7 @@ pub fn resend_running_commands_for_instance(
         .prepare(
             "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
              FROM active_prompts 
-             WHERE status IN ('backed_up', 'queued', 'pending', 'running')
+             WHERE status IN ('backed_up', 'queued', 'pending', 'running', 'in_progress')
              ORDER BY created_at ASC, id ASC LIMIT ?",
         )
         .map_err(|e| format!("Failed to prepare resend query: {}", e))?;
@@ -79,6 +120,7 @@ pub fn resend_running_commands_for_instance(
                 }
             };
             let target_display = target_inst_opt.as_deref().unwrap_or("all");
+            let rationale = ProjectAuditRationaleType::from_dispatch(is_match);
             crate::modules::logger::log_instance_prompt_audit(
                 target_display,
                 "resend_running_commands_for_instance",
@@ -86,13 +128,9 @@ pub fn resend_running_commands_for_instance(
                 &p.repo_path,
                 "",
                 None,
-                "PromptDispatcher:InstanceMatching",
+                PromptAuditCriteriaType::PromptDispatcherInstanceMatching.as_str(),
                 is_match,
-                if is_match {
-                    "PROMPT_DISPATCH_MATCHED"
-                } else {
-                    "PROMPT_DISPATCH_REJECTED"
-                },
+                rationale.as_str(),
             );
             is_match
         })
@@ -138,19 +176,20 @@ pub fn resend_running_commands_for_instance(
         dispatched_repos.insert(clean_path);
 
         let sig = format!("{}:{}", prompt.repo_path, prompt.prompt_content.trim());
-        let already_dispatched = if prompt.status == "backed_up" {
-            false
-        } else {
-            let mut cache = match get_dispatched_prompts_cache().lock() {
-                Ok(guard) => guard,
-                Err(poisoned) => poisoned.into_inner(),
-            };
-            let seen = cache.contains(&prompt.id) || cache.contains(&sig);
-            if !seen {
-                cache.insert(prompt.id.clone());
-                cache.insert(sig);
+        let already_dispatched = match prompt.status.as_str() {
+            "backed_up" | "running" | "pending" | "queued" | "in_progress" => false,
+            _ => {
+                let mut cache = match get_dispatched_prompts_cache().lock() {
+                    Ok(guard) => guard,
+                    Err(poisoned) => poisoned.into_inner(),
+                };
+                let seen = cache.contains(&prompt.id) || cache.contains(&sig);
+                if !seen {
+                    cache.insert(prompt.id.clone());
+                    cache.insert(sig);
+                }
+                seen
             }
-            seen
         };
 
         if already_dispatched {

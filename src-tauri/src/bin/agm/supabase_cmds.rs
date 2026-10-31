@@ -34,6 +34,7 @@ pub(crate) fn cmd_supabase(args: &[String]) {
         }
         "set-config" | "config" => crate::supabase_config_cmds::cmd_supabase_set_config(sub_args),
         "load-json" | "import" => crate::supabase_config_cmds::cmd_supabase_load_json(sub_args),
+        "push-settings" => cmd_supabase_push_settings(&rt, sub_args),
         "export" => match supabase_sync::export_config_json(
             &supabase_sync::load_config().unwrap_or_default(),
         ) {
@@ -155,6 +156,82 @@ pub(crate) fn cmd_supabase(args: &[String]) {
                 sub
             );
         }
+    }
+}
+
+pub(crate) fn cmd_supabase_push_settings(rt: &tokio::runtime::Runtime, args: &[String]) {
+    if args
+        .iter()
+        .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        println!("Usage: agm supabase push-settings --vault <path> [--json]");
+        println!();
+        println!("Imports the Supabase config (keys included) from the vault file — or");
+        println!("every known Supabase JSON in the vault folder — then syncs the local");
+        println!("node and tests connectivity for each enabled endpoint.");
+        println!();
+        println!("Options:");
+        println!("  --vault <path>   Vault JSON file or folder (or set AGM_SUPABASE_VAULT)");
+        println!("  --json           Print the unified JSON report");
+        println!();
+        println!("Exits non-zero if any step fails. No key material is printed.");
+        return;
+    }
+
+    let is_json = args.iter().any(|a| a == "--json");
+    let mut vault_arg: Option<String> = None;
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if arg == "--vault" && i + 1 < args.len() {
+            vault_arg = Some(args[i + 1].clone());
+            i += 2;
+            continue;
+        }
+        if let Some(v) = arg.strip_prefix("--vault=") {
+            vault_arg = Some(v.to_string());
+        }
+        i += 1;
+    }
+
+    let vault_path = vault_arg
+        .or_else(|| std::env::var("AGM_SUPABASE_VAULT").ok())
+        .filter(|s| !s.trim().is_empty());
+    let Some(vault_path) = vault_path else {
+        eprintln!("[ERROR] Missing vault path. Usage: agm supabase push-settings --vault <path> (or set AGM_SUPABASE_VAULT).");
+        std::process::exit(2);
+    };
+
+    let resolved = json_envelope::resolve_relative_json_path(&vault_path);
+    let report =
+        rt.block_on(antigravity_tools_lib::modules::supabase_push::push_settings(&resolved));
+
+    if is_json {
+        let envelope = json_envelope::JsonEnvelope::new("agm/supabase-push-settings", &report);
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&envelope).unwrap_or_default()
+        );
+    } else {
+        for s in &report.steps {
+            println!(
+                "{} [{}] {}",
+                if s.is_ok { "✅" } else { "❌" },
+                s.name,
+                s.message
+            );
+        }
+        println!(
+            "Push settings: {} file(s) loaded, {} endpoint(s) imported, {} credential set(s), {} endpoint(s) total.",
+            report.files_loaded,
+            report.endpoints_imported,
+            report.credentials_imported,
+            report.endpoints_total
+        );
+    }
+
+    if !report.is_success {
+        std::process::exit(1);
     }
 }
 

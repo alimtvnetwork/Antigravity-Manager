@@ -131,7 +131,7 @@ fn test_foreign_claude_signature_dropped_for_gemini() {
         },
     ];
 
-    // 1. 验证 filter_invalid_thinking_blocks_with_family 会将非 Gemini 格式的异构签名从思考块中剔除
+    // 1. Verify that filter_invalid_thinking_blocks_with_family will exclude non-Gemini format heterogeneous signatures from thinking blocks
     filter_invalid_thinking_blocks_with_family(&mut messages, Some("gemini"));
     if let MessageContent::Array(blocks) = &messages[1].content {
         if let ContentBlock::Thinking { signature, .. } = &blocks[0] {
@@ -142,7 +142,7 @@ fn test_foreign_claude_signature_dropped_for_gemini() {
         }
     }
 
-    // 2. 验证 transform_claude_request_in 在目标为 Gemini 时，思考块与工具调用的签名均安全降级为哨兵
+    // 2. Verify that transform_claude_request_in when the target is Gemini, the signatures of think blocks and tool calls are safely downgraded to Sentinel
     let req = ClaudeRequest {
         model: "gemini-3.7-flash-high".to_string(),
         messages,
@@ -177,8 +177,8 @@ fn test_foreign_claude_signature_dropped_for_gemini() {
         assistant_parts[0].get("thoughtSignature").is_none(),
         "Thinking block must be clean without signature"
     );
-    // 铁律：不兼容的外来 Claude 签名被剥离后**留空**，绝不回退成哨兵。
-    // 官方报文里哨兵出现 0/23 次，它不属于 Antigravity 协议。
+    // Iron Rule: Incompatible foreign Claude signatures are left blank after being stripped and never fall back to Sentinels.
+    // Sentinel appears 0/23 times in official messages, and it does not belong to the Antigravity protocol.
     assert!(
         assistant_parts[1].get("thoughtSignature").is_none(),
         "Gemini functionCall must drop the foreign signature instead of falling back to sentinel"
@@ -261,7 +261,7 @@ fn test_claude_request_with_corrupt_and_empty_images_defense() {
 
 #[test]
 fn test_gemini_under_v3_thinking_disabled_and_no_thinking_config() {
-    // 验证 gemini-2.5-flash 请求，即使客户端带或不带 thinking，也绝对不会注入 thinkingConfig
+    // Verify gemini-2.5-flash request, even if the client comes with or without thinking, thinkingConfig will never be injected
     let req = ClaudeRequest {
         model: "gemini-2.5-flash".to_string(),
         messages: vec![Message {
@@ -294,7 +294,7 @@ fn test_gemini_under_v3_thinking_disabled_and_no_thinking_config() {
 
 #[test]
 fn test_gemini_v3_flash_high_thinking_enabled_and_client_budget_ignored() {
-    // 验证 gemini-3.7-flash-high 开启思考，并且客户端传的 99999 预算被忽略，强制使用档位字典的 10000
+    // Verify that gemini-3.7-flash-high starts thinking, and the 99999 budget passed by the client is ignored, and the 10000 of the gear dictionary is forced to be used.
     let req = ClaudeRequest {
         model: "gemini-3.7-flash-high".to_string(),
         messages: vec![Message {
@@ -303,7 +303,7 @@ fn test_gemini_v3_flash_high_thinking_enabled_and_client_budget_ignored() {
         }],
         thinking: Some(ThinkingConfig {
             type_: "enabled".to_string(),
-            budget_tokens: Some(99999), // 客户端传入过大/错误预算
+            budget_tokens: Some(99999), // Client passed in too large/wrong budget
             effort: None,
         }),
         max_tokens: Some(1024),
@@ -346,8 +346,8 @@ fn test_gemini_client_billing_metadata_filtering() {
         "  x-anthropic-billing-header: cc_entrypoint=desktop; \n"
     ));
 
-    // 风险清洗不分 model：非 Gemini 模型同样必须过滤
-    // （任何客户端注入的计费元数据都是风险，与当前模型无关）
+    // Risk cleaning does not differentiate between models: non-Gemini models must also be filtered
+    // (Any client-side injection of billing metadata is a risk and has nothing to do with the current model)
     assert!(is_gemini_client_billing_metadata(
         "claude-sonnet-4-6",
         "x-anthropic-billing-header: cc_version=2.1.270.ffc;"
@@ -449,7 +449,7 @@ fn test_claude_tool_result_multimodal_string_extraction() {
         .expect("contents array");
     let tool_parts = contents[2]["parts"].as_array().expect("tool turn parts");
 
-    // 验证同时存在 functionResponse 和 inlineData 两个 parts
+    // Verify that both functionResponse and inlineData parts exist
     assert_eq!(tool_parts.len(), 2);
     assert!(tool_parts[0].get("functionResponse").is_some());
     assert!(tool_parts[1].get("inlineData").is_some());

@@ -27,6 +27,12 @@ pub fn restart_instance(instance_id: &str) -> AppResult<InstanceStatus> {
         instance_id, resolved_id
     ));
 
+    let mut audit = crate::modules::task_history_db::AuditTask::start(
+        crate::modules::audit_action::AuditAction::RestartInstance,
+        &format!("Restart instance {}", resolved_id),
+        Some(&resolved_id),
+    );
+
     let registry = load_registry().map_err(AppError::Config)?;
     let config = registry
         .instances
@@ -97,6 +103,20 @@ pub fn restart_instance(instance_id: &str) -> AppResult<InstanceStatus> {
         "[Instance] Restarted instance '{}' on bound account {:?}",
         resolved_id, config.bound_account_id
     ));
+    audit.succeed(&format!(
+        "Restarted instance '{}' on bound account {:?}",
+        resolved_id, config.bound_account_id
+    ));
+    crate::modules::task_history_db::record(
+        crate::modules::audit_action::AuditAction::RestartInstance,
+        &resolved_id,
+        "ok",
+        &format!(
+            "Restarted instance '{}' on bound account {:?}",
+            resolved_id, config.bound_account_id
+        ),
+        Some(&resolved_id),
+    );
     Ok(updated)
 }
 
@@ -122,4 +142,135 @@ pub fn clone_instance(
         clone_mode,
         copy_projects,
     )
+}
+
+/// Imp-07: Conscious IDE PID Process Verification
+/// Verify that a candidate process executable name or process name genuinely belongs to the Antigravity IDE family
+pub fn is_conscious_ide_pid(pid: u32) -> bool {
+    let mut system = sysinfo::System::new();
+    system.refresh_processes_specifics(
+        sysinfo::ProcessesToUpdate::Some(&[sysinfo::Pid::from_u32(pid)]),
+        sysinfo::ProcessRefreshKind::new()
+            .with_cmd(sysinfo::UpdateKind::Always)
+            .with_exe(sysinfo::UpdateKind::Always),
+    );
+    if let Some(proc) = system.process(sysinfo::Pid::from_u32(pid)) {
+        let p_name = proc.name().to_string_lossy().to_lowercase();
+        let p_exe = proc
+            .exe()
+            .map(|p| p.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        p_name.contains("antigravity") || p_exe.contains("antigravity")
+    } else {
+        false
+    }
+}
+
+/// Imp-541: Affirmative predicate determining if an instance process is genuinely alive and healthy.
+/// Eliminates compound negative logic (`!running || !has_active_process`).
+pub fn is_instance_running_and_active(running: bool, has_active_process: bool) -> bool {
+    running && has_active_process
+}
+
+/// Imp-541: Determines whether a candidate lockfile is stale and safe to be unlinked.
+pub fn is_stale_lock_removable(is_pid_alive: bool, is_content_empty: bool) -> bool {
+    !is_pid_alive || is_content_empty
+}
+
+/// Imp-61: Stale Session Lock Recovery
+/// Scans the instance data path for stale IDE session lockfiles (`.vscode-server`, `.antigravity-session`,
+/// `SingletonLock`, `code.lock`). If the holding PID is dead in the OS process table or file is orphaned,
+/// safely unlinks the stale lock to avoid startup stalls.
+pub fn recover_stale_session_locks(data_path: &std::path::Path) -> usize {
+    let mut recovered = 0;
+    if !data_path.exists() {
+        return 0;
+    }
+
+    let lock_patterns = [
+        "SingletonLock",
+        "code.lock",
+        ".antigravity-session",
+        ".antigravity.lock",
+        ".vscode-server.lock",
+    ];
+
+    let mut system = sysinfo::System::new();
+
+    for pattern in &lock_patterns {
+        let lock_file = data_path.join(pattern);
+        if lock_file.exists() {
+            let mut should_remove = false;
+            if let Ok(content) = std::fs::read_to_string(&lock_file) {
+                let trimmed = content.trim();
+                if let Ok(pid) = trimmed.parse::<u32>() {
+                    system.refresh_processes_specifics(
+                        sysinfo::ProcessesToUpdate::Some(&[sysinfo::Pid::from_u32(pid)]),
+                        sysinfo::ProcessRefreshKind::new(),
+                    );
+                    let is_alive = system.process(sysinfo::Pid::from_u32(pid)).is_some();
+                    should_remove = is_stale_lock_removable(is_alive, false);
+                } else if trimmed.is_empty() {
+                    should_remove = is_stale_lock_removable(false, true);
+                }
+            } else {
+                should_remove = true;
+            }
+
+            if should_remove {
+                // Justification: best-effort recovery of stale IDE lockfile
+                if std::fs::remove_file(&lock_file).is_ok() {
+                    recovered += 1;
+                    crate::modules::logger::log_info(&format!(
+                        "[Instance] Recovered stale session lockfile: {:?}",
+                        lock_file
+                    ));
+                }
+            }
+        }
+    }
+
+    recovered
+}
+
+/// Imp-63: Instance Launch CDP Backoff Ladder
+/// Probes the instance's DevTools active CDP port with a configurable backoff ladder.
+/// Returns the first responsive port or None if timed out across all steps.
+pub fn probe_instance_cdp_with_backoff(instance_id: &str, backoff_steps: &[u64]) -> Option<u16> {
+    let data_dir =
+        if instance_id.is_empty() || instance_id == "default" || instance_id == "__default__" {
+            super::storage::get_default_antigravity_data_dir()
+        } else if let Ok(reg) = super::load_registry() {
+            reg.instances
+                .iter()
+                .find(|i| i.id == instance_id || i.name == instance_id)
+                .map(|i| std::path::PathBuf::from(&i.data_dir))
+                .unwrap_or_else(super::storage::get_default_antigravity_data_dir)
+        } else {
+            super::storage::get_default_antigravity_data_dir()
+        };
+
+    let steps = if backoff_steps.is_empty() {
+        &[500, 1000, 2000][..]
+    } else {
+        backoff_steps
+    };
+
+    for &pause_ms in steps {
+        if pause_ms > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(pause_ms));
+        }
+        for file in super::cdp_onboarding::candidate_devtools_port_files(&data_dir) {
+            if let Ok(content) = std::fs::read_to_string(&file) {
+                if let Some(first_line) = content.lines().next() {
+                    if let Ok(port) = first_line.trim().parse::<u16>() {
+                        if port > 0 {
+                            return Some(port);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
 }

@@ -314,6 +314,14 @@ pub fn create_instance_with_account(
     );
     sync_instance_ide_parity(&instance_id).map_err(|e| e.to_string())?;
 
+    crate::modules::task_history_db::record(
+        crate::modules::audit_action::AuditAction::CreateInstance,
+        trimmed_name,
+        "ok",
+        &format!("Created instance profile {}", instance_id),
+        Some(&instance_id),
+    );
+
     Ok(config)
 }
 
@@ -324,10 +332,83 @@ pub fn create_instance(name: String) -> Result<InstanceConfig, String> {
 
 /// Stop an instance process and confirm the PID is gone.
 pub fn stop_instance(instance_id: &str) -> Result<(), String> {
+    refuse_if_caller_instance(instance_id)?;
     let resolved = resolve_instance_id(instance_id).unwrap_or_else(|_| instance_id.to_string());
-    let closed = close_instance_verified(&resolved, std::time::Duration::from_millis(5000))?;
-    if !closed {
-        return Err(format!("Instance '{resolved}' is still running after stop"));
+    let saved_pid = get_instance_saved_pid(&resolved).or_else(|| {
+        load_registry().ok().and_then(|r| {
+            r.instances
+                .into_iter()
+                .find(|i| i.id == resolved)
+                .and_then(|i| i.pid)
+        })
+    });
+    let closed = close_instance_verified(&resolved, std::time::Duration::from_millis(5000))
+        .map_err(|e| format!("Error closing instance '{resolved}': {e}"))?;
+
+    // Unconditional post-stop cleanup
+    if let Ok(reg) = load_registry() {
+        if let Some(inst) = reg.instances.iter().find(|i| i.id == resolved) {
+            let data_path = std::path::PathBuf::from(&inst.data_dir);
+            clear_stale_instance_lockfiles(&data_path);
+        }
     }
+
+    if !closed {
+        if let Some(pid) = saved_pid {
+            if is_pid_alive_targeted(pid) && saved_pid_matches(pid) {
+                return Err(format!(
+                    "Instance '{resolved}' primary PID {pid} stayed alive after stop"
+                ));
+            }
+        }
+        crate::modules::logger::log_warn(&format!(
+            "[Instance] Stop completed for '{}' with helper stragglers; locks and DB cleaned",
+            resolved
+        ));
+    }
+
+    // Update SQLite database instance_processes marking stopped state (is_active = 0)
+    if let Ok(conn) = open_instance_db() {
+        // Justification: non-critical sqlite bookkeeping write; read paths tolerate stale data
+        crate::error::record_ignored(
+            conn.execute(
+                "UPDATE instance_processes SET is_active = 0 WHERE instance_id = ?1 OR instance_id = ?2",
+                rusqlite::params![resolved, instance_id],
+            ),
+            "update instance_processes stopped state",
+        );
+    }
+
+    // Only mark stopped in registry/DB after termination is confirmed
+    // Justification: mark instance stopped in DB and registry; best effort cleanup
+    crate::error::record_ignored(mark_instance_stopped(&resolved), "mark instance stopped");
+    invalidate_instance_process_cache(&resolved);
+    if instance_id != resolved {
+        invalidate_instance_process_cache(instance_id);
+    }
+    crate::modules::repo_db::invalidate_prompt_tree_cache(Some(&resolved));
+
+    // Emit Tauri IPC events instances://refreshed and accounts://refreshed
+    if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+        use tauri::Emitter;
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("instances://refreshed", ()),
+            "emit instances://refreshed",
+        );
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("accounts://refreshed", ()),
+            "emit accounts://refreshed",
+        );
+    }
+
+    crate::modules::task_history_db::record(
+        crate::modules::audit_action::AuditAction::StopInstance,
+        &resolved,
+        "ok",
+        "Stopped instance processes",
+        Some(&resolved),
+    );
     Ok(())
 }

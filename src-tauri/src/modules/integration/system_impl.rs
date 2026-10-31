@@ -93,17 +93,27 @@ impl SystemIntegration for DesktopIntegration {
             crate::modules::repo_db::backup_running_prompts("default"),
             "back up running prompts before account switch",
         );
-        // Justification: prompt backup is best-effort; the switch proceeds and the reinject decision below is recomputed from the actual backed-up count
-        crate::error::record_ignored(
+        let backup_prompts_res =
             crate::modules::backup_prompts_db::backup_active_running_prompts_for_instance(
                 Some("default"),
                 None,
-            ),
+            );
+        let backed_up_prompts_count = match &backup_prompts_res {
+            Ok((_info, recs)) => recs.len(),
+            Err(_) => 0,
+        };
+        // Justification: prompt backup is best-effort; the switch proceeds and the reinject decision below is recomputed from the actual backed-up count
+        crate::error::record_ignored(
+            backup_prompts_res.map(|_| ()),
             "back up active running prompts before account switch",
         );
-        let needs_reinject = crate::modules::repo_db::needs_prompt_channel_wait(
-            crate::modules::repo_db::count_backed_up_prompts("default"),
-        );
+        let needs_reinject = crate::modules::repo_db::count_backed_up_prompts("default") > 0
+            || backed_up_prompts_count > 0
+            || crate::modules::backup_prompts_db::count_unrestored_prompts_for_instance(Some(
+                "default",
+            ))
+            .unwrap_or(0)
+                > 0;
 
         // =========================================================================
         // STEP 2: Close the Antigravity IDE
@@ -111,13 +121,54 @@ impl SystemIntegration for DesktopIntegration {
         crate::modules::logger::log_info(
             "[Desktop] [Step 2/5] Closing running Antigravity IDE processes...",
         );
-        crate::error::record_ignored(
-            crate::modules::instance::close_instance_verified(
-                "default",
-                std::time::Duration::from_millis(5000),
-            ),
-            "close Antigravity IDE verified before account switch",
-        ); // Justification: verified IDE close ensures dying process exits before credential injection
+        let close_res = crate::modules::instance::close_instance_verified(
+            "default",
+            std::time::Duration::from_millis(5000),
+        );
+        let closed = match close_res {
+            Ok(c) => c,
+            Err(e) => {
+                let err_msg = format!("Failed to close default instance: {}", e);
+                crate::modules::logger::log_error(&format!("[Desktop][ERROR] {}", err_msg));
+                return Err(err_msg);
+            }
+        };
+        if !closed {
+            #[cfg(target_os = "windows")]
+            {
+                let def_dir = crate::modules::instance::get_default_antigravity_data_dir();
+                let stragglers = crate::modules::instance::find_pids_for_data_dir(
+                    &def_dir.to_string_lossy(),
+                    true,
+                );
+                for spid in stragglers {
+                    crate::modules::instance::force_terminate_pid_win32(spid);
+                }
+                std::thread::sleep(std::time::Duration::from_millis(200));
+            }
+            let def_dir = crate::modules::instance::get_default_antigravity_data_dir();
+            let remaining =
+                crate::modules::instance::find_pids_for_data_dir(&def_dir.to_string_lossy(), true);
+            if remaining
+                .iter()
+                .any(|&p| crate::modules::instance::is_pid_alive_targeted(p))
+            {
+                let err_msg = "Default instance is still running after verified close; stopping account switch before credentials are rewritten".to_string();
+                crate::modules::logger::log_error(&format!("[Desktop][ERROR] {}", err_msg));
+                return Err(err_msg);
+            }
+        }
+        if let Ok(reg) = crate::modules::instance::load_registry() {
+            if let Some(def_inst) = reg
+                .instances
+                .iter()
+                .find(|i| i.is_default || i.id == "default")
+            {
+                crate::modules::instance::clear_stale_instance_lockfiles(std::path::Path::new(
+                    &def_inst.data_dir,
+                ));
+            }
+        }
 
         // =========================================================================
         // STEP 3: Switch the Account Credentials (OS Keyring + state.vscdb + storage.json)
@@ -233,11 +284,20 @@ impl SystemIntegration for DesktopIntegration {
         }
 
         // =========================================================================
-        // STEP 5: Re-Inject the Backed-Up Running Prompts (Asynchronous 5-Second Post-Launch Restoration)
+        // STEP 5: Re-Inject the Backed-Up Running Prompts (Asynchronous Post-Launch Restoration)
         // =========================================================================
+        let needs_reinject = needs_reinject
+            || crate::modules::repo_db::count_backed_up_prompts("default") > 0
+            || backed_up_prompts_count > 0
+            || crate::modules::backup_prompts_db::count_unrestored_prompts_for_instance(Some(
+                "default",
+            ))
+            .unwrap_or(0)
+                > 0;
+
         if needs_reinject {
             crate::modules::logger::log_info(
-                "[Desktop] [Step 5/5] Scheduling 5s post-launch prompt restore for instance default",
+                "[Desktop] [Step 5/5] Scheduling post-launch prompt restore for instance default",
             );
             crate::modules::instance::schedule_prompt_restore_after_launch("default".to_string());
             note_prompt_reinjected(true);
@@ -266,7 +326,7 @@ impl SystemIntegration for DesktopIntegration {
     }
 
     fn show_notification(&self, title: &str, body: &str) {
-        // 使用 tauri-plugin-dialog 或原生通知（此处简化）
+        // Use tauri-plugin-dialog or native notifications (simplified here)
         crate::modules::logger::log_info(&format!("[Notification] {}: {}", title, body));
     }
 }

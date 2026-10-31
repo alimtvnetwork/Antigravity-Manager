@@ -198,12 +198,12 @@ pub fn switch_prompt_snapshot(instance_id: &str) -> SwitchPromptSnap {
     conn.query_row(
         "SELECT id, prompt_content, IFNULL(session_id, '')
          FROM active_prompts
-         WHERE status IN ('running', 'backed_up', 'dispatched')
+         WHERE status IN ('running', 'backed_up', 'dispatched', 'pending', 'queued', 'blocked')
            AND (
                 instance_id = ?1
                 OR (?1 = 'default' AND instance_id IN ('default', '__default__', ''))
            )
-         ORDER BY updated_at DESC
+         ORDER BY created_at ASC, id ASC
          LIMIT 1",
         [instance_id],
         |row| {
@@ -215,4 +215,11 @@ pub fn switch_prompt_snapshot(instance_id: &str) -> SwitchPromptSnap {
         },
     )
     .unwrap_or_else(|_| SwitchPromptSnap::empty())
+}
+
+/// Restore running prompts from split SQLite backup database into active_prompts
+pub fn restore_running_prompts(
+    instance_id: Option<&str>,
+) -> Result<Vec<crate::modules::backup_prompts_db::PromptBackupRecord>, String> {
+    crate::modules::backup_prompts_db::restore_running_prompts(instance_id, false, None)
 }

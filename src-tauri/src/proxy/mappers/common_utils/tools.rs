@@ -19,8 +19,8 @@ pub fn inject_google_search_tool(body: &mut Value, _mapped_model: Option<&str>) 
                 })
             });
 
-            // [STABILITY GUARD] 如果客户端自身已经定义了函数工具 (functionDeclarations / function_declarations)，
-            // 不强行注入 googleSearch 工具。防止服务端接地调用导致客户端无法分发、空工具调用或报未知工具错误。
+            // [STABILITY GUARD] If the client itself has defined function facilities (functionDeclarations / function_declarations),
+            // Do not forcefully inject the googleSearch tool. Prevent server-side grounding calls from causing the client to fail to distribute, call empty tools, or report unknown tool errors.
             if has_functions {
                 tracing::debug!(
                     "Skipping googleSearch injection: functionDeclarations present, avoiding client tool dispatch conflicts"
@@ -28,7 +28,7 @@ pub fn inject_google_search_tool(body: &mut Value, _mapped_model: Option<&str>) 
                 return;
             }
 
-            // 首先清理掉已存在的 googleSearch 或 googleSearchRetrieval，以防重复产生冲突
+            // First clean up the existing googleSearch or googleSearchRetrieval to prevent repeated conflicts
             tools_arr.retain(|t| {
                 if let Some(o) = t.as_object() {
                     !(o.contains_key("googleSearch")
@@ -39,7 +39,7 @@ pub fn inject_google_search_tool(body: &mut Value, _mapped_model: Option<&str>) 
                 }
             });
 
-            // 注入统一的 googleSearch (v1internal 规范)
+            // Inject unified googleSearch (v1internal specification)
             tools_arr.push(json!({
                 "googleSearch": {}
             }));
@@ -47,14 +47,14 @@ pub fn inject_google_search_tool(body: &mut Value, _mapped_model: Option<&str>) 
     }
 }
 
-/// 深度迭代清理客户端发送的 [undefined] 脏字符串，防止 Gemini 接口校验失败
+/// In-depth iteration cleans up [undefined] dirty strings sent by the client to prevent Gemini interface verification failure
 pub fn deep_clean_undefined(value: &mut Value, depth: usize) {
     if depth > 10 {
         return;
     }
     match value {
         Value::Object(map) => {
-            // 移除值为 "[undefined]" 的键
+            // Remove keys with value "[undefined]"
             map.retain(|_, v| {
                 if let Some(s) = v.as_str() {
                     s != "[undefined]"
@@ -62,7 +62,7 @@ pub fn deep_clean_undefined(value: &mut Value, depth: usize) {
                     true
                 }
             });
-            // 递归处理嵌套
+            // Handle nesting recursively
             for v in map.values_mut() {
                 deep_clean_undefined(v, depth + 1);
             }
@@ -81,7 +81,7 @@ pub fn deep_clean_undefined(value: &mut Value, depth: usize) {
 pub fn detects_networking_tool(tools: &Option<Vec<Value>>) -> bool {
     if let Some(list) = tools {
         for tool in list {
-            // 1. 直发风格 (Claude/Simple OpenAI/Anthropic Builtin/Vertex): { "name": "..." } 或 { "type": "..." }
+            // 1. Straight hair style (Claude/Simple OpenAI/Anthropic Builtin/Vertex): { "name": "..." } or { "type": "..." }
             if let Some(n) = tool.get("name").and_then(|v| v.as_str()) {
                 if n == "web_search"
                     || n == "google_search"
@@ -104,7 +104,7 @@ pub fn detects_networking_tool(tools: &Option<Vec<Value>>) -> bool {
                 }
             }
 
-            // 2. OpenAI 嵌套风格: { "type": "function", "function": { "name": "..." } }
+            // 2. OpenAI nested style: { "type": "function", "function": { "name": "..." } }
             if let Some(func) = tool.get("function") {
                 if let Some(n) = func.get("name").and_then(|v| v.as_str()) {
                     let keywords = [
@@ -120,7 +120,7 @@ pub fn detects_networking_tool(tools: &Option<Vec<Value>>) -> bool {
                 }
             }
 
-            // 3. Gemini 原生风格: { "functionDeclarations": [ { "name": "..." } ] }
+            // 3. Gemini native style: { "functionDeclarations": [ { "name": "..." } ] }
             if let Some(decls) = tool.get("functionDeclarations").and_then(|v| v.as_array()) {
                 for decl in decls {
                     if let Some(n) = decl.get("name").and_then(|v| v.as_str()) {
@@ -135,7 +135,7 @@ pub fn detects_networking_tool(tools: &Option<Vec<Value>>) -> bool {
                 }
             }
 
-            // 4. Gemini googleSearch 声明 (含 googleSearchRetrieval 变体)
+            // 4. Gemini googleSearch statement (including googleSearchRetrieval variant)
             if tool.get("googleSearch").is_some() || tool.get("googleSearchRetrieval").is_some() {
                 return true;
             }
@@ -144,13 +144,13 @@ pub fn detects_networking_tool(tools: &Option<Vec<Value>>) -> bool {
     false
 }
 
-/// 探测是否包含非联网相关的本地函数工具
+/// Detect whether non-networking related local function tools are included
 pub fn contains_non_networking_tool(tools: &Option<Vec<Value>>) -> bool {
     if let Some(list) = tools {
         for tool in list {
             let mut is_networking = false;
 
-            // 简单逻辑：如果它是一个函数声明且名字不是联网关键词，则视为非联网工具
+            // Simple logic: if it is a function declaration and the name is not a networking keyword, it is considered a non-networking tool
             if let Some(n) = tool.get("name").and_then(|v| v.as_str()) {
                 let keywords = [
                     "web_search",
@@ -180,7 +180,7 @@ pub fn contains_non_networking_tool(tools: &Option<Vec<Value>>) -> bool {
             {
                 is_networking = true;
             } else if tool.get("functionDeclarations").is_some() {
-                // 如果是 Gemini 风格的 functionDeclarations，进去看一眼
+                // If it is Gemini style functionDeclarations, go in and take a look.
                 if let Some(decls) = tool.get("functionDeclarations").and_then(|v| v.as_array()) {
                     for decl in decls {
                         if let Some(n) = decl.get("name").and_then(|v| v.as_str()) {
@@ -191,12 +191,12 @@ pub fn contains_non_networking_tool(tools: &Option<Vec<Value>>) -> bool {
                                 "builtin_web_search",
                             ];
                             if !keywords.contains(&n) {
-                                return true; // 发现本地函数
+                                return true; // discover local functions
                             }
                         }
                     }
                 }
-                is_networking = true; // 即使全是联网，外层也标记为联网
+                is_networking = true; // Even though it is all networked, the outer layer is marked as networked
             }
 
             if !is_networking {
@@ -207,7 +207,7 @@ pub fn contains_non_networking_tool(tools: &Option<Vec<Value>>) -> bool {
     false
 }
 
-/// 检测是否携带任何工具定义 (无论是本地函数还是联网工具)
+/// Check whether any tool definitions are carried (either local functions or network tools)
 pub fn has_any_tools(tools: &Option<Vec<Value>>) -> bool {
     if let Some(list) = tools {
         !list.is_empty()
@@ -216,7 +216,7 @@ pub fn has_any_tools(tools: &Option<Vec<Value>>) -> bool {
     }
 }
 
-/// 检查 contents 中是否包含工具调用或工具返回结果 (表明处于多轮 Agent 会话中)
+/// Check whether contents contains tool calls or tool return results (indicating multiple Agent sessions)
 pub fn contents_has_tool_interactions(contents: &Value) -> bool {
     if let Some(arr) = contents.as_array() {
         for msg in arr {

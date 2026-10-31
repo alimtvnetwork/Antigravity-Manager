@@ -73,8 +73,8 @@ pub(crate) async fn completions_send(
     uri: &axum::http::Uri,
 ) -> CompletionsSendOutcome {
     let norm_start = std::time::Instant::now();
-    // 3. 模型配置解析
-    // 将 OpenAI 工具转为 Value 数组以便探测联网
+    // 3. Model configuration analysis
+    // Convert OpenAI tool to Value array for detecting networking
     let tools_val: Option<Vec<Value>> = openai_req
         .tools
         .as_ref()
@@ -89,8 +89,8 @@ pub(crate) async fn completions_send(
         None, // body
     );
 
-    // 3. 提取 SessionId (复用)
-    // [New] 使用 TokenManager 内部逻辑提取 session_id，支持粘性调度
+    // 3. Extract SessionId (reuse)
+    // [New] Use TokenManager internal logic to extract session_id and support sticky scheduling
     let session_id_str = session_id_str.clone();
     let session_id = Some(session_id_str.as_str());
 

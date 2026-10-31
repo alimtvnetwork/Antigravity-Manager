@@ -27,6 +27,24 @@ export interface AgmConversationNode {
     latest_response?: string;
     execution_results?: string;
     tool_calls_summary?: string;
+    media_paths?: string[];
+    media_thumbnails?: string[];
+    prompts?: AgmPromptTurnNode[];
+    selected_turn_number?: number | null;
+}
+
+export interface AgmPromptTurnNode {
+    turn_number: number;
+    step_index: number;
+    prompt_text: string;
+    preview_200w: string;
+    status: 'RUNNING' | 'QUEUED' | 'COMPLETED' | string;
+    is_running: boolean;
+    is_queued: boolean;
+    timestamp: string;
+    created_at: number;
+    media_paths: string[];
+    media_thumbnails: string[];
 }
 
 
@@ -59,11 +77,41 @@ export interface PromptTreeViewModalProps {
     sequenceNumber?: number;
     executablePath?: string;
     initialSelectedProjectId?: string;
+    renameConversation?: (conversationId: string, newTitle: string) => Promise<void> | void;
 }
 
-export type ViewMode = 'preview' | 'raw' | 'edit';
+export interface TreePanelProps {
+    renameConversation?: (conversationId: string, newTitle: string) => Promise<void> | void;
+    onRenameConversation?: (conversationId: string, newTitle: string) => Promise<void> | void;
+    onResendPrompts?: (count: number | 'all') => void;
+    onEnqueue?: () => void;
+    onRerunConversation?: (convoId: string, nudgeType: string) => void;
+}
 
-export type PromptTier = 'USER_PROMPT' | 'SUBAGENT_INSTRUCTION' | 'SYSTEM_MESSAGE' | 'TOOL_OUTPUT';
+
+export enum PromptOriginTier {
+    UserPrompt = 'USER_PROMPT',
+    SubagentInstruction = 'SUBAGENT_INSTRUCTION',
+    SystemMessage = 'SYSTEM_MESSAGE',
+    ToolOutput = 'TOOL_OUTPUT',
+}
+
+export enum PromptViewMode {
+    Preview = 'preview',
+    Raw = 'raw',
+    Edit = 'edit',
+}
+
+export enum CopyFormat {
+    RichMedia = 'rich_media',
+    CleanText = 'clean_text',
+    ImageAsText = 'image_as_text',
+    Json = 'json',
+}
+
+export type ViewMode = PromptViewMode | 'preview' | 'raw' | 'edit';
+
+export type PromptTier = PromptOriginTier | 'USER_PROMPT' | 'SUBAGENT_INSTRUCTION' | 'SYSTEM_MESSAGE' | 'TOOL_OUTPUT';
 
 export interface TierClassificationResult {
     tier: PromptTier;
@@ -90,4 +138,19 @@ export interface HierarchicalConversationNode {
     subagents: HierarchicalConversationNode[];
     isExpanded: boolean;
 }
+
+export interface ExtractedPromptImage {
+    alt: string;
+    dataUri: string;
+    mimeType: string;
+    byteLength: number;
+    hash: string;
+}
+
+export interface PromptRewriteResult {
+    rewrittenPrompt: string;
+    hasImages: boolean;
+    images: ExtractedPromptImage[];
+}
+
 

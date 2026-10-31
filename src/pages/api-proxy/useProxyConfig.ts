@@ -63,7 +63,7 @@ export function useProxyConfig(): ProxyConfigState {
     }, []);
 
     const saveConfig = useCallback(async (newConfig: AppConfig) => {
-        // 1. 立即更新 UI 状态，确保流畅
+        // 1. Update the UI status immediately to ensure smoothness
         setAppConfig(newConfig);
         try {
             await invoke('save_config', { config: newConfig });
@@ -146,18 +146,18 @@ export function useProxyConfig(): ProxyConfigState {
         saveConfig(newConfig);
     }, [appConfig, saveConfig]);
 
-    // 专门处理模型映射的热更新 (全量)
+    // Specially handles hot updates of model mapping (full volume)
     const handleMappingUpdate = useCallback(async (_type: 'custom', key: string, value: string) => {
         if (!appConfig) return;
 
         const trimmedKey = key.trim();
         const lowerKey = trimmedKey.toLowerCase();
 
-        // 新增通配符仅允许内置 gemini-3.x-flash（x 必须大于 8）；已存在的项可继续编辑目标
+        // New wildcard only allows built-in gemini-3.x-flash (x must be greater than 8); existing items can continue to edit the target
         const isExisting = !!(appConfig.proxy.custom_mapping && Object.prototype.hasOwnProperty.call(appConfig.proxy.custom_mapping, trimmedKey));
         if (!isExisting && (trimmedKey.includes('*') || /gemini-3\.x-flash/i.test(trimmedKey) || lowerKey.includes('.x'))) {
             if (lowerKey !== BUILT_IN_WILDCARD_KEY) {
-                showToast(t('proxy.router.wildcard_only_gemini_3x') || '仅允许内置通配符 gemini-3.x-flash（x 必须大于 8），其他请填写具体模型 ID', 'warning');
+                showToast(t('proxy.router.wildcard_only_gemini_3x') || 'Only built-in wildcard gemini-3.x-flash is allowed (x must be greater than 8), otherwise please fill in the specific model ID', 'warning');
                 return;
             }
         }
@@ -202,7 +202,7 @@ export function useProxyConfig(): ProxyConfigState {
         if (!appConfig) return;
         setIsResetConfirmOpen(false);
 
-        // 恢复到默认预设映射值
+        // Revert to default preset mapping values
         const newConfig = {
             ...appConfig.proxy,
             custom_mapping: { ...DEFAULT_MODEL_MAPPINGS }
@@ -221,7 +221,7 @@ export function useProxyConfig(): ProxyConfigState {
         }
     }, [appConfig, t]);
 
-    // 初始化加载
+    // Initial load
     useEffect(() => {
         loadConfig();
     }, [loadConfig]);

@@ -3,11 +3,16 @@ import { useConfigStore } from '../../stores/useConfigStore';
 import { useInstanceStore } from '../../stores/useInstanceStore';
 import type { InstanceStatus } from '../../services/instanceService';
 import { findQuotaModel } from '../../config/modelConfig';
-import { isGhostConversation } from '../../components/instances/PromptTreeViewModal';
 import type { AgmProjectTreeNode } from '../../components/instances/PromptTreeViewModal';
-import { isNodeOwnedByInstance } from './instancePageUtils';
+import {
+    isNodeOwnedByInstance,
+    isConversationOwnedByInstance,
+    isConversationGenuinelyRunning,
+} from './instancePageUtils';
 import type { InstanceActionType } from './instancePageUtils';
 import type { Account } from '../../types/account';
+
+export { isConversationOwnedByInstance, isConversationGenuinelyRunning };
 
 export interface InstanceCardData {
     boundAccount: Account | null;
@@ -51,39 +56,66 @@ export function useInstanceCardData(
     const displayEmail =
         inst.config.bound_email || boundAccount?.email || (isActive && curEmail ? curEmail : null);
 
-    const geminiPro = findQuotaModel(boundAccount?.quota?.models, 'gemini-pro');
+    const targetModel = config?.auto_profile_switcher?.target_model;
+    const targetQuotaModel = targetModel
+        ? boundAccount?.quota?.models?.find(
+              (m) => m.name.toLowerCase() === targetModel.toLowerCase() || m.name.toLowerCase().includes(targetModel.toLowerCase())
+          )
+        : undefined;
     const geminiFlash = findQuotaModel(boundAccount?.quota?.models, 'gemini-flash');
-    const geminiModel = geminiPro || geminiFlash || null;
+    const geminiPro = findQuotaModel(boundAccount?.quota?.models, 'gemini-pro');
+    const geminiModel = targetQuotaModel || geminiFlash || geminiPro || null;
 
     const weeklyBucket = (boundAccount?.quota?.quota_groups || [])
         .find((item) => {
             const name = (item.display_name || '').toLowerCase();
-            return name.includes('gemini') || (!name.includes('claude') && !name.includes('gpt'));
+            const isGemini = name.includes('gemini');
+            if (isGemini) {
+                return true;
+            }
+            const isClaude = name.includes('claude');
+            if (isClaude) {
+                return false;
+            }
+            const isGpt = name.includes('gpt');
+            if (isGpt) {
+                return false;
+            }
+            return true;
         })
-        ?.buckets?.find(
-            (item) =>
-                (item.window || '').toLowerCase().includes('week') ||
-                (item.bucket_id || '').toLowerCase().includes('week')
-        );
+        ?.buckets?.find((item) => {
+            const windowName = (item.window || '').toLowerCase();
+            const isWeekWindow = windowName.includes('week');
+            if (isWeekWindow) {
+                return true;
+            }
+            const bucketId = (item.bucket_id || '').toLowerCase();
+            return bucketId.includes('week');
+        });
 
     const weeklyQuota = weeklyBucket
         ? {
               percentage: Math.round((weeklyBucket.remaining_fraction || 0) * 100),
               resetTime: weeklyBucket.reset_time,
           }
-        : ((boundAccount?.quota as { weekly?: { percentage: number; resetTime?: string } | null })?.weekly || null);
+        : ((boundAccount?.quota as { weekly?: { percentage: number; resetTime?: string } | null })?.weekly
+          || (geminiModel ? { percentage: 100, resetTime: undefined } : null));
 
+    const isInstanceRunning = Boolean(inst.is_running);
     const hasActiveTask =
-        Boolean(inst.is_running) &&
+        isInstanceRunning &&
         runningTreeNodes.some((node) => {
+            const isNodeRunning = Boolean(node.is_running);
+            if (!isNodeRunning) {
+                return false;
+            }
             const isInstanceMatch = isNodeOwnedByInstance(node, inst.config);
-            const hasGenuineRunningConv = (node.conversations || []).some(
-                (c) =>
-                    Boolean(c.is_running) &&
-                    !isGhostConversation(c) &&
-                    !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+            if (!isInstanceMatch) {
+                return false;
+            }
+            return (node.conversations || []).some((c) =>
+                isConversationGenuinelyRunning(c, inst.config, node.instance_seq_num)
             );
-            return isInstanceMatch && Boolean(node.is_running) && hasGenuineRunningConv;
         });
 
     const cfg = config as { antigravity_ide_executable?: string; antigravity_executable?: string } | null;

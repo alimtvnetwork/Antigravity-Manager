@@ -5,7 +5,7 @@ async fn refresh_access_token_once(
     account_id: Option<&str>,
     client_cfg: &OAuthClientConfig,
 ) -> Result<TokenResponse, (Option<reqwest::StatusCode>, String)> {
-    // [PHASE 2] 根据 account_id 使用对应的代理
+    // [PHASE 2] Use the corresponding proxy based on account_id
     let client = if let Some(pool) = crate::proxy::proxy_pool::get_global_proxy_pool() {
         pool.get_effective_standard_client(account_id, 60).await
     } else {
@@ -19,7 +19,7 @@ async fn refresh_access_token_once(
         ("grant_type", "refresh_token"),
     ];
 
-    // [FIX #1583] 提供更详细的日志，帮助诊断 Docker 环境下的代理问题
+    // [FIX #1583] Provide more detailed logs to help diagnose proxy issues in Docker environments
     if let Some(id) = account_id {
         crate::modules::logger::log_info(&format!("Refreshing Token for account: {}...", id));
     } else {
@@ -45,7 +45,7 @@ async fn refresh_access_token_once(
                 (
                     None,
                     format!(
-                        "Refresh request failed: {}. 无法连接 Google 授权服务器，请检查代理设置。",
+                        "Refresh request failed: {} . Unable to connect to Google authorization server, please check proxy settings.",
                         e
                     ),
                 )
@@ -91,7 +91,7 @@ pub async fn refresh_access_token_with_client(
         let mut last_attempt_err = None;
         let mut recovered_token = None;
 
-        // 对同一个 OAuth Client 最多执行 2 次尝试（首次遇 invalid_grant 进行 500ms 短退避重试确认）
+        // A maximum of 2 attempts are made for the same OAuth Client (the first time invalid_grant is encountered, a 500ms short backoff retry is performed to confirm)
         for retry_count in 0..2 {
             if retry_count > 0 {
                 tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
@@ -105,7 +105,7 @@ pub async fn refresh_access_token_with_client(
                     let is_grant_error = err_msg.contains("invalid_grant");
                     if is_grant_error && retry_count == 0 {
                         crate::modules::logger::log_warn(&format!(
-                            "[OAuth] Client [{}] 收到疑似 invalid_grant，将在 500ms 后进行二次退避确认...",
+                            "[OAuth] Client [ {} ] received a suspected invalid_grant and will perform a secondary backoff confirmation after 500ms...",
                             client_cfg.key
                         ));
                         last_attempt_err = Some((status_opt, err_msg));

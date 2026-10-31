@@ -9,6 +9,8 @@
 #
 #  Profiles (repeatable, stacked via multiple --profile flags):
 #    minimal     rust toolchain + clippy/rustfmt
+#    build-tools agm-build-tools: native-deps + rust + sccache + cargo-watch
+#    agm-build-tools alias for build-tools
 #    rust-dev    minimal + sccache + cargo-watch
 #    frontend    nodejs (fnm) + pnpm + tauri-cli
 #    full        rust-dev + frontend + gh
@@ -54,6 +56,7 @@ FLAG_ONLY=""
 FLAG_DRY_RUN=0
 FLAG_LIST_ITEMS=0
 FLAG_TROUBLESHOOT=0
+FLAG_CLEAR_DOWNLOADS=0
 FLAG_SSH=""
 COMMAND=""
 
@@ -232,6 +235,7 @@ parse_args() {
                 FLAG_ONLY="$FLAG_ONLY $2"; shift 2 ;;
             --item=*)         FLAG_ONLY="$FLAG_ONLY ${1#--item=}"; shift ;;
             --dry-run)        FLAG_DRY_RUN=1; shift ;;
+            --clear-downloads|--clear-cache) FLAG_CLEAR_DOWNLOADS=1; shift ;;
             --list-items)     FLAG_LIST_ITEMS=1; shift ;;
             --troubleshoot)   FLAG_TROUBLESHOOT=1; shift ;;
             --ssh)            shift 2 ;;   # consumed in pre-scan
@@ -261,11 +265,14 @@ parse_args() {
 # --- item resolution ----------------------------------------------------------
 profile_items() {
     case "$1" in
-        minimal)  printf 'rust' ;;
-        rust-dev) printf 'rust sccache cargo-watch' ;;
-        frontend) printf 'nodejs pnpm tauri-cli' ;;
-        full)     printf 'rust sccache cargo-watch nodejs pnpm tauri-cli gh' ;;
-        *) say_err "unknown profile: '$1' (minimal|rust-dev|frontend|full)"; exit 2 ;;
+        minimal)         printf 'rust' ;;
+        build-tools)     printf 'native-deps rust sccache cargo-watch' ;;
+        agm-build-tools) printf 'native-deps rust sccache cargo-watch' ;;
+        dev-rust)        printf 'native-deps rust sccache cargo-watch' ;;
+        rust-dev)        printf 'rust sccache cargo-watch' ;;
+        frontend)        printf 'nodejs pnpm tauri-cli' ;;
+        full)            printf 'rust sccache cargo-watch nodejs pnpm tauri-cli gh' ;;
+        *) say_err "unknown profile: '$1' (minimal|build-tools|agm-build-tools|rust-dev|frontend|full)"; exit 2 ;;
     esac
 }
 
@@ -664,6 +671,18 @@ run_remote() {
 
 # --- main ---------------------------------------------------------------------
 parse_args "$@"
+
+if [ "$FLAG_CLEAR_DOWNLOADS" -eq 1 ]; then
+    say_step "Clearing toolchain download cache..."
+    for d in "$HOME/.cache/agm-toolchain" "/tmp/agm-toolchain-cache"; do
+        if [ -d "$d" ]; then
+            rm -rf "$d"
+            say_ok "Removed cache directory: $d"
+        fi
+    done
+    say_ok "Toolchain cache cleared successfully."
+    exit 0
+fi
 
 if [ "$FLAG_LIST_ITEMS" -eq 1 ]; then
     list_items

@@ -42,9 +42,13 @@ pub fn backup_active_running_prompts_for_instance(
             || p.instance_id == target_inst
             || (target_inst == "default"
                 && (p.instance_id == "default" || p.instance_id.is_empty()));
+        // Uncompleted-prompt sweep: all prompts not marked completed or succeeded
+        // (running, queued, backed_up, pending, in_flight, dispatched, blocked) are backup candidates
+        // at any age — removing restrictive time windows so prompts interrupted by quota exhaustion
+        // or account switches are never dropped.
+        let is_candidate_status = p.status != "completed" && p.status != "succeeded";
         if is_inst_match
-            && (p.status == "running" || p.status == "queued" || p.status == "backed_up")
-            && p.updated_at >= freshness_cutoff
+            && is_candidate_status
             && !candidate_prompts.iter().any(|c| {
                 c.id == p.id
                     || (c.repo_path.to_lowercase().replace('\\', "/")
@@ -95,9 +99,14 @@ pub fn backup_active_running_prompts_for_instance(
                 || uris_norm.contains(&p.project_id.to_lowercase())
         });
 
-        let conv_id = matched_conv
-            .map(|c| c.conversation_id.clone())
-            .or_else(|| p.session_id.clone())
+        // Preserve the prompt's ORIGINAL session_id verbatim so restore and
+        // re-send re-attach to the same conversation. The live matched
+        // conversation is only a fallback when the prompt carries no session.
+        let conv_id = p
+            .session_id
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| matched_conv.map(|c| c.conversation_id.clone()))
             .unwrap_or_else(|| "-".to_string());
 
         let conv_name = matched_conv.and_then(|c| {
@@ -110,6 +119,31 @@ pub fn backup_active_running_prompts_for_instance(
 
         let proj_name = resolve_friendly_project_name(&p.repo_path, &p.project_id);
 
+        // Extract ALL data URIs from content when the live row carries no
+        // payload yet, so no image is silently dropped (AC2).
+        let (backup_uris, _) =
+            crate::modules::repo_db::detection::extract_image_uris_or_paths(&p.prompt_content);
+        let mut images_payload = p
+            .image_payload
+            .clone()
+            .or_else(|| crate::modules::repo_db::detection::serialize_image_uris(&backup_uris));
+        // Preserve upstream screenshot-id token tagging (single-payload form
+        // only; JSON-array multi-URI payloads keep their own structure so the
+        // token append cannot corrupt the JSON).
+        if let Some(ss_token) = repo_db::extract_screenshot_id_token(&p.prompt_content) {
+            let needs_token = images_payload
+                .as_ref()
+                .map(|cur| !cur.contains(&ss_token) && !cur.starts_with('['))
+                .unwrap_or(true);
+            if needs_token {
+                images_payload = Some(match images_payload {
+                    Some(cur) => format!("{};screenshot_id={}", cur, ss_token),
+                    None => format!("screenshot_id={}", ss_token),
+                });
+            }
+        }
+        let has_images = images_payload.is_some();
+
         let record = PromptBackupRecord {
             id: format!("rec_{}", Uuid::new_v4().simple()),
             backup_batch_id: batch_id.clone(),
@@ -121,8 +155,8 @@ pub fn backup_active_running_prompts_for_instance(
             conversation_name: conv_name,
             sequence_id: (idx + 1) as i64,
             prompt_text: p.prompt_content.clone(),
-            has_images: p.image_payload.is_some(),
-            images_payload: p.image_payload.clone(),
+            has_images,
+            images_payload,
             status: p.status.clone(),
             created_at: now,
             is_restored: false,
@@ -143,9 +177,17 @@ pub fn backup_active_running_prompts_for_instance(
         if let Some(existing_rec_id) = existing_unrestored {
             // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
             crate::error::record_ignored(conn.execute(
-                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, is_restored = 0 WHERE id = ?4",
-                params![record.backup_batch_id, now, target_inst, existing_rec_id],
+                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, is_restored = 0, has_images = ?4, images_payload = ?5, prompt_text = ?6 WHERE id = ?7",
+                params![record.backup_batch_id, now, target_inst, record.has_images, record.images_payload, record.prompt_text, existing_rec_id],
             ), "db execute");
+            let payload_bytes = record.images_payload.as_ref().map(|s| s.len()).unwrap_or(0);
+            crate::modules::logger::log_info(&format!(
+                "[PROMPT_BACKUP] Backed up prompt {} for instance '{}' (has_images: {}, payload_bytes: {})",
+                record.prompt_id,
+                record.instance_id.as_deref().unwrap_or(target_inst),
+                record.has_images,
+                payload_bytes
+            ));
             records.push(record);
             continue;
         }
@@ -162,9 +204,17 @@ pub fn backup_active_running_prompts_for_instance(
         if let Some(existing_rec_id) = existing_restored {
             // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
             crate::error::record_ignored(conn.execute(
-                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, is_restored = 0, restored_at = NULL WHERE id = ?4",
-                params![record.backup_batch_id, now, target_inst, existing_rec_id],
+                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, is_restored = 0, restored_at = NULL, has_images = ?4, images_payload = ?5, prompt_text = ?6 WHERE id = ?7",
+                params![record.backup_batch_id, now, target_inst, record.has_images, record.images_payload, record.prompt_text, existing_rec_id],
             ), "db execute");
+            let payload_bytes = record.images_payload.as_ref().map(|s| s.len()).unwrap_or(0);
+            crate::modules::logger::log_info(&format!(
+                "[PROMPT_BACKUP] Backed up prompt {} for instance '{}' (has_images: {}, payload_bytes: {})",
+                record.prompt_id,
+                record.instance_id.as_deref().unwrap_or(target_inst),
+                record.has_images,
+                payload_bytes
+            ));
             records.push(record);
             continue;
         }
@@ -196,6 +246,15 @@ pub fn backup_active_running_prompts_for_instance(
             ],
         )
         .map_err(|e| format!("Failed to insert prompt backup record: {}", e))?;
+
+        let payload_bytes = record.images_payload.as_ref().map(|s| s.len()).unwrap_or(0);
+        crate::modules::logger::log_info(&format!(
+            "[PROMPT_BACKUP] Backed up prompt {} for instance '{}' (has_images: {}, payload_bytes: {})",
+            record.prompt_id,
+            record.instance_id.as_deref().unwrap_or(target_inst),
+            record.has_images,
+            payload_bytes
+        ));
 
         records.push(record);
     }
@@ -243,15 +302,15 @@ pub fn backup_queued_prompts_for_instance(
     let is_default_scope = target_inst == "default" || target_inst == "__default__";
     let queued_sql = if unscoped {
         "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload
-         FROM active_prompts WHERE status = 'queued' ORDER BY created_at ASC, id ASC"
+         FROM active_prompts WHERE status IN ('queued', 'pending', 'blocked') ORDER BY created_at ASC, id ASC"
     } else if is_default_scope {
         "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload
-         FROM active_prompts WHERE status = 'queued'
+         FROM active_prompts WHERE status IN ('queued', 'pending', 'blocked')
            AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL)
          ORDER BY created_at ASC, id ASC"
     } else {
         "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload
-         FROM active_prompts WHERE status = 'queued' AND instance_id = ?1
+         FROM active_prompts WHERE status IN ('queued', 'pending', 'blocked') AND instance_id = ?1
          ORDER BY created_at ASC, id ASC"
     };
     let mut qstmt = repo_conn
@@ -328,9 +387,14 @@ pub fn backup_queued_prompts_for_instance(
                 || uris_norm.contains(&p.project_id.to_lowercase())
         });
 
-        let conv_id = matched_conv
-            .map(|c| c.conversation_id.clone())
-            .or_else(|| p.session_id.clone())
+        // Preserve the prompt's ORIGINAL session_id verbatim so restore and
+        // re-send re-attach to the same conversation. The live matched
+        // conversation is only a fallback when the prompt carries no session.
+        let conv_id = p
+            .session_id
+            .clone()
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| matched_conv.map(|c| c.conversation_id.clone()))
             .unwrap_or_else(|| "-".to_string());
 
         let conv_name = matched_conv.and_then(|c| {
@@ -350,6 +414,31 @@ pub fn backup_queued_prompts_for_instance(
             p.instance_id.clone()
         };
 
+        // Fresh enqueues store image_payload: None on the live row; extract
+        // ALL data URIs from content so no image is silently dropped (AC2).
+        let (backup_uris, _) =
+            crate::modules::repo_db::detection::extract_image_uris_or_paths(&p.prompt_content);
+        let mut images_payload = p
+            .image_payload
+            .clone()
+            .or_else(|| crate::modules::repo_db::detection::serialize_image_uris(&backup_uris));
+        // Preserve upstream screenshot-id token tagging (single-payload form
+        // only; JSON-array multi-URI payloads keep their own structure so the
+        // token append cannot corrupt the JSON).
+        if let Some(ss_token) = repo_db::extract_screenshot_id_token(&p.prompt_content) {
+            let needs_token = images_payload
+                .as_ref()
+                .map(|cur| !cur.contains(&ss_token) && !cur.starts_with('['))
+                .unwrap_or(true);
+            if needs_token {
+                images_payload = Some(match images_payload {
+                    Some(cur) => format!("{};screenshot_id={}", cur, ss_token),
+                    None => format!("screenshot_id={}", ss_token),
+                });
+            }
+        }
+        let has_images = images_payload.is_some();
+
         let record = PromptBackupRecord {
             id: format!("rec_{}", Uuid::new_v4().simple()),
             backup_batch_id: batch_id.clone(),
@@ -362,8 +451,8 @@ pub fn backup_queued_prompts_for_instance(
             // FIFO position in the live queue at backup time.
             sequence_id: (idx + 1) as i64,
             prompt_text: p.prompt_content.clone(),
-            has_images: p.image_payload.is_some(),
-            images_payload: p.image_payload.clone(),
+            has_images,
+            images_payload,
             status: p.status.clone(),
             created_at: now,
             is_restored: false,
@@ -383,9 +472,17 @@ pub fn backup_queued_prompts_for_instance(
         if let Some(existing_rec_id) = existing_unrestored {
             // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
             crate::error::record_ignored(conn.execute(
-                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, sequence_id = ?4, is_restored = 0 WHERE id = ?5",
-                params![record.backup_batch_id, now, eff_inst, record.sequence_id, existing_rec_id],
+                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, sequence_id = ?4, is_restored = 0, has_images = ?5, images_payload = ?6, prompt_text = ?7 WHERE id = ?8",
+                params![record.backup_batch_id, now, eff_inst, record.sequence_id, record.has_images, record.images_payload, record.prompt_text, existing_rec_id],
             ), "db execute");
+            let payload_bytes = record.images_payload.as_ref().map(|s| s.len()).unwrap_or(0);
+            crate::modules::logger::log_info(&format!(
+                "[PROMPT_BACKUP] Backed up prompt {} for instance '{}' (has_images: {}, payload_bytes: {})",
+                record.prompt_id,
+                record.instance_id.as_deref().unwrap_or(target_inst),
+                record.has_images,
+                payload_bytes
+            ));
             records.push(record);
             continue;
         }
@@ -402,9 +499,17 @@ pub fn backup_queued_prompts_for_instance(
         if let Some(existing_rec_id) = existing_restored {
             // Justification: best-effort DB statement (idempotent schema/cleanup write); failure logged
             crate::error::record_ignored(conn.execute(
-                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, sequence_id = ?4, is_restored = 0, restored_at = NULL WHERE id = ?5",
-                params![record.backup_batch_id, now, eff_inst, record.sequence_id, existing_rec_id],
+                "UPDATE prompt_backups SET backup_batch_id = ?1, created_at = ?2, instance_id = ?3, sequence_id = ?4, is_restored = 0, restored_at = NULL, has_images = ?5, images_payload = ?6, prompt_text = ?7 WHERE id = ?8",
+                params![record.backup_batch_id, now, eff_inst, record.sequence_id, record.has_images, record.images_payload, record.prompt_text, existing_rec_id],
             ), "db execute");
+            let payload_bytes = record.images_payload.as_ref().map(|s| s.len()).unwrap_or(0);
+            crate::modules::logger::log_info(&format!(
+                "[PROMPT_BACKUP] Backed up prompt {} for instance '{}' (has_images: {}, payload_bytes: {})",
+                record.prompt_id,
+                record.instance_id.as_deref().unwrap_or(target_inst),
+                record.has_images,
+                payload_bytes
+            ));
             records.push(record);
             continue;
         }
@@ -437,6 +542,15 @@ pub fn backup_queued_prompts_for_instance(
         )
         .map_err(|e| format!("Failed to insert queued prompt backup record: {}", e))?;
 
+        let payload_bytes = record.images_payload.as_ref().map(|s| s.len()).unwrap_or(0);
+        crate::modules::logger::log_info(&format!(
+            "[PROMPT_BACKUP] Backed up prompt {} for instance '{}' (has_images: {}, payload_bytes: {})",
+            record.prompt_id,
+            record.instance_id.as_deref().unwrap_or(target_inst),
+            record.has_images,
+            payload_bytes
+        ));
+
         records.push(record);
     }
 
@@ -457,25 +571,34 @@ pub fn backup_queued_prompts_for_instance(
     Ok((batch_info, records))
 }
 
-/// Enforce FIFO retention cap on prompt_backups table
+/// Enforce FIFO retention cap on restored prompt_backups rows.
+/// RC-5: unrestored rows (`is_restored = 0`) are NEVER pruned — they are
+/// the only durable copy of prompts still owed a restore. The cap applies
+/// to restored rows only, keeping the newest `max_cap` of them.
 pub fn enforce_max_backup_prompts_cap(conn: &Connection, max_cap: usize) -> Result<usize, String> {
     if max_cap == 0 {
         return Ok(0);
     }
 
-    let total_count: usize = conn
-        .query_row("SELECT COUNT(*) FROM prompt_backups", [], |r| r.get(0))
+    let restored_count: usize = conn
+        .query_row(
+            "SELECT COUNT(*) FROM prompt_backups WHERE is_restored = 1",
+            [],
+            |r| r.get(0),
+        )
         .unwrap_or(0);
 
-    if total_count <= max_cap {
+    if restored_count <= max_cap {
         return Ok(0);
     }
 
     let deleted = conn
         .execute(
             "DELETE FROM prompt_backups 
-             WHERE id NOT IN (
+             WHERE is_restored = 1
+               AND id NOT IN (
                  SELECT id FROM prompt_backups 
+                 WHERE is_restored = 1
                  ORDER BY created_at DESC, id DESC 
                  LIMIT ?1
              )",
@@ -495,8 +618,8 @@ pub fn enforce_max_backup_prompts_cap(conn: &Connection, max_cap: usize) -> Resu
     );
 
     crate::modules::logger::log_info(&format!(
-        "[BackupPrompts] Enforced max cap {}: pruned {} older backup records (total was {})",
-        max_cap, deleted, total_count
+        "[BackupPrompts] Enforced max cap {}: pruned {} older restored backup records (restored total was {})",
+        max_cap, deleted, restored_count
     ));
 
     Ok(deleted)

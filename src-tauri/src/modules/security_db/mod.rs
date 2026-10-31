@@ -1,5 +1,5 @@
 //! Security Database Module
-//! 安全监控相关的数据库操作
+//! Security monitoring related database operations
 
 pub mod access_logs;
 pub mod blacklist;

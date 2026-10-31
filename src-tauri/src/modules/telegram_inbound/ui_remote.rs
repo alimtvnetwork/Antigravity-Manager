@@ -11,6 +11,7 @@ use crate::error::AppError;
 use crate::modules::audit::{
     record_ui_interaction, InteractionActor, InteractionTrigger, RecordInteractionInput,
 };
+use chrono::{Local, Utc};
 use serde_json::{json, Value};
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -279,7 +280,7 @@ pub fn ui_service_goto(actor: InteractionActor, route_raw: &str) -> Result<Strin
 /// record; this POST triggers the live Tauri-event navigation so the UI
 /// responds immediately instead of waiting for a poll. Best-effort: any
 /// failure is tracked and the queued intent remains.
-async fn post_ui_navigate_event(route: &str) {
+pub(crate) async fn post_ui_navigate_event(route: &str) {
     let token: String = crate::modules::config::load_app_config()
         .ok()
         .and_then(|c| {
@@ -322,35 +323,49 @@ pub fn ui_service_goto_to(
     route_raw: &str,
     intent_path: &PathBuf,
 ) -> Result<String, AppError> {
+    let is_canonical_intent = ui_intent_file_path()
+        .map(|canonical| &canonical == intent_path)
+        .unwrap_or(false);
+
     match resolve_ui_route(route_raw) {
         Some(route) => {
             queue_ui_intent_to(actor, "goto", Some(&route), None, intent_path)?;
-            audit_ui_action(
-                actor,
-                "ui_goto",
-                &route,
-                None,
-                InteractionTrigger::Navigation,
-                json!({ "route": route }),
-                "ok",
-                None,
-            );
+            if is_canonical_intent {
+                audit_ui_action(
+                    actor,
+                    "ui_goto",
+                    &route,
+                    None,
+                    InteractionTrigger::Navigation,
+                    json!({ "route": route }),
+                    "ok",
+                    None,
+                );
+            }
             Ok(format!(
                 "🧭 <b>UI navigation sent</b>\n• <b>Route:</b> <code>{}</code>\nThe manager window navigates there now (intent also queued).",
                 escape_html(&route)
             ))
         }
         None => {
-            audit_ui_action(
-                actor,
-                "ui_goto",
-                "/ui",
-                None,
-                InteractionTrigger::Navigation,
-                json!({ "requested": route_raw.trim() }),
-                "error",
-                Some(format!("unknown ui route: {}", route_raw.trim())),
-            );
+            if is_canonical_intent {
+                let requested = route_raw.trim();
+                let ui_target = if requested.is_empty() {
+                    "/ui".to_string()
+                } else {
+                    format!("/ui?invalid={requested}")
+                };
+                audit_ui_action(
+                    actor,
+                    "ui_goto",
+                    &ui_target,
+                    None,
+                    InteractionTrigger::Navigation,
+                    json!({ "requested": requested }),
+                    "error",
+                    Some(format!("unknown ui route: {}", requested)),
+                );
+            }
             Ok(unknown_route_reply(route_raw))
         }
     }
@@ -372,32 +387,40 @@ pub fn ui_service_scroll_to(
     element_id_raw: &str,
     intent_path: &PathBuf,
 ) -> Result<String, AppError> {
+    let is_canonical_intent = ui_intent_file_path()
+        .map(|canonical| &canonical == intent_path)
+        .unwrap_or(false);
+
     let element_id = element_id_raw.trim();
     if element_id.is_empty() || element_id.len() > 128 || element_id.chars().any(|c| c.is_control())
     {
+        if is_canonical_intent {
+            audit_ui_action(
+                actor,
+                "ui_scroll",
+                "/ui?invalid_element=true",
+                None,
+                InteractionTrigger::Scroll,
+                json!({ "requested": element_id_raw }),
+                "error",
+                Some("invalid element id".to_string()),
+            );
+        }
+        return Ok("⚠️ <b>Invalid element id.</b> Send <code>/ui scroll &lt;element-id&gt;</code> with a plain element id (max 128 chars).".to_string());
+    }
+    queue_ui_intent_to(actor, "scroll", None, Some(element_id), intent_path)?;
+    if is_canonical_intent {
         audit_ui_action(
             actor,
             "ui_scroll",
             "/ui",
-            None,
+            Some(element_id),
             InteractionTrigger::Scroll,
-            json!({ "requested": element_id_raw }),
-            "error",
-            Some("invalid element id".to_string()),
+            json!({ "element_id": element_id }),
+            "ok",
+            None,
         );
-        return Ok("⚠️ <b>Invalid element id.</b> Send <code>/ui scroll &lt;element-id&gt;</code> with a plain element id (max 128 chars).".to_string());
     }
-    queue_ui_intent_to(actor, "scroll", None, Some(element_id), intent_path)?;
-    audit_ui_action(
-        actor,
-        "ui_scroll",
-        "/ui",
-        Some(element_id),
-        InteractionTrigger::Scroll,
-        json!({ "element_id": element_id }),
-        "ok",
-        None,
-    );
     Ok(format!(
         "🖱️ <b>UI scroll queued</b>\n• <b>Element:</b> <code>{}</code>\nThe manager window scrolls it into view and focuses it on its next poll.",
         escape_html(element_id)
@@ -489,7 +512,7 @@ pub fn help_copy_markup() -> Value {
 pub fn window_command_section() -> &'static str {
     "\n\
     🎨 <b>Window, screenshot, and where the next prompt goes</b>\n\
-    🔵 <b>This machine.</b> <code>/ui</code> opens Antigravity Manager when it is closed. <code>/shot</code> opens it only if needed, then sends a picture of the current manager window back to this chat. Each machine that runs the manager answers for its own screen.\n\
+    🔵 <b>This machine.</b> <code>/ui</code> opens Antigravity Manager when it is closed. <code>/shot</code> and <code>/screenshot</code> send the desktop mosaic, AGM Instances, AGM Accounts, and each running Antigravity IDE window. Each machine that runs the manager answers for its own screen.\n\
     <pre>/ui\n/shot\n/target default C001</pre>\n\
     🟢 Send <code>/target &lt;instance&gt; &lt;C001&gt;</code> first — your next plain message becomes the prompt for that conversation. <code>/target clear</code> cancels. For a guided picker with delivery proof, use <code>/send</code>.\n\
     🟡 <code>/open &lt;machine&gt;</code> opens AGM on a fleet machine; <code>/screenshot &lt;machine&gt;</code> photographs it. Bare <code>/open</code> / <code>/screenshot</code> stay local.\n\
@@ -606,8 +629,8 @@ fn open_target_verb(rest: &str) -> Option<UiVerb> {
 
 fn shot_target_verb(rest: &str) -> Option<UiVerb> {
     match super::open_shot::resolve_machine_target(rest) {
-        Ok(super::open_shot::OpenShotTarget::Remote(_)) => None,
-        _ => Some(UiVerb::Shot),
+        Ok(super::open_shot::OpenShotTarget::Local) if rest.trim().is_empty() => Some(UiVerb::Shot),
+        _ => None,
     }
 }
 
@@ -665,23 +688,15 @@ async fn run_ui_verb(verb: UiVerb) -> LocalUiAction {
                 caption: String::new(),
             }
         }
-        UiVerb::Shot => match capture_manager_png() {
-            Ok(png) => LocalUiAction {
-                reply: format!(
-                    "📸 <b>Screenshot sent</b> from <code>{}</code>.\nThe picture is the Antigravity Manager window on this machine.",
-                    clean_machine()
-                ),
+        UiVerb::Shot => {
+            let reply = super::open_shot::execute_screenshot_command("").await;
+            LocalUiAction {
+                reply,
                 markup: Some(help_copy_markup()),
-                caption: format!("AGM window on {}", clean_machine()),
-                png: Some(png),
-            },
-            Err(err) => LocalUiAction {
-                reply: format!("❌ <b>Screenshot failed:</b> <code>{}</code>", escape_html(&err)),
-                markup: None,
                 png: None,
                 caption: String::new(),
-            },
-        },
+            }
+        }
         UiVerb::ShowAim => LocalUiAction {
             reply: aim_status_html(),
             markup: Some(help_copy_markup()),
@@ -754,19 +769,45 @@ async fn run_ui_verb(verb: UiVerb) -> LocalUiAction {
                     format!("Screenshot unavailable: {}", escape_html(&err)),
                 ),
             };
+            let now_utc = Utc::now();
+            let utc_str = now_utc.to_rfc3339();
+            let local_str = Local::now().format("%Y-%m-%d %I:%M:%S %p").to_string();
+            let (_, detected_images) =
+                crate::modules::repo_db::extract_image_payload_or_path(&text);
+            let media_count = detected_images.len();
+            let (target_node, target_instance) = if instance.contains(':') {
+                let (m_part, i_part) = instance.split_once(':').unwrap_or(("local", "default"));
+                (m_part.to_string(), i_part.to_string())
+            } else if !(conversation.to_uppercase().starts_with('C')
+                || conversation.to_uppercase().starts_with('P')
+                || conversation.to_uppercase().starts_with("GM:"))
+                && crate::modules::instance::resolve_instance_id(&conversation).is_ok()
+            {
+                (instance.clone(), conversation.clone())
+            } else {
+                ("local".to_string(), instance.clone())
+            };
+
             LocalUiAction {
                 reply: format!(
-                    "✅ <b>Prompt delivered</b> to <code>{}</code> on <code>{}</code>\n{}\n\n{}",
+                    "✅ <b>Prompt Dispatched & Acknowledged</b>\n\
+                    • <b>Dispatched At:</b> <code>{}</code> ({})\n\
+                    • <b>Target Node:</b> <code>{}</code>\n\
+                    • <b>Instance:</b> <code>{}</code>\n\
+                    • <b>Conversation:</b> <code>{}</code>\n\
+                    • <b>Attached Media:</b> {} image(s)\n\
+                    {}\n\n{}",
+                    utc_str,
+                    local_str,
+                    escape_html(&target_node),
+                    escape_html(&target_instance),
                     escape_html(&conversation),
-                    escape_html(&instance),
+                    media_count,
                     note,
                     injected
                 ),
                 markup: None,
-                caption: format!(
-                    "AGM after prompt to {} on {}",
-                    conversation, instance
-                ),
+                caption: format!("AGM after prompt to {} on {}", conversation, instance),
                 png,
             }
         }
@@ -967,10 +1008,13 @@ fn manager_process_running() -> bool {
     let mut sys = sysinfo::System::new();
     sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
     sys.processes().values().any(|proc| {
-        proc.name()
-            .to_string_lossy()
-            .to_ascii_lowercase()
-            .contains("agm-alim")
+        let name = proc.name().to_string_lossy().to_ascii_lowercase();
+        name.contains("agm-alim")
+            || name.contains("agm-ui")
+            || name.contains("antigravity-tools")
+            || name == "agm"
+            || name == "agm.exe"
+            || name.contains("antigravity_manager")
     })
 }
 
@@ -1003,26 +1047,47 @@ public class AgmWinShot {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
   public struct RECT { public int L; public int T; public int R; public int B; }
 }
 "@
-$proc = Get-Process -Name 'agm-alim' -ErrorAction SilentlyContinue |
+[void][AgmWinShot]::SetProcessDPIAware()
+$procNames = @('agm-alim', 'agm-ui', 'antigravity-tools', 'agm', 'antigravity_manager')
+$proc = Get-Process -Name $procNames -ErrorAction SilentlyContinue |
   Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
   Sort-Object -Property WorkingSet64 -Descending |
   Select-Object -First 1
-if (-not $proc) { throw 'Antigravity Manager window handle was not found' }
-$h = $proc.MainWindowHandle
-[void][AgmWinShot]::ShowWindow($h, 9)
-[void][AgmWinShot]::SetForegroundWindow($h)
-Start-Sleep -Milliseconds 350
+$h = [IntPtr]::Zero
+if ($proc) {
+  $h = $proc.MainWindowHandle
+  [void][AgmWinShot]::ShowWindow($h, 9)
+  [void][AgmWinShot]::SetForegroundWindow($h)
+  Start-Sleep -Milliseconds 350
+}
+if ($h -eq [IntPtr]::Zero) {
+  $h = [AgmWinShot]::GetForegroundWindow()
+}
 $rect = New-Object AgmWinShot+RECT
-if (-not [AgmWinShot]::GetWindowRect($h, [ref]$rect)) { throw 'GetWindowRect failed' }
-$w = $rect.R - $rect.L
-$ht = $rect.B - $rect.T
-if ($w -lt 40 -or $ht -lt 40) { throw "window is too small (${w}x${ht})" }
-$bmp = New-Object System.Drawing.Bitmap $w, $ht
-$g = [System.Drawing.Graphics]::FromImage($bmp)
-$g.CopyFromScreen($rect.L, $rect.T, 0, 0, (New-Object System.Drawing.Size($w, $ht)))
+$captured = $false
+if ($h -ne [IntPtr]::Zero -and [AgmWinShot]::GetWindowRect($h, [ref]$rect)) {
+  $w = $rect.R - $rect.L
+  $ht = $rect.B - $rect.T
+  if ($w -ge 40 -and $ht -ge 40) {
+    $bmp = New-Object System.Drawing.Bitmap $w, $ht
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.CopyFromScreen($rect.L, $rect.T, 0, 0, (New-Object System.Drawing.Size($w, $ht)))
+    $captured = $true
+  }
+}
+if (-not $captured) {
+  $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+  $w = $bounds.Width
+  $ht = $bounds.Height
+  $bmp = New-Object System.Drawing.Bitmap $w, $ht
+  $g = [System.Drawing.Graphics]::FromImage($bmp)
+  $g.CopyFromScreen($bounds.X, $bounds.Y, 0, 0, (New-Object System.Drawing.Size($w, $ht)))
+}
 $bmp.Save($OutPath, [System.Drawing.Imaging.ImageFormat]::Png)
 $g.Dispose()
 $bmp.Dispose()

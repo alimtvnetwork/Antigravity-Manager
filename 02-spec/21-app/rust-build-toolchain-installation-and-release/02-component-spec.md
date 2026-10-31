@@ -24,7 +24,7 @@ This document specifies:
 - The architectural mechanics of `scripts/bump-version.mjs`.
 - The exhaustive enumeration and schema mutation rules for all 15 version manifest files.
 - The strict `@aukgit` attribution invariant: `(Thanks to @aukgit)` in dual-language changelogs and the total ban on other GitHub handles (`@...`).
-- Mandatory synchronization requirements between `CHANGELOG.md` / `CHANGELOG_EN.md` and `README.md` (`## 📝 更新日志`) / `README_EN.md` (`## 📝 Changelog`).
+- Mandatory synchronization requirements between `CHANGELOG.md` / `CHANGELOG_EN.md` and `README.md` (`## 📝 Changelog`) / `README_EN.md` (`## 📝 Changelog`).
 - Mandatory local pre-flight quality gates (`cargo fmt`, `cargo clippy`, `npm run build`).
 
 ---
@@ -71,7 +71,7 @@ Antigravity-Manager enforces strict physical branch isolation across its two rel
 
 | Channel | Branch | Target Tag Pattern | Purpose & Distribution | Documentation Scope |
 |---|---|---|---|---|
-| **Stable Releases (正式版)** | `main` | `vX.Y.Z` (e.g. `v4.184.0`) | Official production packages; updates Docker and GitHub `latest` tags; services desktop automatic update channels. | Full synchronization across `CHANGELOG.md`, `CHANGELOG_EN.md`, `README.md` (`## 📝 更新日志`), and `README_EN.md` (`## 📝 Changelog`). |
+| **Stable Releases (official version)** | `main` | `vX.Y.Z` (e.g. `v4.184.0`) | Official production packages; updates Docker and GitHub `latest` tags; services desktop automatic update channels. | Full synchronization across `CHANGELOG.md`, `CHANGELOG_EN.md`, `README.md` (`## 📝 Changelog`), and `README_EN.md` (`## 📝 Changelog`). |
 | **Preview Releases (Beta)** | `beta` | `vX.Y.Z-beta.N` (e.g. `v4.184.0-beta.1`) | Independent preview builds (`makeLatest: false`, `prerelease: true`); isolated from production auto-update channels. | Recorded exclusively in `CHANGELOG.md` and `CHANGELOG_EN.md`. `README.md` and `README_EN.md` are kept strictly on the latest stable version. |
 
 ### 2.2 Release Gate Interception & Verification Invariants
@@ -188,7 +188,7 @@ The table below enumerates all 15 version manifest files maintained across the A
 | 10 | `src/components/layout/MiniView.tsx` | TSX | Fallback in `setAppVersion(...)` | `'4.184.0'` | Stable & Beta |
 | 11 | `src/pages/Settings.tsx` | TSX | Fallback in `useState<string>(...)` | `'4.184.0'` | Stable & Beta |
 | 12 | `releases-manifest.json` | JSON | `latest_version`, `latest_tag`, `releases` top item | `"4.184.0"`, `"v4.184.0"`, unshifted release obj | Stable & Beta |
-| 13 | `CHANGELOG.md` | Markdown | Heading under `版本历史记录` / `版本演进` | Insert `v4.184.0 (<today>)` skeleton block | Stable & Beta |
+| 13 | `CHANGELOG.md` | Markdown | Heading under `Version History` / `Version Evolution` | Insert `v4.184.0 (<today>)` skeleton block | Stable & Beta |
 | 14 | `CHANGELOG_EN.md` | Markdown | Heading under `Version History` | Insert `v4.184.0 (<today>)` skeleton block | Stable & Beta |
 | 15 | `src-tauri/hooks.nsh` | NSIS | `StrCpy $0 "<currentVersion>"` | `StrCpy $0 "4.184.0"` | Stable & Beta |
 
@@ -378,7 +378,7 @@ To honor third-party contributors while maintaining release note attribution dis
 For all **Stable Releases** (`main` branch):
 - It is strictly forbidden to update only `CHANGELOG.md` or `CHANGELOG_EN.md` while leaving `README.md` or `README_EN.md` with stale release highlights.
 - The release engineer must write a concise, high-density summary of the release and synchronize it into:
-  1. `README.md` under section `## 📝 更新日志` (or `## 📝 Changelog`)
+  1. `README.md` under section `## 📝 Changelog` (or `## 📝 Changelog`)
   2. `README_EN.md` under section `## 📝 Changelog`
 
 ### 6.2 Structural Placement & Formatting Standards
@@ -460,7 +460,7 @@ To ensure blind-AI audit readiness, all release assertions are governed by affir
 | `is_lockfile_version_consistent` | `src-tauri/Cargo.lock` and `package-lock.json` match `package.json`. | Post-bump verification & `cargo check`. |
 | `has_no_duplicate_cargo_lock_version` | Package `agm-alim` in `Cargo.lock` contains exactly one `version` line. | Automated regex check in `bump-version.mjs`. |
 | `is_attribution_strictly_aukgit` | All release notes credit `(Thanks to @aukgit)` with zero other `@...` handles. | Text inspection of `CHANGELOG.md` & `CHANGELOG_EN.md`. |
-| `is_readme_synchronized` | `README.md` and `README_EN.md` contain updated `v4.184.0` summaries. | Section inspection of `## 📝 更新日志` / `## 📝 Changelog`. |
+| `is_readme_synchronized` | `README.md` and `README_EN.md` contain updated `v4.184.0` summaries. | Section inspection of `## 📝 Changelog` / `## 📝 Changelog`. |
 | `is_rust_fmt_clean` | Rust source code conforms to formatting rules. | `cd src-tauri && cargo fmt -- --check` exits with 0. |
 | `is_rust_clippy_clean` | Rust code compiles across all targets and features without warnings. | `cd src-tauri && cargo clippy --all-targets --all-features` exits with 0. |
 | `is_frontend_build_clean` | Frontend TypeScript type-checks and Vite compiles successfully. | `npm run build` exits with 0. |

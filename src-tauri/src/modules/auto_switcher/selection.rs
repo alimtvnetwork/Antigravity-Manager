@@ -42,6 +42,10 @@ pub(crate) fn is_account_period_finished(acc: &Account, target_model: &str, now_
 /// Check if account is in proxy rate limit cooldown for target model (or account-wide 429)
 pub(crate) fn is_account_rate_limited(acc: &Account, target_model: &str, now_sec: i64) -> bool {
     let target = target_model.trim().to_lowercase();
+    let is_target_claude = target.contains("claude")
+        || target.contains("sonnet")
+        || target.contains("opus")
+        || target.contains("haiku");
     acc.live_limited_models.iter().any(|(model, status)| {
         if status.until <= now_sec {
             return false;
@@ -52,6 +56,12 @@ pub(crate) fn is_account_rate_limited(acc: &Account, target_model: &str, now_sec
             || (!target.is_empty() && (m.contains(&target) || target.contains(&m)))
             || (target.contains("flash") && m.contains("flash"))
             || (target.contains("pro") && m.contains("pro"))
+            || (is_target_claude
+                && (m.contains("claude")
+                    || m.contains("sonnet")
+                    || m.contains("opus")
+                    || m.contains("haiku")
+                    || m.contains("3p")))
     })
 }
 
@@ -64,6 +74,89 @@ pub(crate) fn is_account_validation_blocked(acc: &Account, now_sec: i64) -> bool
         Some(until) => until > now_sec,
         None => true,
     }
+}
+
+/// Check if an account (by ID or email) is actively bound to or active on any running sibling instance on this host
+pub(crate) fn is_account_bound_to_running_sibling(
+    registry: &crate::models::InstanceRegistry,
+    current_instance_id: &str,
+    account_id: &str,
+    account_email: &str,
+) -> bool {
+    registry.instances.iter().any(|i| {
+        let is_running_sibling = i.id != current_instance_id
+            && crate::modules::instance::is_instance_running(&i.id, &i.data_dir, i.pid);
+        if !is_running_sibling {
+            return false;
+        }
+        let is_bound_id_match = i.bound_account_id.as_deref() == Some(account_id);
+        let is_bound_email_match = i
+            .bound_email
+            .as_deref()
+            .map(|e| e.eq_ignore_ascii_case(account_email))
+            .unwrap_or(false);
+        let is_default_instance = i.is_default || i.id == "default" || i.id == "__default__";
+        let is_default_match = is_default_instance
+            && account::get_current_account_id().ok().flatten().as_deref() == Some(account_id);
+
+        if is_bound_id_match || is_bound_email_match || is_default_match {
+            return true;
+        }
+
+        if let Some(ref bid) = i.bound_account_id {
+            if let Ok(bacc) = account::load_account(bid) {
+                if bacc.email.eq_ignore_ascii_case(account_email) {
+                    return true;
+                }
+            }
+        }
+
+        false
+    })
+}
+
+/// Helper checking if an account qualifies for the Urgent Expiration Tier (T_remaining <= 24h & Q_weekly >= 15%)
+/// Returns Some(remaining_hours) if urgent, None otherwise.
+pub(crate) fn extract_urgent_expiration_hours(acc: &Account, now_sec: i64) -> Option<f64> {
+    let quota_data = acc.quota.as_ref()?;
+    let groups = quota_data.quota_groups.as_ref()?;
+    let mut min_hours: Option<f64> = None;
+    for g in groups {
+        for b in &g.buckets {
+            if is_gemini_weekly_bucket(&b.window, &b.bucket_id) {
+                if !(0.0..=1.0).contains(&b.remaining_fraction) {
+                    continue;
+                }
+                let pct = (b.remaining_fraction * 100.0).round();
+                if pct >= 15.0 {
+                    let rem = compute_weekly_remaining_headroom_hours(b, now_sec);
+                    if (0.0..=24.0).contains(&rem) {
+                        min_hours = Some(min_hours.map_or(rem, |cur| cur.min(rem)));
+                    }
+                }
+            }
+        }
+    }
+
+    if min_hours.is_some() {
+        return min_hours;
+    }
+
+    // Fallback: check models if no weekly groups found
+    for m in &quota_data.models {
+        if is_gemini_native_model(&m.name) && m.percentage >= 15 {
+            if let Some(reset_ts) = parse_reset_time_to_unix(&m.reset_time) {
+                if reset_ts > now_sec {
+                    let rem = (reset_ts - now_sec) as f64 / 3600.0;
+                    if (0.0..=24.0).contains(&rem) {
+                        min_hours = Some(min_hours.map_or(rem, |cur| cur.min(rem)));
+                    }
+                }
+            }
+        }
+    }
+
+    min_hours
 }
 
 /// Discover, score, and rank candidate profiles with 100% 4h quota accounts prioritized
@@ -82,17 +175,81 @@ pub fn select_candidate_profiles(
         .unwrap_or(60);
     let cooldown_secs: i64 = (cooldown_minutes as i64) * 60;
 
-    let mut effective_exclusions = excluded_account_ids.to_vec();
+    let mut effective_exclusions: Vec<String> = excluded_account_ids
+        .iter()
+        .map(|s| s.trim().to_lowercase())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let mut push_exclusion = |val: &str| {
+        let clean = val.trim().to_lowercase();
+        if !clean.is_empty() && !effective_exclusions.contains(&clean) {
+            effective_exclusions.push(clean);
+        }
+    };
+
     for in_use_id in get_active_in_use_account_ids() {
-        if !effective_exclusions.contains(&in_use_id) {
-            effective_exclusions.push(in_use_id);
+        push_exclusion(&in_use_id);
+    }
+    // Strictly exclude the current instance's own account so it cannot rotate to itself
+    if let Some(cur_inst) = registry
+        .instances
+        .iter()
+        .find(|i| i.id == current_instance_id)
+    {
+        if let Some(ref acc_id) = cur_inst.bound_account_id {
+            push_exclusion(acc_id);
+            if let Ok(acc) = account::load_account(acc_id) {
+                push_exclusion(&acc.email);
+            }
+        }
+        if let Some(ref email) = cur_inst.bound_email {
+            push_exclusion(email);
+            if let Ok(Some(acc)) = account::get_account_by_email(email) {
+                push_exclusion(&acc.id);
+            }
+        }
+        let is_default =
+            cur_inst.is_default || cur_inst.id == "default" || cur_inst.id == "__default__";
+        if is_default {
+            if let Ok(Some(def_id)) = account::get_current_account_id() {
+                push_exclusion(&def_id);
+                if let Ok(acc) = account::load_account(&def_id) {
+                    push_exclusion(&acc.email);
+                }
+            }
+        }
+    }
+    for inst in &registry.instances {
+        let is_running_sibling = inst.id != current_instance_id
+            && crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
+        if is_running_sibling {
+            let active_acc_id = inst.bound_account_id.clone().or_else(|| {
+                let is_default_instance =
+                    inst.is_default || inst.id == "default" || inst.id == "__default__";
+                if is_default_instance {
+                    account::get_current_account_id().ok().flatten()
+                } else {
+                    None
+                }
+            });
+            if let Some(ref acc_id) = active_acc_id {
+                push_exclusion(acc_id);
+                if let Ok(acc) = account::load_account(acc_id) {
+                    push_exclusion(&acc.email);
+                }
+            }
+            if let Some(ref email) = inst.bound_email {
+                push_exclusion(email);
+                if let Ok(Some(acc)) = account::get_account_by_email(email) {
+                    push_exclusion(&acc.id);
+                }
+            }
         }
     }
     for cross_vm_acc in crate::modules::email_inbound::fetch_recent_cross_vm_switched_accounts(3600)
     {
-        if !effective_exclusions.contains(&cross_vm_acc) {
-            effective_exclusions.push(cross_vm_acc);
-        }
+        push_exclusion(&cross_vm_acc);
     }
 
     // Helper closure to evaluate if an account is in cooldown window
@@ -112,6 +269,8 @@ pub fn select_candidate_profiles(
     let mut available_pool: Vec<ProfileCandidate> = Vec::new();
     let mut cooldown_pool: Vec<(ProfileCandidate, i64)> = Vec::new();
     let mut seen_account_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut urgent_hours_map: std::collections::HashMap<String, f64> =
+        std::collections::HashMap::new();
 
     // 1. Inspect instances not in active use
     for inst in &registry.instances {
@@ -137,6 +296,14 @@ pub fn select_candidate_profiles(
         }
 
         if let Ok(acc) = account::load_account(acc_id) {
+            if is_account_bound_to_running_sibling(
+                &registry,
+                current_instance_id,
+                &acc.id,
+                &acc.email,
+            ) {
+                continue;
+            }
             if is_account_excluded(&effective_exclusions, &acc.id, &acc.email) {
                 continue;
             }
@@ -150,6 +317,13 @@ pub fn select_candidate_profiles(
                 ));
                 continue;
             }
+            if is_account_claude_limited(&acc, 15.0, now_sec) {
+                logger::log_info(&format!(
+                    "[AutoSwitcher] Bound account '{}' has reached Claude limits. Skipping...",
+                    acc.email
+                ));
+                continue;
+            }
             // Strictly skip accounts leased by another active machine/node
             if crate::modules::workspace_lease_manager::is_account_or_email_leased_by_other(
                 &acc.id, &acc.email,
@@ -157,29 +331,29 @@ pub fn select_candidate_profiles(
                 continue;
             }
 
-            let is_period_finished = is_account_period_finished(&acc, target_model, now_sec);
-            let quota = if is_period_finished {
-                100.0
-            } else {
-                calculate_candidate_quota(&acc, target_model).unwrap_or(0.0)
-            };
+            let quota = calculate_candidate_quota(&acc, target_model).unwrap_or(0.0);
 
             // Strict 100% 4-Hour Quota Gate:
-            // Candidate accounts must have 100% quota, OR their reset period has elapsed (eligible for live refresh).
-            if quota >= 100.0 || is_period_finished {
-                seen_account_ids.insert(acc.id.clone());
+            // Candidate accounts in primary pool must genuinely have 100% quota and score > 0.
+            if quota >= 100.0 {
                 let score = score_candidate_account(&acc, target_model, now_sec);
-                let candidate = ProfileCandidate {
-                    instance_id: current_instance_id.to_string(),
-                    account_id: acc.id.clone(),
-                    email: acc.email.clone(),
-                    quota_percent: quota,
-                    score,
-                };
-                if is_in_cooldown(&acc) {
-                    cooldown_pool.push((candidate, acc.last_used));
-                } else {
-                    available_pool.push(candidate);
+                if score > 0.0 {
+                    seen_account_ids.insert(acc.id.clone());
+                    if let Some(uh) = extract_urgent_expiration_hours(&acc, now_sec) {
+                        urgent_hours_map.insert(acc.id.clone(), uh);
+                    }
+                    let candidate = ProfileCandidate {
+                        instance_id: current_instance_id.to_string(),
+                        account_id: acc.id.clone(),
+                        email: acc.email.clone(),
+                        quota_percent: quota,
+                        score,
+                    };
+                    if is_in_cooldown(&acc) {
+                        cooldown_pool.push((candidate, acc.last_used));
+                    } else {
+                        available_pool.push(candidate);
+                    }
                 }
             }
         }
@@ -204,6 +378,13 @@ pub fn select_candidate_profiles(
             ));
             continue;
         }
+        if is_account_claude_limited(acc, 15.0, now_sec) {
+            logger::log_info(&format!(
+                "[AutoSwitcher] Account '{}' has reached Claude limits. Skipping...",
+                acc.email
+            ));
+            continue;
+        }
         // Strictly skip accounts leased by another active machine/node
         if crate::modules::workspace_lease_manager::is_account_or_email_leased_by_other(
             &acc.id, &acc.email,
@@ -211,46 +392,39 @@ pub fn select_candidate_profiles(
             continue;
         }
 
-        // Check if bound to an instance running on this machine
-        let bound_inst = registry
-            .instances
-            .iter()
-            .find(|i| i.bound_account_id.as_deref() == Some(&acc.id));
-        if let Some(inst) = bound_inst {
-            if inst.id != current_instance_id
-                && crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid)
-            {
-                continue;
-            }
+        // Check if bound to or active on any running sibling instance on this host
+        if is_account_bound_to_running_sibling(&registry, current_instance_id, &acc.id, &acc.email)
+        {
+            continue;
         }
 
-        let is_period_finished = is_account_period_finished(acc, target_model, now_sec);
-        let quota = if is_period_finished {
-            100.0
-        } else {
-            calculate_candidate_quota(acc, target_model).unwrap_or(0.0)
-        };
+        let quota = calculate_candidate_quota(acc, target_model).unwrap_or(0.0);
 
         // Strict 100% 4-Hour Quota Gate
-        if quota >= 100.0 || is_period_finished {
-            seen_account_ids.insert(acc.id.clone());
+        if quota >= 100.0 {
             let score = score_candidate_account(acc, target_model, now_sec);
-            let candidate = ProfileCandidate {
-                instance_id: current_instance_id.to_string(),
-                account_id: acc.id.clone(),
-                email: acc.email.clone(),
-                quota_percent: quota,
-                score,
-            };
-            if is_in_cooldown(acc) {
-                cooldown_pool.push((candidate, acc.last_used));
-            } else {
-                available_pool.push(candidate);
+            if score > 0.0 {
+                seen_account_ids.insert(acc.id.clone());
+                if let Some(uh) = extract_urgent_expiration_hours(acc, now_sec) {
+                    urgent_hours_map.insert(acc.id.clone(), uh);
+                }
+                let candidate = ProfileCandidate {
+                    instance_id: current_instance_id.to_string(),
+                    account_id: acc.id.clone(),
+                    email: acc.email.clone(),
+                    quota_percent: quota,
+                    score,
+                };
+                if is_in_cooldown(acc) {
+                    cooldown_pool.push((candidate, acc.last_used));
+                } else {
+                    available_pool.push(candidate);
+                }
             }
         }
     }
 
-    // 3. Fallback: If no candidate met the 100% or period-finished criteria, fall back to best available accounts above threshold
+    // 3. Fallback: If no candidate met the 100% criteria, fall back to best available accounts above threshold
     if available_pool.is_empty() {
         for acc in &all_accounts {
             if seen_account_ids.contains(&acc.id) {
@@ -272,37 +446,88 @@ pub fn select_candidate_profiles(
                 continue;
             }
 
-            let bound_inst = registry
-                .instances
-                .iter()
-                .find(|i| i.bound_account_id.as_deref() == Some(&acc.id));
-            if let Some(inst) = bound_inst {
-                if inst.id != current_instance_id
-                    && crate::modules::instance::is_instance_running(
-                        &inst.id,
-                        &inst.data_dir,
-                        inst.pid,
-                    )
-                {
-                    continue;
-                }
+            if is_account_bound_to_running_sibling(
+                &registry,
+                current_instance_id,
+                &acc.id,
+                &acc.email,
+            ) {
+                continue;
             }
 
             let quota = calculate_candidate_quota(acc, target_model).unwrap_or(0.0);
             if quota > threshold {
-                seen_account_ids.insert(acc.id.clone());
                 let score = score_candidate_account_fallback(acc, target_model, now_sec);
-                let candidate = ProfileCandidate {
-                    instance_id: current_instance_id.to_string(),
-                    account_id: acc.id.clone(),
-                    email: acc.email.clone(),
-                    quota_percent: quota,
-                    score,
-                };
-                if is_in_cooldown(acc) {
-                    cooldown_pool.push((candidate, acc.last_used));
-                } else {
-                    available_pool.push(candidate);
+                if score > 0.0 {
+                    seen_account_ids.insert(acc.id.clone());
+                    if let Some(uh) = extract_urgent_expiration_hours(acc, now_sec) {
+                        urgent_hours_map.insert(acc.id.clone(), uh);
+                    }
+                    let candidate = ProfileCandidate {
+                        instance_id: current_instance_id.to_string(),
+                        account_id: acc.id.clone(),
+                        email: acc.email.clone(),
+                        quota_percent: quota,
+                        score,
+                    };
+                    if is_in_cooldown(acc) {
+                        cooldown_pool.push((candidate, acc.last_used));
+                    } else {
+                        available_pool.push(candidate);
+                    }
+                }
+            }
+        }
+    }
+
+    // 3b. Emergency Fallback: If no candidate met quota > threshold, fall back to any healthy account with headroom (> 5.0%)
+    if available_pool.is_empty() && cooldown_pool.is_empty() {
+        for acc in &all_accounts {
+            if seen_account_ids.contains(&acc.id) {
+                continue;
+            }
+            if is_account_excluded(&effective_exclusions, &acc.id, &acc.email) {
+                continue;
+            }
+            if acc.disabled || acc.proxy_disabled || is_account_validation_blocked(acc, now_sec) {
+                continue;
+            }
+            if is_account_rate_limited(acc, target_model, now_sec) {
+                continue;
+            }
+            if crate::modules::workspace_lease_manager::is_account_or_email_leased_by_other(
+                &acc.id, &acc.email,
+            ) {
+                continue;
+            }
+            if is_account_bound_to_running_sibling(
+                &registry,
+                current_instance_id,
+                &acc.id,
+                &acc.email,
+            ) {
+                continue;
+            }
+            let quota = calculate_candidate_quota(acc, target_model).unwrap_or(0.0);
+            if quota > 5.0 {
+                let score = score_candidate_account_fallback(acc, target_model, now_sec);
+                if score > 0.0 {
+                    seen_account_ids.insert(acc.id.clone());
+                    if let Some(uh) = extract_urgent_expiration_hours(acc, now_sec) {
+                        urgent_hours_map.insert(acc.id.clone(), uh);
+                    }
+                    let candidate = ProfileCandidate {
+                        instance_id: current_instance_id.to_string(),
+                        account_id: acc.id.clone(),
+                        email: acc.email.clone(),
+                        quota_percent: quota,
+                        score,
+                    };
+                    if is_in_cooldown(acc) {
+                        cooldown_pool.push((candidate, acc.last_used));
+                    } else {
+                        available_pool.push(candidate);
+                    }
                 }
             }
         }
@@ -314,33 +539,82 @@ pub fn select_candidate_profiles(
     // fall back to the cooldown pool sorted by oldest `last_used` so the system never gets stuck.
     let selected_candidates = if !available_pool.is_empty() {
         // Priority Sorting for available pool:
-        // Sort by subscription tier score descending (Ultra > Pro > Free).
-        // Tie-breaker: deterministic email ordering.
-        available_pool.sort_by(|a, b| match b.score.partial_cmp(&a.score) {
+        // Tier 1: Urgent Expiration candidates (T_remaining <= 24h & Q_weekly >= 15%).
+        //         Sorted ASCENDING by remaining reset hours (burn closest-to-expire first).
+        //         Tie-breaker: descending by score, then ascending by email.
+        // Tier 2: Standard candidates.
+        //         Sorted DESCENDING by score.
+        //         Tie-breaker: deterministic email ordering.
+        let mut urgent_pool: Vec<ProfileCandidate> = Vec::new();
+        let mut standard_pool: Vec<ProfileCandidate> = Vec::new();
+
+        for cand in available_pool {
+            if urgent_hours_map.contains_key(&cand.account_id) {
+                urgent_pool.push(cand);
+            } else {
+                standard_pool.push(cand);
+            }
+        }
+
+        urgent_pool.sort_by(|a, b| {
+            let hours_a = urgent_hours_map
+                .get(&a.account_id)
+                .copied()
+                .unwrap_or(f64::INFINITY);
+            let hours_b = urgent_hours_map
+                .get(&b.account_id)
+                .copied()
+                .unwrap_or(f64::INFINITY);
+            match hours_a.partial_cmp(&hours_b) {
+                Some(std::cmp::Ordering::Equal) | None => match b.score.partial_cmp(&a.score) {
+                    Some(std::cmp::Ordering::Equal) | None => {
+                        a.email.to_lowercase().cmp(&b.email.to_lowercase())
+                    }
+                    Some(ord) => ord,
+                },
+                Some(ord) => ord,
+            }
+        });
+
+        standard_pool.sort_by(|a, b| match b.score.partial_cmp(&a.score) {
             Some(std::cmp::Ordering::Equal) | None => {
                 a.email.to_lowercase().cmp(&b.email.to_lowercase())
             }
             Some(ord) => ord,
         });
-        available_pool
+
+        urgent_pool.extend(standard_pool);
+        urgent_pool
     } else if !cooldown_pool.is_empty() {
         crate::modules::logger::log_info(&format!(
             "[AutoSwitcher] All {} healthy account(s) are currently in cooldown. Triggering graceful fallback to oldest last_used account.",
             cooldown_pool.len()
         ));
-        // Sort by oldest last_used (ascending last_used timestamp: smallest first)
-        cooldown_pool.sort_by(
-            |(a_cand, a_last), (b_cand, b_last)| match a_last.cmp(b_last) {
-                std::cmp::Ordering::Equal => match b_cand.score.partial_cmp(&a_cand.score) {
+        // Imp-05: Cooldown Fallback Never-Used Priority
+        // Sort by never-used first (last_used == 0), then by oldest last_used (ascending last_used timestamp: smallest first)
+        cooldown_pool.sort_by(|(a_cand, a_last), (b_cand, b_last)| {
+            match (*a_last == 0, *b_last == 0) {
+                (true, false) => std::cmp::Ordering::Less, // a never used, prioritize a
+                (false, true) => std::cmp::Ordering::Greater, // b never used, prioritize b
+                (true, true) => match b_cand.score.partial_cmp(&a_cand.score) {
                     Some(std::cmp::Ordering::Equal) | None => a_cand
                         .email
                         .to_lowercase()
                         .cmp(&b_cand.email.to_lowercase()),
                     Some(ord) => ord,
                 },
-                ord => ord,
-            },
-        );
+                (false, false) => match a_last.cmp(b_last) {
+                    std::cmp::Ordering::Equal => match b_cand.score.partial_cmp(&a_cand.score) {
+                        Some(std::cmp::Ordering::Equal) | None => a_cand
+                            .email
+                            .to_lowercase()
+                            .cmp(&b_cand.email.to_lowercase()),
+                        Some(ord) => ord,
+                    },
+                    ord => ord,
+                },
+            }
+        });
         cooldown_pool.into_iter().map(|(cand, _)| cand).collect()
     } else {
         Vec::new()
@@ -380,11 +654,91 @@ pub async fn select_and_verify_next_best_profile(
         "list_active_leases",
     );
 
+    let mut effective_exclusions = excluded_account_ids.to_vec();
+    if let Ok(reg) = instance::load_registry() {
+        // Exclude current instance's own account so it cannot rotate to itself
+        if let Some(cur_inst) = reg.instances.iter().find(|i| i.id == current_instance_id) {
+            if let Some(ref acc_id) = cur_inst.bound_account_id {
+                if !effective_exclusions.contains(acc_id) {
+                    effective_exclusions.push(acc_id.clone());
+                }
+                if let Ok(acc) = account::load_account(acc_id) {
+                    if !effective_exclusions.contains(&acc.email) {
+                        effective_exclusions.push(acc.email.clone());
+                    }
+                }
+            }
+            if let Some(ref email) = cur_inst.bound_email {
+                if !effective_exclusions.contains(email) {
+                    effective_exclusions.push(email.clone());
+                }
+                if let Ok(Some(acc)) = account::get_account_by_email(email) {
+                    if !effective_exclusions.contains(&acc.id) {
+                        effective_exclusions.push(acc.id.clone());
+                    }
+                }
+            }
+            let is_default =
+                cur_inst.is_default || cur_inst.id == "default" || cur_inst.id == "__default__";
+            if is_default {
+                if let Ok(Some(def_id)) = account::get_current_account_id() {
+                    if !effective_exclusions.contains(&def_id) {
+                        effective_exclusions.push(def_id.clone());
+                    }
+                    if let Ok(acc) = account::load_account(&def_id) {
+                        if !effective_exclusions.contains(&acc.email) {
+                            effective_exclusions.push(acc.email.clone());
+                        }
+                    }
+                }
+            }
+        }
+        for inst in &reg.instances {
+            let is_running_sibling = inst.id != current_instance_id
+                && crate::modules::instance::is_instance_running(
+                    &inst.id,
+                    &inst.data_dir,
+                    inst.pid,
+                );
+            if is_running_sibling {
+                let active_acc_id = inst.bound_account_id.clone().or_else(|| {
+                    let is_default_instance =
+                        inst.is_default || inst.id == "default" || inst.id == "__default__";
+                    if is_default_instance {
+                        account::get_current_account_id().ok().flatten()
+                    } else {
+                        None
+                    }
+                });
+                if let Some(ref acc_id) = active_acc_id {
+                    if !effective_exclusions.contains(acc_id) {
+                        effective_exclusions.push(acc_id.clone());
+                    }
+                    if let Ok(acc) = account::load_account(acc_id) {
+                        if !effective_exclusions.contains(&acc.email) {
+                            effective_exclusions.push(acc.email.clone());
+                        }
+                    }
+                }
+                if let Some(ref email) = inst.bound_email {
+                    if !effective_exclusions.contains(email) {
+                        effective_exclusions.push(email.clone());
+                    }
+                    if let Ok(Some(acc)) = account::get_account_by_email(email) {
+                        if !effective_exclusions.contains(&acc.id) {
+                            effective_exclusions.push(acc.id.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     let candidates = select_candidate_profiles(
         current_instance_id,
         target_model,
         threshold,
-        excluded_account_ids,
+        &effective_exclusions,
     )?;
 
     if candidates.is_empty() {
@@ -396,9 +750,33 @@ pub async fn select_and_verify_next_best_profile(
 
     let mut best_fallback: Option<ProfileCandidate> = None;
     let mut highest_fallback_quota: f64 = 0.0;
+    let mut best_emergency_fallback: Option<ProfileCandidate> = None;
+    let mut highest_emergency_quota: f64 = 0.0;
+    let (node_alias, _) = crate::modules::email_sender::get_local_node_identity();
+    let m_name = crate::modules::email_watcher::detect_machine_name();
+    let m_ip = crate::modules::email_watcher::detect_local_ip();
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
 
     for candidate in candidates {
         let masked_email = crate::modules::logger::mask_email(&candidate.email);
+
+        // Pre-switch live verification against running sibling instances on this host
+        if let Ok(reg) = instance::load_registry() {
+            let is_bound_to_running_sibling = is_account_bound_to_running_sibling(
+                &reg,
+                current_instance_id,
+                &candidate.account_id,
+                &candidate.email,
+            );
+            if is_bound_to_running_sibling {
+                logger::log_warn(&format!(
+                    "[AutoSwitcher] Candidate '{}' is actively bound to running sibling instance on this host. Skipping...",
+                    masked_email
+                ));
+                continue;
+            }
+        }
+
         logger::log_info(&format!(
             "[AutoSwitcher] Pre-switch live verification: checking candidate '{}' (cached quota: {:.1}%)...",
             masked_email, candidate.quota_percent
@@ -438,6 +816,10 @@ pub async fn select_and_verify_next_best_profile(
                 "auto_switcher::cooldown_skip",
                 "instances | auto_switcher | cooldown_guard",
                 serde_json::json!({
+                    "agm_version": pkg_ver,
+                    "machine_name": m_name,
+                    "node_alias": node_alias,
+                    "local_ip": m_ip,
                     "account_id": cand_acc.id,
                     "account_email_masked": masked_email,
                     "cooldown_reason": "rate_limited",
@@ -475,8 +857,23 @@ pub async fn select_and_verify_next_best_profile(
             continue;
         }
 
-        // Live API Quota Refresh directly from Google API
-        let fetch_res = account::fetch_quota_with_retry(&mut cand_acc).await;
+        // Imp-06: Pre-Switch Live Refresh Timeout Guard (bounded 5000ms) with cached quota fallback
+        let fetch_res = match tokio::time::timeout(
+            std::time::Duration::from_millis(5000),
+            account::fetch_quota_with_retry(&mut cand_acc),
+        )
+        .await
+        {
+            Ok(res) => res,
+            Err(_) => {
+                let cached_q = calculate_candidate_quota(&cand_acc, target_model).unwrap_or(0.0);
+                logger::log_warn(&format!(
+                    "[AutoSwitcher] Live quota refresh timed out after 5000ms for candidate '{}'. Using cached quota: {:.1}%",
+                    masked_email, cached_q
+                ));
+                Ok(cand_acc.quota.clone().unwrap_or_default())
+            }
+        };
         let fresh_4h_quota = match fetch_res {
             Ok(fresh_q) => {
                 cand_acc.quota = Some(fresh_q);
@@ -490,13 +887,18 @@ pub async fn select_and_verify_next_best_profile(
                 q_val
             }
             Err(e) => {
+                let cached_q = calculate_candidate_quota(&cand_acc, target_model).unwrap_or(0.0);
                 logger::log_warn(&format!(
-                    "[AutoSwitcher] Failed to refresh live quota from Google API for candidate '{}': {}. Skipping...",
-                    masked_email, e
+                    "[AutoSwitcher] Failed to refresh live quota from Google API for candidate '{}': {}. Using cached quota: {:.1}%",
+                    masked_email, e, cached_q
                 ));
-                continue;
+                cached_q
             }
         };
+
+        if fresh_4h_quota <= 0.0 {
+            continue;
+        }
 
         // Strict 100% requirement for 4-hour window:
         if fresh_4h_quota >= 100.0 {
@@ -510,13 +912,19 @@ pub async fn select_and_verify_next_best_profile(
                 "auto_switcher::candidate_evaluation",
                 &format!("instances | auto_switcher | candidate_evaluator | {current_instance_id}"),
                 serde_json::json!({
+                    "agm_version": pkg_ver,
+                    "machine_name": m_name,
+                    "node_alias": node_alias,
+                    "local_ip": m_ip,
                     "instance_id": current_instance_id,
                     "target_model": target_model,
                     "threshold_percent": threshold,
                     "selected_candidate": candidate.account_id,
                     "selected_email_masked": masked_email,
                     "quota_4h": fresh_4h_quota,
-                    "reason": "100% 4h window quota confirmed"
+                    "score": candidate.score,
+                    "reason": "100% 4h window quota confirmed",
+                    "timestamp": chrono::Utc::now().timestamp_millis(),
                 }),
                 "ok",
                 "",
@@ -542,11 +950,21 @@ pub async fn select_and_verify_next_best_profile(
                     quota_percent: fresh_4h_quota,
                     score: candidate.score,
                 });
+            } else if fresh_4h_quota > 5.0 && fresh_4h_quota > highest_emergency_quota {
+                highest_emergency_quota = fresh_4h_quota;
+                best_emergency_fallback = Some(ProfileCandidate {
+                    instance_id: candidate.instance_id,
+                    account_id: candidate.account_id,
+                    email: candidate.email,
+                    quota_percent: fresh_4h_quota,
+                    score: candidate.score,
+                });
             }
         }
     }
 
-    if let Some(fallback) = best_fallback {
+    let effective_fallback = best_fallback.or(best_emergency_fallback);
+    if let Some(fallback) = effective_fallback {
         let fallback_masked = crate::modules::logger::mask_email(&fallback.email);
         logger::log_info(&format!(
             "[AutoSwitcher] No 100.0% quota profile found; selecting best available candidate '{}' with {:.1}% quota.",
@@ -558,13 +976,19 @@ pub async fn select_and_verify_next_best_profile(
             "auto_switcher::candidate_evaluation",
             &format!("instances | auto_switcher | candidate_evaluator | {current_instance_id}"),
             serde_json::json!({
+                "agm_version": pkg_ver,
+                "machine_name": m_name,
+                "node_alias": node_alias,
+                "local_ip": m_ip,
                 "instance_id": current_instance_id,
                 "target_model": target_model,
                 "threshold_percent": threshold,
                 "selected_candidate": fallback.account_id,
                 "selected_email_masked": fallback_masked,
                 "quota_4h": fallback.quota_percent,
-                "reason": "fallback best available candidate"
+                "score": fallback.score,
+                "reason": "fallback best available candidate",
+                "timestamp": chrono::Utc::now().timestamp_millis(),
             }),
             "ok",
             "",
@@ -578,11 +1002,16 @@ pub async fn select_and_verify_next_best_profile(
         "auto_switcher::candidate_evaluation",
         &format!("instances | auto_switcher | candidate_evaluator | {current_instance_id}"),
         serde_json::json!({
+            "agm_version": pkg_ver,
+            "machine_name": m_name,
+            "node_alias": node_alias,
+            "local_ip": m_ip,
             "instance_id": current_instance_id,
             "target_model": target_model,
             "threshold_percent": threshold,
             "selected_candidate": serde_json::Value::Null,
-            "reason": "no usable quota profile found"
+            "reason": "no usable quota profile found",
+            "timestamp": chrono::Utc::now().timestamp_millis(),
         }),
         "ok",
         "",
@@ -658,5 +1087,42 @@ mod tests {
 
         acc.validation_blocked_until = Some(now_sec - 10);
         assert!(!is_account_validation_blocked(&acc, now_sec));
+    }
+
+    #[test]
+    fn test_is_account_bound_to_running_sibling_stopped_or_self() {
+        use crate::models::{InstanceConfig, InstanceRegistry};
+        let mut reg = InstanceRegistry::default();
+        let inst1 = InstanceConfig {
+            id: "inst-1".to_string(),
+            name: "Instance 1".to_string(),
+            data_dir: "/tmp/inst1".to_string(),
+            executable_path: None,
+            extensions_dir: None,
+            bound_account_id: Some("acc-1".to_string()),
+            bound_email: Some("acc1@test.local".to_string()),
+            created_at: 100,
+            last_used: 100,
+            is_default: false,
+            pid: None,
+            seq_num: Some(1),
+        };
+        reg.instances.push(inst1);
+
+        // When self is inst-1, it is not considered a sibling
+        assert!(!is_account_bound_to_running_sibling(
+            &reg,
+            "inst-1",
+            "acc-1",
+            "acc1@test.local"
+        ));
+
+        // When target is inst-2, but inst-1 is NOT running (pid is 0/none and fake path), it returns false
+        assert!(!is_account_bound_to_running_sibling(
+            &reg,
+            "inst-2",
+            "acc-1",
+            "acc1@test.local"
+        ));
     }
 }

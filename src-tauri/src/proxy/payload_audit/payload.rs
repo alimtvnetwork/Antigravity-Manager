@@ -43,6 +43,31 @@ pub fn simplify_payload_json(value: &Value) -> Value {
         }
     }
 
+    // Imp-54: Mask sensitive credentials and bearer tokens in debug audit payloads
+    for sec_key in [
+        "api_key",
+        "apiKey",
+        "access_token",
+        "client_secret",
+        "password",
+        "authorization",
+    ] {
+        if let Some(v) = inner.get(sec_key).or_else(|| value.get(sec_key)) {
+            if let Some(s) = v.as_str() {
+                if !s.is_empty() {
+                    let masked = if s.to_ascii_lowercase().starts_with("bearer ") {
+                        "Bearer ***REDACTED***".to_string()
+                    } else if s.len() > 8 {
+                        format!("{}...{}", &s[..4], &s[s.len() - 3..])
+                    } else {
+                        "***REDACTED***".to_string()
+                    };
+                    concise.insert(sec_key.to_string(), Value::String(masked));
+                }
+            }
+        }
+    }
+
     // 2. Thought signature and thinking
     for sig_key in [
         "thinking_signature",
@@ -97,10 +122,10 @@ pub fn simplify_payload_json(value: &Value) -> Value {
         concise.insert("systemInstruction".into(), sys.clone());
     }
 
-    // 5.5 OpenAI Responses 协议：instructions（系统指令）与 input（对话上下文）
-    //     这两个是 Responses / Codex 的核心载荷，且不是 messages 的别名 —— 不保留会让
-    //     日志里"系统提示词块与上下文块整段消失"（客户端原文看不到，而中转报文是 Gemini
-    //     格式故看起来完整）。
+    // 5.5 OpenAI Responses protocol: instructions (system instructions) and input (dialogue context)
+    //     These two are the core payloads of Responses / Codex and are not aliases of messages - not retaining them will make
+    //     In the log, "The system prompts that the entire word block and context block disappear" (the client cannot see the original text, but the relay message is Gemini
+    //     format so it looks complete).
     if let Some(instructions) = inner
         .get("instructions")
         .or_else(|| value.get("instructions"))
@@ -188,7 +213,7 @@ pub fn simplify_payload_json(value: &Value) -> Value {
         concise.insert("usageMetadata".into(), usage.clone());
     }
 
-    // 9.5 耗时诊断指标 (_timing)
+    // 9.5 Time-consuming diagnostic indicator (_timing)
     if let Some(timing) = inner.get("_timing").or_else(|| value.get("_timing")) {
         concise.insert("_timing".into(), timing.clone());
     }
@@ -250,7 +275,7 @@ pub fn simplify_payload_json(value: &Value) -> Value {
         return simplify_unknown(value);
     }
 
-    // 按关注度重排字段：核心信息前置；未列入 CORE_FIELD_ORDER 的字段保持原相对顺序追加
+    // Rearrange fields by attention: core information comes first; fields not included in CORE_FIELD_ORDER remain in their original relative order and are appended
     reorder_payload_fields(&Value::Object(concise))
 }
 

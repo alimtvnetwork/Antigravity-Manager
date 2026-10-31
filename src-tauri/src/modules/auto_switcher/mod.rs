@@ -1,31 +1,263 @@
+pub mod account_staleness_detector;
+pub mod account_switch_audit_emitter;
+pub mod account_tier_filter;
+pub mod active_instance_prober;
+pub mod audit_enricher;
+pub mod binding_affinity;
+pub mod binding_conflict_detector;
+pub mod binding_history_cache;
+pub mod bounce_dampener;
+pub mod breakdown;
+pub mod candidate_cooldown_sweeper;
+pub mod candidate_dedup;
+pub mod candidate_dynamic_scorer;
+pub mod candidate_exclusion_registry;
+pub mod candidate_score_decay;
+pub mod conflict_checker;
+pub mod consecutive_failure_multiplier;
+pub mod consecutive_switch_cooldown;
+pub mod consecutive_switch_throttle;
+pub mod cooldown_cleaner;
+pub mod cooldown_decay;
+pub mod cooldown_decay_stepper;
+pub mod cooldown_recovery_curve;
+pub mod cooldown_telemetry_reporter;
+pub mod cooldown_timer;
+pub mod cooldown_watchdog;
 pub mod daemon;
+pub mod decision_telemetry_logger;
+pub mod drain_circuit_breaker;
+pub mod dynamic_quota_floor;
+pub mod entropy_candidate_shuffler;
+pub mod epoch_drift_compensator;
+pub mod event_history_pruner;
+pub mod failover_ladder;
+pub mod fast_forward_target_resolver;
+pub mod headroom_score_multiplier;
+pub mod headroom_trend;
+pub mod hourly_entropy_guard;
+pub mod instance_affinity_key;
+pub mod instance_cooldown_map;
+pub mod instance_lease_claim;
+pub mod instance_readiness_barrier;
 pub mod instances;
+pub mod jitter;
+pub mod jittered_backoff;
+pub mod jittered_velocity_estimator;
+pub mod lease_guard;
+pub mod lease_prerelease_coordinator;
+pub mod lease_reclaim_watchdog;
+pub mod lease_sweeper;
 pub mod manual;
+pub mod min_run_guard;
+pub mod model_quota_filter;
+pub mod multimodel_composite_scorer;
+pub mod priority_tier_ladder;
 pub mod quota;
+pub mod quota_acceleration_detector;
+pub mod quota_boundary_synchronizer;
+pub mod quota_exhaustion_predictor;
+pub mod quota_forecaster;
+pub mod quota_gap;
+pub mod quota_recovery_forecaster;
+pub mod quota_reset_epoch_tracker;
+pub mod quota_ring_buffer;
+pub mod quota_window_align;
+pub mod readiness_evaluator;
+pub mod reason_formatter;
 pub mod recovery;
+pub mod relaunch_readiness_evaluator;
+pub mod reset_boundary;
+pub mod reset_phase;
 pub mod rotation;
+pub mod rotation_brake;
 pub mod scheduling;
+pub mod score_normalizer;
+pub mod score_percentile_normalizer;
+pub mod score_snapshot;
+pub mod score_variance_guard;
 pub mod scoring;
 pub mod selection;
+pub mod selection_jitter_allocator;
+pub mod session_affinity_tracker;
+pub mod settling_guard;
+pub mod sibling_filter;
+pub mod sliding_velocity_guard;
+pub mod sort_comparator;
+pub mod stale_binding_sweeper;
 pub mod status;
+pub mod switch_audit_logger;
+pub mod switch_history_ring;
+pub mod switch_reason_sanitizer;
+pub mod switch_recovery_tracker;
+pub mod switch_settling_barrier;
+pub mod switch_settling_timer;
+pub mod switch_settling_watchdog;
 #[cfg(test)]
 mod tests_a;
 #[cfg(test)]
+pub mod tests_account_staleness;
+#[cfg(test)]
+pub mod tests_account_switch_audit_emitter;
+#[cfg(test)]
+pub mod tests_account_tier_filter;
+#[cfg(test)]
 mod tests_b;
+#[cfg(test)]
+pub mod tests_binding_affinity;
+#[cfg(test)]
+pub mod tests_candidate_dedup;
+#[cfg(test)]
+pub mod tests_candidate_dynamic_scorer;
+#[cfg(test)]
+pub mod tests_consecutive_switch;
+#[cfg(test)]
+pub mod tests_cooldown_decay_stepper;
+#[cfg(test)]
+pub mod tests_drain_circuit_breaker;
+#[cfg(test)]
+pub mod tests_dynamic_quota_floor;
+#[cfg(test)]
+pub mod tests_epoch_drift_compensator;
+#[cfg(test)]
+pub mod tests_fast_forward_target_resolver;
+#[cfg(test)]
+pub mod tests_headroom_multiplier;
+#[cfg(test)]
+pub mod tests_hourly_entropy_guard;
+#[cfg(test)]
+pub mod tests_quota_acceleration_detector;
+#[cfg(test)]
+pub mod tests_quota_and_cooldown;
+#[cfg(test)]
+pub mod tests_quota_exhaustion_predictor;
+#[cfg(test)]
+pub mod tests_quota_recovery_forecaster;
+#[cfg(test)]
+pub mod tests_rotation_brake;
+#[cfg(test)]
+pub mod tests_score_and_decay;
+#[cfg(test)]
+pub mod tests_score_variance_guard;
+#[cfg(test)]
+pub mod tests_switch_settling_timer;
+#[cfg(test)]
+pub mod tests_weekly_headroom_ratio;
 #[cfg(test)]
 pub(crate) use crate::models::account::Account;
 #[cfg(test)]
 pub(crate) use tests_a::make_test_account;
+pub mod throttle_brake;
+pub mod throttle_recovery_observer;
+pub mod tie_breaker;
+pub mod tier_priority_normalizer;
+pub mod tier_weights;
 pub mod types;
+pub mod velocity_smoother;
+pub mod velocity_spike_dampener;
+pub mod weekly_headroom_ratio;
 
+pub use account_staleness_detector::*;
+pub use account_switch_audit_emitter::*;
+pub use account_tier_filter::*;
+pub use active_instance_prober::*;
+pub use audit_enricher::*;
+pub use binding_affinity::*;
+pub use binding_conflict_detector::*;
+pub use binding_history_cache::*;
+pub use bounce_dampener::*;
+pub use breakdown::*;
+pub use candidate_cooldown_sweeper::*;
+pub use candidate_dedup::*;
+pub use candidate_dynamic_scorer::*;
+pub use candidate_exclusion_registry::*;
+pub use candidate_score_decay::*;
+pub use conflict_checker::*;
+pub use consecutive_failure_multiplier::*;
+pub use consecutive_switch_cooldown::*;
+pub use consecutive_switch_throttle::*;
+pub use cooldown_cleaner::*;
+pub use cooldown_decay::*;
+pub use cooldown_decay_stepper::*;
+pub use cooldown_recovery_curve::*;
+pub use cooldown_telemetry_reporter::*;
+pub use cooldown_timer::*;
+pub use cooldown_watchdog::*;
 pub use daemon::*;
+pub use decision_telemetry_logger::*;
+pub use drain_circuit_breaker::*;
+pub use dynamic_quota_floor::*;
+pub use entropy_candidate_shuffler::*;
+pub use epoch_drift_compensator::*;
+pub use event_history_pruner::*;
+pub use failover_ladder::*;
+pub use fast_forward_target_resolver::*;
+pub use headroom_score_multiplier::*;
+pub use headroom_trend::*;
+pub use hourly_entropy_guard::*;
+pub use instance_affinity_key::*;
+pub use instance_cooldown_map::*;
+pub use instance_lease_claim::*;
+pub use instance_readiness_barrier::*;
 pub use instances::*;
+pub use jitter::*;
+pub use jittered_backoff::*;
+pub use jittered_velocity_estimator::*;
+pub use lease_guard::*;
+pub use lease_prerelease_coordinator::*;
+pub use lease_reclaim_watchdog::*;
+pub use lease_sweeper::*;
 pub use manual::*;
+pub use min_run_guard::*;
+pub use model_quota_filter::*;
+pub use multimodel_composite_scorer::*;
+pub use priority_tier_ladder::*;
 pub use quota::*;
+pub use quota_acceleration_detector::*;
+pub use quota_boundary_synchronizer::*;
+pub use quota_exhaustion_predictor::*;
+pub use quota_forecaster::*;
+pub use quota_gap::*;
+pub use quota_recovery_forecaster::*;
+pub use quota_reset_epoch_tracker::*;
+pub use quota_ring_buffer::*;
+pub use quota_window_align::*;
+pub use readiness_evaluator::*;
+pub use reason_formatter::*;
 pub use recovery::*;
+pub use relaunch_readiness_evaluator::*;
+pub use reset_boundary::*;
+pub use reset_phase::*;
 pub use rotation::*;
+pub use rotation_brake::*;
 pub use scheduling::*;
+pub use score_normalizer::*;
+pub use score_percentile_normalizer::*;
+pub use score_snapshot::*;
+pub use score_variance_guard::*;
 pub use scoring::*;
 pub use selection::*;
+pub use selection_jitter_allocator::*;
+pub use session_affinity_tracker::*;
+pub use settling_guard::*;
+pub use sibling_filter::*;
+pub use sliding_velocity_guard::*;
+pub use sort_comparator::*;
+pub use stale_binding_sweeper::*;
 pub use status::*;
+pub use switch_audit_logger::*;
+pub use switch_history_ring::*;
+pub use switch_reason_sanitizer::*;
+pub use switch_recovery_tracker::*;
+pub use switch_settling_barrier::*;
+pub use switch_settling_timer::*;
+pub use switch_settling_watchdog::*;
+pub use throttle_brake::*;
+pub use throttle_recovery_observer::*;
+pub use tie_breaker::*;
+pub use tier_priority_normalizer::*;
+pub use tier_weights::*;
 pub use types::*;
+pub use velocity_smoother::*;
+pub use velocity_spike_dampener::*;
+pub use weekly_headroom_ratio::*;

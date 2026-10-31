@@ -308,6 +308,15 @@ pub(crate) fn dispatch_ui_domain(subcommand: &str, args: &[String]) {
         "ls" => cmd_ui_ls(args),
         "scroll" => cmd_ui_scroll(args),
         "click" => cmd_ui_click(args),
+        "instances" | "instance" => {
+            if let Some((sub, rest)) = args.split_first() {
+                if sub == "click" {
+                    cmd_instances_click(rest);
+                    return;
+                }
+            }
+            crate::common::handle_unknown_domain_command("ui", subcommand, args);
+        }
         "record" | "rec" | "audit" => cmd_ui_record(args),
         "help" | "h" => cmd_ui_help_full(args),
         _ => crate::common::handle_unknown_domain_command("ui", subcommand, args),
@@ -680,12 +689,19 @@ fn normalize_element_id(raw: &str) -> String {
 
 /// Every registry route that catalogues `element_id` in its static
 /// `known_ids` manifest. Element ids are never invented: only ids actually
-/// found in page sources are listed (see `ROUTE_REGISTRY`).
+/// found in page sources are listed (see `ROUTE_REGISTRY`). Dynamic instance
+/// action targets (starting with `instance-`) map to `/instances`.
 fn routes_for_element_id(element_id: &str) -> Vec<&'static UiRoute> {
-    ROUTE_REGISTRY
+    let mut routes: Vec<&'static UiRoute> = ROUTE_REGISTRY
         .iter()
-        .filter(|r| r.known_ids.iter().any(|id| *id == element_id))
-        .collect()
+        .filter(|r| r.known_ids.contains(&element_id))
+        .collect();
+    if routes.is_empty() && element_id.starts_with("instance-") {
+        if let Some(inst_route) = find_route("instances") {
+            routes.push(inst_route);
+        }
+    }
+    routes
 }
 
 /// Print every catalogued element id with its route — used in error hints so
@@ -704,8 +720,9 @@ fn print_catalogued_elements() {
 /// Accepted forms: `agm ui <scroll|click> <element-id>` or
 /// `agm ui <scroll|click> <element-id> <route>`. The id is validated against
 /// the static element manifest; an id catalogued on several routes requires
-/// the `<route>` argument. Every failure prints the real reason and exits
-/// non-zero.
+/// the `<route>` argument. Dynamic instance action targets (`instance-*`)
+/// map directly to the `/instances` route. Every failure prints the real reason
+/// and exits non-zero.
 fn resolve_element_target(ctx: &CliContext, action: &str) -> (String, &'static UiRoute) {
     let raw_id = match ctx.positional_args.first() {
         Some(id) => id.clone(),
@@ -727,7 +744,10 @@ fn resolve_element_target(ctx: &CliContext, action: &str) -> (String, &'static U
             print_valid_routes();
             std::process::exit(1);
         };
-        if !entry.known_ids.iter().any(|id| *id == element_id) {
+        if !entry.known_ids.contains(&element_id.as_str()) {
+            if entry.path == "instances" && element_id.starts_with("instance-") {
+                return (element_id, entry);
+            }
             eprintln!("[ERROR] Element '#{element_id}' is not catalogued on '/{route}'.");
             let known_on = routes_for_element_id(&element_id);
             if known_on.is_empty() {
@@ -746,6 +766,11 @@ fn resolve_element_target(ctx: &CliContext, action: &str) -> (String, &'static U
 
     match routes_for_element_id(&element_id).as_slice() {
         [] => {
+            if element_id.starts_with("instance-") {
+                if let Some(entry) = find_route("instances") {
+                    return (element_id, entry);
+                }
+            }
             eprintln!("[ERROR] Unknown element id '#{element_id}'.");
             eprintln!("[HINT] Only element ids actually found in page sources are catalogued -");
             eprintln!("[HINT] never invent an id. `agm ui ls <route>` shows a route's manifest.");
@@ -897,6 +922,73 @@ pub(crate) fn cmd_ui_scroll(args: &[String]) {
     );
 }
 
+/// Normalize an instance card action (switch, launch, stop, restart, fastforward, tree, settings, more).
+pub(crate) fn normalize_instance_action(raw: &str) -> Option<&'static str> {
+    let clean = raw.trim().to_lowercase();
+    match clean.as_str() {
+        "switch" => Some("switch"),
+        "launch" | "start" | "open" => Some("launch"),
+        "stop" | "kill" | "close" => Some("stop"),
+        "restart" => Some("restart"),
+        "fastforward" | "fast-forward" | "ff" => Some("fastforward"),
+        "tree" | "prompts" => Some("tree"),
+        "settings" | "setting" => Some("settings"),
+        "more" => Some("more"),
+        _ => None,
+    }
+}
+
+/// `agm instances click <instance_id> <action>` or `agm instances click instance-<action>-<instance_id>`
+/// Click or trigger an instance action button on the live UI via the `/ui/click` management API bridge.
+pub(crate) fn cmd_instances_click(args: &[String]) {
+    if args.iter().any(|a| a == "--help" || a == "-h") || args.is_empty() {
+        println!("agm instances click <instance_id> <action> [--json]");
+        println!("  Click/trigger a card action button on the target instance in the live UI.");
+        println!("  Actions: switch, launch (start), stop (kill), restart, fastforward (ff), tree, settings, more");
+        println!("  Example: agm instances click default switch");
+        println!("           agm instances click instance-switch-default");
+        return;
+    }
+
+    let mut flags = Vec::new();
+    let mut pos = Vec::new();
+    for a in args {
+        if a.starts_with('-') {
+            flags.push(a.clone());
+        } else {
+            pos.push(a.clone());
+        }
+    }
+
+    let element_id = match pos.as_slice() {
+        [single] if single.starts_with("instance-") => single.clone(),
+        [inst_id, action] => {
+            if let Some(act) = normalize_instance_action(action) {
+                format!("instance-{act}-{inst_id}")
+            } else if let Some(act) = normalize_instance_action(inst_id) {
+                format!("instance-{act}-{action}")
+            } else {
+                format!("instance-{action}-{inst_id}")
+            }
+        }
+        [single] => {
+            eprintln!("[ERROR] Missing action for instance '{single}'. Usage: agm instances click <instance_id> <action>");
+            eprintln!("Available actions: switch, launch, stop, restart, fastforward, tree, settings, more");
+            std::process::exit(1);
+        }
+        _ => {
+            eprintln!(
+                "[ERROR] Invalid arguments. Usage: agm instances click <instance_id> <action>"
+            );
+            std::process::exit(1);
+        }
+    };
+
+    let mut forward_args = vec![element_id, "instances".to_string()];
+    forward_args.extend(flags);
+    cmd_ui_click(&forward_args);
+}
+
 /// `agm ui click <element-id> [route]` — activate an element through the
 /// same code path as a user click: the backend emits `agm://ui-click` and
 /// the frontend hook performs a real `.click()`, so the audit recorder logs
@@ -909,7 +1001,33 @@ pub(crate) fn cmd_ui_click(args: &[String]) {
         print_ui_help_topic("click");
         return;
     }
-    let ctx = CliContext::parse(args);
+
+    // Support alias syntax: `agm ui click <instance_id> <action>`
+    let mut rewritten_args = args.to_vec();
+    let pos_indices: Vec<usize> = rewritten_args
+        .iter()
+        .enumerate()
+        .filter(|(_, a)| !a.starts_with('-'))
+        .map(|(i, _)| i)
+        .collect();
+
+    if pos_indices.len() == 2 {
+        let i0 = pos_indices[0];
+        let i1 = pos_indices[1];
+        let a0 = rewritten_args[i0].clone();
+        let a1 = rewritten_args[i1].clone();
+        if !a0.starts_with("instance-") && find_route(&normalize_route(&a1)).is_none() {
+            if let Some(act) = normalize_instance_action(&a1) {
+                rewritten_args[i0] = format!("instance-{act}-{a0}");
+                rewritten_args[i1] = "instances".to_string();
+            } else if let Some(act) = normalize_instance_action(&a0) {
+                rewritten_args[i0] = format!("instance-{act}-{a1}");
+                rewritten_args[i1] = "instances".to_string();
+            }
+        }
+    }
+
+    let ctx = CliContext::parse(&rewritten_args);
     let (element_id, route) = resolve_element_target(&ctx, "click");
     if !ui_backend_running() {
         eprintln!("[ERROR] AGM UI is not running.");
@@ -1279,4 +1397,55 @@ pub(crate) fn cmd_ui_help_full(args: &[String]) {
     println!("  (POST /api/ui/navigate, GET /api/ui/element-tree, POST /api/ui/scroll,");
     println!("  POST /api/ui/click). When the running AGM build lacks an endpoint, the");
     println!("  command reports it explicitly instead of faking success.");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_normalize_instance_action() {
+        assert_eq!(normalize_instance_action("switch"), Some("switch"));
+        assert_eq!(normalize_instance_action("launch"), Some("launch"));
+        assert_eq!(normalize_instance_action("start"), Some("launch"));
+        assert_eq!(normalize_instance_action("stop"), Some("stop"));
+        assert_eq!(normalize_instance_action("kill"), Some("stop"));
+        assert_eq!(normalize_instance_action("restart"), Some("restart"));
+        assert_eq!(normalize_instance_action("ff"), Some("fastforward"));
+        assert_eq!(
+            normalize_instance_action("fast-forward"),
+            Some("fastforward")
+        );
+        assert_eq!(normalize_instance_action("tree"), Some("tree"));
+        assert_eq!(normalize_instance_action("settings"), Some("settings"));
+        assert_eq!(normalize_instance_action("more"), Some("more"));
+        assert_eq!(normalize_instance_action("unknown_action"), None);
+    }
+
+    #[test]
+    fn test_routes_for_dynamic_instance_element() {
+        let routes = routes_for_element_id("instance-switch-default");
+        assert_eq!(routes.len(), 1);
+        assert_eq!(routes[0].path, "instances");
+
+        let routes_launch = routes_for_element_id("instance-launch-v2");
+        assert_eq!(routes_launch.len(), 1);
+        assert_eq!(routes_launch[0].path, "instances");
+    }
+
+    #[test]
+    fn test_resolve_element_target_dynamic_instance() {
+        let ctx = CliContext::parse(&["instance-switch-default".to_string()]);
+        let (elem, route) = resolve_element_target(&ctx, "click");
+        assert_eq!(elem, "instance-switch-default");
+        assert_eq!(route.path, "instances");
+
+        let ctx_with_route = CliContext::parse(&[
+            "instance-restart-default".to_string(),
+            "instances".to_string(),
+        ]);
+        let (elem_with_route, route_with_route) = resolve_element_target(&ctx_with_route, "click");
+        assert_eq!(elem_with_route, "instance-restart-default");
+        assert_eq!(route_with_route.path, "instances");
+    }
 }

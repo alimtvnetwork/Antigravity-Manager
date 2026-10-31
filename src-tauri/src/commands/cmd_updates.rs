@@ -13,14 +13,14 @@ pub struct NativeUpdateMetadata {
     pub raw_json: serde_json::Value,
 }
 
-/// 检测 GitHub releases 更新
+/// Detecting GitHub releases
 #[tauri::command]
 pub async fn check_for_updates() -> Result<UpdateInfo, String> {
-    modules::logger::log_info("收到前端触发的更新检查请求");
+    modules::logger::log_info("Receive an update check request triggered by the frontend");
     crate::modules::update_checker::check_for_updates().await
 }
 
-/// 基于动态通道和端点进行原生更新检查，支持预发布版 (Beta) 与正式版自动更新分离
+/// Native update checking based on dynamic channels and endpoints, supporting the separation of automatic updates between pre-release versions (Beta) and official versions
 #[tauri::command]
 pub async fn check_native_update<R: tauri::Runtime>(
     webview: tauri::Webview<R>,
@@ -44,18 +44,24 @@ pub async fn check_native_update<R: tauri::Runtime>(
         }
     };
 
-    crate::modules::logger::log_info(&format!("原生更新器准备检查目标地址: {}", target_endpoint));
+    crate::modules::logger::log_info(&format!(
+        "The native updater is ready to check the target address: {}",
+        target_endpoint
+    ));
 
     let mut builder = webview.updater_builder();
 
     let url = Url::parse(&target_endpoint)
-        .map_err(|e| format!("无效的更新地址 '{}': {}", target_endpoint, e))?;
+        .map_err(|e| format!("Invalid update address ' {} ': {}", target_endpoint, e))?;
     builder = builder.endpoints(vec![url]).map_err(|e| e.to_string())?;
 
     let proxy_url = proxy.or_else(crate::modules::update_checker::get_upstream_proxy_url);
     if let Some(proxy_str) = proxy_url {
         if let Ok(proxy_parsed) = Url::parse(&proxy_str) {
-            crate::modules::logger::log_info(&format!("原生更新器应用代理配置: {}", proxy_str));
+            crate::modules::logger::log_info(&format!(
+                "Native updater application proxy configuration: {}",
+                proxy_str
+            ));
             builder = builder.proxy(proxy_parsed);
         }
     }
@@ -68,20 +74,20 @@ pub async fn check_native_update<R: tauri::Runtime>(
     });
 
     let updater = builder.build().map_err(|e| {
-        let msg = format!("构建原生更新器失败: {}", e);
+        let msg = format!("Failed to build native updater: {}", e);
         crate::modules::logger::log_error(&msg);
         msg
     })?;
 
     let update = updater.check().await.map_err(|e| {
-        let msg = format!("原生更新器检查失败: {}", e);
+        let msg = format!("Native updater check failed: {}", e);
         crate::modules::logger::log_error(&msg);
         msg
     })?;
 
     if let Some(update) = update {
         crate::modules::logger::log_info(&format!(
-            "原生更新器发现可用更新: {} (当前版本: {})",
+            "Native updater found available update: {} (current version: {} )",
             update.version, update.current_version
         ));
         let current_version = update.current_version.clone();
@@ -103,7 +109,7 @@ pub async fn check_native_update<R: tauri::Runtime>(
         };
         Ok(Some(metadata))
     } else {
-        crate::modules::logger::log_info("原生更新器未检测到更新");
+        crate::modules::logger::log_info("No update detected by native updater");
         Ok(None)
     }
 }
@@ -137,35 +143,35 @@ pub async fn update_last_check_time() -> Result<(), String> {
     crate::modules::update_checker::update_last_check_time()
 }
 
-/// 检测是否通过 Homebrew Cask 安装
+/// Detect whether installed through Homebrew Cask
 #[tauri::command]
 pub async fn check_homebrew_installation() -> Result<bool, String> {
     Ok(crate::modules::update_checker::is_homebrew_installed())
 }
 
-/// 检测是否以 AppImage 方式运行（Linux 专用）
-/// Tauri 的原生更新器在 Linux 上只支持 AppImage，
-/// RPM/DEB 安装的用户不应触发原生自动更新以避免 ENOEXEC 错误。
+/// Detect whether to run in AppImage mode (Linux only)
+/// Tauri's native updater only supports AppImage on Linux.
+/// Users of RPM/DEB installations should not trigger native automatic updates to avoid ENOEXEC errors.
 #[tauri::command]
 pub async fn check_appimage_installation() -> Result<bool, String> {
     Ok(crate::modules::update_checker::is_appimage_running())
 }
 
-/// 通过 Homebrew Cask 升级应用
+/// Upgrading applications via Homebrew Cask
 #[tauri::command]
 pub async fn brew_upgrade_cask() -> Result<String, String> {
-    modules::logger::log_info("收到前端触发的 Homebrew 升级请求");
+    modules::logger::log_info("Receive a Homebrew upgrade request triggered by the front end");
     crate::modules::update_checker::brew_upgrade_cask().await
 }
 
-/// 获取更新设置
+/// Get update settings
 #[tauri::command]
 pub async fn get_update_settings() -> Result<crate::modules::update_checker::UpdateSettings, String>
 {
     crate::modules::update_checker::load_update_settings()
 }
 
-/// 保存更新设置
+/// Save update settings
 #[tauri::command]
 pub async fn save_update_settings(
     settings: crate::modules::update_checker::UpdateSettings,

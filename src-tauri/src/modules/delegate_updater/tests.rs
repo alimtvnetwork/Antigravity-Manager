@@ -31,6 +31,13 @@ pub(crate) mod tests {
             opts.target_exe.unwrap().to_string_lossy(),
             "users\\test\\AppData\\Local\\Programs\\agm-alim\\agm-alim.exe"
         );
+        assert!(!opts.is_pinned);
+
+        let pinned_opts = parse_delegate_args(&["--version".to_string(), "4.227.0".to_string()]);
+        assert!(pinned_opts.is_pinned);
+
+        let explicit_pin_opts = parse_delegate_args(&["-isPinned".to_string()]);
+        assert!(explicit_pin_opts.is_pinned);
     }
 
     #[test]

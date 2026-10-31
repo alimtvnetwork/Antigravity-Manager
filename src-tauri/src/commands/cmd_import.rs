@@ -8,7 +8,7 @@ pub async fn import_v1_accounts(
 ) -> Result<Vec<Account>, String> {
     let accounts = modules::migration::import_from_v1().await?;
 
-    // 对导入的账号尝试刷新一波
+    // Try refreshing the imported account
     for mut account in accounts.clone() {
         // Justification: quota auto-refresh after v1 import is opportunistic; the import already succeeded
         crate::error::record_ignored(
@@ -73,21 +73,21 @@ pub async fn import_custom_db(
     proxy_state: tauri::State<'_, crate::commands::proxy::ProxyServiceState>,
     path: String,
 ) -> Result<Account, String> {
-    // 调用重构后的自定义导入函数
+    // Call the refactored custom import function
     let mut account = modules::migration::import_from_custom_db_path(path).await?;
 
-    // 自动设为当前账号
+    // Automatically set as current account
     let account_id = account.id.clone();
     modules::account::set_current_account_id(&account_id)?;
 
-    // 自动触发刷新额度
+    // Automatically trigger refresh quota
     // Justification: quota auto-refresh after custom DB import is opportunistic; the import already succeeded
     crate::error::record_ignored(
         internal_refresh_account_quota(&app, &mut account).await,
         "auto-refresh quota after custom DB import",
     );
 
-    // 刷新托盘图标展示
+    // Refresh tray icon display
     crate::modules::tray::update_tray_menus(&app);
 
     // Reload token pool
@@ -116,16 +116,16 @@ pub async fn sync_account_from_db(
         return Ok(None);
     }
 
-    // 1. 获取 DB 中的 Refresh Token
+    // 1. Get the Refresh Token in DB
     let db_refresh_token = match modules::migration::get_refresh_token_from_db(current_target) {
         Ok(token) => token,
         Err(e) => {
-            modules::logger::log_info(&format!("自动同步跳过: {}", e));
+            modules::logger::log_info(&format!("Automatic sync skip: {}", e));
             return Ok(None);
         }
     };
 
-    // 1.1 检查是否是上一次已知导入失败的失效 Token，避免周期性死循环重试
+    // 1.1 Check whether it is an invalid token that failed the last known import to avoid periodic infinite loop retries.
     if let Ok(guard) = LAST_FAILED_SYNC_TOKEN.lock() {
         if let Some(ref failed_token) = *guard {
             if failed_token == &db_refresh_token {
@@ -134,24 +134,24 @@ pub async fn sync_account_from_db(
         }
     }
 
-    // 2. 获取 Manager 当前账号
+    // 2. Get Manager’s current account
     let curr_account = modules::account::get_current_account()?;
 
-    // 3. 对比：如果 Refresh Token 相同，说明账号没变，无需导入
+    // 3. Comparison: If the Refresh Token is the same, it means that the account has not changed and there is no need to import it.
     if let Some(acc) = curr_account {
         if acc.token.refresh_token == db_refresh_token {
-            // 账号未变，由于已经是周期性任务，直接返回
+            // The account has not changed. Since it is already a periodic task, it will be returned directly.
             return Ok(None);
         }
         modules::logger::log_info(&format!(
-            "检测到账号切换 ({} -> DB新账号)，正在同步...",
+            "Account switching detected ( {} -> DB new account), synchronizing...",
             acc.email
         ));
     } else {
-        modules::logger::log_info("检测到新登录账号，正在自动同步...");
+        modules::logger::log_info("New login account detected, automatically synchronizing...");
     }
 
-    // 4. 执行完整导入（非致命探针，若本地 Token 失效或无可导入账号，记录并返回 Ok(None)，杜绝弹窗打扰用户）
+    // 4. Perform a complete import (non-fatal probe, if the local Token is invalid or there is no imported account, record and return Ok (None) to prevent pop-ups from disturbing the user)
     let mut account = match modules::migration::import_from_db(current_target).await {
         Ok(acc) => {
             if let Ok(mut guard) = LAST_FAILED_SYNC_TOKEN.lock() {
@@ -163,23 +163,26 @@ pub async fn sync_account_from_db(
             if let Ok(mut guard) = LAST_FAILED_SYNC_TOKEN.lock() {
                 *guard = Some(db_refresh_token);
             }
-            modules::logger::log_info(&format!("自动同步跳过 (本地账号导入失败): {}", e));
+            modules::logger::log_info(&format!(
+                "Automatic synchronization skipped (local account import failed): {}",
+                e
+            ));
             return Ok(None);
         }
     };
 
-    // 既然是从数据库导入，自动将其设为 Manager 的当前账号并保留当前 target
+    // Since it is imported from the database, it is automatically set to the current account of the Manager and the current target is retained.
     let account_id = account.id.clone();
     modules::account::set_current_account_id_with_target(&account_id, current_target)?;
 
-    // 自动触发刷新额度
+    // Automatically trigger refresh quota
     // Justification: quota auto-refresh after DB sync is opportunistic; the sync already succeeded
     crate::error::record_ignored(
         internal_refresh_account_quota(&app, &mut account).await,
         "auto-refresh quota after account DB sync",
     );
 
-    // 刷新托盘图标展示
+    // Refresh tray icon display
     crate::modules::tray::update_tray_menus(&app);
 
     // Reload token pool

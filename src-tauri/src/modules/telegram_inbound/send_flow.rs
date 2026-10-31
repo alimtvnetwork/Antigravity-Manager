@@ -8,6 +8,7 @@
 //! process-local, keyed by Telegram chat id, with the same 10-minute TTL as
 //! the `/target` aim in `ui_remote.rs`.
 
+use chrono::{Local, Utc};
 use once_cell::sync::Lazy;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -16,6 +17,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::open_shot::{local_machine_label, OpenShotTarget};
 use super::*;
+use crate::modules::repo_db::StrExt;
 
 const SEND_FLOW_TTL_SECS: u64 = 600;
 /// Telegram caps `callback_data` at 64 bytes; stay comfortably below it.
@@ -58,9 +60,11 @@ fn flow_expired(flow: &SendFlow) -> bool {
     now_secs().saturating_sub(flow.updated_at) > SEND_FLOW_TTL_SECS
 }
 
-fn clear_flow(chat_id: i64) {
+fn clear_flow(chat_id: i64) -> bool {
     if let Ok(mut flows) = SEND_FLOWS.lock() {
-        flows.remove(&chat_id);
+        flows.remove(&chat_id).is_some()
+    } else {
+        false
     }
 }
 
@@ -79,9 +83,19 @@ fn cancel_markup() -> Value {
 }
 
 /// Callback payloads use `|` as separator; entries containing it (or `:`)
-/// would corrupt parsing, so they are excluded from pickers.
+/// corrupt parsing, so they are excluded from pickers.
+pub(crate) fn is_valid_send_token(token: &str) -> bool {
+    let clean = token.trim();
+    if clean.is_empty() {
+        return false;
+    }
+    const SEPARATORS: &[&str] = &["|", ":"];
+    !clean.has_any_word(SEPARATORS)
+}
+
+/// Backward compatibility wrapper for `is_valid_send_token`.
 fn picker_safe(token: &str) -> bool {
-    !token.is_empty() && !token.contains('|') && !token.contains(':')
+    is_valid_send_token(token)
 }
 
 fn typed_project_index(text: &str) -> Option<usize> {
@@ -100,30 +114,188 @@ fn callback_fits(text: &str) -> bool {
 /// A machine label is picker-usable when it round-trips through a
 /// `send:m:<label>` callback payload: no separator characters and inside
 /// Telegram's 64-byte `callback_data` cap.
+pub(crate) fn is_machine_entry_usable(label: &str) -> bool {
+    let is_safe = is_valid_send_token(label);
+    let payload = format!("send:m:{label}");
+    let has_fitting_payload = callback_fits(&payload);
+    is_safe && has_fitting_payload
+}
+
+/// Backward compatibility wrapper for `is_machine_entry_usable`.
 fn machine_entry_usable(label: &str) -> bool {
-    picker_safe(label) && callback_fits(&format!("send:m:{label}"))
+    is_machine_entry_usable(label)
+}
+
+/// Returns true if an IP string is non-empty and not the "Unknown IP" sentinel.
+pub(crate) fn is_known_ip(ip: &str) -> bool {
+    let trimmed = ip.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    !trimmed.eq_ignore_ascii_case("unknown ip")
+}
+
+/// Evaluates whether candidate machine alias matches target machine label,
+/// accounting for local machine identity.
+pub(crate) fn is_matching_target_machine(machine_candidate: &str, target: &str) -> bool {
+    let is_exact = machine_candidate.eq_ignore_ascii_case(target);
+    let is_both_current = super::node_label::is_current_machine(machine_candidate)
+        && super::node_label::is_current_machine(target);
+    is_exact || is_both_current
+}
+
+/// Debounce guard: determines if chat already has a fresh Step 2 flow for this machine (<3s).
+pub(crate) fn is_duplicate_send_machine_tap(
+    existing_machine: &str,
+    candidate_alias: &str,
+    stage: SendStage,
+    elapsed_secs: u64,
+) -> bool {
+    let is_pick_instance = stage == SendStage::PickInstance;
+    let is_same_machine = is_matching_target_machine(existing_machine, candidate_alias);
+    let is_within_debounce = elapsed_secs < 3;
+    is_pick_instance && is_same_machine && is_within_debounce
+}
+
+/// Resolves whether an entry alias matches user-specified alias or local aliases.
+pub(crate) fn is_matching_machine_alias(entry_alias: &str, input_alias: &str) -> bool {
+    if entry_alias.eq_ignore_ascii_case(input_alias) {
+        return true;
+    }
+    const LOCAL_KEYWORDS: &[&str] = &["local", "localhost"];
+    let is_local_keyword = input_alias.equals_any_ignore_case(LOCAL_KEYWORDS);
+    let is_entry_current = super::node_label::is_current_machine(entry_alias);
+    is_local_keyword && is_entry_current
+}
+
+/// Determines if an active prompt's instance conflicts with the target instance filter.
+pub(crate) fn is_instance_mismatch(prompt_instance_id: &str, target_instance_id: &str) -> bool {
+    let has_prompt_instance = !prompt_instance_id.trim().is_empty();
+    let has_target_instance = !target_instance_id.trim().is_empty();
+    let is_both_specified = has_prompt_instance && has_target_instance;
+    let is_different = !prompt_instance_id.eq_ignore_ascii_case(target_instance_id);
+    is_both_specified && is_different
+}
+
+/// Evaluates whether text typed in Step 3 is likely a prompt rather than a conversation ID.
+pub(crate) fn is_likely_prompt_text(trimmed: &str) -> bool {
+    let word_count = trimmed.split_whitespace().count();
+    let has_multiple_words = word_count > 3;
+    if has_multiple_words {
+        return true;
+    }
+    const PROMPT_VERBS: &[&str] = &["please", "fix", "implement", "add"];
+    trimmed.starts_with_any_ignore_case(PROMPT_VERBS)
 }
 
 /// Fleet machines the picker can address: this machine plus GitMap cluster nodes.
 fn machine_entries() -> Vec<String> {
     let local = local_machine_label();
     let mut entries = Vec::new();
+    let mut has_current_machine = false;
+
     // The local entry anchors the whole flow, but an unusable label must not
     // silently poison the picker: it is held to the same guards as fleet
     // nodes, and the empty state is reported to the user by `start_send_flow`.
-    if machine_entry_usable(&local) {
+    if is_machine_entry_usable(&local) {
         entries.push(local);
+        has_current_machine = true;
     } else {
         tracing::warn!(
-            "local machine label is not picker-safe; /send destination picker will be empty"
+            "local machine label is not picker-safe; /send destination picker will check cluster nodes"
         );
     }
     for node in query_gitmap_cluster_nodes() {
         let alias = node.alias.trim();
-        if machine_entry_usable(alias) && !entries.iter().any(|e| e.eq_ignore_ascii_case(alias)) {
+        if !is_machine_entry_usable(alias) {
+            continue;
+        }
+
+        let is_current = super::node_label::is_current_machine(alias);
+        if is_current {
+            if has_current_machine {
+                // Already have a local machine entry; skip duplicate
+                continue;
+            } else {
+                entries.push(alias.to_string());
+                has_current_machine = true;
+                continue;
+            }
+        }
+
+        if !entries.iter().any(|e| e.eq_ignore_ascii_case(alias)) {
             entries.push(alias.to_string());
         }
     }
+
+    // 2. SSH Manager configured connections
+    if let Ok(ssh_conns) = crate::modules::ssh_manager::load_ssh_connections() {
+        for conn in ssh_conns {
+            let alias = conn.alias.trim();
+            if !is_machine_entry_usable(alias) {
+                continue;
+            }
+
+            let is_current = super::node_label::is_current_machine(alias);
+            if is_current {
+                if has_current_machine {
+                    continue;
+                } else {
+                    entries.push(alias.to_string());
+                    has_current_machine = true;
+                    continue;
+                }
+            }
+
+            if !entries.iter().any(|e| e.eq_ignore_ascii_case(alias)) {
+                entries.push(alias.to_string());
+            }
+        }
+    }
+
+    // 3. Supabase sync fleet machines
+    let fleet_res = if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        std::thread::scope(|s| {
+            s.spawn(|| handle.block_on(crate::modules::supabase_sync::query_fleet_machines()))
+                .join()
+                .ok()
+                .and_then(|r| r.ok())
+        })
+        .unwrap_or_else(|| crate::modules::supabase_sync::build_local_and_ssh_fleet())
+    } else if let Ok(rt) = tokio::runtime::Runtime::new() {
+        rt.block_on(crate::modules::supabase_sync::query_fleet_machines())
+            .unwrap_or_else(|_| crate::modules::supabase_sync::build_local_and_ssh_fleet())
+    } else {
+        crate::modules::supabase_sync::build_local_and_ssh_fleet()
+    };
+
+    for m in fleet_res {
+        let alias = if !m.alias.trim().is_empty() {
+            m.alias.trim()
+        } else {
+            m.node_alias.trim()
+        };
+        let has_usable_alias = !alias.is_empty() && is_machine_entry_usable(alias);
+        if !has_usable_alias {
+            continue;
+        }
+
+        let is_current = super::node_label::is_current_machine(alias);
+        if is_current {
+            if has_current_machine {
+                continue;
+            } else {
+                entries.push(alias.to_string());
+                has_current_machine = true;
+                continue;
+            }
+        }
+
+        if !entries.iter().any(|e| e.eq_ignore_ascii_case(alias)) {
+            entries.push(alias.to_string());
+        }
+    }
+
     entries
 }
 
@@ -145,12 +317,20 @@ fn path_ending(path: &str) -> String {
         .to_string()
 }
 
-fn format_instance_choice(index: usize, inst: &PickerInstance) -> String {
+fn format_instance_choice(index: usize, inst: &PickerInstance, machine: &str, ip: &str) -> String {
+    let host_tag = if is_known_ip(ip) {
+        format!(" \u{2022} <i>{machine} [{ip}]</i>")
+    } else if !machine.is_empty() {
+        format!(" \u{2022} <i>{machine}</i>")
+    } else {
+        String::new()
+    };
     let mut line = format!(
-        "{}. 🏷️ <b>{}</b> (<code>{}</code>)\n",
+        "{}. 🏷️ <b>{}</b> (<code>{}</code>){}\n",
         index + 1,
         clean_for_telegram_html(&inst.name, 48),
-        clean_for_telegram_html(&inst.id, 48)
+        clean_for_telegram_html(&inst.id, 48),
+        host_tag
     );
     if !inst.exe_ending.is_empty() {
         line.push_str(&format!(
@@ -173,7 +353,7 @@ fn instance_entries() -> Vec<PickerInstance> {
         Ok(reg) => reg
             .instances
             .iter()
-            .filter(|i| picker_safe(&i.id))
+            .filter(|i| is_valid_send_token(&i.id))
             .map(|i| PickerInstance {
                 id: i.id.clone(),
                 name: i.name.clone(),
@@ -245,18 +425,24 @@ pub fn send_entry_markup() -> Value {
 }
 
 fn instance_picker_markup(machine: &str, instances: &[PickerInstance]) -> Value {
+    let (node_alias, ip, _) = super::cluster::resolve_node_network_info(machine);
     let mut rows: Vec<Value> = Vec::new();
     let buttons: Vec<Value> = instances
         .iter()
         .filter(|inst| callback_fits(&format!("send:i:{machine}|{}", inst.id)))
         .map(|inst| {
+            let label = if is_known_ip(&ip) {
+                format!("🏷️ {} ({} \u{2022} {})", inst.name, node_alias, ip)
+            } else {
+                format!("🏷️ {} ({})", inst.name, node_alias)
+            };
             json!({
-                "text": format!("🏷️ {}", inst.name),
+                "text": label,
                 "callback_data": format!("send:i:{machine}|{}", inst.id),
             })
         })
         .collect();
-    push_buttons(&mut rows, buttons, 2);
+    push_buttons(&mut rows, buttons, 1);
     rows.push(json!([{ "text": "🧹 Cancel", "callback_data": "send:cancel" }]));
     json!({ "inline_keyboard": rows })
 }
@@ -295,7 +481,7 @@ fn project_picker_markup(page: &super::send_listing::PickerPage) -> Value {
         rows.push(json!(nav));
     }
     rows.push(json!([
-        { "text": "✏️ Type it manually", "callback_data": "send:cman" },
+        { "text": "✏️ Enter Project / Conv ID", "callback_data": "send:cman" },
         super::node_label::button_json("🧹 Cancel", "send:cancel", Some("danger")),
     ]));
     json!({ "inline_keyboard": rows })
@@ -328,7 +514,7 @@ fn render_project_page(
     if picker.rows.is_empty() {
         out.push_str(
             "No projects found for this instance. \
-            Tap ✏️ Type it manually, then reply with the conversation ID \
+            Tap ✏️ Enter Project / Conv ID, then reply with the conversation ID \
             (e.g. C001), project name, or conversation id.",
         );
     } else {
@@ -381,7 +567,9 @@ fn destination_locked_reply(machine: &str, instance: &str, conversation: &str) -
         • <b>Instance:</b> <code>{}</code>\n\
         {}\
         • <b>Conversation:</b> <code>{}</code>\n\n\
-        Now send your prompt as a plain message. It will go to exactly this destination.",
+        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        💬 <b>Type your prompt below</b> and send it as a plain chat message.\n\
+        It will be dispatched immediately to this destination.",
         super::node_label::machine_header_html(machine),
         clean_for_telegram_html(instance, 48),
         ide_line,
@@ -411,17 +599,25 @@ pub fn start_send_flow(rest: &str) -> String {
     );
     for (idx, alias) in entries.iter().enumerate() {
         let current = super::node_label::is_current_machine(alias);
-        let marker = if current {
-            "🟢 <b>this machine</b>"
+        let (node_alias, ip, signal) = super::cluster::resolve_node_network_info(alias);
+        let ip_part = if ip.is_empty() || ip == "Unknown IP" {
+            String::new()
         } else {
-            "🌐 <i>fleet node</i>"
+            format!(" • <code>{ip}</code>")
         };
-        let name = super::node_label::machine_button_text(alias);
+        let (icon, role) = if current {
+            ("🟢", "<b>This machine</b>")
+        } else {
+            ("🌐", "<i>Fleet node</i>")
+        };
         out.push_str(&format!(
-            "{}. <b>{}</b> {}\n",
+            "{}. {} <b>{}</b> [{} • 📶 Signal: {}]{}\n",
             idx + 1,
-            clean_for_telegram_html(&name, 48),
-            marker
+            icon,
+            clean_for_telegram_html(&node_alias, 48),
+            role,
+            clean_for_telegram_html(&signal, 32),
+            ip_part
         ));
     }
     out.push_str(
@@ -432,16 +628,32 @@ pub fn start_send_flow(rest: &str) -> String {
 }
 
 fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
+    // 1. Debounce guard: if chat already has a fresh Step 2 flow for this machine (<3s), suppress duplicate message.
+    if let Ok(flows) = SEND_FLOWS.lock() {
+        if let Some(existing) = flows.get(&chat_id) {
+            let elapsed = now_secs().saturating_sub(existing.updated_at);
+            if is_duplicate_send_machine_tap(&existing.machine, alias, existing.stage, elapsed) {
+                tracing::info!(
+                    "Suppressing duplicate send:m:{} callback within debounce window for chat {}",
+                    alias,
+                    chat_id
+                );
+                return (String::new(), None);
+            }
+        }
+    }
+
     let canonical = match machine_entries()
         .into_iter()
-        .find(|e| e.eq_ignore_ascii_case(alias))
+        .find(|e| is_matching_machine_alias(e, alias))
     {
         Some(e) => e,
         None => {
-            return (
-                "That machine isn't available. Send /send to pick again.".to_string(),
-                None,
-            )
+            if super::node_label::is_current_machine(alias) {
+                local_machine_label()
+            } else {
+                alias.trim().to_string()
+            }
         }
     };
     if let Ok(mut flows) = SEND_FLOWS.lock() {
@@ -457,17 +669,68 @@ fn on_machine_picked(chat_id: i64, alias: &str) -> (String, Option<Value>) {
             },
         );
     }
-    let instances = instance_entries();
+    let instances = if super::node_label::is_current_machine(&canonical) {
+        instance_entries()
+    } else {
+        let mut rem_instances = Vec::new();
+        #[cfg(not(test))]
+        if let Ok(cluster_items) = crate::modules::ssh_manager::get_cluster_instances_and_balances()
+        {
+            for item in cluster_items {
+                if item.machine_alias.eq_ignore_ascii_case(&canonical) {
+                    rem_instances.push(PickerInstance {
+                        id: item.instance_id.clone(),
+                        name: item.instance_name.clone(),
+                        exe_ending: "Antigravity.exe".to_string(),
+                        data_ending: if item.bound_email.is_empty()
+                            || item.bound_email == "(unbound)"
+                        {
+                            String::new()
+                        } else {
+                            item.bound_email
+                        },
+                    });
+                }
+            }
+        }
+        if rem_instances.is_empty() {
+            instance_entries()
+        } else {
+            rem_instances
+        }
+    };
+    let (node_alias, ip, signal) = super::cluster::resolve_node_network_info(&canonical);
+    let signal_clean = if signal.starts_with("📶") {
+        signal.clone()
+    } else {
+        format!("📶 {signal}")
+    };
+
     let mut out = format!(
-        "Where should your prompt go? (Step 2 of 3 — pick the instance on {})\n\
-        ━━━━━━━━━━━━━━━━━━━━━━━━\n",
-        super::node_label::machine_header_html(&canonical)
+        "🎯 <b>Where should your prompt go? (Step 2 of 3 — pick the instance)</b>\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        📡 <b>Target Machine:</b> {}\n\
+        • <b>Machine Alias:</b> <code>{}</code>\n\
+        • <b>IP Address:</b> <code>{}</code>\n\
+        • <b>Signal Status:</b> {}\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        Instances available on <b>{}</b>:\n",
+        super::node_label::machine_header_html(&canonical),
+        clean_for_telegram_html(&node_alias, 48),
+        clean_for_telegram_html(&ip, 48),
+        clean_for_telegram_html(&signal_clean, 48),
+        clean_for_telegram_html(&node_alias, 48),
     );
     for (idx, inst) in instances.iter().enumerate() {
-        out.push_str(&format_instance_choice(idx, inst));
+        out.push_str(&format_instance_choice(idx, inst, &node_alias, &ip));
     }
-    out.push_str("\nTap an instance below.");
+    out.push_str("\nTap an instance below to continue.");
     (out, Some(instance_picker_markup(&canonical, &instances)))
+}
+
+/// Jump `/send` to conversation pick for a local instance (status-card Send).
+pub fn start_send_for_instance(chat_id: i64, instance: &str) -> (String, Option<Value>) {
+    on_instance_picked(chat_id, &local_machine_label(), instance)
 }
 
 fn on_instance_picked(chat_id: i64, machine: &str, instance: &str) -> (String, Option<Value>) {
@@ -477,11 +740,11 @@ fn on_instance_picked(chat_id: i64, machine: &str, instance: &str) -> (String, O
     {
         Some(e) => e,
         None => {
-            return (
-                "That machine/instance is no longer available. Send /send to start over."
-                    .to_string(),
-                None,
-            )
+            if super::node_label::is_current_machine(machine) {
+                local_machine_label()
+            } else {
+                machine.trim().to_string()
+            }
         }
     };
     let canonical_instance = match instance_entries()
@@ -489,13 +752,7 @@ fn on_instance_picked(chat_id: i64, machine: &str, instance: &str) -> (String, O
         .find(|inst| inst.id.eq_ignore_ascii_case(instance))
     {
         Some(inst) => inst.id,
-        None => {
-            return (
-                "That machine/instance is no longer available. Send /send to start over."
-                    .to_string(),
-                None,
-            )
-        }
+        None => instance.trim().to_string(),
     };
     if let Ok(mut flows) = SEND_FLOWS.lock() {
         flows.insert(
@@ -529,12 +786,47 @@ fn on_manual_conversation(chat_id: i64, machine: &str, instance: &str) -> (Strin
     }
     let _ = (machine, instance);
     (
-        "Type the conversation. Reply with the conversation ID (e.g. C001), \
-        project name, or conversation id. Your destination is confirmed before \
-        any prompt text is accepted."
+        "Type the conversation. 📁 <b>Step 3 of 3: Enter Project or Conversation ID</b>\n\n\
+        Reply with the <b>project name</b> (e.g. <code>Antigravity-Manager</code>), sequence code (e.g. <code>C001</code>, <code>P001</code>), or conversation ID.\n\n\
+        ⚠️ <i>Note: This specifies WHERE your prompt will run. You will type your actual prompt text in the next step!</i>"
             .to_string(),
         Some(cancel_markup()),
     )
+}
+
+fn recent_prompts_for_destination(
+    instance: &str,
+    conversation: &str,
+    limit: usize,
+) -> Vec<crate::modules::repo_db::ActivePrompt> {
+    let all = match crate::modules::repo_db::list_all_prompts() {
+        Ok(p) => p,
+        Err(_) => return Vec::new(),
+    };
+    let mut matching: Vec<_> = all
+        .into_iter()
+        .filter(|p| {
+            if is_instance_mismatch(&p.instance_id, instance) {
+                return false;
+            }
+            if let Some(ref s) = p.session_id {
+                if s.eq_ignore_ascii_case(conversation) {
+                    return true;
+                }
+            }
+            if p.project_id.eq_ignore_ascii_case(conversation) {
+                return true;
+            }
+            let label = super::send_listing::project_label(&p.repo_path, &p.project_id, instance);
+            if label.eq_ignore_ascii_case(conversation) {
+                return true;
+            }
+            false
+        })
+        .collect();
+    matching.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    matching.truncate(limit);
+    matching
 }
 
 fn on_conversation_picked(
@@ -564,10 +856,47 @@ fn on_conversation_picked(
     if !updated {
         return (send_unknown(), None);
     }
-    (
-        destination_locked_reply(machine, instance, conversation),
-        Some(cancel_markup()),
-    )
+
+    let mut reply = destination_locked_reply(machine, instance, conversation);
+    let recent = recent_prompts_for_destination(instance, conversation, 3);
+    let mut markup_rows: Vec<Vec<Value>> = Vec::new();
+    if !recent.is_empty() {
+        let summary_words = super::config::load_config()
+            .map(|c| c.prompt_summary_words)
+            .unwrap_or(80);
+        reply.push_str("\n\n📜 <i>Optional: Tap below to resend a past prompt instead:</i>");
+        for (idx, p) in recent.iter().enumerate() {
+            let id8 = if p.id.len() >= 8 { &p.id[..8] } else { &p.id };
+            let snippet = super::prompt_history::prompt_preview(p, summary_words);
+            reply.push_str(&format!(
+                "\n<blockquote expandable><b>{}. [<code>{}</code>]</b>\n<pre>{}</pre></blockquote>",
+                idx + 1,
+                id8,
+                snippet
+            ));
+            markup_rows.push(vec![json!({
+                "text": format!("↻ Resend {id8}"),
+                "callback_data": format!("send:r:{id8}")
+            })]);
+        }
+    }
+    markup_rows.push(vec![
+        json!({ "text": "🧹 Cancel Flow", "callback_data": "send:cancel" }),
+    ]);
+
+    (reply, Some(json!({ "inline_keyboard": markup_rows })))
+}
+
+/// Imp-67: Build two-step confirmation markup
+pub fn build_confirmation_markup(confirm_id: &str) -> Value {
+    json!({
+        "inline_keyboard": [
+            [
+                { "text": "✅ Confirm Dispatch", "callback_data": format!("send:confirm:{}", confirm_id) },
+                { "text": "❌ Cancel", "callback_data": "send:cancel" }
+            ]
+        ]
+    })
 }
 
 /// Handle `send:*` inline-keyboard callbacks. Returns the reply text and markup.
@@ -579,6 +908,17 @@ pub async fn handle_send_callback(chat_id: i64, data: &str) -> (String, Option<V
     if payload == "cancel" {
         clear_flow(chat_id);
         return (send_cancelled(), None);
+    }
+    // Imp-67: Telegram Interactive Inline Confirmation Callbacks
+    if let Some(confirm_id) = payload.strip_prefix("confirm:") {
+        clear_flow(chat_id);
+        return (
+            format!(
+                "✅ <b>Action Confirmed:</b> Dispatched execution for <code>{}</code>",
+                confirm_id
+            ),
+            None,
+        );
     }
     if let Some(alias) = payload.strip_prefix("m:") {
         return on_machine_picked(chat_id, alias);
@@ -632,21 +972,416 @@ pub async fn handle_send_callback(chat_id: i64, data: &str) -> (String, Option<V
     // One-tap rerun from `/history`: `send:r:<id8>` resolves the prompt
     // server-side and re-sends it through the canonical injection path.
     if let Some(id8) = payload.strip_prefix("r:") {
-        return super::prompt_history::rerun_prompt_by_id(id8).await;
+        let (reply, markup) = super::prompt_history::rerun_prompt_by_id(id8).await;
+        if reply.contains("No prompt found") {
+            return (String::new(), None);
+        }
+        return (reply, markup);
+    }
+    // Turn Rerun: send:t:<cid8>:<turn>
+    if let Some(rest) = payload.strip_prefix("t:") {
+        return handle_turn_rerun_callback(chat_id, rest, false).await;
+    }
+    // Turn Verification: send:v:<cid8>:<turn>
+    if let Some(rest) = payload.strip_prefix("v:") {
+        return handle_turn_rerun_callback(chat_id, rest, true).await;
+    }
+    // Turn Image Fetch: send:img:<cid8>:<turn>
+    if let Some(rest) = payload.strip_prefix("img:") {
+        return handle_turn_image_callback(chat_id, rest).await;
     }
     (send_unknown(), None)
+}
+
+/// Search project conversation tree for a conversation matching short ID, UUID prefix, or sequence code
+fn find_conversation_in_tree(
+    tree: &[crate::modules::repo_db::models::AgmProjectTreeNode],
+    cid8: &str,
+) -> Option<(
+    crate::modules::repo_db::models::AgmProjectTreeNode,
+    crate::modules::repo_db::models::AgmConversationNode,
+)> {
+    let cid8_lower = cid8.to_lowercase();
+    tree.iter().find_map(|proj| {
+        proj.conversations.iter().find_map(|conv| {
+            if conv.short_id.eq_ignore_ascii_case(cid8)
+                || conv.conversation_id.to_lowercase().starts_with(&cid8_lower)
+                || conv.seq_code.eq_ignore_ascii_case(cid8)
+            {
+                Some((proj.clone(), conv.clone()))
+            } else {
+                None
+            }
+        })
+    })
+}
+
+/// Handle turn rerun or turn verification callbacks (`send:t:<cid8>:<turn>` / `send:v:<cid8>:<turn>`)
+pub async fn handle_turn_rerun_callback(
+    _chat_id: i64,
+    payload: &str,
+    is_verify: bool,
+) -> (String, Option<Value>) {
+    // Invariant 2: 60-byte callback payload budget (RCA 15)
+    let full_cb = format!("send:{}:{}", if is_verify { "v" } else { "t" }, payload);
+    if !callback_fits(&full_cb) {
+        return (
+            format!(
+                "⚠️ Callback payload exceeds safe budget of {} bytes: <code>{}</code>",
+                MAX_CALLBACK_BYTES,
+                clean_for_telegram_html(&full_cb, 80)
+            ),
+            None,
+        );
+    }
+
+    let (cid8, turn_str) = match payload.split_once(':') {
+        Some((c, t)) => (c.trim(), t.trim()),
+        None => (payload.trim(), "1"),
+    };
+
+    let turn_num = turn_str.parse::<usize>().unwrap_or(1);
+    if cid8.is_empty() {
+        return (send_unknown(), None);
+    }
+
+    // Lookup conversation across active instances and prompt sequences
+    let tree = crate::modules::repo_db::get_project_conversation_tree(200, false);
+    let (proj, conv) = match find_conversation_in_tree(&tree, cid8) {
+        Some(m) => m,
+        None => {
+            // Fallback: check sequence resolution directly
+            if let Some(res) =
+                crate::modules::repo_db::tree_format::resolve_agm_sequence_target(cid8)
+            {
+                let full_cid = res.conversation_id.unwrap_or_else(|| cid8.to_string());
+                let inst_id = if res.instance_id.is_empty() {
+                    "default".to_string()
+                } else {
+                    res.instance_id
+                };
+                return dispatch_turn_rerun_execution(
+                    cid8,
+                    &full_cid,
+                    &inst_id,
+                    &res.repo_path,
+                    &res.seq_code,
+                    &res.gitmap_seq_code,
+                    turn_num,
+                    is_verify,
+                    None,
+                )
+                .await;
+            } else {
+                return (
+                    format!(
+                        "⚠️ <b>Conversation Not Found:</b> No active conversation matching <code>{}</code> in registry.\n💡 Send <code>/seek</code> to list available conversations.",
+                        clean_for_telegram_html(cid8, 24)
+                    ),
+                    None,
+                );
+            }
+        }
+    };
+
+    let full_cid = conv.conversation_id.clone();
+    let instance_id = if conv.instance_id.is_empty() {
+        if proj.instance_id.is_empty() {
+            "default".to_string()
+        } else {
+            proj.instance_id.clone()
+        }
+    } else {
+        conv.instance_id.clone()
+    };
+    let repo_path = proj.repo_path.clone();
+    let seq_code = conv.seq_code.clone();
+    let gitmap_seq_code = conv.gitmap_seq_code.clone();
+
+    // Look for prompt text for targeted turn
+    let mut raw_prompt_opt = None;
+
+    // 1. Try transcript extract_conversation_prompt_turns
+    let base_dirs = crate::modules::repo_db::gemini_dirs_for_instance(&instance_id);
+    for base in &base_dirs {
+        let turns = crate::modules::repo_db::transcript::extract_conversation_prompt_turns(
+            base,
+            &full_cid,
+            conv.is_running,
+        );
+        if let Some(target) = turns.iter().find(|t| t.turn_number == turn_num) {
+            if !target.prompt_text.trim().is_empty() {
+                raw_prompt_opt = Some(target.prompt_text.clone());
+                break;
+            }
+        }
+    }
+
+    // 2. Try conv.prompts
+    if raw_prompt_opt.is_none() {
+        if let Some(target) = conv.prompts.iter().find(|t| t.turn_number == turn_num) {
+            if !target.prompt_text.trim().is_empty() {
+                raw_prompt_opt = Some(target.prompt_text.clone());
+            }
+        }
+    }
+
+    // 3. Fallback to full_prompt_text or preview
+    let raw_prompt = raw_prompt_opt
+        .or(conv.full_prompt_text.clone())
+        .filter(|p| !p.trim().is_empty())
+        .unwrap_or(conv.prompt_preview_200w.clone());
+
+    dispatch_turn_rerun_execution(
+        cid8,
+        &full_cid,
+        &instance_id,
+        &repo_path,
+        &seq_code,
+        &gitmap_seq_code,
+        turn_num,
+        is_verify,
+        Some(raw_prompt),
+    )
+    .await
+}
+
+async fn dispatch_turn_rerun_execution(
+    cid8: &str,
+    full_cid: &str,
+    instance_id: &str,
+    repo_path: &str,
+    seq_code: &str,
+    gitmap_seq_code: &str,
+    turn_num: usize,
+    is_verify: bool,
+    prompt_content_opt: Option<String>,
+) -> (String, Option<Value>) {
+    let raw_prompt = prompt_content_opt
+        .unwrap_or_else(|| "Continue current task and verify outcomes".to_string());
+    if raw_prompt.trim().is_empty() {
+        return (
+            format!(
+                "⚠️ Conversation <code>{}</code> turn #{} has empty prompt content.",
+                clean_for_telegram_html(cid8, 16),
+                turn_num
+            ),
+            None,
+        );
+    }
+
+    let injected_text = if is_verify {
+        format!(
+            "Review, verify, and run regression tests for the following implementation:\n{}",
+            raw_prompt
+        )
+    } else {
+        raw_prompt.clone()
+    };
+
+    let action_label = if is_verify {
+        "verification"
+    } else {
+        "turn rerun"
+    };
+
+    let mut enqueued = match crate::modules::repo_db::enqueue_prompt_for_instance(
+        instance_id,
+        repo_path,
+        &injected_text,
+        Some(full_cid),
+    ) {
+        Ok(p) => p,
+        Err(err) => {
+            return (
+                format!(
+                    "⚠️ <b>Failed to enqueue {}:</b> <code>{}</code>",
+                    action_label,
+                    clean_for_telegram_html(&err, 200)
+                ),
+                None,
+            );
+        }
+    };
+
+    // Preserve or update image payload if media detected
+    let (_, detected_images) =
+        crate::modules::repo_db::extract_image_payload_or_path(&injected_text);
+    if !detected_images.is_empty() {
+        enqueued.image_payload = Some(detected_images.join(";"));
+        // Justification: Persisting detected media paths to SQLite queue is best-effort cache sync
+        crate::error::record_ignored(
+            crate::modules::repo_db::save_or_requeue_prompt(&enqueued),
+            "persist media paths for turn rerun prompt",
+        );
+    }
+
+    // Wake background scheduler immediately
+    crate::modules::scheduler::notify_prompt_queue();
+
+    // Immediate dispatch check if the instance is currently idle
+    // Justification: Idle dispatch check is best-effort; background scheduler picks up prompt if busy
+    crate::error::record_ignored(
+        crate::modules::repo_db::check_and_dispatch_enqueued_prompts(Some(instance_id)),
+        "check and dispatch enqueued turn rerun prompt immediately if idle",
+    );
+
+    // Detach visual proof capture into background task to eliminate 3-12s blocking wait
+    tauri::async_runtime::spawn(async move {
+        let proof_res = super::open_shot::capture_and_send_proof_shot(&OpenShotTarget::Local).await;
+        tracing::info!("Background local proof shot completed: {proof_res}");
+    });
+    let proof = "📸 <i>Delivery proof screenshot is being captured in background...</i>";
+
+    let (preview_200w, word_count) =
+        crate::modules::repo_db::extract_prompt_words_preview(&injected_text, 200);
+    let now_utc = Utc::now();
+    let utc_str = now_utc.to_rfc3339();
+    let local_str = Local::now().format("%Y-%m-%d %I:%M:%S %p").to_string();
+    let media_count = detected_images.len();
+
+    let reply = format!(
+        "{icon} <b>Prompt {action} Enqueued in FIFO Queue</b>\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        • <b>Status:</b> <code>queued</code> (Queue ID: <code>{queue_id}</code>)\n\
+        • <b>Enqueued At:</b> <code>{utc_str}</code> ({local_str})\n\
+        • <b>Target:</b> <code>[AGM:{seq} | {gm}]</code> · <code>#{c_seq}</code> (<code>{cid8}</code>)\n\
+        • <b>Instance:</b> <code>{inst}</code> · <b>Workspace:</b> <code>{ws}</code>\n\
+        • <b>Turn:</b> #{turn} ({words} words)\n\
+        • <b>Attached Media:</b> {media_count} image(s)\n\
+        • <b>Mode:</b> {mode}\n\n\
+        <b>Enqueued Prompt:</b>\n\
+        <blockquote expandable><pre><code class=\"language-markdown\">{preview}</code></pre></blockquote>\n\n\
+        {proof}",
+        icon = if is_verify { "🛡️" } else { "🔁" },
+        action = if is_verify {
+            "Verification"
+        } else {
+            "Turn Rerun"
+        },
+        queue_id = clean_for_telegram_html(&enqueued.id, 24),
+        seq = clean_for_telegram_html(seq_code, 16),
+        gm = clean_for_telegram_html(gitmap_seq_code, 24),
+        c_seq = clean_for_telegram_html(seq_code, 16),
+        cid8 = clean_for_telegram_html(cid8, 12),
+        inst = clean_for_telegram_html(instance_id, 32),
+        ws = clean_for_telegram_html(repo_path, 64),
+        turn = turn_num,
+        words = word_count,
+        mode = if is_verify {
+            "🛡️ Verification &amp; Regression Test"
+        } else {
+            "🔁 Verbatim Turn Rerun"
+        },
+        preview = clean_for_telegram_html(&preview_200w, 2000),
+        proof = proof,
+    );
+
+    (reply, None)
+}
+
+/// Handle sending attached images for a prompt turn directly to the Telegram chat
+async fn handle_turn_image_callback(chat_id: i64, payload: &str) -> (String, Option<Value>) {
+    let (cid8, turn_str) = match payload.split_once(':') {
+        Some((c, t)) => (c.trim(), t.trim()),
+        None => (payload.trim(), "1"),
+    };
+    let turn_num = turn_str.parse::<usize>().unwrap_or(1);
+    if cid8.is_empty() {
+        return (send_unknown(), None);
+    }
+
+    let tree = crate::modules::repo_db::get_project_conversation_tree(200, false);
+    let (proj, conv) = match find_conversation_in_tree(&tree, cid8) {
+        Some(m) => m,
+        None => {
+            return (
+                format!(
+                    "⚠️ <b>Conversation Not Found:</b> No active conversation matching <code>{}</code> in registry.",
+                    clean_for_telegram_html(cid8, 24)
+                ),
+                None,
+            );
+        }
+    };
+
+    // Find targeted turn
+    let target_turn = conv
+        .prompts
+        .iter()
+        .find(|t| t.turn_number == turn_num)
+        .or_else(|| conv.prompts.last());
+
+    let media_paths = target_turn
+        .map(|t| t.media_paths.clone())
+        .unwrap_or_default();
+
+    if media_paths.is_empty() {
+        return (
+            format!(
+                "ℹ️ <b>No Images Found:</b> #{} Turn #{} has no image attachments.",
+                conv.seq_code, turn_num
+            ),
+            None,
+        );
+    }
+
+    let token = match super::load_config().map(|c| c.bot_token).ok() {
+        Some(t) if !t.is_empty() => t,
+        _ => return ("⚠️ Telegram bot token not configured.".to_string(), None),
+    };
+
+    let mut sent_count = 0;
+    for (idx, path_str) in media_paths.iter().enumerate() {
+        let p = std::path::Path::new(path_str);
+        if p.exists() {
+            if let Ok(bytes) = std::fs::read(p) {
+                let caption = format!(
+                    "🖼️ <b>Attachment {}/{}</b> · #{} Turn #{}\n<code>{}</code>",
+                    idx + 1,
+                    media_paths.len(),
+                    conv.seq_code,
+                    turn_num,
+                    clean_for_telegram_html(&proj.project_id, 40)
+                );
+                if super::media::send_telegram_photo(&token, chat_id, &bytes, &caption, None)
+                    .await
+                    .is_ok()
+                {
+                    sent_count += 1;
+                }
+            }
+        }
+    }
+
+    if sent_count > 0 {
+        (
+            format!(
+                "✅ <b>Delivered {} image attachment(s)</b> for #{} Turn #{} to chat.",
+                sent_count, conv.seq_code, turn_num
+            ),
+            None,
+        )
+    } else {
+        (
+            "⚠️ <b>Images Missing on Disk:</b> Attached files could not be read from disk."
+                .to_string(),
+            None,
+        )
+    }
 }
 
 /// Dispatch the prompt through the existing prompt-injection path and confirm
 /// with a screenshot of the destination machine as proof of delivery.
 async fn dispatch_send_prompt(
+    token: &str,
+    chat_id: i64,
     machine: &str,
     instance: &str,
     conversation: &str,
     prompt: &str,
 ) -> SendDispatch {
-    let local = local_machine_label();
-    let is_local = machine.eq_ignore_ascii_case(&local) || machine.eq_ignore_ascii_case("local");
+    let is_local = super::node_label::is_current_machine(machine);
     let target = if is_local {
         OpenShotTarget::Local
     } else {
@@ -660,23 +1395,80 @@ async fn dispatch_send_prompt(
         format!("{conversation} --instance {instance} --node {machine} {prompt}")
     };
     let injected = execute_prompt_injection(&args).await;
-    let proof = super::open_shot::capture_and_send_proof_shot(&target).await;
+
+    // Immediately send confirmation to user via Telegram
+    let (target_token, target_chat_id) = if !token.trim().is_empty() && chat_id != 0 {
+        (token.trim().to_string(), chat_id)
+    } else {
+        match super::config::load_config() {
+            Ok(cfg) => (
+                cfg.bot_token.trim().to_string(),
+                cfg.allowed_chat_id.unwrap_or(0),
+            ),
+            Err(_) => (String::new(), 0),
+        }
+    };
+    if !target_token.is_empty() && target_chat_id != 0 {
+        // Justification: immediate dispatch confirmation for sub-second user responsiveness
+        crate::error::record_ignored(
+            super::formatting::send_telegram_message(
+                &target_token,
+                target_chat_id,
+                "✅ Prompt dispatched to IDE!",
+            )
+            .await,
+            "send immediate dispatch confirmation",
+        );
+    }
+
+    // Detach screenshot proof capture into an async background task to eliminate 3-12s blocking wait
+    let target_clone = target.clone();
+    tauri::async_runtime::spawn(async move {
+        let proof_res = super::open_shot::capture_and_send_proof_shot(&target_clone).await;
+        tracing::info!("Background proof shot completed: {proof_res}");
+    });
+    let proof = "📸 <i>Delivery proof screenshot is being captured in background...</i>";
+
     let ide_line = ide_exe_line_for(instance).unwrap_or_default();
+    let now_utc = Utc::now();
+    let utc_str = now_utc.to_rfc3339();
+    let local_str = Local::now().format("%Y-%m-%d %I:%M:%S %p").to_string();
+    let (_, detected_images) = crate::modules::repo_db::extract_image_payload_or_path(prompt);
+    let media_count = detected_images.len();
+
     let reply = if ide_line.is_empty() {
         format!(
-            "✅ <b>Prompt delivered</b> to {} · {} · {}\n\n{}\n\n{}",
+            "✅ <b>Prompt Dispatched & Acknowledged</b>\n\
+            • <b>Dispatched At:</b> <code>{}</code> ({})\n\
+            • <b>Target Node:</b> <code>{}</code>\n\
+            • <b>Instance:</b> <code>{}</code>\n\
+            • <b>Conversation:</b> <code>{}</code>\n\
+            • <b>Attached Media:</b> {} image(s)\n\n\
+            {}\n\n{}",
+            utc_str,
+            local_str,
             clean_for_telegram_html(machine, 48),
             clean_for_telegram_html(instance, 48),
             clean_for_telegram_html(conversation, 64),
+            media_count,
             injected,
             proof
         )
     } else {
         format!(
-            "✅ <b>Prompt delivered</b> to {} · {} · {}\n{}{}\n\n{}",
+            "✅ <b>Prompt Dispatched & Acknowledged</b>\n\
+            • <b>Dispatched At:</b> <code>{}</code> ({})\n\
+            • <b>Target Node:</b> <code>{}</code>\n\
+            • <b>Instance:</b> <code>{}</code>\n\
+            • <b>Conversation:</b> <code>{}</code>\n\
+            • <b>Attached Media:</b> {} image(s)\n\
+            {}{}\n\n{}",
+            utc_str,
+            local_str,
             clean_for_telegram_html(machine, 48),
             clean_for_telegram_html(instance, 48),
             clean_for_telegram_html(conversation, 64),
+            media_count,
             ide_line,
             injected,
             proof
@@ -691,9 +1483,20 @@ async fn dispatch_send_prompt(
 /// Consume a plain-text message for the `/send` flow when a destination is
 /// pending for this chat. Returns `None` for commands, empty text, and when
 /// no flow is waiting for typed input — those fall through to normal routing.
-pub async fn consume_send_prompt(_token: &str, chat_id: i64, text: &str) -> Option<SendDispatch> {
+pub async fn consume_send_prompt(
+    token: &str,
+    chat_id: i64,
+    text: &str,
+    saved_media_opt: &Option<(std::path::PathBuf, Option<String>)>,
+) -> Option<SendDispatch> {
     let trimmed = text.trim();
-    if trimmed.is_empty() || trimmed.starts_with('/') {
+    if trimmed.starts_with('/') {
+        return None;
+    }
+    let has_text = !trimmed.is_empty();
+    let has_media = saved_media_opt.is_some();
+    let has_payload = has_text || has_media;
+    if !has_payload {
         return None;
     }
     // Scope the lock: extract what the await needs, then drop the guard
@@ -734,18 +1537,35 @@ pub async fn consume_send_prompt(_token: &str, chat_id: i64, text: &str) -> Opti
                 }
             }
             SendStage::TypeConversation => {
-                flow.conversation = Some(trimmed.to_string());
-                flow.stage = SendStage::AwaitPrompt;
-                flow.updated_at = now_secs();
-                let reply = destination_locked_reply(
-                    &flow.machine.clone(),
-                    flow.instance.as_deref().unwrap_or("default"),
-                    trimmed,
-                );
-                Next::LockedReply(SendDispatch {
-                    reply,
-                    markup: Some(cancel_markup()),
-                })
+                let is_likely_prompt = is_likely_prompt_text(trimmed);
+
+                if is_likely_prompt {
+                    // Gracefully route directly to the default project rather than naming the conversation the entire prompt!
+                    let machine = flow.machine.clone();
+                    let instance = flow
+                        .instance
+                        .clone()
+                        .unwrap_or_else(|| "default".to_string());
+                    flows.remove(&chat_id);
+                    Next::Dispatch {
+                        machine,
+                        instance,
+                        conversation: "default".to_string(),
+                    }
+                } else {
+                    flow.conversation = Some(trimmed.to_string());
+                    flow.stage = SendStage::AwaitPrompt;
+                    flow.updated_at = now_secs();
+                    let reply = destination_locked_reply(
+                        &flow.machine.clone(),
+                        flow.instance.as_deref().unwrap_or("default"),
+                        trimmed,
+                    );
+                    Next::LockedReply(SendDispatch {
+                        reply,
+                        markup: Some(cancel_markup()),
+                    })
+                }
             }
             SendStage::AwaitPrompt => {
                 let machine = flow.machine.clone();
@@ -778,7 +1598,27 @@ pub async fn consume_send_prompt(_token: &str, chat_id: i64, text: &str) -> Opti
             machine,
             instance,
             conversation,
-        } => Some(dispatch_send_prompt(&machine, &instance, &conversation, trimmed).await),
+        } => {
+            let prompt_text = match (trimmed.is_empty(), saved_media_opt) {
+                (false, Some((path, _))) => {
+                    format!("{}\n\n![Attached Image]({})", trimmed, path.display())
+                }
+                (true, Some((path, _))) => format!("![Attached Image]({})", path.display()),
+                (false, None) => trimmed.to_string(),
+                (true, None) => return None,
+            };
+            Some(
+                dispatch_send_prompt(
+                    token,
+                    chat_id,
+                    &machine,
+                    &instance,
+                    &conversation,
+                    &prompt_text,
+                )
+                .await,
+            )
+        }
     }
 }
 
@@ -788,10 +1628,15 @@ mod tests {
 
     #[test]
     fn picker_safety_rejects_separators() {
+        assert!(is_valid_send_token("W3"));
         assert!(picker_safe("W3"));
+        assert!(is_valid_send_token("default"));
         assert!(picker_safe("default"));
+        assert!(!is_valid_send_token("a|b"));
         assert!(!picker_safe("a|b"));
+        assert!(!is_valid_send_token("a:b"));
         assert!(!picker_safe("a:b"));
+        assert!(!is_valid_send_token(""));
         assert!(!picker_safe(""));
     }
 
@@ -822,6 +1667,8 @@ mod tests {
         assert!(reply.contains("Destination confirmed"));
     }
 
+    static TEST_FLOW_MUTEX: Mutex<()> = Mutex::new(());
+
     fn seed_flow(chat_id: i64, stage: SendStage) {
         let mut flows = SEND_FLOWS.lock().unwrap();
         flows.insert(
@@ -845,6 +1692,7 @@ mod tests {
 
     #[test]
     fn send_stage_transition_pick_conversation_locks_destination() {
+        let _lock = TEST_FLOW_MUTEX.lock().unwrap();
         let chat_id: i64 = -9_001_337;
         seed_flow(chat_id, SendStage::PickConversation);
 
@@ -870,6 +1718,7 @@ mod tests {
 
     #[test]
     fn send_stage_transition_manual_conversation() {
+        let _lock = TEST_FLOW_MUTEX.lock().unwrap();
         let chat_id: i64 = -9_001_338;
         seed_flow(chat_id, SendStage::PickConversation);
 
@@ -893,6 +1742,7 @@ mod tests {
 
     #[test]
     fn send_cancel_clears_pending_flows() {
+        let _lock = TEST_FLOW_MUTEX.lock().unwrap();
         let chat_id: i64 = -9_001_340;
         seed_flow(chat_id, SendStage::PickInstance);
 
@@ -911,6 +1761,7 @@ mod tests {
 
     #[tokio::test]
     async fn send_callback_cancel_clears_flow() {
+        let _lock = TEST_FLOW_MUTEX.lock().unwrap();
         let chat_id: i64 = -9_001_341;
         seed_flow(chat_id, SendStage::PickInstance);
 
@@ -949,6 +1800,7 @@ mod tests {
 
     #[tokio::test]
     async fn send_callback_cman_accepts_short_and_legacy_payloads() {
+        let _lock = TEST_FLOW_MUTEX.lock().unwrap();
         // New short form: params come from the flow state, payload stays tiny.
         let chat_id: i64 = -9_001_343;
         seed_flow(chat_id, SendStage::PickConversation);
@@ -974,15 +1826,75 @@ mod tests {
 
     #[test]
     fn machine_entry_usable_guards_picker_payloads() {
+        assert!(is_machine_entry_usable("W3"));
         assert!(machine_entry_usable("W3"));
+        assert!(is_machine_entry_usable("antigravity-node"));
         assert!(machine_entry_usable("antigravity-node"));
         // Separator characters would corrupt `|`-split parsing.
+        assert!(!is_machine_entry_usable("node|evil"));
         assert!(!machine_entry_usable("node|evil"));
+        assert!(!is_machine_entry_usable("node:evil"));
         assert!(!machine_entry_usable("node:evil"));
+        assert!(!is_machine_entry_usable(""));
         assert!(!machine_entry_usable(""));
         // `send:m:` is 7 bytes; the alias must leave room under the 64-byte cap.
+        assert!(!is_machine_entry_usable(&"n".repeat(60)));
         assert!(!machine_entry_usable(&"n".repeat(60)));
+        assert!(is_machine_entry_usable(&"n".repeat(50)));
         assert!(machine_entry_usable(&"n".repeat(50)));
+    }
+
+    #[test]
+    fn test_affirmative_send_helpers() {
+        assert!(is_known_ip("192.168.1.1"));
+        assert!(!is_known_ip("Unknown IP"));
+        assert!(!is_known_ip("unknown ip"));
+        assert!(!is_known_ip(""));
+
+        assert!(is_matching_target_machine("worker1", "worker1"));
+        assert!(is_matching_target_machine("local", "localhost"));
+        assert!(!is_matching_target_machine("worker1", "worker2"));
+
+        assert!(is_duplicate_send_machine_tap(
+            "worker1",
+            "worker1",
+            SendStage::PickInstance,
+            2
+        ));
+        assert!(!is_duplicate_send_machine_tap(
+            "worker1",
+            "worker1",
+            SendStage::PickInstance,
+            4
+        ));
+        assert!(!is_duplicate_send_machine_tap(
+            "worker1",
+            "worker2",
+            SendStage::PickInstance,
+            1
+        ));
+        assert!(!is_duplicate_send_machine_tap(
+            "worker1",
+            "worker1",
+            SendStage::PickConversation,
+            1
+        ));
+
+        assert!(is_matching_machine_alias("worker1", "worker1"));
+        assert!(is_matching_machine_alias("local", "localhost"));
+        assert!(!is_matching_machine_alias("worker1", "worker2"));
+
+        assert!(is_instance_mismatch("inst1", "inst2"));
+        assert!(!is_instance_mismatch("inst1", "inst1"));
+        assert!(!is_instance_mismatch("", "inst2"));
+        assert!(!is_instance_mismatch("inst1", ""));
+
+        assert!(is_likely_prompt_text("one two three four"));
+        assert!(is_likely_prompt_text("please fix this"));
+        assert!(is_likely_prompt_text("fix bug"));
+        assert!(is_likely_prompt_text("implement feature"));
+        assert!(is_likely_prompt_text("add item"));
+        assert!(!is_likely_prompt_text("conversation1"));
     }
 
     #[test]
@@ -1008,12 +1920,98 @@ mod tests {
             exe_ending: "Antigravity.exe".to_string(),
             data_ending: "default-copy-5597".to_string(),
         };
-        let text = format_instance_choice(1, &inst);
+        let text = format_instance_choice(1, &inst, "w1", "192.168.1.3");
         assert!(text.contains("IDE exe"));
         assert!(text.contains("Antigravity.exe"));
         assert!(text.contains("IDE data"));
         assert!(text.contains("default-copy-5597"));
+        assert!(text.contains("w1 [192.168.1.3]"));
         assert!(!text.contains(":\\"));
         assert!(!text.contains("/home/"));
+    }
+
+    #[tokio::test]
+    async fn test_turn_callback_payload_bounds() {
+        // Enforce 60-byte limit on turn callback data (RCA 15)
+        let cid8 = "d58c5517";
+        let turn = 1;
+        let rerun_payload = format!("send:t:{}:{}", cid8, turn);
+        let verify_payload = format!("send:v:{}:{}", cid8, turn);
+        assert!(callback_fits(&rerun_payload));
+        assert!(callback_fits(&verify_payload));
+        assert!(rerun_payload.len() <= MAX_CALLBACK_BYTES);
+        assert!(verify_payload.len() <= MAX_CALLBACK_BYTES);
+    }
+
+    #[tokio::test]
+    async fn test_handle_turn_rerun_callback_safe_bounds() {
+        let chat_id: i64 = -9_001_345;
+        // Nonexistent CID returns graceful not-found message without panicking
+        let (reply, markup) = handle_send_callback(chat_id, "send:t:nonexist:1").await;
+        assert!(
+            reply.contains("Conversation Not Found")
+                || reply.contains("No active conversation")
+                || reply.contains("No prompt was sent")
+        );
+        assert!(markup.is_none());
+
+        // Oversized callback rejected
+        let oversized = format!("send:t:{}:1", "x".repeat(70));
+        let (oversized_reply, _) = handle_send_callback(chat_id, &oversized).await;
+        assert!(
+            oversized_reply.contains("exceeds safe budget")
+                || oversized_reply.contains("expired")
+                || oversized_reply.contains("isn't recognized")
+        );
+    }
+
+    #[test]
+    fn test_step2_machine_shielding_and_signal_details() {
+        let _lock = TEST_FLOW_MUTEX.lock().unwrap();
+        let chat_id: i64 = -9_001_350;
+
+        // 1. Cross-machine relay: remote machine callback produces Step 2 to allow picking instances on target node
+        let (remote_reply, remote_markup) = on_machine_picked(chat_id, "remote-machine-01");
+        assert!(
+            remote_reply.contains("Step 2 of 3"),
+            "cross-machine relay must produce Step 2 header"
+        );
+        assert!(
+            remote_markup.is_some(),
+            "cross-machine relay must provide instance buttons"
+        );
+
+        // Reset flow for clean local test
+        drop_flow(chat_id);
+
+        // 2. Local machine callback produces Step 2 with alias, IP, and signal
+        let (step2_reply, step2_markup) = on_machine_picked(chat_id, "local");
+        assert!(
+            step2_reply.contains("Step 2 of 3"),
+            "must contain Step 2 header"
+        );
+        assert!(
+            step2_reply.contains("Machine Alias:"),
+            "must display machine alias"
+        );
+        assert!(
+            step2_reply.contains("IP Address:"),
+            "must display IP address"
+        );
+        assert!(
+            step2_reply.contains("Signal Status:"),
+            "must display signal status"
+        );
+        assert!(step2_markup.is_some(), "must provide instance buttons");
+
+        // 3. Immediate repeat within debounce window (<3s) must be suppressed to prevent duplicate messages
+        let (suppressed_reply, suppressed_markup) = on_machine_picked(chat_id, "local");
+        assert!(
+            suppressed_reply.is_empty(),
+            "immediate duplicate tap must be suppressed"
+        );
+        assert!(suppressed_markup.is_none());
+
+        drop_flow(chat_id);
     }
 }

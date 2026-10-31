@@ -15,15 +15,15 @@ pub(crate) async fn apply_compression(
 ) -> Result<ClaudeRequest, Response> {
     let mut request_with_mapped = request_for_body.clone();
     // ===== [3-Layer Progressive Compression + Calibrated Estimation] Context Management =====
-    // [ENHANCED] 整合 3.3.47 的三层压缩框架 + PR #925 的动态校准机制
-    // [NEW] 只有当 st.scaling_enabled 为 true 时才执行压缩逻辑 (联动机制)
+    // [ENHANCED] Integrate the three-layer compression framework of 3.3.47 + the dynamic calibration mechanism of PR #925
+    // [NEW] Compression logic is executed only when st.scaling_enabled is true (linkage mechanism)
     // Layer 1 (60%): Tool message trimming - Does NOT break cache
     // Layer 2 (75%): Thinking purification - Breaks cache but preserves signatures
     // Layer 3 (90%): Fork conversation + XML summary - Ultimate optimization
     let mut compression_applied = false;
 
     if !st.retried_without_thinking && st.compression_level == "high" {
-        // 新增 st.scaling_enabled 联动判断
+        // Added st.scaling_enabled linkage judgment
         // 1. Determine context limit (Flash: ~1M, Pro: ~2M)
         let context_limit = if mapped_model.contains("flash") {
             1_000_000
@@ -31,7 +31,7 @@ pub(crate) async fn apply_compression(
             2_000_000
         };
 
-        // 2. [ENHANCED] 使用校准器提高估算准确度 (PR #925)
+        // 2. [ENHANCED] Use calibrator to improve estimation accuracy (PR #925)
         let raw_estimated = ContextManager::estimate_token_usage(&request_with_mapped);
         let calibrator = get_calibrator();
         let mut estimated_usage = calibrator.calibrate(raw_estimated);

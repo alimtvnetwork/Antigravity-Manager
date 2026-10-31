@@ -553,6 +553,10 @@ func extractVersionValue(rawMap map[string]interface{}) string {
 10. **DRY is Priority One:** Duplicate logic across two sites must be extracted immediately.
 11. **Component Modularity:** Small, reusable components. For features with 3+ components, produce a Mermaid diagram first.
 12. **Immutable-First:** Assign every variable once at declaration. Never reassign except loop indices. Prefer `const`, `let`, `final`, `val` over mutable variables. Build result objects with spread or copy.
+13. **GitMap Search Primacy & Fast Tooling:** TOTAL BAN on `rg`, `ripgrep`, `grep`, `git grep`, PowerShell `Select-String`, `findstr`, or recursive `Get-ChildItem`. All symbol searches, directory inventories, and file reads MUST use GitMap high-speed commands:
+    - **Code & Symbol Search:** `gitmap aum search "<pattern>" [dir]` or named-flag syntax `gitmap aum search --query "<pattern>" --root "<dir>"` (supports `--pattern`, `--dir`, `--path`, `-q`, `-p`, `-d`).
+    - **Instant Directory Listing:** `gitmap lf <dir>` or `gitmap find "*.*" <dir>`.
+    - **Zero-Disk File Streaming:** `gitmap cat <filepath>`.
 13. **Asset Naming:** Assets go to `assets/<NN-folder>/<NN-file>.<ext>` with two-digit sequence prefixes (e.g., `assets/01-icons/03-logo.svg`).
 14. **No Inverted Complex Conditions:** Never use `!` on complex conditions containing AND/OR. Simplify or extract into named booleans.
 15. **Boolean Return Wrapper:** Functions returning multiple values including a boolean must return a named struct/object (e.g. `{ data, isSuccess }`), never bare tuples `(int, bool)`.
@@ -835,10 +839,43 @@ To avoid 50-result tool truncation limits and eliminate multi-turn exploratory r
 
 ---
 
+## GitMap Command Discipline, Pre-Flight Pull & Semantic Commit Standards
+
+### 1. Mandatory Pre-Flight Pull via GitMap
+- **Pre-Flight Rule:** Before modifying or creating any code, files, or specifications, you MUST run `gitmap pull` (or `gitmap pull <repo>`, alias `gitmap p`).
+- **TOTAL BAN on Raw `git pull`:** Never execute `git pull` or `git pull origin <branch>` directly without attempting `gitmap pull` first. Fallback to raw `git pull` ONLY if the `gitmap` executable is not installed or unavailable in PATH.
+
+### 2. GitMap Dedicated Semantic Commit Verbs (TOTAL BAN on Misusing CPF)
+GitMap automatically stages, formats with the appropriate sovereign type prefix, and pushes in a single atomic command. You MUST choose the exact verb matching the task category:
+
+| Change Category | GitMap Command | Sovereign Output Header | Purpose & Rule |
+| :--- | :--- | :--- | :--- |
+| **Features** | `gitmap cpf "<module> - <summary>"` | `Feature: <module> - <summary>` | New features, enhancements, additions. NEVER use for chores or releases. |
+| **Bug Fixes** | `gitmap cbf "<module> - <summary>"` (or `cpb`) | `Bug: <module> - <summary>` | Defect repairs, regression fixes, error resolutions. |
+| **Refactoring** | `gitmap cfr "<module> - <summary>"` | `Refactor: <module> - <summary>` | Code restructuring, DRY extraction, type reorganization. |
+| **Chores / Sync / Docs** | `gitmap cpc "<module> - <summary>"` | `Chore: <module> - <summary>` | Guideline updates, prompts sync, dependencies, documentation. |
+| **Releases / Version Bumps** | `gitmap cpr "<module> - <summary>"` | `Release: <module> - <summary>` | Version increments, release tags, release branch ceremonies. |
+| **Local Checkpoint (No Push)** | `gitmap commit "wip - <msg>"` (or `cm`) | Verbatim `<msg>` | Local WIP checkpoints only. No remote push. |
+
+### 3. Commit Argument Formatting Standards
+- **Hyphen-Separated Standard:** Always format the commit argument as `"<module> - summary of changes"` with space-padded hyphen.
+- **Subsystem Module Standard (Title Case or Lowercase Allowed):** The `<module>` token MUST represent a functional codebase subsystem (e.g. `Auth`, `Storage`, `Ui`, `Guidelines`, `Scanner`, `Cli`, `Sync`, `Prompt`). Title Case (`Auth`, `Storage`, `Ui`) or lowercase (`auth`, `storage`, `ui`) is completely valid. ALL-CAPS shout case (`AUTH`, `STORAGE`) should not be used.
+- **TOTAL BAN on 'commit' / 'commits' as Module:** The word `commit` or `commits` MUST NEVER be used as a module name (e.g. NEVER run `gitmap cpc "commit - ..."` or `gitmap cpf "COMMIT - ..."`). Committing is already the version control action being performed by Git and GitMap; writing `commit` as the module produces meaningless tautological stuttering (`Chore: commit - ...`). If modifying commit-related tooling, code, or documentation, name the specific component (e.g. `Formatter`, `Provenance`, `Cli`, `Docs`) or omit the module prefix entirely (`gitmap cpc "clean constructor helpers and strip redundant tokens"`).
+- **TOTAL BAN on Third Brackets `[...]`:** Never use square brackets (`[...]`) in commit messages or module tags (e.g. BANNED: `gitmap cpf "[module]: ..."`, `gitmap cpr "[v1.0]: ..."`).
+- **TOTAL BAN on Colons Inside Arguments:** Do not pass colons `:` inside the message argument (e.g. BANNED: `gitmap cpf "module: feature description"`). Use space-padded hyphen: `"<module> - feature description"`.
+- **TOTAL BAN on Nested Conventional Prefixes:** Never pass redundant type prefixes like `chore(release):`, `feat(...)`, `fix(...)`, or `chore:` inside the argument (e.g. BANNED: `gitmap cpf "chore(release): bump version"`, `gitmap cpr "release: v1.0"`). GitMap adds the sovereign prefix automatically!
+- **TOTAL BAN on Raw Git Commits:** Never execute `git commit`, `git commit -m "..."`, `git add -A`, or raw `git push`.
+- **TOTAL BAN on Per-File Commits:** All modified files across the turn MUST be accumulated in the working tree and committed together in a SINGLE grouped atomic commit at the final step before ending.
+
+---
+
 ## Final Step Git Commit & Push Mandate (Strict Checklist)
 
-- [ ] **MANDATORY FINAL COMMIT & PUSH TO GIT (ANYHOW):** At the FINAL step of the turn, after all targeted files have been refactored, verified with targeted linters, and plans/subtasks consolidated, you MUST stage everything (`git add -A`), create a clean, descriptive conventional commit (`git commit -m "<summary>"`), and push directly to the remote repository (`git push origin <branch>`). Leaving uncommitted changes or unpushed commits on the active branch at the end of a turn is an immediate failure.
-- [ ] **TOTAL BAN ON PER-FILE COMMITS (DO NOT COMMIT EACH FILE INDIVIDUALLY):** You MUST NOT create separate git commits for each individual file as you edit them (e.g. running `git commit` after editing File 1, then committing again after File 2 is STRICTLY FORBIDDEN). Committing file-by-file pollutes git log history, creates subagent lock collisions, and breaks atomic rollback/bisectability. All modified files, test change caches, and plan records across the turn MUST be accumulated in the working tree and committed together in a SINGLE grouped atomic commit at the final step before pushing!
+- [ ] **MANDATORY PRE-FLIGHT PULL VIA GITMAP:** Executed `gitmap pull` (fallback `git pull`) prior to touching files.
+- [ ] **MANDATORY FINAL COMMIT & PUSH VIA GITMAP:** At the FINAL step of the turn, after all targeted files have been refactored, verified with targeted linters, and plans/subtasks consolidated, you MUST commit and push using the dedicated GitMap semantic verb (`gitmap cpr` for releases, `gitmap cpc` for chores/guidelines, `gitmap cbf` for bug fixes, `gitmap cfr` for refactors, `gitmap cpf` for features). Format with Title Case or lowercase subsystem module and hyphen: `gitmap <verb> "<module> - summary"`. TOTAL BAN on `commit` as a module name.
+- [ ] **STRICT VERB TAXONOMY VERIFIED:** Did NOT use `gitmap cpf` for chores, bug fixes, or releases. Used `cpr` for release bumps, `cpc` for chores/syncs, `cbf` for bug fixes.
+- [ ] **ZERO NESTED CONVENTIONAL PREFIXES & ZERO THIRD BRACKETS:** No `chore(release):`, no `feat(...)`, no `fix(...)`, no `[...]` square brackets, no colons `:` inside the argument.
+- [ ] **TOTAL BAN ON PER-FILE COMMITS:** Staged and pushed all files across the turn together in a single atomic GitMap command at the final step. Leaving uncommitted changes or unpushed commits on the active branch at the end of a turn is an immediate failure.
 
 ---
 

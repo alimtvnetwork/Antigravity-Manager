@@ -36,7 +36,7 @@ function buildDroidModel(modelId: string, modelName: string) {
             ...(isThinking ? { extraArgs: { thinking: { type: 'enabled', budget_tokens: 32000 } } } : {}),
         };
     }
-    // Gemini 与其他视觉模型全面开启图像支持 (noImageSupport: false)
+    // Gemini and other visual models fully enable image support (noImageSupport: false)
     const supportsImage = isGemini || modelId.includes('gpt-4') || modelId.includes('image');
     return {
         model: modelId,

@@ -13,8 +13,16 @@ import {
     Play,
     ArrowRightLeft,
     FastForward,
+    FileDown,
+    FileUp,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { showToast } from '../../components/common/ToastContainer';
+import {
+    downloadPromptTreeStatusJson,
+    openAndRestorePromptBackupFile,
+    resendPromptsForInstance,
+} from '../../components/instances/PromptTreeView/usePromptTreeCoreActions';
 import type { InstanceStatus } from '../../services/instanceService';
 import type { InstanceCardData } from './instanceCardData';
 import type { InstancePageApi } from './instancePageTypes';
@@ -52,215 +60,320 @@ export function InstanceCardActions({ api, inst, data, hasActiveTask }: Instance
 
     return (
         <div className="pt-2.5 border-t border-gray-100 dark:border-[#40285e]/80 mt-2 space-y-1.5">
-                                                {/* Row 1: Primary Actions Capsule (Launch/Stop, Switch Account, Fast-Forward, Sync PID) */}
-                                                <div className="flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#090611] border border-slate-200/80 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs w-full">
-                                                    {inst.is_running ? (
-                                                        <div className="flex-1 flex items-center divide-x divide-slate-200 dark:divide-[#40285e]">
-                                                            <button
-                                                                type="button"
-                                                                disabled={isBusy}
-                                                                onClick={() => handleStop(inst.config.id)}
-                                                                className="flex-1 flex items-center justify-center py-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-l-[4px] transition-colors cursor-pointer disabled:opacity-50"
-                                                                title="Stop Instance"
-                                                            >
-                                                                {currentAction === 'stop' ? (
-                                                                    <RotateCw className="w-3.5 h-3.5 animate-spin text-rose-500" />
-                                                                ) : (
-                                                                    <Square className="w-3.5 h-3.5 fill-current" />
-                                                                )}
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                disabled={isBusy}
-                                                                onClick={() => handleRestart(inst.config.id)}
-                                                                className="flex-1 flex items-center justify-center py-1 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer disabled:opacity-50"
-                                                                title="Restart Instance on Current Account"
-                                                            >
-                                                                {currentAction === 'restart' ? (
-                                                                    <RotateCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
-                                                                ) : (
-                                                                    <RotateCcw className="w-3.5 h-3.5" />
-                                                                )}
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <button
-                                                            type="button"
-                                                            disabled={isBusy}
-                                                            onClick={() => handleLaunch(inst.config.id)}
-                                                            className="flex-1 flex items-center justify-center py-1 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 rounded-l-[4px] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                                            title="Launch Instance"
-                                                        >
-                                                            {currentAction === 'launch' ? (
-                                                                <RotateCw className="w-3.5 h-3.5 animate-spin text-teal-500" />
-                                                            ) : (
-                                                                <Play className="w-3.5 h-3.5 fill-current" />
-                                                            )}
-                                                        </button>
-                                                    )}
+            {/* Level 1: Primary Lifecycle & Switching (5 items) */}
+            <div className="relative flex w-full items-stretch overflow-hidden rounded-full border border-slate-200/80 bg-slate-100 shadow-2xs divide-x divide-slate-200 dark:border-[#40285e] dark:bg-[#090611] dark:divide-[#40285e]">
+                {/* Slot 1: Lifecycle (Stop/Restart or Launch) */}
+                {inst.is_running ? (
+                    <div className="flex-1 flex items-center divide-x divide-slate-200 dark:divide-[#40285e]">
+                        <button
+                            id={`instance-stop-${inst.config.id}`}
+                            data-ui-name="instance-stop-btn"
+                            data-ui-id={`instance-stop-${inst.config.id}`}
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => handleStop(inst.config.id, inst.pid ?? undefined)}
+                            className="flex-1 flex items-center justify-center py-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer disabled:opacity-50"
+                            title="Stop Instance"
+                        >
+                            {currentAction === 'stop' ? (
+                                <RotateCw className="w-3.5 h-3.5 animate-spin text-rose-500" />
+                            ) : (
+                                <Square className="w-3.5 h-3.5 fill-current" />
+                            )}
+                        </button>
+                        <button
+                            id={`instance-restart-${inst.config.id}`}
+                            data-ui-name="instance-restart-btn"
+                            data-ui-id={`instance-restart-${inst.config.id}`}
+                            type="button"
+                            disabled={isBusy}
+                            onClick={() => handleRestart(inst.config.id)}
+                            className="flex-1 flex items-center justify-center py-1 text-sky-700 dark:text-sky-300 hover:bg-sky-600 hover:!text-white transition-all duration-300 ease-out font-semibold cursor-pointer disabled:opacity-50"
+                            title="Restart Instance on Current Account"
+                        >
+                            {currentAction === 'restart' ? (
+                                <RotateCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
+                            ) : (
+                                <RotateCcw className="w-3.5 h-3.5" />
+                            )}
+                        </button>
+                    </div>
+                ) : (
+                    <button
+                        id={`instance-launch-${inst.config.id}`}
+                        data-ui-name="instance-launch-btn"
+                        data-ui-id={`instance-launch-${inst.config.id}`}
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => handleLaunch(inst.config.id)}
+                        className="flex-1 flex items-center justify-center py-1 text-teal-600 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Launch Instance"
+                    >
+                        {currentAction === 'launch' ? (
+                            <RotateCw className="w-3.5 h-3.5 animate-spin text-teal-500" />
+                        ) : (
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                        )}
+                    </button>
+                )}
 
-                                                    <button
-                                                        type="button"
-                                                        disabled={isBusy}
-                                                        onClick={() => onSwitchAccount()}
-                                                        className="flex-1 flex items-center justify-center py-1 text-sky-600 dark:text-sky-400 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        title="Switch Account"
-                                                    >
-                                                        {currentAction === 'switch' ? (
-                                                            <RotateCw className="w-3.5 h-3.5 animate-spin text-sky-500" />
-                                                        ) : (
-                                                            <ArrowRightLeft className="w-3.5 h-3.5" />
-                                                        )}
-                                                    </button>
+                {/* Slot 2: Switch Account (3D Yellow Hover) */}
+                <button
+                    id={`instance-switch-${inst.config.id}`}
+                    data-ui-name="instance-switch-btn"
+                    data-ui-id={`instance-switch-${inst.config.id}`}
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => onSwitchAccount()}
+                    className={cn(
+                        "flex-1 flex items-center justify-center py-1 transition-all duration-300 ease-out font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+                        "text-amber-600 dark:text-amber-300 bg-amber-500/10 dark:bg-amber-500/20 border-x border-amber-500/30",
+                        "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:!text-black hover:[&_svg]:!text-black"
+                    )}
+                    title="Switch Account"
+                >
+                    {currentAction === 'switch' ? (
+                        <RotateCw className="w-3.5 h-3.5 animate-spin text-amber-700" />
+                    ) : (
+                        <ArrowRightLeft className="w-3.5 h-3.5" />
+                    )}
+                </button>
 
-                                                    <button
-                                                        type="button"
-                                                        disabled={isBusy}
-                                                        onClick={() => handleFastForward(inst.config.id)}
-                                                        className="flex-1 flex items-center justify-center py-1 text-amber-600 dark:text-amber-400 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        title="Fast Forward to Next Best"
-                                                    >
-                                                        {currentAction === 'fast-forward' ? (
-                                                            <RotateCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
-                                                        ) : (
-                                                            <FastForward className="w-3.5 h-3.5" />
-                                                        )}
-                                                    </button>
+                {/* Slot 3: Fast Forward (3D Yellow Hover) */}
+                <button
+                    id={`instance-fastforward-${inst.config.id}`}
+                    data-ui-name="instance-fastforward-btn"
+                    data-ui-id={`instance-fastforward-${inst.config.id}`}
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => handleFastForward(inst.config.id)}
+                    className={cn(
+                        "flex-1 flex items-center justify-center py-1 transition-all duration-300 ease-out font-semibold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+                        "bg-transparent text-slate-600 dark:text-slate-400",
+                        "hover:bg-gradient-to-b hover:from-[#FDE047] hover:via-[#FACC15] hover:to-[#EAB308] hover:!text-black hover:[&_svg]:!text-black"
+                    )}
+                    title="Fast Forward to Next Best"
+                >
+                    {currentAction === 'fast-forward' ? (
+                        <RotateCw className="w-3.5 h-3.5 animate-spin text-amber-700" />
+                    ) : (
+                        <FastForward className="w-3.5 h-3.5" />
+                    )}
+                </button>
 
-                                                    <button
-                                                        type="button"
-                                                        disabled={isBusy || Boolean(syncingInstanceIds[inst.config.id])}
-                                                        onClick={() => handleSync(inst.config.id)}
-                                                        className="flex-1 flex items-center justify-center py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#40285e] rounded-r-[4px] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        title="Sync PID and Quota"
-                                                    >
-                                                        <Cpu className={cn("w-3.5 h-3.5 text-teal-500", (currentAction === 'sync' || syncingInstanceIds[inst.config.id]) && "animate-pulse")} />
-                                                    </button>
-                                                </div>
+                {/* Slot 4: Audit Trail */}
+                <button
+                    id={`instance-audit-${inst.config.id}`}
+                    data-ui-name="instance-audit-btn"
+                    data-ui-id={`instance-audit-${inst.config.id}`}
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => openAuditDialog(inst.config.id, inst.config.name)}
+                    className="flex-1 flex items-center justify-center py-1 text-slate-600 dark:text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Audit Trail"
+                >
+                    <History className="w-3.5 h-3.5" />
+                </button>
 
-                                                {/* Row 2: Secondary Actions Capsule (Prompts Tree, Settings, Clone Profile, Audit, More Popover) */}
-                                                <div className="flex items-center rounded-[5px] overflow-hidden bg-slate-100 dark:bg-[#090611] border border-slate-200/80 dark:border-[#40285e] p-0.5 divide-x divide-slate-200 dark:divide-[#40285e] shadow-2xs w-full relative">
-                                                    {/* Slot 1: Prompts Tree */}
-                                                    <button
-                                                        id={`prompt-tree-btn-${inst.config.id}`}
-                                                        type="button"
-                                                        disabled={isBusy}
-                                                        onClick={() => openPromptTree(inst.config.id)}
-                                                        className={cn(
-                                                            "flex-1 flex items-center justify-center py-1 transition-colors cursor-pointer relative rounded-l-[4px] disabled:opacity-50 disabled:cursor-not-allowed",
-                                                            hasActiveTask
-                                                                ? "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-300 hover:bg-cyan-100 dark:hover:bg-cyan-900/50"
-                                                                : "text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 hover:bg-slate-200 dark:hover:bg-[#40285e]"
-                                                        )}
-                                                        title={hasActiveTask ? "Prompt Tree (Active Task Running)" : "Prompt Tree"}
-                                                    >
-                                                        <Layers className="w-3.5 h-3.5" />
-                                                        {hasActiveTask && (
-                                                            <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
-                                                        )}
-                                                    </button>
+                {/* Slot 5: Sync PID & Quota */}
+                <button
+                    id={`instance-sync-${inst.config.id}`}
+                    data-ui-name="instance-sync-btn"
+                    data-ui-id={`instance-sync-${inst.config.id}`}
+                    type="button"
+                    disabled={isBusy || Boolean(syncingInstanceIds[inst.config.id])}
+                    onClick={() => handleSync(inst.config.id)}
+                    className="flex-1 flex items-center justify-center py-1 text-teal-600 dark:text-teal-400 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Sync PID and Quota"
+                >
+                    <Cpu className={cn("w-3.5 h-3.5 text-teal-500", (currentAction === 'sync' || syncingInstanceIds[inst.config.id]) && "animate-pulse")} />
+                </button>
+            </div>
 
-                                                    {/* Slot 2: Settings */}
-                                                    <button
-                                                        type="button"
-                                                        disabled={isBusy}
-                                                        onClick={() => openSettingsDialog(inst.config.id)}
-                                                        className="flex-1 flex items-center justify-center py-1 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        title="Settings & Sync"
-                                                    >
-                                                        <SlidersHorizontal className="w-3.5 h-3.5" />
-                                                    </button>
+            {/* Level 2: Utilities & Profile Management (6 items) */}
+            <div className="relative flex w-full items-stretch overflow-hidden rounded-full border border-slate-200/80 bg-slate-100 shadow-2xs divide-x divide-slate-200 dark:border-[#40285e] dark:bg-[#090611] dark:divide-[#40285e]">
+                {/* Slot 1: Prompt Tree (Active task cyan dot) */}
+                <button
+                    id={`instance-tree-${inst.config.id}`}
+                    data-ui-name="instance-tree-btn"
+                    data-ui-id={`instance-tree-${inst.config.id}`}
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => openPromptTree(inst.config.id)}
+                    className={cn(
+                        "flex-1 flex items-center justify-center py-1 transition-colors cursor-pointer relative disabled:opacity-50 disabled:cursor-not-allowed",
+                        hasActiveTask
+                            ? "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-300 hover:bg-cyan-100 dark:hover:bg-cyan-900/50"
+                            : "text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 hover:bg-slate-200 dark:hover:bg-[#40285e]"
+                    )}
+                    title={hasActiveTask ? "Prompt Tree (Active Task Running)" : "Prompt Tree"}
+                >
+                    <Layers className="w-3.5 h-3.5" />
+                    {hasActiveTask && (
+                        <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
+                    )}
+                </button>
 
-                                                    {/* Slot 3: Clone Profile */}
-                                                    <button
-                                                        type="button"
-                                                        disabled={isBusy}
-                                                        onClick={() => openCopyDialog(inst.config.id, inst.config.name)}
-                                                        className="flex-1 flex items-center justify-center py-1 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        title="Clone Profile"
-                                                    >
-                                                        <Copy className="w-3.5 h-3.5" />
-                                                    </button>
+                {/* Slot 2: Settings & Sync */}
+                <button
+                    id={`instance-settings-${inst.config.id}`}
+                    data-ui-name="instance-settings-btn"
+                    data-ui-id={`instance-settings-${inst.config.id}`}
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => openSettingsDialog(inst.config.id)}
+                    className="flex-1 flex items-center justify-center py-1 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-300 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Settings & Sync"
+                >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                </button>
 
-                                                    {/* Slot 4: Audit Trail */}
-                                                    <button
-                                                        type="button"
-                                                        disabled={isBusy}
-                                                        onClick={() => openAuditDialog(inst.config.id, inst.config.name)}
-                                                        className="flex-1 flex items-center justify-center py-1 text-slate-600 dark:text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                                        title="Audit Trail"
-                                                    >
-                                                        <History className="w-3.5 h-3.5" />
-                                                    </button>
+                {/* Slot 3: Clone Profile */}
+                <button
+                    id={`instance-clone-${inst.config.id}`}
+                    data-ui-name="instance-clone-btn"
+                    data-ui-id={`instance-clone-${inst.config.id}`}
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => openCopyDialog(inst.config.id, inst.config.name)}
+                    className="flex-1 flex items-center justify-center py-1 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Clone Profile"
+                >
+                    <Copy className="w-3.5 h-3.5" />
+                </button>
 
-                                                    {/* Slot 5: More Popover Trigger */}
-                                                    <div className="flex-1 relative">
-                                                        <button
-                                                            type="button"
-                                                            disabled={isBusy}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setCardMoreId(cardMoreId === inst.config.id ? null : inst.config.id);
-                                                            }}
-                                                            className={cn(
-                                                                "w-full flex items-center justify-center py-1 rounded-r-[4px] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
-                                                                cardMoreId === inst.config.id
-                                                                    ? "bg-slate-200 dark:bg-[#40285e] text-slate-900 dark:text-white"
-                                                                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#40285e]"
-                                                            )}
-                                                            title="More Actions (Clone Executable, Wipe, Delete)"
-                                                        >
-                                                            <MoreHorizontal className="w-3.5 h-3.5" />
-                                                        </button>
+                {/* Slot 4: Clone Executable */}
+                <button
+                    id={`instance-clone-exe-${inst.config.id}`}
+                    data-ui-name="instance-clone-exe-btn"
+                    data-ui-id={`instance-clone-exe-${inst.config.id}`}
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => handleCloneExecutable(inst.config.id)}
+                    className="flex-1 flex items-center justify-center py-1 text-slate-600 dark:text-slate-400 hover:text-amber-500 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Clone Executable"
+                >
+                    <Cpu className="w-3.5 h-3.5" />
+                </button>
 
-                                                        {/* More Popover Dropdown */}
-                                                        {cardMoreId === inst.config.id && (
-                                                            <div
-                                                                className="absolute right-0 bottom-full mb-1 z-30 min-w-[170px] rounded-[5px] border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] py-1 text-slate-800 dark:text-slate-200 shadow-xl text-xs"
-                                                                onClick={(e) => e.stopPropagation()}
-                                                            >
-                                                                <button
-                                                                    type="button"
-                                                                    disabled={isBusy}
-                                                                    onClick={() => {
-                                                                        setCardMoreId(null);
-                                                                        handleCloneExecutable(inst.config.id);
-                                                                    }}
-                                                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#40285e] text-slate-200 dark:text-slate-100 dark:hover:text-amber-300 cursor-pointer disabled:opacity-50"
-                                                                >
-                                                                    <Cpu className="w-3.5 h-3.5" />
-                                                                    <span>Clone Executable</span>
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    disabled={inst.is_running || isBusy}
-                                                                    onClick={() => {
-                                                                        setCardMoreId(null);
-                                                                        handleWipeSession(inst.config.id);
-                                                                    }}
-                                                                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#40285e] text-amber-600 dark:text-amber-400 cursor-pointer disabled:opacity-40"
-                                                                >
-                                                                    <KeyRound className="w-3.5 h-3.5 text-amber-500" />
-                                                                    <span>Wipe Credentials</span>
-                                                                </button>
-                                                                {!inst.config.is_default && (
-                                                                    <button
-                                                                        type="button"
-                                                                        disabled={inst.is_running || isBusy || deletingId === inst.config.id}
-                                                                        onClick={() => {
-                                                                            setCardMoreId(null);
-                                                                            handleDelete(inst.config.id);
-                                                                        }}
-                                                                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 cursor-pointer disabled:opacity-40"
-                                                                    >
-                                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                                        <span>Delete Profile</span>
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
+                {/* Slot 5: Wipe Session / Reset */}
+                <button
+                    id={`instance-wipe-${inst.config.id}`}
+                    data-ui-name="instance-wipe-btn"
+                    data-ui-id={`instance-wipe-${inst.config.id}`}
+                    type="button"
+                    disabled={inst.is_running || isBusy}
+                    onClick={() => handleWipeSession(inst.config.id)}
+                    className="flex-1 flex items-center justify-center py-1 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Wipe Session / Credentials"
+                >
+                    <KeyRound className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Slot 6: Delete Profile / More Actions Popover */}
+                <div className="flex-1 relative">
+                    <button
+                        id={`instance-more-${inst.config.id}`}
+                        data-ui-name="instance-more-btn"
+                        data-ui-id={`instance-more-${inst.config.id}`}
+                        type="button"
+                        disabled={isBusy}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setCardMoreId(cardMoreId === inst.config.id ? null : inst.config.id);
+                        }}
+                        className={cn(
+                            "w-full flex items-center justify-center py-1 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+                            cardMoreId === inst.config.id
+                                ? "bg-slate-200 dark:bg-[#40285e] text-slate-900 dark:text-white"
+                                : "text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#40285e]"
+                        )}
+                        title="More Actions"
+                    >
+                        <MoreHorizontal className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* More Popover Dropdown */}
+                    {cardMoreId === inst.config.id && (
+                        <div
+                            className="absolute right-0 bottom-full mb-1 z-30 min-w-[170px] rounded-[5px] border border-slate-200 dark:border-[#40285e] bg-white dark:bg-[#171025] py-1 text-slate-800 dark:text-slate-200 shadow-xl text-xs"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={async () => {
+                                    setCardMoreId(null);
+                                    try {
+                                        const count = await resendPromptsForInstance(inst.config.id, (msg) => {
+                                            if (msg) showToast(msg, 'info');
+                                        });
+                                        showToast(`Resent ${count} prompt(s) for ${inst.config.name}`, 'success');
+                                    } catch (e: any) {
+                                        showToast(e?.message || 'Failed to resend prompts', 'error');
+                                    }
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#40285e] text-blue-600 dark:text-cyan-300 cursor-pointer disabled:opacity-50"
+                                title="Re-send running and queued prompts in FIFO order"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5 text-cyan-500" />
+                                <span>Resend Prompts (FIFO)</span>
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={async () => {
+                                    setCardMoreId(null);
+                                    await downloadPromptTreeStatusJson('running_and_queued', undefined, (msg) => {
+                                        if (msg) showToast(msg, 'info');
+                                    });
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#40285e] text-purple-600 dark:text-purple-300 cursor-pointer disabled:opacity-50"
+                                title="Export running and queued prompts to JSON"
+                            >
+                                <FileDown className="w-3.5 h-3.5 text-purple-500" />
+                                <span>Export Prompts (.json)</span>
+                            </button>
+                            <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={async () => {
+                                    setCardMoreId(null);
+                                    try {
+                                        await openAndRestorePromptBackupFile(inst.config.id, (msg) => {
+                                            if (msg) showToast(msg, 'info');
+                                        });
+                                    } catch (e: any) {
+                                        showToast(e?.message || 'Failed to restore prompts', 'error');
+                                    }
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 dark:hover:bg-[#40285e] text-emerald-600 dark:text-emerald-400 cursor-pointer disabled:opacity-50"
+                                title="Restore prompts from JSON backup file"
+                            >
+                                <FileUp className="w-3.5 h-3.5 text-emerald-500" />
+                                <span>Restore Prompts (.json)</span>
+                            </button>
+                            {!inst.config.is_default && (
+                                <>
+                                    <div className="my-1 border-t border-slate-100 dark:border-[#40285e]" />
+                                    <button
+                                        type="button"
+                                        disabled={inst.is_running || isBusy || deletingId === inst.config.id}
+                                        onClick={() => {
+                                            setCardMoreId(null);
+                                            handleDelete(inst.config.id);
+                                        }}
+                                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-600 dark:text-rose-400 cursor-pointer disabled:opacity-40"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        <span>Delete Profile</span>
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
     );
 }

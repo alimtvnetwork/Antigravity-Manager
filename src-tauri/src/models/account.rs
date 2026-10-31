@@ -32,7 +32,7 @@ pub struct LiveLimitStatus {
     pub message: Option<String>,
 }
 
-/// 账号数据结构
+/// Account data structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Account {
     pub id: String,
@@ -45,10 +45,10 @@ pub struct Account {
     )]
     pub priority: u8,
     pub token: TokenData,
-    /// 可选的设备指纹，用于切换账号时固定机器信息
+    /// Optional device fingerprint, used to fix machine information when switching accounts
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub device_profile: Option<DeviceProfile>,
-    /// 设备指纹历史（生成/采集时记录），不含基线
+    /// Device fingerprint history (recorded when generated/collected), excluding baseline
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub device_history: Vec<DeviceProfileVersion>,
     pub quota: Option<QuotaData>,
@@ -70,33 +70,33 @@ pub struct Account {
     /// Unix timestamp when the proxy was disabled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub proxy_disabled_at: Option<i64>,
-    /// 受配额保护禁用的模型列表 [NEW #621]
+    /// List of models disabled by quota protection [NEW #621]
     #[serde(default, skip_serializing_if = "HashSet::is_empty")]
     pub protected_models: HashSet<String>,
     /// Temporary live upstream throttles observed from actual generation requests.
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub live_limited_models: HashMap<String, LiveLimitStatus>,
-    /// [NEW] 403 验证阻止状态 (VALIDATION_REQUIRED)
+    /// [NEW] 403 Validation Blocking Status (VALIDATION_REQUIRED)
     #[serde(default)]
     pub validation_blocked: bool,
-    /// [NEW] 验证阻止截止时间戳
+    /// [NEW] Validate blocking expiration timestamp
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub validation_blocked_until: Option<i64>,
-    /// [NEW] 验证阻止原因
+    /// [NEW] Verify blocking reason
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub validation_blocked_reason: Option<String>,
-    /// [NEW] 验证链接 URL (#1522)
+    /// [NEW] Verification link URL (#1522)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub validation_url: Option<String>,
     pub created_at: i64,
     pub last_used: i64,
-    /// 绑定的代理 ID (None = 使用全局代理池)
+    /// The bound proxy ID (None = use global proxy pool)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub proxy_id: Option<String>,
-    /// 代理绑定时间
+    /// Agent binding time
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub proxy_bound_at: Option<i64>,
-    /// 用户自定义标签
+    /// User-defined labels
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custom_label: Option<String>,
 }
@@ -181,7 +181,7 @@ impl Account {
     }
 }
 
-/// 账号索引数据（accounts.json）
+/// Account index data (accounts.json)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountIndex {
     pub version: String,
@@ -191,7 +191,7 @@ pub struct AccountIndex {
     pub current_target_ide: Option<String>,
 }
 
-/// 账号摘要信息
+/// Account summary information
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountSummary {
     pub id: String,
@@ -201,7 +201,7 @@ pub struct AccountSummary {
     pub disabled: bool,
     #[serde(default)]
     pub proxy_disabled: bool,
-    /// 受保护的模型列表 [NEW] 供 UI 显示锁定图标
+    /// List of protected models [NEW] for UI to display lock icon
     #[serde(default, skip_serializing_if = "HashSet::is_empty")]
     pub protected_models: HashSet<String>,
     pub created_at: i64,
@@ -225,7 +225,7 @@ impl Default for AccountIndex {
     }
 }
 
-/// 设备指纹（storage.json 中 telemetry 相关字段）
+/// Device fingerprint (telemetry related fields in storage.json)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceProfile {
     pub machine_id: String,
@@ -234,7 +234,7 @@ pub struct DeviceProfile {
     pub sqm_id: String,
 }
 
-/// 指纹历史版本
+/// Fingerprint history version
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeviceProfileVersion {
     pub id: String,
@@ -245,14 +245,14 @@ pub struct DeviceProfileVersion {
     pub is_current: bool,
 }
 
-/// 导出账号项（用于备份/迁移）
+/// Export account items (for backup/migration)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountExportItem {
     pub email: String,
     pub refresh_token: String,
 }
 
-/// 导出账号响应
+/// Export account response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountExportResponse {
     pub accounts: Vec<AccountExportItem>,

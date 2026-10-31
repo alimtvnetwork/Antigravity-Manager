@@ -41,25 +41,25 @@ fn test_openai_image_params_support() {
 
 #[test]
 fn test_mixed_tools_injection_gemini_native() {
-    // 验证 Gemini Native 协议在 Gemini 2.0+ 下支持混合工具
+    // Verify Gemini Native protocol supports hybrid tools under Gemini 2.0+
     let body = json!({
         "contents": [{"parts": [{"text": "Hello"}]}],
         "tools": [{"functionDeclarations": [{"name": "get_weather", "parameters": {"type": "OBJECT", "properties": {"location": {"type": "STRING"}}}}]}],
         "generationConfig": {}
     });
 
-    // 模拟 -online 触发的 RequestConfig
+    // Simulate a RequestConfig triggered by -online
     use crate::proxy::mappers::common_utils::resolve_request_config;
     let _config =
         resolve_request_config("-online", "gemini-2.0-flash", &None, None, None, None, None);
 
-    // 实际上 wrap_request 内部会根据 config.inject_google_search 调用 inject_google_search_tool
-    // 但 wrap_request 的签名不直接接受 RequestConfig，它内部逻辑如下：
+    // In fact, wrap_request internally calls inject_google_search_tool based on config.inject_google_search
+    // But the signature of wrap_request does not directly accept RequestConfig. Its internal logic is as follows:
     // if config.inject_google_search { ... }
 
-    // 我们改为直接测试涉及的 wrap_request 逻辑片段。
-    // 由于测试 wrap_request 比较复杂（涉及外部 config），
-    // 我们可以直接验证 inject_google_search_tool 在 native 格式下的表现。
+    // We instead directly test the piece of wrap_request logic involved.
+    // Since testing wrap_request is more complex (involving external config),
+    // We can directly verify the performance of inject_google_search_tool in native format.
 
     let mut inner_request = body.clone();
     crate::proxy::mappers::common_utils::inject_google_search_tool(
@@ -184,7 +184,7 @@ fn test_gemini_anthropic_alignment_thinking_and_signatures() {
     let model_msg = &contents[0];
     let parts = model_msg["parts"].as_array().unwrap();
 
-    // 【2026-09-27】占位思考块（"·"）直接丢弃，不再归一为 "..."
+    // 【2026-09-27】The placeholder thinking block ("·") is discarded directly and is no longer normalized to "..."
     // Part 0 should be the second (meaningful) thinking block, now promoted to the head
     assert_eq!(parts[0]["thought"], true);
     assert_eq!(
@@ -204,7 +204,7 @@ fn test_gemini_thinking_level_authority_resolution() {
     crate::proxy::config::update_thinking_budget_config(
         crate::proxy::config::ThinkingBudgetConfig::default(),
     );
-    // 1. 启发式模型忽略客户端 thinkingLevel
+    // 1. Heuristic model ignores client thinkingLevel
     let req_high = json!({
         "contents": [{"role": "user", "parts": [{"text": "hi"}]}],
         "generationConfig": {
@@ -223,7 +223,7 @@ fn test_gemini_thinking_level_authority_resolution() {
     assert_eq!(tc["thinkingBudget"], 16384);
     assert!(tc.get("thinkingLevel").is_none());
 
-    // 2. 裸模型 Flash 接管客户端 thinkingLevel
+    // 2. Naked model Flash takes over client thinkingLevel
     let req_flash_high = json!({
         "contents": [{"role": "user", "parts": [{"text": "hi"}]}],
         "generationConfig": {
@@ -253,7 +253,7 @@ fn test_gemini_thinking_level_authority_resolution() {
     assert_eq!(tc["thinkingBudget"], 1024);
     assert!(tc.get("thinkingLevel").is_none());
 
-    // 3. 裸模型 Flash 客户端传 NONE 或未传：绝不关闭思考，强制回填 -medium (4096)
+    // 3. Naked model Flash client passes NONE or not: never close thinking and force backfill -medium (4096)
     let req_flash_none = json!({
         "contents": [{"role": "user", "parts": [{"text": "hi"}]}],
         "generationConfig": {
@@ -286,7 +286,7 @@ fn test_gemini_thinking_level_authority_resolution() {
     let tc = &wrapped["request"]["generationConfig"]["thinkingConfig"];
     assert_eq!(tc["thinkingBudget"], 4096);
 
-    // 4. 裸模型 Flash 客户端传入自定义 thinkingBudget：彻底被忽略，由服务端权威等级回填
+    // 4. The naked model Flash client passes in a custom thinkingBudget: it is completely ignored and is backfilled by the server's authority level.
     let req_flash_custom_budget = json!({
         "contents": [{"role": "user", "parts": [{"text": "hi"}]}],
         "generationConfig": {

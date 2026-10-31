@@ -21,7 +21,7 @@ mod tests {
         }
         let _guard = ResetGuard;
 
-        // 1. 显式关闭：彻底不带 thinkingConfig
+        // 1. Explicitly close: completely without thinkingConfig
         let mut gc1 = json!({
             "thinkingConfig": { "includeThoughts": true }
         });
@@ -35,7 +35,7 @@ mod tests {
         );
         assert!(gc1.get("thinkingConfig").is_none());
 
-        // 2. 缺省：includeThoughts=true，绝无 thinkingBudget
+        // 2. Default: includeThoughts=true, no thinkingBudget
         let mut gc2 = json!({});
         InboundThinkingPipeline::configure_inbound_thinking(
             "gemini-3.8-flash-tiered",
@@ -50,7 +50,7 @@ mod tests {
         assert!(tc2.get("thinkingBudget").is_none());
         assert!(tc2.get("thinkingLevel").is_none());
 
-        // 3. 显式等级：thinkingLevel=LOW / HIGH，绝无 thinkingBudget，必须带上 includeThoughts: true
+        // 3. Explicit level: thinkingLevel=LOW / HIGH, no thinkingBudget, must include includeThoughts: true
         let mut gc3 = json!({});
         InboundThinkingPipeline::configure_inbound_thinking(
             "gemini-3.8-flash-tiered",
@@ -65,7 +65,7 @@ mod tests {
         assert_eq!(tc3.get("thinkingLevel"), Some(&json!("LOW")));
         assert!(tc3.get("thinkingBudget").is_none());
 
-        // 3.1 客户端填了任何自定义等级（非硬编码）且没填预算，忠实透传等级，坚决不填预算
+        // 3.1 If the client fills in any custom level (not hard-coded) and does not fill in the budget, the level will be faithfully and transparently transmitted, and the budget will not be filled in.
         let mut gc3_custom = json!({});
         let budget_custom_res = InboundThinkingPipeline::configure_inbound_thinking(
             "gemini-3.8-flash-tiered",
@@ -88,7 +88,7 @@ mod tests {
         assert!(tc3_custom.get("thinkingBudget").is_none(), "When client provides custom effort without budget, thinkingBudget must strictly remain None");
         assert!(budget_custom_res.is_none());
 
-        // 4. 显式预算：thinkingBudget=8192，绝无 thinkingLevel，必须带上 includeThoughts: true
+        // 4. Explicit budget: thinkingBudget=8192, no thinkingLevel, must include includeThoughts: true
         let mut gc4 = json!({});
         InboundThinkingPipeline::configure_inbound_thinking(
             "gemini-3.8-flash-tiered",
@@ -127,28 +127,28 @@ mod tests {
         );
 
         let parts = contents[0]["parts"].as_array().expect("parts array");
-        // 1. 首位成功提升为 thought: true 的思考块
+        // 1. The first thought block successfully promoted to thought: true
         assert_eq!(parts[0]["thought"], true);
         assert_eq!(parts[0]["text"], thought_text);
-        // 铁律 I4：Gemini 目标的思考块**绝不**携带签名。
-        // 哨兵（skip_thought_signature_validator）不属于 Antigravity 协议 ——
-        // 官方 3 份报文 23 处签名里出现 0 次。
+        // Iron Rule I4: A Gemini target's thought block **never** carries a signature.
+        // Sentinel (skip_thought_signature_validator) does not belong to the Antigravity protocol -
+        // Appears 0 times in 23 signatures in 3 official documents.
         assert!(
             parts[0].get("thoughtSignature").is_none(),
-            "Gemini 目标的思考块不得携带签名（I4）"
+            "Think blocks for Gemini targets must not carry signatures (I4)"
         );
 
-        // 2. 正文部件已干净剔除 <think>...</think> 标签与换行，仅保留真实回答
+        // 2. The text components have been cleanly removed with <think>...</think> tags and line breaks, leaving only true answers.
         assert_eq!(parts[1]["text"], visible_answer);
         assert!(parts[1].get("thought").is_none());
     }
 
-    // ============ 工具回执（functionResponse）role 归一化 ============
+    // ============ Tool receipt (functionResponse) role normalization ============
     //
-    // 目标：与官方 Antigravity 形态一比一 —— `functionResponse` 位于 `role: "model"` 的
-    // content 中。实测（gemini-3.8-flash-tiered @ daily）表明上游对 user / model 两种
-    // role **完全宽容**，故本归一化是「对齐官方形态 + 稳定前缀字节」，
-    // 并天然**向下兼容**两种入站形态。
+    // Goal: One-to-one comparison with the official Antigravity form - `functionResponse` in `role: "model"`
+    // content. Actual measurement (gemini-3.8-flash-tiered@daily) shows that upstream has two types of user / model
+    // role **fully tolerant**, so this normalization is "Align to official form + stable prefix byte",
+    // And it is naturally backward compatible with two inbound forms.
 
     fn fr_part(id: &str, name: &str) -> Value {
         json!({"functionResponse": {"id": id, "name": name, "response": {"output": "ok"}}})
@@ -158,7 +158,7 @@ mod tests {
         json!({"functionCall": {"id": id, "name": name, "args": {}}})
     }
 
-    /// 官方形态（回执已在 `role:"model"`）→ 必须完全幂等。
+    /// Official form (receipt already in `role:"model"`) → Must be fully idempotent.
     #[test]
     fn test_fr_role_official_shape_is_idempotent() {
         let mut contents = vec![
@@ -169,11 +169,11 @@ mod tests {
         ];
         let snapshot = contents.clone();
         let n = InboundThinkingPipeline::normalize_function_response_roles(&mut contents);
-        assert_eq!(n, 0, "官方形态应零改动");
+        assert_eq!(n, 0, "There should be zero changes to the official form");
         assert_eq!(contents, snapshot);
     }
 
-    /// 入站形态：回执在 `role:"user"` → 归一到官方形态（`role:"model"`）。
+    /// Inbound form: The receipt is in `role:"user"` → normalized to the official form (`role:"model"`).
     #[test]
     fn test_fr_role_user_response_is_mapped_to_model() {
         let mut contents = vec![
@@ -184,17 +184,21 @@ mod tests {
         ];
         let n = InboundThinkingPipeline::normalize_function_response_roles(&mut contents);
         assert_eq!(n, 1);
-        assert_eq!(contents.len(), 4, "纯回执轮只改 role，不增删 content");
+        assert_eq!(
+            contents.len(),
+            4,
+            "The pure receipt wheel only changes the role and does not add or delete content."
+        );
         assert_eq!(contents[2]["role"], "model");
         assert_eq!(
             contents[2]["parts"][0]["functionResponse"]["name"],
             "view_file"
         );
-        // 相邻轮次不受影响
+        // Adjacent rounds are not affected
         assert_eq!(contents[3]["role"], "user");
     }
 
-    /// 并发回执：一轮多个回执整体迁移，**内部顺序原样保持**。
+    /// Concurrent receipts: Multiple receipts in one round are migrated as a whole, and the internal order remains intact.
     #[test]
     fn test_fr_role_parallel_responses_kept_in_order() {
         let mut contents = vec![
@@ -211,24 +215,24 @@ mod tests {
         assert_eq!(parts[1]["functionResponse"]["name"], "run_command");
     }
 
-    /// 混合轮：`user [text, fr]` → `user[text]` + `model[fr]`，顺序保持。
+    /// Mixing wheel: `user [text, fr]` → `user[text]` + `model[fr]`, order maintained.
     #[test]
     fn test_fr_role_mixed_turn_is_split_preserving_order() {
         let mut contents = vec![
             json!({"role": "user", "parts": [{"text": "go"}]}),
             json!({"role": "model", "parts": [fc_part("c1", "view_file")]}),
-            json!({"role": "user", "parts": [{"text": "顺便说明"}, fr_part("c1", "view_file")]}),
+            json!({"role": "user", "parts": [{"text": "By the way"}, fr_part("c1", "view_file")]}),
         ];
         let n = InboundThinkingPipeline::normalize_function_response_roles(&mut contents);
         assert_eq!(n, 1);
         assert_eq!(contents.len(), 4);
         assert_eq!(contents[2]["role"], "user");
-        assert_eq!(contents[2]["parts"][0]["text"], "顺便说明");
+        assert_eq!(contents[2]["parts"][0]["text"], "By the way");
         assert_eq!(contents[3]["role"], "model");
         assert!(contents[3]["parts"][0].get("functionResponse").is_some());
     }
 
-    /// 回执附带图片：`user [fr, inlineData]` → `model [fr, inlineData]`。
+    /// The receipt comes with an image: `user [fr, inlineData]` → `model [fr, inlineData]`.
     #[test]
     fn test_fr_role_response_with_inline_data_moves_together() {
         let img = json!({"inlineData": {"mimeType": "image/png", "data": "AAA"}});
@@ -243,7 +247,7 @@ mod tests {
         assert_eq!(contents[2]["parts"].as_array().unwrap().len(), 2);
     }
 
-    /// 用户发图提问 `user [inlineData, text]` **不得**被误判为回执轮。
+    /// A user posting a picture to ask a question `user [inlineData, text]` **must** not be misjudged as a receipt wheel.
     #[test]
     fn test_fr_role_user_image_question_is_untouched() {
         let mut contents = vec![
@@ -251,16 +255,19 @@ mod tests {
             json!({"role": "model", "parts": [{"text": "ok"}]}),
             json!({"role": "user", "parts": [
                 {"inlineData": {"mimeType": "image/png", "data": "AAA"}},
-                {"text": "这张图是什么"}
+                {"text": "what is this picture"}
             ]}),
         ];
         let snapshot = contents.clone();
         let n = InboundThinkingPipeline::normalize_function_response_roles(&mut contents);
-        assert_eq!(n, 0, "无 functionResponse 的轮次绝不改写");
+        assert_eq!(
+            n, 0,
+            "Rounds without functionResponse are never overwritten"
+        );
         assert_eq!(contents, snapshot);
     }
 
-    /// 工具调用轮（`model [fc, fc]`）不受影响。
+    /// Tool call wheel(`model [fc, fc]`) is not affected.
     #[test]
     fn test_fr_role_function_call_turns_untouched() {
         let mut contents = vec![
@@ -273,7 +280,7 @@ mod tests {
         assert_eq!(contents, snapshot);
     }
 
-    /// 防御：首条 content 不得被改成 `model`（Gemini 要求对话以 user 开头）。
+    /// Defense: The first content must not be changed to `model` (Gemini requires the conversation to start with user).
     #[test]
     fn test_fr_role_leading_response_stays_user() {
         let mut contents = vec![
@@ -285,7 +292,7 @@ mod tests {
         assert_eq!(contents[0]["role"], "user");
     }
 
-    /// 测试工具调用与回执 ID 统一归一化为 call_ 规范形态
+    /// Test tool calls and receipt IDs are unified and normalized into the call_ standard form
     #[test]
     fn test_normalize_tool_call_ids() {
         let mut contents = vec![
@@ -320,7 +327,7 @@ mod tests {
                     {
                         "functionCall": {
                             "name": "exec",
-                            "id": "call_1542346", // 已带下划线，保持原样
+                            "id": "call_1542346", // Underlined, leave as is
                             "args": {"command": "ls"}
                         }
                     }
@@ -329,16 +336,19 @@ mod tests {
         ];
 
         let count = InboundThinkingPipeline::normalize_tool_call_ids(&mut contents);
-        assert_eq!(count, 2, "应归一化 2 个丢失下划线的 tool call/response ID");
+        assert_eq!(
+            count, 2,
+            "2 tool call/response IDs that are missing underscores should be normalized"
+        );
 
-        // functionCall 验证
+        // functionCall verification
         assert_eq!(contents[1]["parts"][0]["functionCall"]["id"], "call_573077");
-        // functionResponse 验证
+        // functionResponse verification
         assert_eq!(
             contents[2]["parts"][0]["functionResponse"]["id"],
             "call_573077"
         );
-        // 原生已带下划线不受影响
+        // Native underlined values are not affected
         assert_eq!(
             contents[3]["parts"][0]["functionCall"]["id"],
             "call_1542346"

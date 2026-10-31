@@ -401,7 +401,7 @@ As defined in repository governance:
 
 ### 7.3 Two-Way README Changelog Synchronization
 For stable minor releases:
-- The release notes summary must be mirrored across both `README.md` (under `## 📝 更新日志`) and `README_EN.md` (under `## 📝 Changelog`).
+- The release notes summary must be mirrored across both `README.md` (under `## 📝 Changelog`) and `README_EN.md` (under `## 📝 Changelog`).
 - Never update only `CHANGELOG.md` while leaving `README.md` / `README_EN.md` with outdated release notes.
 
 ---

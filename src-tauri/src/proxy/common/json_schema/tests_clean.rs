@@ -67,7 +67,7 @@ fn test_clean_json_schema_draft_2020_12() {
                 "minLength": 1,
                 "format": "city"
             },
-            // 模拟属性名冲突：pattern 是一个 Object 属性，不应被移除
+            // Simulated property name conflict: pattern is an Object property and should not be removed
             "pattern": {
                 "type": "object",
                 "properties": {
@@ -88,11 +88,11 @@ fn test_clean_json_schema_draft_2020_12() {
 
     clean_json_schema(&mut schema);
 
-    // 1. 验证类型保持小写
+    // 1. Keep validation types in lowercase
     assert_eq!(schema["type"], "object");
     assert_eq!(schema["properties"]["location"]["type"], "string");
 
-    // 2. 验证非标准约束字段被安全移除，且描述保持纯透传不被篡改
+    // 2. Verify that non-standard constraint fields are safely removed and the description remains transparent and cannot be tampered with.
     assert!(schema["properties"]["location"].get("minLength").is_none());
     assert!(schema["properties"]["location"].get("format").is_none());
     assert_eq!(
@@ -100,11 +100,11 @@ fn test_clean_json_schema_draft_2020_12() {
         "The city and state, e.g. San Francisco, CA"
     );
 
-    // 3. 验证名为 "pattern" 的属性未被误删
+    // 3. Verify that the attribute named "pattern" has not been deleted by mistake
     assert!(schema["properties"].get("pattern").is_some());
     assert_eq!(schema["properties"]["pattern"]["type"], "object");
 
-    // 4. 验证内部的 pattern 校验字段被移除，且描述保持原样
+    // 4. Verify that the internal pattern check field is removed and the description remains the same
     assert!(schema["properties"]["pattern"]["properties"]["regex"]
         .get("pattern")
         .is_none());
@@ -113,10 +113,10 @@ fn test_clean_json_schema_draft_2020_12() {
         "Regex pattern"
     );
 
-    // 5. 验证联合类型被降级为单一类型 (Protobuf 兼容性)
+    // 5. Verify that union types are downgraded to single types (Protobuf compatibility)
     assert_eq!(schema["properties"]["unit"]["type"], "string");
 
-    // 6. 验证元数据字段被移除
+    // 6. Verify metadata fields are removed
     assert!(schema.get("$schema").is_none());
 }
 
@@ -149,7 +149,7 @@ fn test_flatten_refs() {
 
     clean_json_schema(&mut schema);
 
-    // 验证引用被展开且类型转为小写
+    // Verify that the reference is expanded and the type is converted to lowercase
     assert_eq!(schema["properties"]["home"]["type"], "object");
     assert_eq!(
         schema["properties"]["home"]["properties"]["city"]["type"],
@@ -168,14 +168,14 @@ fn test_clean_json_schema_missing_required() {
 
     clean_json_schema(&mut schema);
 
-    // 验证 missing_prop 被从 required 中移除
+    // Verify missing_prop is removed from required
     let required = schema["required"].as_array().unwrap();
     assert_eq!(required.len(), 1);
     assert_eq!(required[0].as_str().unwrap(), "existing_prop");
 }
 
 fn test_anyof_type_extraction() {
-    // 测试 FastMCP 风格的 Optional[str] schema
+    // Test FastMCP style Optional[str] schema
     let mut schema = json!({
         "type": "object",
         "properties": {
@@ -204,16 +204,16 @@ fn test_anyof_type_extraction() {
 
     clean_json_schema(&mut schema);
 
-    // 验证 anyOf 被移除
+    // Verify anyOf is removed
     assert!(schema["properties"]["testo"].get("anyOf").is_none());
     assert!(schema["properties"]["importo"].get("anyOf").is_none());
 
-    // 验证 type 被正确提取
+    // Verify type is extracted correctly
     assert_eq!(schema["properties"]["testo"]["type"], "string");
     assert_eq!(schema["properties"]["importo"]["type"], "number");
     assert_eq!(schema["properties"]["attivo"]["type"], "boolean");
 
-    // 验证 default 被移除 (白名单之外)
+    // Verify default is removed (out of whitelist)
     assert!(schema["properties"]["testo"].get("default").is_none());
 }
 
@@ -249,7 +249,7 @@ fn test_existing_type_preserved() {
 
     clean_json_schema(&mut schema);
 
-    // type 已存在，不应被 anyOf 中的类型覆盖
+    // type already exists and should not be overridden by the type in anyOf
     assert_eq!(schema["properties"]["name"]["type"], "string");
     assert!(schema["properties"]["name"].get("anyOf").is_none());
 }
@@ -278,27 +278,27 @@ fn test_issue_815_anyof_properties_preserved() {
 
     let config = &schema["properties"]["config"];
 
-    // 1. 验证类型被提取
+    // 1. Verification type is extracted
     assert_eq!(config["type"], "object");
 
-    // 2. 验证 anyOf 内部的 properties 被合并上来了
+    // 2. Verify that the properties inside anyOf are merged
     assert!(config.get("properties").is_some());
     assert_eq!(config["properties"]["path"]["type"], "string");
     assert_eq!(config["properties"]["recursive"]["type"], "boolean");
 
-    // 3. 验证 required 被合并上来了
+    // 3. Verify that required is merged
     let req = config["required"].as_array().unwrap();
     assert!(req.iter().any(|v| v == "path"));
 
-    // 4. 验证 anyOf 字段本身被移除
+    // 4. Verify that the anyOf field itself is removed
     assert!(config.get("anyOf").is_none());
 
-    // 5. 验证没有因为“空”而注入 reason (因为我们保留了属性)
+    // 5. Verify that reason is not injected because of "null" (because we retain the attribute)
     assert!(config["properties"].get("reason").is_none());
 }
 
 fn test_clean_json_schema_on_non_schema_object() {
-    // 模拟包含 description、command、type 等常规业务字段的运行时工具调用对象
+    // Simulate runtime tool call objects containing general business fields such as description, command, type, etc.
     let mut tool_call = json!({
         "functionCall": {
             "name": "run_command",
@@ -311,10 +311,10 @@ fn test_clean_json_schema_on_non_schema_object() {
         }
     });
 
-    // 调用清洗逻辑
+    // Call cleaning logic
     clean_json_schema(&mut tool_call);
 
-    // 验证：非 Schema 字段与运行时实参绝对不应被剥离，command 与 description 必须同时完好保留
+    // Verification: Non-Schema fields and runtime parameters should never be stripped, and command and description must be kept intact at the same time.
     let fc = &tool_call["functionCall"];
     assert_eq!(fc["name"], "run_command");
     assert_eq!(fc["args"]["command"], "git status");
@@ -331,7 +331,7 @@ fn test_nullable_handling_with_description() {
 
     clean_json_schema(&mut schema);
 
-    // 验证 type 被降级，且描述被追加 (nullable)
+    // Verify that type is downgraded and description is appended (nullable)
     assert_eq!(schema["type"], "string");
     assert!(schema["description"]
         .as_str()
@@ -363,14 +363,14 @@ fn test_clean_anyof_with_propertynames() {
 
     clean_json_schema(&mut schema);
 
-    // 验证 anyOf 被移除（已被合并）
+    // Verify anyOf is removed (merged)
     let config = &schema["properties"]["config"];
     assert!(config.get("anyOf").is_none());
 
-    // 验证 propertyNames 被移除
+    // Verify propertyNames are removed
     assert!(config.get("propertyNames").is_none());
 
-    // 验证合并后的 properties 存在且没有 propertyNames
+    // Verify that the merged properties exist and have no propertyNames
     assert!(config.get("properties").is_some());
     assert_eq!(config["properties"]["key"]["type"], "string");
 }
@@ -391,11 +391,11 @@ fn test_clean_items_array_with_const() {
 
     clean_json_schema(&mut schema);
 
-    // 验证 const 被移除
+    // Verify const is removed
     let status = &schema["items"]["properties"]["status"];
     assert!(status.get("const").is_none());
 
-    // 验证 type 仍然存在
+    // Verify type still exists
     assert_eq!(status["type"], "string");
 }
 
@@ -427,20 +427,20 @@ fn test_deep_nested_array_cleaning() {
 
     clean_json_schema(&mut schema);
 
-    // 验证深层嵌套的非法字段都被移除
+    // Verify that deeply nested illegal fields are removed
     let data = &schema["properties"]["data"];
 
-    // anyOf 应该被合并移除
+    // anyOf should be merged and removed
     assert!(data.get("anyOf").is_none());
 
-    // 验证没有 propertyNames 和 const 逃逸到顶层
+    // Verify that no propertyNames and const escape to the top level
     assert!(data.get("propertyNames").is_none());
     assert!(data.get("const").is_none());
 
-    // 验证结构被正确保留
+    // Verify that the structure is preserved correctly
     assert_eq!(data["type"], "array");
     if let Some(items) = data.get("items") {
-        // items 内部的 anyOf 也应该被合并
+        // anyOf inside items should also be merged
         assert!(items.get("anyOf").is_none());
         assert!(items.get("propertyNames").is_none());
         assert!(items.get("const").is_none());

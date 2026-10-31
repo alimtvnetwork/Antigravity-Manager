@@ -1,4 +1,6 @@
-import { useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from '../../../utils/env';
 import {
     focusOrLaunchInstance,
     focusInstanceWorkspace,
@@ -9,61 +11,132 @@ import { copyToClipboard } from '../../../utils/clipboard';
 import { useErrorStore } from '../../../stores/error-store';
 import { persistClientCrash } from '../../../lib/error-listener';
 import { auditRecord } from '../../audit/audit-client';
-import type { AgmConversationNode } from './types';
+import type { AgmConversationNode, AgmPromptTurnNode } from './types';
 import { isGhostConversation } from './conversationGuards';
+import { patchPromptTreeSwrCache } from './usePromptTreeData';
 import { detectPromptCategory } from './tierClassification';
 import type { PromptTreeState } from './usePromptTreeState';
+import { copyPromptWithRichImages, extractPromptImages } from './clipboard';
+import { formatPromptWithAttachments } from '../../../utils/promptAttachment';
+import {
+    buildRichVerificationPrompt,
+    buildRerunPrompt,
+    buildMultiPromptVerificationPrompt,
+    parseVerificationTypeFromSuffix,
+    buildMultiRoundVerificationPrompts,
+    type MultiRoundVerificationOptions,
+} from './verificationTemplates';
 
-export async function copyPromptWithRichImages(
-    promptText: string,
-    onSuccess: (message: string) => void,
-    onError: (err: unknown) => void
-): Promise<boolean> {
-    if (!promptText || !promptText.trim()) {
-        return false;
+export { copyPromptWithRichImages } from './clipboard';
+
+export function dispatchConversationId(
+    mode: 'current' | 'new',
+    conversationId: string | undefined,
+    _isRunning: boolean
+): string | undefined {
+    if (mode === 'new') {
+        return 'new';
     }
 
-    try {
-        // 1. Synthesize rich HTML payload converting Markdown images to styled HTML <img> tags
-        const htmlContent = promptText
-            .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" style="max-width:100%; border-radius: 8px; margin: 8px 0;" /><br />')
-            .replace(/\n/g, '<br />');
+    const trimmed = conversationId?.trim();
+    if (!trimmed) {
+        return undefined;
+    }
 
-        const blobHtml = new Blob([htmlContent], { type: 'text/html' });
-        const blobText = new Blob([promptText], { type: 'text/plain' });
+    return trimmed;
+}
 
-        const item = new ClipboardItem({
-            'text/html': blobHtml,
-            'text/plain': blobText,
-        });
+export function resolveRepoPathForDispatch(
+    proj: { repo_path?: string } | null | undefined,
+    selectedProject: { repo_path?: string } | null | undefined,
+    conv: AgmConversationNode | null | undefined,
+    treeData: { repo_path?: string; conversations: { conversation_id: string }[] }[]
+): string {
+    const direct = (
+        proj?.repo_path ||
+        selectedProject?.repo_path ||
+        (conv as { repo_path?: string } | null | undefined)?.repo_path ||
+        ''
+    ).trim();
+    if (direct) {
+        return direct;
+    }
+    const convId = conv?.conversation_id;
+    if (!convId) {
+        return '';
+    }
+    for (const node of treeData) {
+        if (node.conversations.some((c) => c.conversation_id === convId)) {
+            const path = (node.repo_path || '').trim();
+            if (path) {
+                return path;
+            }
+        }
+    }
+    return '';
+}
 
-        await navigator.clipboard.write([item]);
-        onSuccess('Copied full prompt with embedded rich images to clipboard!');
-        return true;
-    } catch (err) {
-        // Fallback ladder adhering to "No Silent Errors" rule
-        useErrorStore.getState().trackWarning(err, {
-            source: 'clipboard.copyPromptWithRichImages',
-            triggerAction: 'navigator.clipboard.write',
-        });
+export function workspaceRelativeImageTarget(absPath: string, repoPath: string): string {
+    const stripped = absPath.trim().replace(/^<|>$/g, '').replace(/^file:\/\//i, '');
+    const normalized = stripped.replace(/^\/+/, '').replace(/\\/g, '/');
+    const repo = repoPath.replace(/\\/g, '/').replace(/\/+$/, '');
+    const hasRepoPrefix = repo.length > 0 && normalized.toLowerCase().startsWith(repo.toLowerCase());
+    let relative = hasRepoPrefix ? normalized.slice(repo.length).replace(/^\/+/, '') : '';
 
-        const fallbackOk = await copyToClipboard(promptText);
-        if (fallbackOk) {
-            onSuccess('Copied clean prompt text to clipboard (rich media unsupported in current context)');
-            return true;
+    if (!relative) {
+        const repoName = repo.split('/').filter((part) => part.length > 0).pop() ?? '';
+        const marker = repoName.length > 0 ? `/${repoName.toLowerCase()}/` : '';
+        const markerAt = marker.length > 0 ? normalized.toLowerCase().lastIndexOf(marker) : -1;
+        if (markerAt >= 0) {
+            relative = normalized.slice(markerAt + marker.length);
+        }
+    }
+
+    const isAbsolute = /^[a-zA-Z]:\//.test(relative) || relative.startsWith('/');
+    if (!relative || isAbsolute) {
+        if (/^[a-zA-Z]:\//.test(normalized)) {
+            return `file:///${normalized}`;
+        }
+        relative = normalized.split('/').pop() || 'image';
+    }
+
+    return relative;
+}
+
+/** @deprecated Use formatPromptWithAttachments from 'src/utils/promptAttachment' */
+export function workspaceImageMarkdown(absPath: string, repoPath: string, index: number): string {
+    const relative = workspaceRelativeImageTarget(absPath, repoPath);
+
+    return `![Attached Image ${index}](${relative})`;
+}
+
+/** @deprecated Use formatPromptWithAttachments from 'src/utils/promptAttachment' */
+export function rewritePromptImageTargets(prompt: string, repoPath: string): string {
+    return prompt.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (full, alt: string, src: string) => {
+        const cleaned = src.trim();
+        if (cleaned.startsWith('data:') || cleaned.startsWith('http://') || cleaned.startsWith('https://')) {
+            return full;
         }
 
-        onError(err);
-        return false;
-    }
+        const relative = workspaceRelativeImageTarget(cleaned, repoPath);
+        const label = alt.trim() || 'Attached Image';
+
+        return `![${label}](${relative})`;
+    });
 }
 
 export type PromptAiCopyKind = 'json' | 'text' | 'md';
 
 export function resolvePromptBody(conv: AgmConversationNode, preferred?: string): string {
-    const preferredBody = preferred?.trim();
-    if (preferredBody) return preferredBody;
-    return (conv.full_prompt_text || conv.prompt_preview_200w || '').trim();
+    const preferredBody = preferred?.trim() ?? '';
+    const full = (conv.full_prompt_text || '').trim();
+    const preview = (conv.prompt_preview_200w || '').trim();
+    // Truncated tree previews must not win over the untruncated prompt body.
+    if (preferredBody && preferredBody !== preview) {
+        return preferredBody;
+    }
+    if (full) return full;
+    return preferredBody || preview;
 }
 
 /** JSON copy is only the AI fields already stored on the conversation. */
@@ -92,6 +165,30 @@ export function buildPromptAndAiMarkdown(promptBody: string, conv: AgmConversati
         sections.push(`# Execution Results\n\n${conv.execution_results}`);
     }
     return sections.join('\n\n');
+}
+
+/**
+ * Imp-18: Dual-MIME Rich Clipboard Formatter
+ * Provides structured multi-turn markdown copying for prompt turns and verification records.
+ */
+export function buildStructuredTurnsMarkdown(conv: AgmConversationNode, promptBody?: string): string {
+    const parts: string[] = [`# Conversation: ${conv.title || conv.short_id || 'Prompt Run'}\n`];
+    if (conv.prompts && conv.prompts.length > 0) {
+        for (const turn of conv.prompts) {
+            parts.push(`## Turn ${turn.turn_number}${turn.is_running ? ' (RUNNING)' : ''}`);
+            parts.push(`\n**Prompt:**\n\n${turn.prompt_text || '*(empty)*'}\n`);
+        }
+    } else {
+        const body = promptBody || resolvePromptBody(conv);
+        parts.push(`**Prompt:**\n\n${body || '*(empty)*'}\n`);
+        if (conv.latest_response) {
+            parts.push(`**Response:**\n\n${conv.latest_response}\n`);
+        }
+    }
+    if (conv.execution_results) {
+        parts.push(`### Execution Results\n\n${conv.execution_results}\n`);
+    }
+    return parts.join('\n');
 }
 
 export function buildPromptAiCopyPayload(
@@ -127,8 +224,8 @@ export async function copyPromptAiPayload(
 }
 
 export interface PromptTreePromptActions {
-    handleCopyAllWithRichImages: () => Promise<void>;
-    handleCopyWithImagesRich: () => Promise<void>;
+    handleCopyAllWithRichImages: () => Promise<boolean>;
+    handleCopyWithImagesRich: () => Promise<boolean>;
     handleCopyAiResultsJson: () => Promise<void>;
     handleCopyPromptAndAiText: () => Promise<void>;
     handleCopyPromptAndAiMarkdown: () => Promise<void>;
@@ -139,12 +236,28 @@ export interface PromptTreePromptActions {
     handleFocusIde: () => Promise<void>;
     extractAssets: (text: string) => { images: string[]; files: string[] };
     openInspector: (conv: AgmConversationNode, repoPath: string) => void;
+    handleMultiPromptResend: (count: number | 'all') => Promise<{ sent: number; failed: number }>;
+    handleVerifyLastPrompts: (count?: number) => Promise<boolean>;
+    handleCloneAndCompact: () => Promise<string | null>;
+    handleExportConvJson: () => void;
+    handleExportConvYaml: () => void;
+    handleExportConvSqlite: () => Promise<void>;
+    handleOpenVerificationModal: (conversationId?: string | AgmConversationNode, defaultTurns?: number[]) => void;
+    isVerificationModalOpen: boolean;
+    setIsVerificationModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    verificationModalConv: AgmConversationNode | null;
+    enqueueVerificationRounds: (options: MultiRoundVerificationOptions) => Promise<boolean>;
+    handleRerunConversation: (options?: Partial<HandleRerunConversationOptions>) => Promise<any>;
+    isResending: boolean;
+    isEnqueueing: boolean;
+    isRerunning: boolean;
 }
 
 interface UsePromptTreePromptActionsProps {
     state: PromptTreeState;
     instanceId: string;
     selectConversation: (conv: AgmConversationNode, project: import('./types').AgmProjectTreeNode) => void;
+    loadTree?: (isInitialLoad?: boolean, isForce?: boolean) => Promise<void>;
 }
 
 const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'svg'] as const;
@@ -153,6 +266,7 @@ export function usePromptTreePromptActions({
     state,
     instanceId,
     selectConversation,
+    loadTree,
 }: UsePromptTreePromptActionsProps): PromptTreePromptActions {
     const {
         treeData,
@@ -176,20 +290,24 @@ export function usePromptTreePromptActions({
         activePromptTextRef,
         setShowAllWords,
         setInspectorPrompt,
+        setTreeData,
+        setSelectedConversation,
     } = state;
 
     const extractAssets = useCallback((text: string) => {
         const images: string[] = [];
         const files: string[] = [];
 
-        const imgRegex = /!\[(.*?)\]\((https?:\/\/.*?|data:image\/.*?;base64,.*?)\)/g;
-        let match;
+        const imgRegex = /!\[(.*?)\]\((https?:\/\/.*?|data:image\/[^;]+;base64,[A-Za-z0-9+/=]+|[^\s)]+?\.(?:png|jpe?g|gif|webp|svg))\)/gi;
+        let match: RegExpExecArray | null;
         while ((match = imgRegex.exec(text)) !== null) {
-            images.push(match[1]);
+            if (match[2]) {
+                images.push(match[2].trim());
+            }
         }
 
         const fileRegex = /(?:file:\/\/\/|[a-zA-Z]:\\|\/)[^\s)"]+/g;
-        let fileMatch;
+        let fileMatch: RegExpExecArray | null;
         while ((fileMatch = fileRegex.exec(text)) !== null) {
             if (!fileMatch[0].match(/\.(png|jpg|jpeg|gif|webp|svg)$/i)) {
                 files.push(fileMatch[0]);
@@ -218,14 +336,17 @@ export function usePromptTreePromptActions({
         [activePromptText, extractAssets, setShowAllWords, setInspectorPrompt]
     );
 
-    const handleCopyAllWithRichImages = useCallback(async () => {
-        const text = editedPromptText.trim() || activePromptTextRef.current || activePromptText || selectedConversation?.prompt_preview_200w || '';
+    const handleCopyAllWithRichImages = useCallback(async (): Promise<boolean> => {
+        const conv = selectedConversationRef.current || selectedConversation;
+        const preferred = editedPromptText.trim() || activePromptTextRef.current || activePromptText;
+        const text = conv ? resolvePromptBody(conv, preferred) : (preferred || '');
         if (!text) {
             setActionMsg('No prompt content to copy');
             setTimeout(() => setActionMsg(null), 2000);
-            return;
+            return false;
         }
 
+        const mediaPaths = conv?.media_paths;
         const ok = await copyPromptWithRichImages(
             text,
             (msg) => {
@@ -245,16 +366,20 @@ export function usePromptTreePromptActions({
                     }
                 );
                 setError('Failed to copy prompt to clipboard');
-            }
+            },
+            mediaPaths
         );
         if (ok) {
             setIsCopiedAll(true);
             setTimeout(() => setIsCopiedAll(false), 2000);
+            return true;
         }
-    }, [editedPromptText, activePromptText, selectedConversation, activePromptTextRef, setIsCopiedAll, setActionMsg, setError]);
+        setError('Failed to copy prompt to clipboard');
+        return false;
+    }, [editedPromptText, activePromptText, selectedConversation, activePromptTextRef, selectedConversationRef, setIsCopiedAll, setActionMsg, setError]);
 
-    const handleCopyWithImagesRich = useCallback(async () => {
-        await handleCopyAllWithRichImages();
+    const handleCopyWithImagesRich = useCallback(async (): Promise<boolean> => {
+        return handleCopyAllWithRichImages();
     }, [handleCopyAllWithRichImages]);
 
     const copySelectedPromptAi = useCallback(async (kind: PromptAiCopyKind) => {
@@ -309,20 +434,30 @@ export function usePromptTreePromptActions({
         }
 
         images.forEach((imgUrl, index) => {
-            const a = document.createElement('a');
-            a.href = imgUrl;
-            let ext = 'png';
-            if (imgUrl.includes('image/jpeg') || imgUrl.endsWith('.jpg') || imgUrl.endsWith('.jpeg')) {
-                ext = 'jpg';
-            } else if (imgUrl.includes('image/webp') || imgUrl.endsWith('.webp')) {
-                ext = 'webp';
-            } else if (imgUrl.includes('image/svg') || imgUrl.endsWith('.svg')) {
-                ext = 'svg';
+            try {
+                const a = document.createElement('a');
+                a.href = imgUrl;
+                let ext = 'png';
+                if (imgUrl.includes('image/jpeg') || imgUrl.endsWith('.jpg') || imgUrl.endsWith('.jpeg')) {
+                    ext = 'jpg';
+                } else if (imgUrl.includes('image/webp') || imgUrl.endsWith('.webp')) {
+                    ext = 'webp';
+                } else if (imgUrl.includes('image/svg') || imgUrl.endsWith('.svg')) {
+                    ext = 'svg';
+                }
+                a.download = `prompt-image-${selectedConversation?.short_id || 'img'}-${index + 1}.${ext}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } catch (err) {
+                useErrorStore.getState().trackWarning(
+                    err instanceof Error ? err : new Error(String(err)),
+                    {
+                        source: 'usePromptTreePromptActions.handleSaveImages',
+                        triggerAction: 'downloadPromptImage',
+                    }
+                );
             }
-            a.download = `prompt-image-${selectedConversation?.short_id || 'img'}-${index + 1}.${ext}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
         });
 
         setActionMsg(`Saved ${images.length} image(s) to downloads!`);
@@ -388,59 +523,105 @@ export function usePromptTreePromptActions({
                 source: 'PromptTreeViewModal.handleResendPrompt',
                 triggerAction: 'resolve_send_target',
             });
-            setError('Send failed: no conversation or project could be resolved — select a prompt first.');
+            setError('Send failed: no conversation or project could be resolved â€” select a prompt first.');
             return;
         }
 
         try {
             setIsResending(true);
-            setActionMsg('Dispatching prompt to running instance...');
+            setActionMsg('Cancelling active task & dispatching prompt now...');
             let promptContent = (!selectedConversation && conv)
-                ? (conv.prompt_preview_200w || '')
-                : (editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv?.prompt_preview_200w || '');
-            if (confirmationSuffix && confirmationSuffix !== 'None (Send as is)') {
-                promptContent = `${promptContent}\n\n${confirmationSuffix}`;
+                ? (conv.full_prompt_text || conv.prompt_preview_200w || '')
+                : (editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv?.full_prompt_text || conv?.prompt_preview_200w || '');
+            if (!promptContent && conv) {
+                promptContent = resolvePromptBody(conv);
             }
-            const repoPath = proj?.repo_path || '';
+            const repoPath = resolveRepoPathForDispatch(proj, selectedProject, conv, treeData);
+            const targetInstId = selectedConversation?.instance_id || conv?.instance_id || proj?.instance_id || instanceId || 'default';
+            const targetConvId = dispatchConversationId(
+                conversationTargetMode,
+                conv?.conversation_id,
+                Boolean(conv?.is_running)
+            ) || (conversationTargetMode === 'current' ? 'current' : undefined);
+            if (conversationTargetMode === 'new' && newConversationTitle?.trim()) {
+                promptContent = `# ${newConversationTitle.trim()}\n\n${promptContent}`;
+            }
 
-            // 1. Dispatch prompt directly to running instance via sendPromptNow.
+            if (confirmationSuffix && confirmationSuffix !== 'None (Send as is)' && confirmationSuffix !== 'none') {
+                const templateType = parseVerificationTypeFromSuffix(confirmationSuffix);
+                if (templateType !== 'none') {
+                    promptContent = buildRichVerificationPrompt(templateType, {
+                        originalPrompt: promptContent,
+                        instanceId: targetInstId,
+                        repoPath,
+                        convId: targetConvId,
+                    });
+                }
+            }
+
+            // Format prompt and attached images using canonical Antigravity attachment format
+            const activeTurn = conv?.selected_turn_number != null
+                ? conv.prompts?.find((t) => t.turn_number === conv.selected_turn_number)
+                : undefined;
+            const mediaList: string[] = Array.from(new Set([
+                ...(activeTurn?.media_paths || []),
+                ...(activeTurn?.media_thumbnails || []),
+                ...(selectedConversation?.media_paths || conv?.media_paths || []),
+                ...(selectedConversation?.media_thumbnails || conv?.media_thumbnails || []),
+                ...(conv?.prompts?.flatMap((p) => p.media_paths || []) || []),
+                ...(conv?.sub_runs?.flatMap((s) => s.media_paths || []) || []),
+            ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+
+            promptContent = formatPromptWithAttachments(promptContent, mediaList, { repoPath });
+
+            // Dispatch real prompt content directly to running instance via sendPromptNow without stripping Base64 images to non-existent relative attachments
             // Track real dispatch outcome: the backend returns Err when the agy
             // CLI spawn fails, and the success message must not show in that case.
-            const targetInstId = proj?.instance_id || instanceId || 'default';
             let dispatchOk = false;
             let dispatchErr: unknown = null;
-            const targetConvId = conversationTargetMode === 'new'
-                ? (newConversationTitle?.trim() || undefined)
-                : conv?.conversation_id;
             try {
-                await sendPromptNow(targetInstId, repoPath, promptContent, targetConvId);
+                await sendPromptNow(targetInstId, repoPath, promptContent, targetConvId, mediaList);
                 dispatchOk = true;
             } catch (sendErr) {
                 dispatchErr = sendErr;
                 persistClientCrash(sendErr, 'PromptTreeViewModal.handleSend');
             }
 
-            // 2. Copy prompt content to clipboard so user can paste immediately (manual fallback).
-            // Use the robust helper: copyToClipboard throws
-            // NotAllowedError when the document is not focused (e.g. the IDE
-            // window stole focus during dispatch) — the execCommand fallback
-            // covers that case instead of just logging a warning.
+            // Prime system clipboard concurrently with dual-MIME rich HTML images for immediate pasting.
             try {
-                const copied = await copyToClipboard(promptContent);
-                if (!copied) {
-                    throw new Error('clipboard copy returned false');
-                }
+                await copyPromptWithRichImages(promptContent, undefined, undefined, mediaList);
             } catch (clipErr) {
-                // Tracked in the error module; send dispatch already attempted above, user pastes manually if needed.
                 useErrorStore.getState().trackWarning(clipErr, {
                     source: 'PromptTreeViewModal.handleSend',
-                    triggerAction: 'copy_prompt_fallback',
+                    triggerAction: 'copy_prompt_rich_fallback',
                 });
             }
 
             if (dispatchOk) {
-                setActionMsg("Prompt dispatched to IDE & copied to clipboard!");
+                setActionMsg("Prompt dispatched to IDE (active task cancelled & preempted)!");
                 setTimeout(() => setActionMsg(null), 3000);
+                if (isTauri()) {
+                    try {
+                        await invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId }).catch(async () => {
+                            await invoke('reset_prompt_tree_cache', { instanceId: targetInstId });
+                        });
+                    } catch (cacheErr) {
+                        useErrorStore.getState().trackWarning(cacheErr, {
+                            source: 'usePromptTreePromptActions.handleResendPrompt',
+                            triggerAction: 'invalidate_prompt_tree_cache',
+                        });
+                    }
+                }
+                if (loadTree) {
+                    try {
+                        await loadTree(false, true);
+                    } catch (loadErr) {
+                        useErrorStore.getState().trackWarning(loadErr, {
+                            source: 'usePromptTreePromptActions.handleResendPrompt',
+                            triggerAction: 'loadTree',
+                        });
+                    }
+                }
             } else {
                 const errorObj = dispatchErr instanceof Error ? dispatchErr : new Error(String(dispatchErr) || 'dispatch rejected');
                 setError(`Send failed: ${errorObj.message} — prompt copied to clipboard; paste it into the IDE manually.`);
@@ -459,7 +640,7 @@ export function usePromptTreePromptActions({
         selectedConversation, selectedProject, treeData, archivedProjectIds,
         editedPromptText, activePromptText, confirmationSuffix, conversationTargetMode, newConversationTitle, instanceId,
         selectConversation, selectedConversationRef, selectedProjectRef,
-        activePromptTextRef, setSelectedProject, setActionMsg, setError, setIsResending,
+        activePromptTextRef, setSelectedProject, setActionMsg, setError, setIsResending, loadTree,
     ]);
 
     const handleExport = useCallback(
@@ -522,7 +703,58 @@ ${activePromptText}
     );
 
     const handleEnqueuePrompt = useCallback(async () => {
-        if (!selectedConversation) {
+        let conv = selectedConversationRef.current || selectedConversation;
+        let proj = selectedProjectRef.current || selectedProject;
+
+        // Fallback 1: If selectedConversation is null, find most recent non-empty conversation in selectedProject
+        if (!conv && proj && proj.conversations.length > 0) {
+            const candidates = proj.conversations.filter(
+                (c) => !isGhostConversation(c) && !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+            );
+            if (candidates.length > 0) {
+                const sorted = [...candidates].sort((a, b) => {
+                    const aTime = new Date(a.last_modified).getTime() || 0;
+                    const bTime = new Date(b.last_modified).getTime() || 0;
+                    return bTime - aTime;
+                });
+                conv = sorted[0];
+                selectConversation(conv, proj);
+            }
+        }
+
+        // Fallback 2: If selectedProject is null but conv exists, find and assign proj from treeData (so repoPath is NEVER empty "")
+        if (!proj && conv) {
+            for (const p of treeData) {
+                if (p.conversations.some((c) => c.conversation_id === conv?.conversation_id)) {
+                    proj = p;
+                    setSelectedProject(p);
+                    break;
+                }
+            }
+        }
+
+        // Fallback 3: If both conv and proj are null, pick newest valid conversation across non-archived projects
+        if (!conv && !proj && treeData.length > 0) {
+            for (const p of treeData) {
+                if (archivedProjectIds.includes(p.project_id)) continue;
+                const candidates = p.conversations.filter(
+                    (c) => !isGhostConversation(c) && !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+                );
+                if (candidates.length > 0) {
+                    proj = p;
+                    const sorted = [...candidates].sort((a, b) => {
+                        const aTime = new Date(a.last_modified).getTime() || 0;
+                        const bTime = new Date(b.last_modified).getTime() || 0;
+                        return bTime - aTime;
+                    });
+                    conv = sorted[0];
+                    selectConversation(conv, proj);
+                    break;
+                }
+            }
+        }
+
+        if (!conv) {
             // Visible no-op guard: previously a silent return that made the
             // Queue button appear dead with no feedback.
             useErrorStore.getState().trackWarning('Queue: no conversation selected', {
@@ -534,16 +766,123 @@ ${activePromptText}
         }
         try {
             setIsEnqueueing(true);
-            setActionMsg('Enqueueing prompt into FIFO scheduler queue...');
-            const promptContent = editedPromptText.trim() || activePromptText || selectedConversation.prompt_preview_200w || '';
-            const repoPath = selectedProject?.repo_path || '';
-            const targetInstId = selectedProject?.instance_id || instanceId || 'default';
-            const targetConvId = conversationTargetMode === 'new'
-                ? (newConversationTitle?.trim() || undefined)
-                : selectedConversation.conversation_id;
-            await enqueuePrompt(targetInstId, repoPath, promptContent, targetConvId);
+            setActionMsg('Enqueuing prompt to IDE and FIFO queue...');
+            let promptContent = editedPromptText.trim() || activePromptTextRef.current || activePromptText || conv.full_prompt_text || conv.prompt_preview_200w || '';
+            if (!promptContent && conv) {
+                promptContent = resolvePromptBody(conv);
+            }
+            const repoPath = resolveRepoPathForDispatch(proj, selectedProject, conv, treeData);
+            const targetInstId = selectedConversation?.instance_id || conv.instance_id || proj?.instance_id || instanceId || 'default';
+            const targetConvId = dispatchConversationId(
+                conversationTargetMode,
+                conv.conversation_id,
+                Boolean(conv.is_running)
+            ) || conv.conversation_id;
+            if (conversationTargetMode === 'new' && newConversationTitle?.trim()) {
+                promptContent = `# ${newConversationTitle.trim()}\n\n${promptContent}`;
+            }
 
-            setActionMsg('Prompt enqueued into FIFO scheduler queue!');
+            if (confirmationSuffix && confirmationSuffix !== 'None (Send as is)' && confirmationSuffix !== 'none') {
+                const templateType = parseVerificationTypeFromSuffix(confirmationSuffix);
+                if (templateType !== 'none') {
+                    promptContent = buildRichVerificationPrompt(templateType, {
+                        originalPrompt: promptContent,
+                        instanceId: targetInstId,
+                        repoPath,
+                        convId: targetConvId,
+                    });
+                }
+            }
+
+            // Format prompt and attached images using canonical Antigravity attachment format
+            const activeTurn = conv?.selected_turn_number != null
+                ? conv.prompts?.find((t) => t.turn_number === conv.selected_turn_number)
+                : undefined;
+            const mediaList: string[] = Array.from(new Set([
+                ...(activeTurn?.media_paths || []),
+                ...(activeTurn?.media_thumbnails || []),
+                ...(selectedConversation?.media_paths || conv?.media_paths || []),
+                ...(selectedConversation?.media_thumbnails || conv?.media_thumbnails || []),
+                ...(conv?.prompts?.flatMap((p) => p.media_paths || []) || []),
+                ...(conv?.sub_runs?.flatMap((s) => s.media_paths || []) || []),
+            ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+
+            promptContent = formatPromptWithAttachments(promptContent, mediaList, { repoPath });
+            await enqueuePrompt(targetInstId, repoPath, promptContent, targetConvId, undefined, mediaList);
+
+            // 0ms Optimistic UI Injection:
+            // Immediately inject a synthetic turn into selectedConversation and treeData
+            const targetConv = conv || selectedConversation;
+            if (targetConv) {
+                const existingTurns = targetConv.prompts || [];
+                const nextTurnNumber = existingTurns.length > 0
+                    ? Math.max(...existingTurns.map((t) => t.turn_number)) + 1
+                    : 1;
+
+                const syntheticTurn: AgmPromptTurnNode = {
+                    turn_number: nextTurnNumber,
+                    step_index: nextTurnNumber - 1,
+                    prompt_text: promptContent,
+                    preview_200w: promptContent.slice(0, 200),
+                    status: 'QUEUED',
+                    is_running: false,
+                    is_queued: true,
+                    timestamp: new Date().toISOString(),
+                    created_at: Date.now(),
+                    media_paths: mediaList,
+                    media_thumbnails: mediaList,
+                };
+                const updatedTurns = [...existingTurns, syntheticTurn];
+
+                setSelectedConversation((prev) => {
+                    if (!prev || prev.conversation_id !== targetConv.conversation_id) return prev;
+                    return {
+                        ...prev,
+                        is_queued: true,
+                        prompts: updatedTurns,
+                    };
+                });
+
+                if (selectedConversationRef.current && selectedConversationRef.current.conversation_id === targetConv.conversation_id) {
+                    selectedConversationRef.current = {
+                        ...selectedConversationRef.current,
+                        is_queued: true,
+                        prompts: updatedTurns,
+                    };
+                }
+
+                setTreeData((prevTree) => {
+                    const next = prevTree.map((projNode) => ({
+                        ...projNode,
+                        conversations: projNode.conversations.map((c) =>
+                            c.conversation_id === targetConv.conversation_id
+                                ? {
+                                      ...c,
+                                      is_queued: true,
+                                      prompts: updatedTurns,
+                                  }
+                                : c
+                        ),
+                    }));
+                    patchPromptTreeSwrCache(targetInstId, () => next);
+                    if (instanceId && instanceId !== targetInstId) {
+                        patchPromptTreeSwrCache(instanceId, () => next);
+                    }
+                    return next;
+                });
+            }
+
+            // Prime system clipboard concurrently with dual-MIME rich HTML images for immediate pasting
+            try {
+                await copyPromptWithRichImages(promptContent, undefined, undefined, mediaList);
+            } catch (clipErr) {
+                useErrorStore.getState().trackWarning(clipErr, {
+                    source: 'PromptTreeViewModal.handleEnqueuePrompt',
+                    triggerAction: 'copy_enqueue_rich_fallback',
+                });
+            }
+
+            setActionMsg('Prompt enqueued to IDE behind current task!');
             setTimeout(() => setActionMsg(null), 3500);
         } catch (err: unknown) {
             const errorObj = err instanceof Error ? err : new Error(String(err) || 'Failed to enqueue prompt');
@@ -557,8 +896,11 @@ ${activePromptText}
             setIsEnqueueing(false);
         }
     }, [
-        selectedConversation, selectedProject, editedPromptText, activePromptText,
-        conversationTargetMode, newConversationTitle, instanceId, setIsEnqueueing, setActionMsg, setError,
+        selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef,
+        treeData, archivedProjectIds, setSelectedProject,
+        editedPromptText, activePromptText, activePromptTextRef, confirmationSuffix,
+        conversationTargetMode, newConversationTitle, instanceId, selectConversation,
+        setIsEnqueueing, setActionMsg, setError, setTreeData, setSelectedConversation,
     ]);
 
     const handleFocusIde = useCallback(async () => {
@@ -583,6 +925,325 @@ ${activePromptText}
         }
     }, [selectedProject, instanceId, setIsFocusing, setActionMsg, setError]);
 
+    const handleMultiPromptResend = useCallback(async (count: number | 'all') => {
+        const conv = selectedConversationRef.current || selectedConversation;
+        const proj = selectedProjectRef.current || selectedProject;
+        if (!conv) {
+            setError('No conversation selected for multi-prompt resend');
+            return { sent: 0, failed: 0 };
+        }
+        const prompts = extractConversationPromptsList(conv);
+        const convMedia = Array.from(new Set([
+            ...(conv.media_paths || []),
+            ...(conv.media_thumbnails || []),
+            ...(conv.prompts?.flatMap((p) => p.media_paths || []) || []),
+            ...(conv.sub_runs?.flatMap((s) => s.media_paths || []) || []),
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+        setActionMsg(`Resending ${count === 'all' ? 'all' : count} prompt(s)...`);
+        const res = await dispatchMultiPromptResend({
+            conversationId: conv.conversation_id,
+            instanceId: selectedConversation?.instance_id || conv.instance_id || proj?.instance_id || instanceId || 'default',
+            repoPath: proj?.repo_path || '',
+            count,
+            prompts,
+            mediaPaths: convMedia,
+        });
+        if (res.sent > 0) {
+            setActionMsg(`Successfully resent ${res.sent} prompt(s)!`);
+            setTimeout(() => setActionMsg(null), 3000);
+        } else if (res.failed > 0) {
+            setError(`Failed to resend prompts (${res.failed} error(s))`);
+        }
+        return res;
+    }, [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, instanceId, setActionMsg, setError]);
+
+    const handleVerifyLastPrompts = useCallback(async (count: number = 10) => {
+        const conv = selectedConversationRef.current || selectedConversation;
+        const proj = selectedProjectRef.current || selectedProject;
+        if (!conv) {
+            setError('No conversation selected to verify');
+            return false;
+        }
+        const prompts = extractConversationPromptsList(conv);
+        const convMedia = Array.from(new Set([
+            ...(conv.media_paths || []),
+            ...(conv.media_thumbnails || []),
+            ...(conv.prompts?.flatMap((p) => p.media_paths || []) || []),
+            ...(conv.sub_runs?.flatMap((s) => s.media_paths || []) || []),
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+        setActionMsg(`Synthesizing ${count}-prompt verification audit & enqueueing...`);
+        const ok = await handleVerifyLastPromptsAndEnqueue({
+            instanceId: selectedConversation?.instance_id || conv.instance_id || proj?.instance_id || instanceId || 'default',
+            repoPath: proj?.repo_path || '',
+            conversationId: conv.conversation_id,
+            convTitle: conv.title || conv.short_id,
+            count,
+            prompts,
+            mediaPaths: convMedia,
+        });
+        if (ok) {
+            setActionMsg(`Synthesized ${Math.min(count, prompts.length)}-prompt audit & enqueued to instance!`);
+            setTimeout(() => setActionMsg(null), 3500);
+        } else {
+            setError('Failed to enqueue verification audit');
+        }
+        return ok;
+    }, [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, instanceId, setActionMsg, setError]);
+
+    const handleCloneAndCompact = useCallback(async () => {
+        const conv = selectedConversationRef.current || selectedConversation;
+        const proj = selectedProjectRef.current || selectedProject;
+        if (!conv) {
+            setError('No conversation selected to clone and compact');
+            return null;
+        }
+        const convMedia = Array.from(new Set([
+            ...(conv.media_paths || []),
+            ...(conv.media_thumbnails || []),
+            ...(conv.prompts?.flatMap((p) => p.media_paths || []) || []),
+            ...(conv.sub_runs?.flatMap((s) => s.media_paths || []) || []),
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+        setActionMsg('Cloning conversation and compacting memory handoff...');
+        const newTitle = await handleCloneAndCompactConversation({
+            instanceId: selectedConversation?.instance_id || conv.instance_id || proj?.instance_id || instanceId || 'default',
+            repoPath: proj?.repo_path || '',
+            sourceConv: conv,
+            mediaPaths: convMedia,
+        });
+        if (newTitle) {
+            setActionMsg(`Cloned & compacted into fresh session '${newTitle}'!`);
+            setTimeout(() => setActionMsg(null), 3500);
+        } else {
+            setError('Failed to clone and compact conversation');
+        }
+        return newTitle;
+    }, [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, instanceId, setActionMsg, setError]);
+
+    const handleExportConvJson = useCallback(() => {
+        const conv = selectedConversationRef.current || selectedConversation;
+        const proj = selectedProjectRef.current || selectedProject;
+        if (!conv) return;
+        exportConversationAsJson(conv, proj?.repo_path);
+        setActionMsg('Exported conversation as JSON');
+        setTimeout(() => setActionMsg(null), 2500);
+    }, [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, setActionMsg]);
+
+    const handleExportConvYaml = useCallback(() => {
+        const conv = selectedConversationRef.current || selectedConversation;
+        const proj = selectedProjectRef.current || selectedProject;
+        if (!conv) return;
+        exportConversationAsYaml(conv, proj?.repo_path);
+        setActionMsg('Exported conversation as YAML');
+        setTimeout(() => setActionMsg(null), 2500);
+    }, [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, setActionMsg]);
+
+    const handleExportConvSqlite = useCallback(async () => {
+        const conv = selectedConversationRef.current || selectedConversation;
+        if (!conv) return;
+        setActionMsg('Exporting conversation as SQLite .db...');
+        await exportConversationAsSqlite(conv);
+        setActionMsg('Exported conversation as SQLite .db');
+        setTimeout(() => setActionMsg(null), 2500);
+    }, [selectedConversation, selectedConversationRef, setActionMsg]);
+
+    const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
+    const [verificationModalConv, setVerificationModalConv] = useState<AgmConversationNode | null>(null);
+
+    const handleOpenVerificationModal = useCallback(
+        (conversationId?: string | AgmConversationNode, _defaultTurns?: number[]) => {
+            let targetConv: AgmConversationNode | null = null;
+            if (typeof conversationId === 'object' && conversationId !== null) {
+                targetConv = conversationId;
+            } else if (typeof conversationId === 'string' && conversationId.trim()) {
+                for (const proj of treeData) {
+                    const found = proj.conversations.find((c) => c.conversation_id === conversationId);
+                    if (found) {
+                        targetConv = found;
+                        break;
+                    }
+                }
+            }
+            if (!targetConv) {
+                targetConv = selectedConversationRef.current || selectedConversation;
+            }
+            if (!targetConv) {
+                setError('Please select a prompt or conversation to audit with verification rounds.');
+                return;
+            }
+            setVerificationModalConv(targetConv);
+            setIsVerificationModalOpen(true);
+        },
+        [treeData, selectedConversation, selectedConversationRef, setError]
+    );
+
+    const enqueueVerificationRounds = useCallback(
+        async (options: MultiRoundVerificationOptions): Promise<boolean> => {
+            try {
+                const prompts = buildMultiRoundVerificationPrompts(options);
+                if (prompts.length === 0) {
+                    setError('No verification prompts synthesized');
+                    return false;
+                }
+                setActionMsg(`Enqueueing ${prompts.length} verification round(s) to FIFO queue...`);
+
+                const targetInstId = options.instanceId || instanceId || 'default';
+                let enqueuedViaIpc = false;
+                if (isTauri()) {
+                    try {
+                        await invoke('enqueue_verification_rounds', {
+                            instanceId: targetInstId,
+                            prompts,
+                            sessionId: options.conversationId,
+                        });
+                        enqueuedViaIpc = true;
+                    } catch {
+                        enqueuedViaIpc = false;
+                    }
+                }
+
+                if (!enqueuedViaIpc) {
+                    for (let i = 0; i < prompts.length; i++) {
+                        await enqueuePrompt(targetInstId, options.repoPath || '', prompts[i], options.conversationId);
+                        if (i < prompts.length - 1) {
+                            await new Promise((resolve) => setTimeout(resolve, 500));
+                        }
+                    }
+                }
+
+                if (isTauri()) {
+                    try {
+                        await invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId });
+                    } catch (cacheErr) {
+                        useErrorStore.getState().trackWarning(cacheErr, {
+                            source: 'usePromptTreePromptActions.enqueueVerificationRounds',
+                            triggerAction: 'invalidate_cache',
+                        });
+                    }
+                }
+
+                await auditRecord({
+                    actor: 'user',
+                    methodName: 'prompt_tree_verification_rounds_enqueued',
+                    route: '/prompts',
+                    uiTarget: 'VerificationModal | EnqueueRounds',
+                    trigger: 'click',
+                    params: {
+                        conversationId: options.conversationId,
+                        instanceId: targetInstId,
+                        roundsCount: prompts.length,
+                        writingStyle: options.writingStyle || options.style,
+                    },
+                    result: 'ok',
+                });
+
+                setActionMsg(`Successfully enqueued ${prompts.length} verification round(s)!`);
+                setTimeout(() => setActionMsg(null), 3500);
+                return true;
+            } catch (err) {
+                persistClientCrash(err, 'usePromptTreePromptActions.enqueueVerificationRounds');
+                useErrorStore.getState().captureException(
+                    err instanceof Error ? err : new Error(String(err)),
+                    {
+                        source: 'usePromptTreePromptActions.enqueueVerificationRounds',
+                        triggerAction: 'enqueue_verification_rounds',
+                    }
+                );
+                setError('Failed to enqueue verification rounds');
+                return false;
+            }
+        },
+        [instanceId, setActionMsg, setError]
+    );
+
+    const [isRerunning, setIsRerunning] = useState(false);
+
+    const handleRerunConversationAction = useCallback(
+        async (overrides?: Partial<HandleRerunConversationOptions>): Promise<RerunDispatchResult> => {
+            setIsRerunning(true);
+            try {
+                const conv = selectedConversationRef.current || selectedConversation;
+                const proj = selectedProjectRef.current || selectedProject;
+                const res = await handleRerunConversation({
+                    conversation: conv,
+                    project: proj,
+                    instanceId,
+                    activePromptText: editedPromptText.trim() || activePromptTextRef.current || activePromptText,
+                    ...overrides,
+                });
+                if (res.dispatched > 0) {
+                    const targetInstId = conv?.instance_id || instanceId;
+                    // 0ms Optimistic UI Injection for rerun rounds
+                    if (conv) {
+                        const existingTurns = conv.prompts || [];
+                        const baseTurnNumber = existingTurns.length > 0
+                            ? Math.max(...existingTurns.map((t) => t.turn_number)) + 1
+                            : 1;
+                        const dispatchedMessages = res.messages || [];
+                        const newTurns: AgmPromptTurnNode[] = [];
+                        for (let rIdx = 0; rIdx < res.dispatched; rIdx++) {
+                            const msgText = dispatchedMessages[rIdx] || conv.full_prompt_text || conv.prompt_preview_200w || 'Rerun turn';
+                            newTurns.push({
+                                turn_number: baseTurnNumber + rIdx,
+                                step_index: baseTurnNumber + rIdx - 1,
+                                prompt_text: msgText,
+                                preview_200w: msgText.slice(0, 200),
+                                status: 'QUEUED',
+                                is_running: false,
+                                is_queued: true,
+                                timestamp: new Date().toISOString(),
+                                created_at: Date.now() + rIdx,
+                                media_paths: conv.media_paths || [],
+                                media_thumbnails: conv.media_thumbnails || [],
+                            });
+                        }
+                        const updatedTurns = [...existingTurns, ...newTurns];
+
+                        setSelectedConversation((prev) => {
+                            if (!prev || prev.conversation_id !== conv.conversation_id) return prev;
+                            return {
+                                ...prev,
+                                is_queued: true,
+                                prompts: updatedTurns,
+                            };
+                        });
+
+                        if (selectedConversationRef.current && selectedConversationRef.current.conversation_id === conv.conversation_id) {
+                            selectedConversationRef.current = {
+                                ...selectedConversationRef.current,
+                                is_queued: true,
+                                prompts: updatedTurns,
+                            };
+                        }
+
+                        setTreeData((prevTree) => {
+                            const next = prevTree.map((projNode) => ({
+                                ...projNode,
+                                conversations: projNode.conversations.map((c) =>
+                                    c.conversation_id === conv.conversation_id
+                                        ? {
+                                              ...c,
+                                              is_queued: true,
+                                              prompts: updatedTurns,
+                                          }
+                                        : c
+                                ),
+                            }));
+                            patchPromptTreeSwrCache(targetInstId, () => next);
+                            return next;
+                        });
+                    }
+
+                    // Optimistic turns stay; skip force/soft reload so Enqueue
+                    // count does not wait on the 30s tree cache.
+                }
+                return res;
+            } finally {
+                setIsRerunning(false);
+            }
+        },
+        [selectedConversation, selectedConversationRef, selectedProject, selectedProjectRef, instanceId, editedPromptText, activePromptText, activePromptTextRef, setTreeData, setSelectedConversation]
+    );
+
     return {
         handleCopyAllWithRichImages,
         handleCopyWithImagesRich,
@@ -596,61 +1257,406 @@ ${activePromptText}
         handleFocusIde,
         extractAssets,
         openInspector,
+        handleMultiPromptResend,
+        handleVerifyLastPrompts,
+        handleCloneAndCompact,
+        handleExportConvJson,
+        handleExportConvYaml,
+        handleExportConvSqlite,
+        handleOpenVerificationModal,
+        isVerificationModalOpen,
+        setIsVerificationModalOpen,
+        verificationModalConv,
+        enqueueVerificationRounds,
+        handleRerunConversation: handleRerunConversationAction,
+        isResending: state.isResending,
+        isEnqueueing: state.isEnqueueing,
+        isRerunning,
     };
 }
 
 export { IMAGE_EXTENSIONS };
 
 // ============================================================================
-// RERUN SECTION (Task-04) — appended at END of file per task ownership.
+// RERUN SECTION (Task-04) â€” appended at END of file per task ownership.
 // ----------------------------------------------------------------------------
 // Rerun support: dispatches a follow-up nudge message N times through the SAME
-// canonical dispatch path as handleResendPrompt (`sendPromptNow`) — no forked
+// canonical dispatch path as handleResendPrompt (`sendPromptNow`) â€” no forked
 // logic, no new backend endpoint. Each individual rerun is audit-logged via
 // `auditRecord`; dispatch failures are routed into the error module (via
 // sendPromptNow's captureError + persistClientCrash) and recorded in the audit
-// entry as `result: 'error'`, so failures are always visible — no silent errors.
+// entry as `result: 'error'`, so failures are always visible â€” no silent errors.
 // ============================================================================
 
 /** Message choice offered by the rerun UI picker. */
-export type RerunMessageOption = 'is-it-done' | 'is-it-published' | 'randomized';
+export type RerunMessageOption =
+    | 'randomized'
+    | 'is-it-completed'
+    | 'is-it-finished'
+    | 'is-it-released'
+    | 'tested-e2e'
+    | 'tested-e2e-and-released'
+    | 'is-it-done'
+    | 'is-it-published'
+    | 'verify-and-finish'
+    | 'check-pending-tasks'
+    | 'run-verification'
+    | 'confirm-pushed'
+    | 'fully-implemented-verified'
+    | 'all-tests-passed'
+    | 'double-check-completion'
+    | 'pending-work-left'
+    | 'confirm-status-next-steps'
+    | 'check-pending-proceed'
+    | 'verify-build-cleanliness';
 
-/** Picker rows rendered by the rerun UI. The randomized row is explicitly labeled. */
+/** Picker rows rendered by the rerun UI. The randomized row is explicitly labeled and auto-picked. */
 export const RERUN_MESSAGE_OPTIONS: ReadonlyArray<{ value: RerunMessageOption; label: string; hint: string }> = [
-    { value: 'is-it-done', label: 'Is it done?', hint: 'Send a completion-check nudge' },
-    { value: 'is-it-published', label: 'Is it published?', hint: 'Send a publish-status nudge' },
     {
         value: 'randomized',
-        label: 'Randomized nudge (random pick)',
-        hint: 'Every dispatch picks ONE message at random from the built-in set',
+        label: 'Randomized nudge (auto-picked random variation)',
+        hint: 'Every dispatch picks ONE message at random from the 25+ built-in variations',
     },
+    { value: 'is-it-completed', label: 'Is it completed?', hint: 'Send a completion-check nudge' },
+    { value: 'is-it-finished', label: 'Is it finished?', hint: 'Send a finish-check nudge' },
+    { value: 'is-it-released', label: 'Is it released?', hint: 'Send a release-status nudge' },
+    {
+        value: 'tested-e2e',
+        label: 'Have you tested these below instructions with end-to-end testing?',
+        hint: 'Send strict E2E testing verification question',
+    },
+    {
+        value: 'tested-e2e-and-released',
+        label: 'Have you tested the below instructions with end-to-end testing and released it?',
+        hint: 'Send strict E2E testing and release completion question',
+    },
+    { value: 'is-it-done', label: 'Is it done?', hint: 'Send a standard done-check nudge' },
+    { value: 'is-it-published', label: 'Is it published?', hint: 'Send a publish-status nudge' },
+    { value: 'verify-and-finish', label: 'Verify and finish remaining items', hint: 'Send a verification reminder nudge' },
+    { value: 'check-pending-tasks', label: 'Check pending tasks and continue', hint: 'Send a task continuation nudge' },
+    { value: 'run-verification', label: 'Run comprehensive verification', hint: 'Send a verification request nudge' },
+    { value: 'confirm-pushed', label: 'Confirm committed and pushed', hint: 'Send a commit and push confirmation nudge' },
+    { value: 'fully-implemented-verified', label: 'Fully implemented and verified?', hint: 'Send an implementation and verification audit nudge' },
+    { value: 'all-tests-passed', label: 'Did all tests pass and is everything green?', hint: 'Send a test suite verification nudge' },
+    { value: 'double-check-completion', label: 'Double check completion and finalize', hint: 'Send a final review and sign-off nudge' },
+    { value: 'pending-work-left', label: 'Is there any pending work left?', hint: 'Send a pending items inquiry nudge' },
+    { value: 'confirm-status-next-steps', label: 'Confirm completion status and next steps', hint: 'Send a status and next steps nudge' },
+    { value: 'check-pending-proceed', label: 'Check pending tasks and proceed with next', hint: 'Send a sequential task progression nudge' },
+    { value: 'verify-build-cleanliness', label: 'Verify build cleanliness and finalize', hint: 'Send a build cleanliness verification nudge' },
 ];
 
-/** Small built-in set of follow-up nudges used by the "randomized" option. */
+/** Built-in set of follow-up nudges used by the "randomized" option (25+ distinct actionable variations). */
 export const RERUN_RANDOM_MESSAGE_SET: ReadonlyArray<string> = [
+    'Is it completed?',
+    'Is it finished?',
+    'Is it released?',
+    'Have you tested these below instructions with end-to-end testing?',
+    'Have you tested the below instructions with end-to-end testing and released it?',
+    'Is it done?',
+    'Is it published?',
+    'Has this been fully implemented and verified?',
+    'Can you check the pending tasks and continue?',
+    'Is the implementation done and pushed?',
+    'Please verify and finish the remaining items.',
+    'Did all tests pass and is everything green?',
+    'Are all requirements satisfied?',
+    'Please double check completion and finalize.',
+    'Is there any pending work left?',
+    'Please confirm completion status and next steps.',
+    'Run comprehensive verification and report status.',
+    'Check pending tasks and proceed with the next one.',
+    'Verify build cleanliness and finalize.',
+    'Confirm all changes are committed and pushed.',
+    'Did you finish all remaining requirements?',
+    'Is the build clean and all tests passing?',
+    'Please check if anything is pending and complete it.',
+    'Please review and finalize the implementation.',
+    'Are all changes committed and tests green?',
+    'Has everything been tested and verified to completion?',
     'Quick status check — is it done yet?',
     'Please continue where you left off and confirm when finished.',
-    'Give me a brief progress update.',
-    'Are you finished? Summarize the result.',
-    'Keep going — ping me when it is published.',
+    'Checking in: how is it going? Any blockers or pending items?',
+    'Status update please: what is done and what is left to complete?',
+    'Are all pending plans completed and verified?',
+    'Please confirm when the task is fully finished and ready.',
+    'What is the current status of the implementation?',
+    'Are you confident?',
+    'Did all tests pass?',
+    'Is the verification green?',
+    'Are edge cases covered?',
+    'Is documentation updated?',
+    'Is the build passing cleanly?',
 ];
 
 export const RERUN_FIXED_MESSAGES: Record<Exclude<RerunMessageOption, 'randomized'>, string> = {
+    'is-it-completed': 'Is it completed?',
+    'is-it-finished': 'Is it finished?',
+    'is-it-released': 'Is it released?',
+    'tested-e2e': 'Have you tested these below instructions with end-to-end testing?',
+    'tested-e2e-and-released': 'Have you tested the below instructions with end-to-end testing and released it?',
     'is-it-done': 'Is it done?',
     'is-it-published': 'Is it published?',
+    'verify-and-finish': 'Please verify and finish the remaining items.',
+    'check-pending-tasks': 'Can you check the pending tasks and continue?',
+    'run-verification': 'Run comprehensive verification and report status.',
+    'confirm-pushed': 'Confirm all changes are committed and pushed.',
+    'fully-implemented-verified': 'Has this been fully implemented and verified?',
+    'all-tests-passed': 'Did all tests pass and is everything green?',
+    'double-check-completion': 'Please double check completion and finalize.',
+    'pending-work-left': 'Is there any pending work left?',
+    'confirm-status-next-steps': 'Please confirm completion status and next steps.',
+    'check-pending-proceed': 'Check pending tasks and proceed with the next one.',
+    'verify-build-cleanliness': 'Verify build cleanliness and finalize.',
 };
 
-export const RERUN_DEFAULT_COUNT = 2;
+export const RERUN_DEFAULT_COUNT = 4;
 export const RERUN_MIN_COUNT = 1;
-export const RERUN_MAX_COUNT = 5;
+export const RERUN_MAX_COUNT = 8;
+
+/** Rerun option used when no choice has been persisted yet: the randomized nudge. */
+export const RERUN_DEFAULT_MESSAGE_OPTION: RerunMessageOption = 'randomized';
+
+export const RERUN_MESSAGE_OPTION_STORAGE_KEY = 'agm:prompt-tree:rerun-option';
+export const RERUN_COUNT_STORAGE_KEY = 'agm:prompt-tree:rerun-count';
+
+// Legacy keys for seamless backward compatibility with existing browser sessions
+const LEGACY_RERUN_MESSAGE_OPTION_KEY = 'agm_prompt_tree_rerun_message_option';
+const LEGACY_RERUN_COUNT_KEY = 'agm_prompt_tree_rerun_count';
+
+export function isRerunMessageOption(value: string | null): value is RerunMessageOption {
+    return (
+        value === 'randomized' ||
+        value === 'is-it-completed' ||
+        value === 'is-it-finished' ||
+        value === 'is-it-released' ||
+        value === 'tested-e2e' ||
+        value === 'tested-e2e-and-released' ||
+        value === 'is-it-done' ||
+        value === 'is-it-published' ||
+        value === 'verify-and-finish' ||
+        value === 'check-pending-tasks' ||
+        value === 'run-verification' ||
+        value === 'confirm-pushed' ||
+        value === 'fully-implemented-verified' ||
+        value === 'all-tests-passed' ||
+        value === 'double-check-completion' ||
+        value === 'pending-work-left' ||
+        value === 'confirm-status-next-steps' ||
+        value === 'check-pending-proceed' ||
+        value === 'verify-build-cleanliness'
+    );
+}
+
+/** Load the persisted rerun message option (defaults to the randomized nudge). */
+export function loadPersistedRerunMessageOption(): RerunMessageOption {
+    try {
+        if (typeof window === 'undefined' || !window.localStorage) {
+            return RERUN_DEFAULT_MESSAGE_OPTION;
+        }
+        const raw = window.localStorage.getItem(RERUN_MESSAGE_OPTION_STORAGE_KEY)
+            || window.localStorage.getItem(LEGACY_RERUN_MESSAGE_OPTION_KEY);
+        return isRerunMessageOption(raw) ? raw : RERUN_DEFAULT_MESSAGE_OPTION;
+    } catch {
+        return RERUN_DEFAULT_MESSAGE_OPTION;
+    }
+}
+
+/** Persist the rerun message option so DetailHeader and the context menu share one choice. */
+export function savePersistedRerunMessageOption(option: RerunMessageOption): void {
+    try {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+        window.localStorage.setItem(RERUN_MESSAGE_OPTION_STORAGE_KEY, option);
+        window.localStorage.setItem(LEGACY_RERUN_MESSAGE_OPTION_KEY, option);
+    } catch (err) {
+        // Best-effort persist; localStorage may throw in restricted contexts. Tracked, in-memory choice still applies.
+        useErrorStore.getState().trackWarning(err, {
+            source: 'usePromptTreePromptActions.savePersistedRerunMessageOption',
+            triggerAction: 'persist_rerun_message_option',
+        });
+    }
+}
+
+/** Load the persisted rerun count (defaults to RERUN_DEFAULT_COUNT = 4, clamped to the picker range 1..8). */
+export function loadPersistedRerunCount(): number {
+    try {
+        if (typeof window === 'undefined' || !window.localStorage) {
+            return RERUN_DEFAULT_COUNT;
+        }
+        const raw = window.localStorage.getItem(RERUN_COUNT_STORAGE_KEY)
+            || window.localStorage.getItem(LEGACY_RERUN_COUNT_KEY);
+        const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+        if (!Number.isFinite(parsed)) return RERUN_DEFAULT_COUNT;
+        return Math.min(RERUN_MAX_COUNT, Math.max(RERUN_MIN_COUNT, parsed));
+    } catch {
+        return RERUN_DEFAULT_COUNT;
+    }
+}
+
+/** Persist the rerun count so DetailHeader and the context menu share one choice. */
+export function savePersistedRerunCount(count: number): void {
+    try {
+        if (typeof window === 'undefined' || !window.localStorage) return;
+        const clamped = Math.min(RERUN_MAX_COUNT, Math.max(RERUN_MIN_COUNT, count));
+        window.localStorage.setItem(RERUN_COUNT_STORAGE_KEY, String(clamped));
+        window.localStorage.setItem(LEGACY_RERUN_COUNT_KEY, String(clamped));
+    } catch (err) {
+        // Best-effort persist; localStorage may throw in restricted contexts. Tracked, in-memory state still applied.
+        useErrorStore.getState().trackWarning(err, {
+            source: 'usePromptTreePromptActions.savePersistedRerunCount',
+            triggerAction: 'persist_rerun_count',
+        });
+    }
+}
+
+/** Maximum recent turns tracked for anti-repeat filtering. */
+export const RERUN_HISTORY_WINDOW = 5;
+
+/** Finds index of a message in RERUN_RANDOM_MESSAGE_SET using exact or case-insensitive/substring matching. */
+export function findMatchingVariationIndex(msg: string): number {
+    if (!msg || typeof msg !== 'string') return -1;
+    const clean = msg.trim().toLowerCase();
+    if (!clean) return -1;
+
+    // 1. Exact case-insensitive match
+    const exactIdx = RERUN_RANDOM_MESSAGE_SET.findIndex(
+        (v) => v.toLowerCase() === clean
+    );
+    if (exactIdx >= 0) return exactIdx;
+
+    // 2. Substring match (e.g. prompt contains the variation or variation contains the prompt)
+    return RERUN_RANDOM_MESSAGE_SET.findIndex((v) => {
+        const vClean = v.toLowerCase();
+        return clean.includes(vClean) || vClean.includes(clean);
+    });
+}
+
+/**
+ * Extracts all rerun nudge variations that have already been used in this conversation
+ * or recent dispatch history, ensuring they are excluded from future random picks.
+ */
+export function extractUsedNudgesFromConversation(
+    conv?: AgmConversationNode | null,
+    sessionHistory?: string[] | null
+): string[] {
+    const used = new Set<string>();
+
+    if (sessionHistory && Array.isArray(sessionHistory)) {
+        for (const item of sessionHistory) {
+            if (item && typeof item === 'string' && item.trim()) {
+                const idx = findMatchingVariationIndex(item);
+                if (idx >= 0) {
+                    used.add(RERUN_RANDOM_MESSAGE_SET[idx]);
+                } else {
+                    used.add(item.trim());
+                }
+            }
+        }
+    }
+
+    if (conv?.prompts && Array.isArray(conv.prompts) && conv.prompts.length > 0) {
+        for (const turn of conv.prompts) {
+            const text = (turn.prompt_text || turn.preview_200w || '').trim();
+            if (!text) continue;
+            for (const variation of RERUN_RANDOM_MESSAGE_SET) {
+                if (text.toLowerCase().includes(variation.toLowerCase())) {
+                    used.add(variation);
+                }
+            }
+        }
+    }
+
+    const convText = (conv?.full_prompt_text || conv?.prompt_preview_200w || '').trim();
+    if (convText) {
+        for (const variation of RERUN_RANDOM_MESSAGE_SET) {
+            if (convText.toLowerCase().includes(variation.toLowerCase())) {
+                used.add(variation);
+            }
+        }
+    }
+
+    return Array.from(used);
+}
+
+/**
+ * Picks a diverse, actionable rerun nudge from the random message set while
+ * strictly excluding all previously used questions in history and conversation turns.
+ *
+ * If all options in the set have been used, it resets the exclusion pool (or excludes only
+ * the most recent question) to maintain continuous execution.
+ */
+export function pickDiverseRerunNudge(history?: string[] | null): string {
+    const historyList = history || [];
+    const usedIndices = new Set<number>();
+    for (const msg of historyList) {
+        const idx = findMatchingVariationIndex(msg);
+        if (idx >= 0) usedIndices.add(idx);
+    }
+
+    let candidates = RERUN_RANDOM_MESSAGE_SET.filter((_, idx) => !usedIndices.has(idx));
+
+    if (candidates.length === 0) {
+        // Fallback: exclude only the most recent question if possible
+        const lastUsed = historyList[historyList.length - 1];
+        candidates = RERUN_RANDOM_MESSAGE_SET.filter((msg) => msg !== lastUsed);
+        if (candidates.length === 0) {
+            candidates = [...RERUN_RANDOM_MESSAGE_SET];
+        }
+    }
+
+    const randomIndex = Math.floor(Math.random() * candidates.length);
+    return candidates[randomIndex];
+}
+
+/**
+ * Testable generator function for retrieving a randomized rerun nudge with anti-repeat history.
+ */
+export function getRandomRerunNudge(history?: string[]): string {
+    return pickDiverseRerunNudge(history);
+}
 
 /** Resolve the actual message text for one rerun dispatch. */
-export function resolveRerunMessage(option: RerunMessageOption): { message: string; pickedIndex: number | null } {
+export function resolveRerunMessage(
+    option: RerunMessageOption,
+    excludeIndices?: Set<number> | number[] | string[] | Set<string>
+): { message: string; pickedIndex: number | null } {
     if (option === 'randomized') {
-        const pickedIndex = Math.floor(Math.random() * RERUN_RANDOM_MESSAGE_SET.length);
+        const excludedIndices = new Set<number>();
+        const excludedMessages = new Set<string>();
+
+        if (excludeIndices) {
+            for (const item of excludeIndices as Iterable<number | string>) {
+                if (typeof item === 'number') {
+                    excludedIndices.add(item);
+                    if (RERUN_RANDOM_MESSAGE_SET[item]) {
+                        excludedMessages.add(RERUN_RANDOM_MESSAGE_SET[item].toLowerCase());
+                    }
+                } else if (typeof item === 'string') {
+                    excludedMessages.add(item.trim().toLowerCase());
+                    const idx = findMatchingVariationIndex(item);
+                    if (idx >= 0) {
+                        excludedIndices.add(idx);
+                    }
+                }
+            }
+        }
+
+        const availableIndices: number[] = [];
+        for (let idx = 0; idx < RERUN_RANDOM_MESSAGE_SET.length; idx++) {
+            const text = RERUN_RANDOM_MESSAGE_SET[idx].toLowerCase();
+            if (!excludedIndices.has(idx) && !excludedMessages.has(text)) {
+                availableIndices.push(idx);
+            }
+        }
+        const pool = availableIndices.length > 0
+            ? availableIndices
+            : Array.from({ length: RERUN_RANDOM_MESSAGE_SET.length }, (_, i) => i);
+
+        const randomPoolIdx = Math.floor(Math.random() * pool.length);
+        const pickedIndex = pool[randomPoolIdx];
         return { message: RERUN_RANDOM_MESSAGE_SET[pickedIndex], pickedIndex };
     }
-    return { message: RERUN_FIXED_MESSAGES[option], pickedIndex: null };
+    const fixed = RERUN_FIXED_MESSAGES[option as Exclude<RerunMessageOption, 'randomized'>];
+    return { message: fixed || RERUN_RANDOM_MESSAGE_SET[0], pickedIndex: null };
 }
 
 export interface RerunDispatchContext {
@@ -660,24 +1666,32 @@ export interface RerunDispatchContext {
     repoPath: string;
     /** Conversation the nudge lands in (undefined = instance default). */
     convId?: string;
-    /** How many times the message is dispatched (clamped to 1..5). */
+    /** How many times the message is dispatched (clamped to 1..8). */
     count: number;
     messageOption: RerunMessageOption;
+    /** Full original prompt text to embed into Chapter 4. */
+    originalPrompt?: string;
     /** Audit/source label, e.g. 'DetailHeader.rerunSection'. */
     source?: string;
+    /** Media attachment paths to forward to instance and clipboard */
+    mediaPaths?: string[];
+    /** Recent history of nudges (up to 5 turns) to prevent repeating questions across consecutive dispatches. */
+    history?: string[];
 }
 
 export interface RerunDispatchResult {
     requested: number;
     dispatched: number;
     failed: number;
+    messages?: string[];
+    history?: string[];
 }
 
 /**
- * Dispatch the chosen rerun message N times through the canonical `sendPromptNow`
- * path (the same function handleResendPrompt uses). Each rerun is audit-logged
- * individually; a failed rerun is audit-logged as `result: 'error'` and routed
- * into the error module — failures are never silent.
+ * Dispatch the chosen rerun message N times into the FIFO queue via `enqueuePrompt`.
+ * CRITICAL INVARIANT: RERUN MUST ALWAYS ENQUEUE, NEVER SEND DIRECTLY.
+ * Each rerun is audit-logged individually; a failed rerun is audit-logged as
+ * `result: 'error'` and routed into the error module — failures are never silent.
  */
 export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<RerunDispatchResult> {
     const requested = Math.min(
@@ -685,19 +1699,68 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
         Math.max(RERUN_MIN_COUNT, Math.floor(ctx.count) || RERUN_DEFAULT_COUNT)
     );
     const source = ctx.source ?? 'DetailHeader.rerunSection';
-    const result: RerunDispatchResult = { requested, dispatched: 0, failed: 0 };
+    const result: RerunDispatchResult = { requested, dispatched: 0, failed: 0, messages: [], history: [] };
     const auditBase = {
         actor: 'user' as const,
         methodName: 'prompt_tree_rerun_dispatch',
+        route: '/prompts',
         uiTarget: 'PromptTreeView | DetailHeader | RerunSection',
         trigger: 'click' as const,
     };
+    const usedIndices = new Set<number>();
+    const recentHistory: string[] = [...(ctx.history || [])];
+
+    // Pre-populate used indices from recent history so questions already used are strictly excluded
+    for (const priorMsg of recentHistory) {
+        const priorIdx = findMatchingVariationIndex(priorMsg);
+        if (priorIdx >= 0) {
+            usedIndices.add(priorIdx);
+        }
+    }
+
+    let lastFormattedPrompt: string | undefined;
+    let lastRerunMedia: string[] | undefined;
+
     for (let i = 0; i < requested; i += 1) {
-        const { message, pickedIndex } = resolveRerunMessage(ctx.messageOption);
+        const { message: rawMessage, pickedIndex } = resolveRerunMessage(ctx.messageOption, usedIndices);
+        if (pickedIndex !== null) {
+            usedIndices.add(pickedIndex);
+        }
+        recentHistory.push(rawMessage);
+        const richPrompt = buildRerunPrompt({
+            prompt: ctx.originalPrompt,
+            originalPrompt: ctx.originalPrompt,
+            customNudgeMessage: rawMessage,
+            round: i + 1,
+            total: requested,
+            convId: ctx.convId,
+            instanceId: ctx.targetInstId,
+            repoPath: ctx.repoPath,
+        });
+        const message = richPrompt || rawMessage;
+        const { images } = extractPromptImages(message);
+        const rerunMedia: string[] = Array.from(new Set([
+            ...(ctx.mediaPaths || []),
+            ...((ctx as { media_paths?: string[] }).media_paths || []),
+            ...images.map((img) => img.dataUri),
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+        const formattedPrompt = formatPromptWithAttachments(message, rerunMedia, { repoPath: ctx.repoPath });
+        lastFormattedPrompt = formattedPrompt;
+        lastRerunMedia = rerunMedia;
+
         try {
-            // Canonical dispatch path — identical call handleResendPrompt makes.
-            await sendPromptNow(ctx.targetInstId, ctx.repoPath, message, ctx.convId);
+            // CRITICAL INVARIANT: RERUN MUST ALWAYS ENQUEUE, NEVER SEND DIRECTLY.
+            // All rounds (round 0 as well as rounds 1..N-1) are enqueued sequentially into the FIFO queue.
+            await enqueuePrompt(
+                ctx.targetInstId,
+                ctx.repoPath,
+                formattedPrompt,
+                ctx.convId,
+                undefined,
+                rerunMedia.length > 0 ? rerunMedia : undefined
+            );
             result.dispatched += 1;
+            result.messages?.push(rawMessage);
             await auditRecord({
                 ...auditBase,
                 params: {
@@ -708,16 +1771,20 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
                     rerunIndex: i + 1,
                     rerunTotal: requested,
                     messagePickedIndex: pickedIndex,
-                    message,
+                    message: formattedPrompt,
                 },
                 result: 'ok',
             });
         } catch (err) {
             result.failed += 1;
             const errorObj = err instanceof Error ? err : new Error(String(err) || 'rerun dispatch failed');
-            // sendPromptNow already routed this into the error store (captureError);
+            // enqueuePrompt already routed this into the error store (captureError);
             // persist the crash record as well so the failure stays visible.
             persistClientCrash(errorObj, 'usePromptTreePromptActions.dispatchRerunMessages');
+            useErrorStore.getState().captureException(errorObj, {
+                source: 'usePromptTreePromptActions.dispatchRerunMessages',
+                triggerAction: 'rerun_dispatch_round',
+            });
             await auditRecord({
                 ...auditBase,
                 params: {
@@ -735,6 +1802,531 @@ export async function dispatchRerunMessages(ctx: RerunDispatchContext): Promise<
             });
         }
     }
+
+    if (lastFormattedPrompt && result.dispatched > 0) {
+        copyPromptWithRichImages(
+            lastFormattedPrompt,
+            undefined,
+            undefined,
+            lastRerunMedia && lastRerunMedia.length > 0 ? lastRerunMedia : undefined
+        ).catch((clipErr: unknown) => {
+            useErrorStore.getState().trackWarning(clipErr, {
+                source: 'usePromptTreePromptActions.dispatchRerunMessages',
+                triggerAction: 'copy_rerun_rich_images',
+            });
+        });
+    }
+
+    result.history = recentHistory;
     return result;
 }
+
+export interface HandleRerunConversationOptions {
+    conversation?: AgmConversationNode | null;
+    project?: { repo_path?: string; instance_id?: string } | null;
+    instanceId?: string;
+    repoPath?: string;
+    count?: number;
+    messageOption?: RerunMessageOption;
+    originalPrompt?: string;
+    activePromptText?: string;
+    mediaPaths?: string[];
+    source?: string;
+    targetConvId?: string;
+    /** Recent history of nudges to avoid repeats. */
+    history?: string[];
+}
+
+/**
+ * High-level orchestration for rerun conversation:
+ * - Resolves originalPrompt from active turns / prompt history rather than leaving it undefined.
+ * - Enforces 3-tier fallback for targetRepoPath (selected project repo_path -> conversation repo_path -> default workspace).
+ * - Dispatches through dispatchRerunMessages.
+ */
+export async function handleRerunConversation(
+    options: HandleRerunConversationOptions
+): Promise<RerunDispatchResult> {
+    const conv = options.conversation;
+    const proj = options.project;
+
+    // Tiered resolution of originalPrompt from active turns / prompt history
+    let originalPrompt = options.originalPrompt?.trim() || options.activePromptText?.trim() || '';
+    if (!originalPrompt && conv) {
+        if (conv.selected_turn_number != null && conv.prompts && conv.prompts.length > 0) {
+            const matchedTurn = conv.prompts.find((p) => p.turn_number === conv.selected_turn_number);
+            if (matchedTurn?.prompt_text?.trim()) {
+                originalPrompt = matchedTurn.prompt_text.trim();
+            }
+        }
+        if (!originalPrompt && conv.prompts && conv.prompts.length > 0) {
+            const runningTurn = conv.prompts.find((p) => Boolean(p.is_running) && Boolean(p.prompt_text?.trim()));
+            if (runningTurn?.prompt_text?.trim()) {
+                originalPrompt = runningTurn.prompt_text.trim();
+            } else {
+                const lastTurnWithText = [...conv.prompts].reverse().find((p) => Boolean(p.prompt_text?.trim()));
+                if (lastTurnWithText?.prompt_text?.trim()) {
+                    originalPrompt = lastTurnWithText.prompt_text.trim();
+                }
+            }
+        }
+        if (!originalPrompt) {
+            originalPrompt = (conv.full_prompt_text || conv.prompt_preview_200w || '').trim();
+        }
+        // Imp-17: 3-Tier Fallback: turn summary -> root prompt title -> ledger
+        if (!originalPrompt) {
+            originalPrompt = (conv.title || '').trim();
+        }
+    }
+
+    // 3-tier fallback for targetRepoPath: selected project repo_path -> conversation repo_path -> default workspace
+    const targetRepoPath =
+        proj?.repo_path?.trim() ||
+        options.repoPath?.trim() ||
+        (conv as { repo_path?: string })?.repo_path?.trim() ||
+        '.';
+
+    const targetInstId =
+        options.instanceId ||
+        conv?.instance_id ||
+        proj?.instance_id ||
+        'default';
+
+    const convMedia: string[] = Array.from(new Set([
+        ...(options.mediaPaths || []),
+        ...(conv?.media_paths || []),
+        ...(conv?.media_thumbnails || []),
+        ...(conv?.prompts?.flatMap((p) => p.media_paths || []) || []),
+        ...(conv?.sub_runs?.flatMap((s) => s.media_paths || []) || []),
+    ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+
+    return dispatchRerunMessages({
+        targetInstId,
+        repoPath: targetRepoPath,
+        convId: options.targetConvId ?? conv?.conversation_id,
+        count: options.count ?? loadPersistedRerunCount(),
+        messageOption: options.messageOption ?? loadPersistedRerunMessageOption(),
+        originalPrompt,
+        source: options.source ?? 'handleRerunConversation',
+        mediaPaths: convMedia,
+        history: options.history,
+    });
+}
 // END RERUN SECTION (Task-04)
+
+// ============================================================================
+// CONVERSATION ACTIONS SECTION (Task-03)
+// ----------------------------------------------------------------------------
+// Multi-prompt resend, verify last prompts & enqueue, clone & compact memory,
+// and per-conversation JSON/YAML/SQLite export utilities.
+// ============================================================================
+
+export function extractConversationPromptsList(conv: AgmConversationNode): string[] {
+    const list: string[] = [];
+    if (conv.sub_runs && conv.sub_runs.length > 0) {
+        for (const sub of conv.sub_runs) {
+            const body = (sub.full_prompt_text || sub.prompt_preview_200w || '').trim();
+            if (body && !list.includes(body)) {
+                list.push(body);
+            }
+        }
+    }
+    const mainBody = (conv.full_prompt_text || conv.prompt_preview_200w || '').trim();
+    if (mainBody && !list.includes(mainBody)) {
+        list.push(mainBody);
+    }
+    return list.length > 0 ? list : (mainBody ? [mainBody] : []);
+}
+
+export interface MultiPromptResendOptions {
+    conversationId: string;
+    instanceId: string;
+    repoPath: string;
+    count: number | 'all';
+    delayMs?: number;
+    prompts?: string[];
+    mediaPaths?: string[];
+}
+
+export async function dispatchMultiPromptResend(
+    options: MultiPromptResendOptions
+): Promise<{ sent: number; failed: number }> {
+    const delay = options.delayMs ?? 500;
+    const allPrompts = options.prompts ?? [];
+    const targetPrompts =
+        options.count === 'all'
+            ? allPrompts
+            : allPrompts.slice(-Math.max(1, Math.floor(Number(options.count))));
+
+    const result = { sent: 0, failed: 0 };
+    for (const prompt of targetPrompts) {
+        if (!prompt || !prompt.trim()) continue;
+        const { rewrittenPrompt, images } = extractPromptImages(prompt);
+        const promptMedia: string[] = Array.from(new Set([
+            ...(options.mediaPaths || []),
+            ...images.map((img) => img.dataUri),
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+        try {
+            // CRITICAL INVARIANT: Multi-prompt resends must strictly enqueue into the FIFO queue.
+            await enqueuePrompt(
+                options.instanceId,
+                options.repoPath,
+                rewrittenPrompt,
+                options.conversationId,
+                undefined,
+                promptMedia.length > 0 ? promptMedia : undefined
+            );
+            result.sent += 1;
+            await auditRecord({
+                actor: 'user',
+                methodName: 'prompt_tree_multi_resend',
+                route: '/prompts',
+                uiTarget: 'ConversationContextMenu | ResendSubmenu',
+                trigger: 'click',
+                params: {
+                    conversationId: options.conversationId,
+                    instanceId: options.instanceId,
+                    promptCount: targetPrompts.length,
+                    prompt,
+                    mediaCount: promptMedia.length,
+                },
+                result: 'ok',
+            });
+        } catch (err) {
+            result.failed += 1;
+            persistClientCrash(err, 'usePromptTreePromptActions.dispatchMultiPromptResend');
+            useErrorStore.getState().trackWarning(err, {
+                source: 'usePromptTreePromptActions.dispatchMultiPromptResend',
+                triggerAction: 'multi_prompt_resend',
+            });
+        }
+        if (delay > 0) {
+            await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+    }
+    return result;
+}
+
+export interface VerifyLastPromptsOptions {
+    instanceId: string;
+    repoPath: string;
+    conversationId: string;
+    convTitle?: string;
+    count?: number;
+    prompts?: string[];
+    mediaPaths?: string[];
+}
+
+export async function handleVerifyLastPromptsAndEnqueue(
+    options: VerifyLastPromptsOptions
+): Promise<boolean> {
+    try {
+        const count = options.count ?? 10;
+        const allPrompts = options.prompts ?? [];
+        const subset = allPrompts.slice(-count);
+        const verificationPrompt = buildMultiPromptVerificationPrompt(
+            subset.length > 0 ? subset : ['Verify all completed tasks in this conversation and provide a full evidence scorecard.'],
+            options.convTitle || options.conversationId
+        );
+
+        const { rewrittenPrompt, images } = extractPromptImages(verificationPrompt);
+        const verifyMedia: string[] = Array.from(new Set([
+            ...(options.mediaPaths || []),
+            ...images.map((img) => img.dataUri),
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+        await enqueuePrompt(
+            options.instanceId,
+            options.repoPath,
+            rewrittenPrompt,
+            options.conversationId,
+            undefined,
+            verifyMedia.length > 0 ? verifyMedia : undefined
+        );
+        try {
+            await copyPromptWithRichImages(
+                verificationPrompt,
+                undefined,
+                undefined,
+                verifyMedia.length > 0 ? verifyMedia : undefined
+            );
+        } catch (clipErr) {
+            useErrorStore.getState().trackWarning(clipErr, {
+                source: 'usePromptTreePromptActions.handleVerifyLastPromptsAndEnqueue',
+                triggerAction: 'copy_verify_prompt_clipboard',
+            });
+        }
+        await auditRecord({
+            actor: 'user',
+            methodName: 'prompt_tree_verify_last_prompts_enqueue',
+            route: '/prompts',
+            uiTarget: 'ConversationContextMenu | VerifyLastPrompts',
+            trigger: 'click',
+            params: {
+                conversationId: options.conversationId,
+                instanceId: options.instanceId,
+                auditedCount: subset.length,
+                mediaCount: verifyMedia.length,
+            },
+            result: 'ok',
+        });
+        return true;
+    } catch (err) {
+        persistClientCrash(err, 'usePromptTreePromptActions.handleVerifyLastPromptsAndEnqueue');
+        useErrorStore.getState().captureException(
+            err instanceof Error ? err : new Error(String(err)),
+            {
+                source: 'usePromptTreePromptActions.handleVerifyLastPromptsAndEnqueue',
+                triggerAction: 'enqueue_verify_prompts',
+            }
+        );
+        return false;
+    }
+}
+
+export interface CloneAndCompactOptions {
+    instanceId: string;
+    repoPath: string;
+    sourceConv: AgmConversationNode;
+    prompts?: string[];
+    mediaPaths?: string[];
+}
+
+export async function handleCloneAndCompactConversation(
+    options: CloneAndCompactOptions
+): Promise<string | null> {
+    try {
+        const { sourceConv, instanceId, repoPath } = options;
+        const allPrompts = options.prompts ?? extractConversationPromptsList(sourceConv);
+        const compactTitle = `[Compacted] ${sourceConv.title || sourceConv.short_id || 'Conversation'}`;
+
+        const summaryGoals = allPrompts
+            .slice(0, 5)
+            .map((p, idx) => `${idx + 1}. ${p.slice(0, 150).replace(/\n/g, ' ')}`)
+            .join('\n');
+
+        const compactContext = [
+            '# 📦 SESSION HANDOFF & COMPACTED MEMORY CONTEXT',
+            '',
+            `> **Source Conversation:** ${sourceConv.title || sourceConv.short_id} (\`${sourceConv.conversation_id}\`)`,
+            `> **Previous Steps Completed:** ${sourceConv.step_count || 1}`,
+            `> **Timestamp:** ${new Date().toISOString()}`,
+            '',
+            '### 1. Predecessor Goals & Instructions Summary:',
+            summaryGoals || 'No prior prompt history found.',
+            '',
+            sourceConv.latest_response ? `### 2. Latest AI Response Outcome:\n${sourceConv.latest_response.slice(0, 800)}\n` : '',
+            sourceConv.execution_results ? `### 3. Key Execution Results:\n${sourceConv.execution_results.slice(0, 800)}\n` : '',
+            '',
+            '### 4. Continuous Execution Handoff Directive:',
+            'You are resuming work from a compacted predecessor session in a fresh clean session context.',
+            'Review the verified state above and continue seamlessly toward task completion.',
+        ].filter(Boolean).join('\n');
+
+        const { rewrittenPrompt, images } = extractPromptImages(compactContext);
+        const compactMedia: string[] = Array.from(new Set([
+            ...(options.mediaPaths || []),
+            ...(sourceConv.media_paths || []),
+            ...(sourceConv.media_thumbnails || []),
+            ...(sourceConv.prompts?.flatMap((p) => p.media_paths || []) || []),
+            ...(sourceConv.sub_runs?.flatMap((s) => s.media_paths || []) || []),
+            ...images.map((img) => img.dataUri),
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+        await enqueuePrompt(
+            instanceId,
+            repoPath,
+            rewrittenPrompt,
+            compactTitle,
+            undefined,
+            compactMedia.length > 0 ? compactMedia : undefined
+        );
+
+        try {
+            await copyPromptWithRichImages(
+                compactContext,
+                undefined,
+                undefined,
+                compactMedia.length > 0 ? compactMedia : undefined
+            );
+        } catch (clipErr) {
+            useErrorStore.getState().trackWarning(clipErr, {
+                source: 'usePromptTreePromptActions.handleCloneAndCompactConversation',
+                triggerAction: 'copy_compacted_context',
+            });
+        }
+
+        await auditRecord({
+            actor: 'user',
+            methodName: 'prompt_tree_clone_and_compact',
+            route: '/prompts',
+            uiTarget: 'ConversationContextMenu | CloneCompact',
+            trigger: 'click',
+            params: {
+                sourceConvId: sourceConv.conversation_id,
+                targetTitle: compactTitle,
+                instanceId,
+                mediaCount: compactMedia.length,
+            },
+            result: 'ok',
+        });
+
+        return compactTitle;
+    } catch (err) {
+        persistClientCrash(err, 'usePromptTreePromptActions.handleCloneAndCompactConversation');
+        useErrorStore.getState().captureException(
+            err instanceof Error ? err : new Error(String(err)),
+            {
+                source: 'usePromptTreePromptActions.handleCloneAndCompactConversation',
+                triggerAction: 'clone_compact_conversation',
+            }
+        );
+        return null;
+    }
+}
+
+export function exportConversationAsJson(conv: AgmConversationNode, repoPath?: string): void {
+    try {
+        const baseName = (conv.title || conv.short_id || 'conversation')
+            .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+            .trim()
+            .replace(/\s+/g, '_')
+            .slice(0, 40) || 'conversation';
+
+        const data = {
+            conversation_id: conv.conversation_id,
+            seq_code: conv.seq_code,
+            title: conv.title,
+            short_id: conv.short_id,
+            status: conv.status,
+            is_running: conv.is_running,
+            step_count: conv.step_count,
+            repo_path: repoPath ?? '',
+            full_prompt_text: conv.full_prompt_text ?? '',
+            prompt_preview_200w: conv.prompt_preview_200w ?? '',
+            latest_response: conv.latest_response ?? '',
+            execution_results: conv.execution_results ?? '',
+            sub_runs: conv.sub_runs ?? [],
+            exported_at: new Date().toISOString(),
+        };
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${baseName}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        useErrorStore.getState().captureException(
+            err instanceof Error ? err : new Error(String(err)),
+            {
+                source: 'usePromptTreePromptActions.exportConversationAsJson',
+                triggerAction: 'export_conv_json',
+            }
+        );
+    }
+}
+
+function escapeYaml(val: unknown): string {
+    if (val === null || val === undefined) return '""';
+    const s = String(val);
+    if (s.includes('\n') || s.includes('"') || s.includes(':') || s.includes('#')) {
+        return `|-\n    ${s.split('\n').join('\n    ')}`;
+    }
+    return `"${s.replace(/"/g, '\\"')}"`;
+}
+
+export function exportConversationAsYaml(conv: AgmConversationNode, repoPath?: string): void {
+    try {
+        const baseName = (conv.title || conv.short_id || 'conversation')
+            .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+            .trim()
+            .replace(/\s+/g, '_')
+            .slice(0, 40) || 'conversation';
+
+        const lines = [
+            `conversation_id: ${escapeYaml(conv.conversation_id)}`,
+            `seq_code: ${escapeYaml(conv.seq_code)}`,
+            `title: ${escapeYaml(conv.title)}`,
+            `short_id: ${escapeYaml(conv.short_id)}`,
+            `status: ${escapeYaml(conv.status)}`,
+            `is_running: ${Boolean(conv.is_running)}`,
+            `step_count: ${conv.step_count || 1}`,
+            `repo_path: ${escapeYaml(repoPath || '')}`,
+            `exported_at: ${escapeYaml(new Date().toISOString())}`,
+            `prompt_text: ${escapeYaml(conv.full_prompt_text || conv.prompt_preview_200w || '')}`,
+            `latest_response: ${escapeYaml(conv.latest_response || '')}`,
+            `execution_results: ${escapeYaml(conv.execution_results || '')}`,
+        ];
+
+        if (conv.sub_runs && conv.sub_runs.length > 0) {
+            lines.push('sub_runs:');
+            for (const sub of conv.sub_runs) {
+                lines.push(`  - id: ${escapeYaml(sub.conversation_id)}`);
+                lines.push(`    title: ${escapeYaml(sub.title)}`);
+                lines.push(`    prompt: ${escapeYaml(sub.full_prompt_text || sub.prompt_preview_200w || '')}`);
+            }
+        }
+
+        const blob = new Blob([lines.join('\n')], { type: 'text/yaml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${baseName}.yaml`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        useErrorStore.getState().captureException(
+            err instanceof Error ? err : new Error(String(err)),
+            {
+                source: 'usePromptTreePromptActions.exportConversationAsYaml',
+                triggerAction: 'export_conv_yaml',
+            }
+        );
+    }
+}
+
+export async function exportConversationAsSqlite(conv: AgmConversationNode): Promise<void> {
+    try {
+        const baseName = (conv.title || conv.short_id || 'conversation')
+            .replace(/[^a-zA-Z0-9_\-\s]/g, '')
+            .trim()
+            .replace(/\s+/g, '_')
+            .slice(0, 40) || 'conversation';
+        const fileName = `${baseName}-${Date.now()}.db`;
+
+        if (!isTauri()) {
+            const data = JSON.stringify(conv, null, 2);
+            const blob = new Blob([data], { type: 'application/x-sqlite3' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            return;
+        }
+
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const selected = await save({
+            defaultPath: fileName,
+            filters: [{ name: 'SQLite Database', extensions: ['db', 'sqlite'] }],
+        });
+        if (!selected) return;
+
+        await invoke('export_prompt_tree_sqlite', { path: selected });
+    } catch (err) {
+        useErrorStore.getState().captureException(
+            err instanceof Error ? err : new Error(String(err)),
+            {
+                source: 'usePromptTreePromptActions.exportConversationAsSqlite',
+                triggerAction: 'export_conv_sqlite',
+            }
+        );
+    }
+}
+

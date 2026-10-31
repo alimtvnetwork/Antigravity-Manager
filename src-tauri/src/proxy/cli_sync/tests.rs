@@ -11,7 +11,7 @@ api_key = "sk-old1"
 base_url = "http://127.0.0.1:8046/v1"
 provider = "openai"
 
-[provider_accounts."local_antigravity测试"]
+[provider_accounts."local_antigravity test"]
 api_key = "sk-old2"
 base_url = "http://127.0.0.1:8046"
 provider = "anthropic"
@@ -42,7 +42,7 @@ model = "deepseek-chat"
     use toml_edit::DocumentMut;
     let doc: DocumentMut = res.parse().expect("result should be valid toml");
 
-    // 验证 antigravity-manager 存在且正确
+    // Verify antigravity-manager exists and is correct
     let accounts = doc.get("provider_accounts").unwrap().as_table().unwrap();
     let ag = accounts.get("antigravity-manager").unwrap();
     assert_eq!(ag.get("provider").unwrap().as_str().unwrap(), "anthropic");
@@ -52,13 +52,13 @@ model = "deepseek-chat"
     );
     assert_eq!(ag.get("api_key").unwrap().as_str().unwrap(), "sk-newkey123");
 
-    // 验证同 URL 旧账号被清除
+    // Verify that the old account with the same URL has been cleared.
     assert!(!accounts.contains_key("local-gemini"));
-    assert!(!accounts.contains_key("local_antigravity测试"));
-    // 验证不同 URL 账号被保留
+    assert!(!accounts.contains_key("local_antigravity test"));
+    // Verify that different URL accounts are reserved
     assert!(accounts.contains_key("other-provider"));
 
-    // 验证核心模型已添加
+    // Verify that the core model has been added
     let models = doc.get("models").unwrap().as_table().unwrap();
     assert!(models.contains_key("claude-sonnet-4-6"));
     assert!(models.contains_key("claude-sonnet-4-6-thinking"));
@@ -69,11 +69,11 @@ model = "deepseek-chat"
     assert!(models.contains_key("gemini-3.7-flash"));
     assert!(models.contains_key("gemini-3.1-pro"));
 
-    // 验证旧关联模型已被清除，且保留其他账号模型
+    // Verify that the old association model has been cleared and other account models are retained
     assert!(!models.contains_key("gemini-3.7"));
     assert!(models.contains_key("other-model"));
 
-    // 验证模型属性：开启思考模式和思考不回传，以及上下文大小（Gemini 1M，Claude 256k）
+    // Verify model attributes: turn on thinking mode and thinking without postback, and context size (Gemini 1M, Claude 256k)
     let m = models.get("gemini-3.8-flash-high").unwrap();
     assert_eq!(
         m.get("account").unwrap().as_str().unwrap(),
@@ -112,7 +112,7 @@ model = "deepseek-chat"
         "exclude"
     );
 
-    // 验证默认模型
+    // Verify default model
     assert_eq!(
         doc.get("default_model").unwrap().as_str().unwrap(),
         "gemini-3.8-flash-high"

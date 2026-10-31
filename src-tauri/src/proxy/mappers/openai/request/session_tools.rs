@@ -1,5 +1,5 @@
 // Tools phase (split from request.rs).
-// OpenAI → Gemini 请求转换
+// OpenAI → Gemini request conversion
 use super::super::models::*;
 use crate::proxy::model_specs;
 use crate::proxy::token_manager::ProxyToken;
@@ -26,8 +26,8 @@ pub(crate) fn phase_tools(
 
     let mut function_declarations: Vec<Value> = Vec::new();
 
-    // [CACHE:L2] 计算原始 tools 的 hash，查 Layer 2 缓存
-    // 命中则跳过所有 tools 处理逻辑，跨 session 复用已处理的 tools
+    // [CACHE:L2] Calculate the hash of the original tools and check the Layer 2 cache
+    // If hit, all tools processing logic will be skipped and processed tools will be reused across sessions.
     let mut tools_layer_hit = false;
     let tools_raw_hash = if let Some(ref original_tools) = request.tools {
         let raw_json = serde_json::to_string(original_tools).unwrap_or_default();
@@ -63,7 +63,7 @@ pub(crate) fn phase_tools(
                     func.clone()
                 } else {
                     let mut func = tool.clone();
-                    // [FIX] 剔除 "type" 前如果不存在 "name"，则提取 "type" 兜底作为名字
+                    // [FIX] If "name" does not exist before removing "type", extract "type" as the name
                     if func.get("name").is_none() {
                         let tool_type_opt = func
                             .get("type")
@@ -89,7 +89,7 @@ pub(crate) fn phase_tools(
                     .map(|s| s.to_string());
 
                 if name_opt.is_none() {
-                    // [FIX] 如果工具没有名称，视为无效工具直接跳过 (防止 REQUIRED_FIELD_MISSING)
+                    // [FIX] If the tool has no name, it is treated as an invalid tool and skipped directly (prevent REQUIRED_FIELD_MISSING)
                     tracing::warn!(
                         "[OpenAI-Request] Skipping tool without name: {:?}",
                         gemini_func
@@ -97,7 +97,7 @@ pub(crate) fn phase_tools(
                     continue;
                 }
 
-                // [NEW CRITICAL FIX] 保留函数定义根层级的合法字段，移除所有非法字段 (如 type, execution, format 等)
+                // [NEW CRITICAL FIX] Keep legal fields at the root level of function definition and remove all illegal fields (such as type, execution, format, etc.)
                 if let Some(obj) = gemini_func.as_object_mut() {
                     let mut clean_obj = serde_json::Map::new();
                     if let Some(name) = obj.get("name") {
@@ -113,12 +113,12 @@ pub(crate) fn phase_tools(
                 }
 
                 if let Some(params) = gemini_func.get_mut("parameters") {
-                    // [DEEP FIX] 统一调用公共库清洗：展开 $ref 并剔除所有层级的 format/definitions
+                    // [DEEP FIX] Unified call for public library cleaning: expand $ref and remove format/definitions at all levels
                     crate::proxy::common::json_schema::clean_json_schema(params);
 
-                    // Gemini v1internal 要求：
-                    // 1. type 必须是大写 (OBJECT, STRING 等)
-                    // 2. 根对象必须有 "type": "OBJECT"，且必须声明 "properties" (即使为空)，杜绝 MALFORMED_FUNCTION_CALL
+                    // Gemini v1internal requirements:
+                    // 1. type must be uppercase (OBJECT, STRING, etc.)
+                    // 2. The root object must have "type": "OBJECT", and "properties" must be declared (even if it is empty), and MALFORMED_FUNCTION_CALL must be eliminated
                     if let Some(params_obj) = params.as_object_mut() {
                         if !params_obj.contains_key("type") {
                             params_obj.insert("type".to_string(), json!("OBJECT"));
@@ -128,7 +128,7 @@ pub(crate) fn phase_tools(
                         }
                     }
 
-                    // 递归转换 type 为大写 (符合 Protobuf 定义)
+                    // Recursively convert type to uppercase (in line with Protobuf definition)
                     enforce_uppercase_types(params);
                 } else {
                     gemini_func.as_object_mut().unwrap().insert(
@@ -143,7 +143,7 @@ pub(crate) fn phase_tools(
             }
         }
 
-        // [CACHE:L2] 缓存处理完成的 tools，下次相同 schema 可以直接命中
+        // [CACHE:L2] Cache the tools after processing, and the same schema can be directly hit next time
         if let Some(ref key) = tools_raw_hash {
             if !tools_layer_hit {
                 if let Ok(cached_json) = serde_json::to_string(&function_declarations) {
@@ -159,7 +159,7 @@ pub(crate) fn phase_tools(
         }
     } // end if !tools_layer_hit (includes the sort and insert below)
 
-    // [CACHE] 按 function name 稳定排序，确保跨请求的 tool schema 字节一致
+    // [CACHE] Stable sorting by function name to ensure tool schema byte consistency across requests
     function_declarations.sort_by(|a, b| {
         let name_a = a.get("name").and_then(|v| v.as_str()).unwrap_or("");
         let name_b = b.get("name").and_then(|v| v.as_str()).unwrap_or("");
@@ -171,9 +171,9 @@ pub(crate) fn phase_tools(
     if !function_declarations.is_empty() {
         inner_request["tools"] = json!([{ "functionDeclarations": function_declarations }]);
 
-        // [REMOVED v4.8.2] toolConfig / tool_config 双写已移除：官方 Antigravity 报文不带该字段，
-        // 且 camelCase 与 snake_case 双份会写出一对矛盾配置 (AUTO vs VALIDATED)。
-        // 工具调用行为在协议无关节点 (align_google_request_prefix_topology) 统一处理。
+        // [REMOVED v4.8.2] toolConfig / tool_config double writing has been removed: the official Antigravity message does not carry this field,
+        // And the double copy of camelCase and snake_case will write a pair of contradictory configurations (AUTO vs VALIDATED).
+        // Tool calling behavior is handled uniformly in the protocol-agnostic node (align_google_request_prefix_topology).
         let _mode = None as Option<&str>;
     }
 
@@ -200,8 +200,8 @@ pub(crate) fn phase_tools(
             inner_request,
             Some(mapped_model),
         );
-        // [REMOVED v4.8.2] toolConfig / tool_config 注入已移除（官方不带该字段），
-        // googleSearch 工具声明本身已由 inject_google_search_tool 写入 tools。
+        // [REMOVED v4.8.2] toolConfig / tool_config injection has been removed (officially this field is not included),
+        // The googleSearch tool declaration itself has been written to tools by inject_google_search_tool.
     }
 
     if let Some(ref image_config) = setup.config.image_config {
@@ -210,7 +210,7 @@ pub(crate) fn phase_tools(
             obj.remove("systemInstruction");
             let gen_config = obj.entry("generationConfig").or_insert_with(|| json!({}));
             if let Some(gen_obj) = gen_config.as_object_mut() {
-                // [REMOVED] thinkingConfig 拦截已删除，允许图像生成时输出思维链
+                // [REMOVED] thinkingConfig interception has been removed, allowing the output of thinking chains when images are generated
                 // gen_obj.remove("thinkingConfig");
                 gen_obj.remove("responseMimeType");
                 gen_obj.remove("responseModalities");
@@ -219,11 +219,11 @@ pub(crate) fn phase_tools(
         }
     }
 
-    // [ADDED v4.1.24] 注入稳定 sessionId 对齐官方规范
-    // [FIX session-1M] sessionId 混入对话指纹与代数:
-    //   - 同一对话内保持稳定(保留上游服务端会话缓存收益)
-    //   - 不同对话使用不同 sessionId,避免共享同一服务端累计会话
-    //   - 检测到上游 1M 累计报错后 bump 代数,新 sessionId = 全新上游会话,对话无感恢复
+    // [ADDED v4.1.24] Inject stable sessionId to align with official specifications
+    // [FIX session-1M] sessionId mixed with session fingerprint and algebra:
+    //   - Remain stable within the same session (retain the upstream server session cache revenue)
+    //   - Use different sessionIds for different conversations to avoid sharing cumulative sessions on the same server
+    //   - After detecting 1M cumulative error reports from the upstream, bump generation, new sessionId = new upstream session, and the conversation is restored without any sense.
     if let Some(t) = token {
         let generation =
             crate::proxy::common::session::current_bump(&t.account_id, &setup.session_id);
@@ -234,8 +234,8 @@ pub(crate) fn phase_tools(
         ));
     }
 
-    // [CACHE] 重建 inner_request 字段顺序——稳定前缀在前，动态内容在后
-    // [CACHE] 统一委托进站流水线进行前缀拓扑规范化与对齐（Pipeline First 核心归一）
+    // [CACHE] Rebuild inner_request field order - stable prefix first, dynamic content last
+    // [CACHE] Unified entrust the inbound pipeline to perform prefix topology standardization and alignment (Pipeline First core normalization)
     crate::proxy::pipeline::InboundThinkingPipeline::align_google_request_prefix_topology(
         inner_request,
     );

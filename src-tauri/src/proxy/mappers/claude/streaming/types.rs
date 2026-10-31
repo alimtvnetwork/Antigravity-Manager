@@ -3,7 +3,7 @@ use crate::proxy::mappers::claude::models::*;
 use serde_json::Value;
 
 pub fn remap_function_call_args(name: &str, args: &mut Value) {
-    // 纯透传协议工具参数，不进行任何字段重命名与拦截改写
+    // Purely transparent transmission of protocol tool parameters without any field renaming or interception rewriting
     if let Some(obj) = args.as_object() {
         tracing::debug!(
             "[Streaming] Tool Call (Passthrough): '{}' Args: {:?}",
@@ -13,7 +13,7 @@ pub fn remap_function_call_args(name: &str, args: &mut Value) {
     }
 }
 
-/// 块类型枚举
+/// block type enum
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BlockType {
     None,
@@ -22,7 +22,7 @@ pub enum BlockType {
     Function,
 }
 
-/// 签名管理器
+/// signature manager
 pub struct SignatureManager {
     pending: Option<String>,
 }

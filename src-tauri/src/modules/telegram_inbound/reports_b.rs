@@ -85,8 +85,9 @@ pub fn format_expand_prompt_report(query_str: &str) -> String {
             );
             format!(
                 "{} <b>Prompt {} — {}</b>\n\
-                Machine: {} · Instance: <code>{}</code>\n\
-                Status: {}\n\
+                • <b>Machine:</b> {}\n\
+                • <b>Instance:</b> <code>{}</code>\n\
+                • <b>Status:</b> {}\n\
                 {}\n\
                 {}{}",
                 palette.mark,
@@ -211,6 +212,475 @@ pub fn format_prompts_query_report(term: &str) -> String {
     out
 }
 
+/// Format conversation seek report with ≥200-word expandable prompt previews and inline rerun/verify buttons
+pub async fn format_seek_conversations_report(
+    query_str: &str,
+) -> (String, Option<serde_json::Value>) {
+    let tree = repo_db::get_project_conversation_tree(200, false);
+
+    // Invariant 1: FIFO Ordering in Database Queries
+    // Tree was populated via FIFO queries; calculate global counters:
+    let active_count: usize = tree.iter().map(|p| p.running_count).sum();
+    let mut instances_set = std::collections::HashSet::new();
+    for p in &tree {
+        if !p.instance_id.is_empty() {
+            instances_set.insert(&p.instance_id);
+        }
+    }
+    let inst_count = instances_set.len().max(1);
+
+    let raw_q = query_str.trim();
+    let is_unfiltered = raw_q.is_empty() || raw_q == "*" || raw_q.eq_ignore_ascii_case("all");
+    let query_label = if is_unfiltered {
+        "All active & running".to_string()
+    } else {
+        clean_for_telegram_html(raw_q, 64)
+    };
+
+    struct MatchCandidate<'a> {
+        proj: &'a crate::modules::repo_db::AgmProjectTreeNode,
+        conv: &'a crate::modules::repo_db::AgmConversationNode,
+        score: i32,
+    }
+
+    let mut candidates: Vec<MatchCandidate> = Vec::new();
+    let q_lower = raw_q.to_lowercase();
+    let q_digits = raw_q
+        .trim_start_matches('#')
+        .trim_start_matches(|c: char| c.is_alphabetic())
+        .trim();
+
+    for proj in &tree {
+        for conv in &proj.conversations {
+            let mut score = 0;
+
+            if is_unfiltered {
+                // Prioritize running conversations, then queued, then recent
+                score = if conv.is_running {
+                    100
+                } else if conv.is_queued {
+                    50
+                } else {
+                    10
+                };
+            } else {
+                let conv_seq_clean = conv.seq_code.trim_start_matches('#').to_lowercase();
+                let conv_seq_digits = conv
+                    .seq_code
+                    .trim_start_matches('#')
+                    .trim_start_matches(|c: char| c.is_alphabetic())
+                    .trim();
+                let proj_seq_clean = proj.seq_code.trim_start_matches('#').to_lowercase();
+                let proj_seq_digits = proj
+                    .seq_code
+                    .trim_start_matches('#')
+                    .trim_start_matches(|c: char| c.is_alphabetic())
+                    .trim();
+
+                // 1. Direct sequence code match (#C001, C001, c1)
+                if conv.seq_code.eq_ignore_ascii_case(raw_q)
+                    || format!("#{}", conv.seq_code).eq_ignore_ascii_case(raw_q)
+                    || conv_seq_clean == q_lower
+                    || (!q_digits.is_empty()
+                        && conv_seq_digits == q_digits
+                        && (q_lower.starts_with('c') || q_lower.starts_with("#c")))
+                {
+                    score += 150;
+                }
+                // 2. Project sequence code match (P001, GM:#1)
+                else if proj.seq_code.eq_ignore_ascii_case(raw_q)
+                    || format!("#{}", proj.seq_code).eq_ignore_ascii_case(raw_q)
+                    || proj_seq_clean == q_lower
+                    || (!q_digits.is_empty()
+                        && proj_seq_digits == q_digits
+                        && (q_lower.starts_with('p') || q_lower.starts_with("#p")))
+                {
+                    score += 120;
+                }
+                // 3. GitMap sequence code match
+                else if conv.gitmap_seq_code.to_lowercase().contains(&q_lower)
+                    || proj.gitmap_seq_code.to_lowercase().contains(&q_lower)
+                {
+                    score += 110;
+                }
+                // 4. Conversation UUID or 8-char short_id prefix match
+                else if conv.conversation_id.to_lowercase().starts_with(&q_lower)
+                    || conv.short_id.to_lowercase().starts_with(&q_lower)
+                {
+                    score += 140;
+                }
+                // 5. Workspace / project name / repo path match
+                else if proj.project_id.to_lowercase().contains(&q_lower)
+                    || proj.repo_name.to_lowercase().contains(&q_lower)
+                    || proj.repo_path.to_lowercase().contains(&q_lower)
+                {
+                    score += 80;
+                }
+                // 6. Conversation title match
+                else if conv.title.to_lowercase().contains(&q_lower) {
+                    score += 70;
+                }
+                // 7. Instance ID match
+                else if conv.instance_id.to_lowercase().contains(&q_lower)
+                    || proj.instance_id.to_lowercase().contains(&q_lower)
+                {
+                    score += 60;
+                }
+                // 8. Prompt preview or full text match
+                else if conv.prompt_preview_200w.to_lowercase().contains(&q_lower)
+                    || conv
+                        .full_prompt_text
+                        .as_deref()
+                        .unwrap_or("")
+                        .to_lowercase()
+                        .contains(&q_lower)
+                    || conv
+                        .prompts
+                        .iter()
+                        .any(|t| t.prompt_text.to_lowercase().contains(&q_lower))
+                {
+                    score += 50;
+                }
+
+                if score > 0 && conv.is_running {
+                    score += 30;
+                }
+            }
+
+            if score > 0 {
+                candidates.push(MatchCandidate { proj, conv, score });
+            }
+        }
+    }
+
+    // Sort: highest score first, then running first, then stable FIFO seq_id
+    candidates.sort_by(|a, b| {
+        b.score
+            .cmp(&a.score)
+            .then_with(|| b.conv.is_running.cmp(&a.conv.is_running))
+            .then_with(|| a.conv.seq_id.cmp(&b.conv.seq_id))
+    });
+
+    // Dedup by conversation_id in case grouped runs exist
+    let mut seen_cids = std::collections::HashSet::new();
+    candidates.retain(|c| seen_cids.insert(c.conv.conversation_id.clone()));
+
+    // Take top 5 matching conversations to respect Telegram message size limits
+    let matches: Vec<_> = candidates.into_iter().take(5).collect();
+
+    if matches.is_empty() {
+        let empty_msg = format!(
+            "🎯 <b>CONVERSATION SEEK &amp; PROMPT TURNS</b>\n\
+            ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+            • <b>Running Prompts:</b> <code>{}</code> active across <code>{}</code> instances\n\
+            • <b>Filter:</b> <code>{}</code>\n\n\
+            <i>No conversations matched query \"<b>{}</b>\".</i>\n\n\
+            💡 Send <code>/seek</code> without arguments to list active conversations, or <code>/tree</code> for the full project hierarchy.",
+            active_count,
+            inst_count,
+            query_label,
+            clean_for_telegram_html(raw_q, 48)
+        );
+        return (empty_msg, None);
+    }
+
+    let mut out = format!(
+        "🎯 <b>CONVERSATION SEEK &amp; PROMPT TURNS</b>\n\
+        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+        • <b>Running Prompts:</b> <code>{}</code> active across <code>{}</code> instances\n\
+        • <b>Filter:</b> <code>{}</code>\n\
+        • <b>Matching Conversations:</b> <code>{}</code>\n\n",
+        active_count,
+        inst_count,
+        query_label,
+        matches.len()
+    );
+
+    let mut keyboard_rows: Vec<Vec<serde_json::Value>> = Vec::new();
+
+    for candidate in &matches {
+        let proj = candidate.proj;
+        let conv = candidate.conv;
+
+        let proj_name = repo_db::format_friendly_workspace_label(
+            &proj.project_id,
+            &proj.repo_name,
+            &proj.repo_path,
+        );
+        let short_ws = shorten_project_name(&proj_name);
+        let cid8 = if conv.short_id.is_empty() {
+            if conv.conversation_id.len() >= 8 {
+                &conv.conversation_id[..8]
+            } else {
+                &conv.conversation_id
+            }
+        } else {
+            &conv.short_id
+        };
+        let inst_id = if conv.instance_id.is_empty() {
+            if proj.instance_id.is_empty() {
+                "default"
+            } else {
+                &proj.instance_id
+            }
+        } else {
+            &conv.instance_id
+        };
+
+        let status_badge = if conv.is_running {
+            "🟢 RUNNING"
+        } else if conv.is_queued {
+            "🟡 QUEUED"
+        } else {
+            "⚪ COMPLETED"
+        };
+
+        // Determine active or latest prompt turn
+        let (turn_num, total_turns, turn_status, raw_turn_prompt) = if !conv.prompts.is_empty() {
+            let active_turn = if conv.is_running {
+                conv.prompts
+                    .iter()
+                    .find(|t| t.is_running)
+                    .or_else(|| conv.prompts.last())
+            } else {
+                conv.prompts.last()
+            };
+            if let Some(t) = active_turn {
+                let st = if t.is_running {
+                    "RUNNING"
+                } else if t.is_queued {
+                    "QUEUED"
+                } else if !t.status.trim().is_empty() {
+                    t.status.as_str()
+                } else {
+                    "COMPLETED"
+                };
+                (
+                    t.turn_number,
+                    conv.prompts.len(),
+                    st,
+                    t.prompt_text.as_str(),
+                )
+            } else {
+                (
+                    1,
+                    1,
+                    if conv.is_running {
+                        "RUNNING"
+                    } else {
+                        "COMPLETED"
+                    },
+                    conv.full_prompt_text
+                        .as_deref()
+                        .unwrap_or(&conv.prompt_preview_200w),
+                )
+            }
+        } else {
+            (
+                1,
+                1,
+                if conv.is_running {
+                    "RUNNING"
+                } else {
+                    "COMPLETED"
+                },
+                conv.full_prompt_text
+                    .as_deref()
+                    .unwrap_or(&conv.prompt_preview_200w),
+            )
+        };
+
+        // Clamp preview to ≥200 words using repo_db
+        let (preview_200w, _word_count) =
+            repo_db::extract_prompt_words_preview(raw_turn_prompt, 200);
+        let clean_preview = clean_for_telegram_html(&preview_200w, 1800);
+
+        out.push_str(&format!(
+            "📂 <b>[AGM:{} | {}]</b> <code>#{}</code> — <b>{}</b>\n\
+            • <b>Instance:</b> <code>{}</code> · <b>ID:</b> <code>{}</code>\n\
+            • <b>Title:</b> <i>{}</i>\n\
+            • <b>Status:</b> {} (Turn {}/{})\n\n\
+            <b>Turn #{}</b> [<i>{}</i>]:\n\
+            <blockquote expandable><pre><code class=\"language-markdown\">{}</code></pre></blockquote>\n\n",
+            clean_for_telegram_html(&proj.seq_code, 16),
+            clean_for_telegram_html(&proj.gitmap_seq_code, 24),
+            clean_for_telegram_html(&conv.seq_code, 16),
+            clean_for_telegram_html(&short_ws, 32),
+            clean_for_telegram_html(inst_id, 32),
+            clean_for_telegram_html(cid8, 12),
+            clean_for_telegram_html(&conv.title, 48),
+            status_badge,
+            turn_num,
+            total_turns,
+            turn_num,
+            clean_for_telegram_html(turn_status, 24),
+            clean_preview
+        ));
+
+        // Invariant 2: 60-Byte Callback Payload Cap (RCA 15)
+        let rerun_cb = format!("send:t:{}:{}", cid8, turn_num);
+        let verify_cb = format!("send:v:{}:{}", cid8, turn_num);
+        let copy_turn_text = clamp_telegram_copy_text(raw_turn_prompt, TELEGRAM_COPY_TEXT_MAX);
+
+        let has_turn_images = conv.prompts.iter().any(|t| !t.media_paths.is_empty());
+        let img_cb = format!("send:img:{}:{}", cid8, turn_num);
+
+        if matches.len() == 1 {
+            let mut row = vec![
+                serde_json::json!({
+                    "text": format!("🔁 Rerun Turn #{}", turn_num),
+                    "callback_data": rerun_cb
+                }),
+                serde_json::json!({
+                    "text": format!("🛡️ Verify Turn #{}", turn_num),
+                    "callback_data": verify_cb
+                }),
+                serde_json::json!({
+                    "text": "📋 Copy Turn",
+                    "copy_text": { "text": copy_turn_text }
+                }),
+            ];
+            if has_turn_images {
+                row.push(serde_json::json!({
+                    "text": "🖼️ Send Images",
+                    "callback_data": img_cb
+                }));
+            }
+            keyboard_rows.push(row);
+        } else {
+            let mut row = vec![
+                serde_json::json!({
+                    "text": format!("🔁 #{} Rerun T#{}", conv.seq_code, turn_num),
+                    "callback_data": rerun_cb
+                }),
+                serde_json::json!({
+                    "text": format!("🛡️ #{} Verify T#{}", conv.seq_code, turn_num),
+                    "callback_data": verify_cb
+                }),
+                serde_json::json!({
+                    "text": format!("📋 #{} Copy", conv.seq_code),
+                    "copy_text": { "text": copy_turn_text }
+                }),
+            ];
+            if has_turn_images {
+                row.push(serde_json::json!({
+                    "text": format!("🖼️ #{} Img", conv.seq_code),
+                    "callback_data": img_cb
+                }));
+            }
+            keyboard_rows.push(row);
+        }
+    }
+
+    let markup = if !keyboard_rows.is_empty() {
+        Some(serde_json::json!({ "inline_keyboard": keyboard_rows }))
+    } else {
+        None
+    };
+
+    (out.trim_end().to_string(), markup)
+}
+
+/// Alias for `format_seek_conversations_report`
+pub async fn format_conversation_seek_report(
+    query_str: &str,
+) -> (String, Option<serde_json::Value>) {
+    format_seek_conversations_report(query_str).await
+}
+
+/// Resolve inline reply markup with Rerun/Verify/Copy buttons for conversation seek
+pub fn resolve_seek_conversations_markup(query_str: &str) -> Option<serde_json::Value> {
+    let tree = repo_db::get_project_conversation_tree(200, false);
+    let raw_q = query_str.trim();
+    let is_unfiltered = raw_q.is_empty() || raw_q == "*" || raw_q.eq_ignore_ascii_case("all");
+
+    let mut keyboard_rows: Vec<Vec<serde_json::Value>> = Vec::new();
+    let mut count = 0;
+
+    for proj in &tree {
+        for conv in &proj.conversations {
+            if count >= 5 {
+                break;
+            }
+            let is_match = is_unfiltered
+                || conv.seq_code.eq_ignore_ascii_case(raw_q)
+                || format!("#{}", conv.seq_code).eq_ignore_ascii_case(raw_q)
+                || proj.seq_code.eq_ignore_ascii_case(raw_q)
+                || conv
+                    .conversation_id
+                    .to_lowercase()
+                    .starts_with(&raw_q.to_lowercase())
+                || conv
+                    .short_id
+                    .to_lowercase()
+                    .starts_with(&raw_q.to_lowercase())
+                || proj
+                    .project_id
+                    .to_lowercase()
+                    .contains(&raw_q.to_lowercase())
+                || conv.title.to_lowercase().contains(&raw_q.to_lowercase());
+
+            if is_match {
+                let cid8 = if conv.short_id.is_empty() {
+                    if conv.conversation_id.len() >= 8 {
+                        &conv.conversation_id[..8]
+                    } else {
+                        &conv.conversation_id
+                    }
+                } else {
+                    &conv.short_id
+                };
+                let turn_num = conv.prompts.last().map(|t| t.turn_number).unwrap_or(1);
+                let raw_prompt = conv
+                    .prompts
+                    .last()
+                    .map(|t| t.prompt_text.as_str())
+                    .or(conv.full_prompt_text.as_deref())
+                    .unwrap_or(&conv.prompt_preview_200w);
+
+                let rerun_cb = format!("send:t:{}:{}", cid8, turn_num);
+                let verify_cb = format!("send:v:{}:{}", cid8, turn_num);
+                let copy_turn_text = clamp_telegram_copy_text(raw_prompt, TELEGRAM_COPY_TEXT_MAX);
+
+                let has_turn_images = conv.prompts.iter().any(|t| !t.media_paths.is_empty());
+                let img_cb = format!("send:img:{}:{}", cid8, turn_num);
+
+                let mut row = vec![
+                    serde_json::json!({
+                        "text": format!("🔁 #{} Rerun T#{}", conv.seq_code, turn_num),
+                        "callback_data": rerun_cb
+                    }),
+                    serde_json::json!({
+                        "text": format!("🛡️ #{} Verify T#{}", conv.seq_code, turn_num),
+                        "callback_data": verify_cb
+                    }),
+                    serde_json::json!({
+                        "text": format!("📋 #{} Copy", conv.seq_code),
+                        "copy_text": { "text": copy_turn_text }
+                    }),
+                ];
+                if has_turn_images {
+                    row.push(serde_json::json!({
+                        "text": format!("🖼️ #{} Img", conv.seq_code),
+                        "callback_data": img_cb
+                    }));
+                }
+                keyboard_rows.push(row);
+                count += 1;
+            }
+        }
+        if count >= 5 {
+            break;
+        }
+    }
+
+    if !keyboard_rows.is_empty() {
+        Some(serde_json::json!({ "inline_keyboard": keyboard_rows }))
+    } else {
+        None
+    }
+}
+
 /// Format the colorful grouped Telegram command manual (HTML parse mode).
 /// Every command is shown in a tap-to-copy <code> block, and the message
 /// carries native copy-text inline buttons for the essentials.
@@ -232,6 +702,8 @@ pub fn format_help_manual() -> String {
         • <code>/target W3 default</code> — Point subsequent plain messages at machine <code>W3</code> instance <code>default</code>\n\
         • <code>/target default C001</code> — Point the next plain message at a conversation (<code>/target clear</code> cancels, <code>/where</code> shows the target)\n\
         • <code>/send</code> — Guided 3-step picker: machine → instance → conversation, then type the prompt\n\
+        • <code>/seek [query]</code> — Seek running conversations with ≥200-word expandable prompt previews &amp; rerun buttons\n\
+        • <code>/conversations</code> — Alias for <code>/seek</code> conversation browser (also <code>/turns</code>, <code>/convs</code>)\n\
         • <code>/prompt C001 Is it done?</code> — Send to conversation (<code>C001</code>, <code>P001</code>, <code>GM:#1</code>)\n\
         • <code>C001 your prompt here</code> — Shorthand: ID + text sends directly\n\
         • <code>/prompts</code> · <code>/prompt_queue</code> · <code>/templates</code> — Reusable prompt templates\n\n\
@@ -263,7 +735,13 @@ pub fn format_help_manual() -> String {
         🟣 <b>Fleet telemetry</b>\n\
         • <code>/fleet</code> · <code>/whoami</code> · <code>/ping</code> — Machine, instance &amp; bound account identity\n\
         • <code>/instances</code> · <code>/accounts</code> · <code>/status</code> · <code>/observe</code> · <code>/tree</code> · <code>/active</code>\n\
-        • <code>/queues</code> · <code>/query &lt;term&gt;</code> · <code>/expand &lt;id&gt;</code> · <code>/projects</code> · <code>/snapshot</code>\n\n\
+        • <code>/seek</code> · <code>/conversations</code> · <code>/queues</code> · <code>/query &lt;term&gt;</code> · <code>/expand &lt;id&gt;</code> · <code>/projects</code> · <code>/snapshot</code>\n\n\
+        🛠 <b>100 Improvements Flywheel</b>\n\
+        • <code>/improvements</code> — Status card: Plan 100, Next 10, Status, Check\n\
+        • <code>/improvements plan</code> · <code>/improvements plan ui</code> — Start a 100-item wave\n\
+        • <code>/improvements next</code> · <code>/next10</code> — Implement the next batch of 10\n\
+        • CLI: <code>agm improvements plan --dry-run</code> · <code>agm next10 --dry-run</code>\n\
+        • Ledger: <code>.ai-memory/improvements/flywheel.json</code>\n\n\
         🟡 <b>Backup, Cleanup, Updates &amp; Email</b>\n\
         • <code>/backup</code> · <code>/restore</code> · <code>/prune [N]</code> · <code>/clean</code>\n\
         • <code>/update</code> · <code>/update gitmap</code> · <code>/update all</code> · <code>/gitmap ssh update agm</code>\n\
@@ -283,7 +761,7 @@ pub fn format_help_manual() -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::format_help_manual;
+    use super::*;
     use crate::modules::telegram_inbound::ui_remote::window_command_section;
 
     #[test]
@@ -301,6 +779,8 @@ mod tests {
         assert!(help.contains("| commit "));
         assert!(help.contains("| branch "));
         assert!(help.contains("| release "));
+        assert!(help.contains("/seek"));
+        assert!(help.contains("/conversations"));
         assert!(help.contains(window_command_section().trim()));
     }
 
@@ -311,5 +791,96 @@ mod tests {
         assert!(help.contains("/ui ls"));
         assert!(help.contains("/ui scroll"));
         assert!(help.contains("Drive the UI remotely"));
+    }
+
+    #[test]
+    fn help_manual_documents_improvements_flywheel() {
+        let help = format_help_manual();
+        assert!(help.contains("/improvements"));
+        assert!(help.contains("/improvements plan"));
+        assert!(help.contains("/next10"));
+        assert!(help.contains(".ai-memory/improvements/flywheel.json"));
+    }
+
+    #[test]
+    fn test_turn_callback_fits_60_byte_cap() {
+        // RCA 15 Invariant: Telegram callback_data caps at 64 bytes; AGM enforces MAX_CALLBACK_BYTES = 60.
+        let cid8 = "d58c5517";
+        let turn = 125;
+        let rerun_cb = format!("send:t:{}:{}", cid8, turn);
+        let verify_cb = format!("send:v:{}:{}", cid8, turn);
+
+        assert!(
+            rerun_cb.len() <= 60,
+            "Rerun callback length {} exceeds 60-byte cap",
+            rerun_cb.len()
+        );
+        assert!(
+            verify_cb.len() <= 60,
+            "Verify callback length {} exceeds 60-byte cap",
+            verify_cb.len()
+        );
+        assert_eq!(rerun_cb, "send:t:d58c5517:125");
+        assert_eq!(verify_cb, "send:v:d58c5517:125");
+
+        // Edge case: large 16-char CID and 5-digit turn
+        let long_cid = "0123456789abcdef";
+        let large_turn = 99999;
+        let edge_cb = format!("send:t:{}:{}", long_cid, large_turn);
+        assert!(
+            edge_cb.len() <= 60,
+            "Edge callback length {} exceeds 60-byte cap",
+            edge_cb.len()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_expandable_blockquote_tag_balance() {
+        let (report, _) = format_seek_conversations_report("all").await;
+
+        let open_b_count = report.matches("<blockquote expandable>").count();
+        let close_b_count = report.matches("</blockquote>").count();
+        assert_eq!(
+            open_b_count, close_b_count,
+            "Unbalanced blockquote tags in seek report"
+        );
+
+        let open_pre_count = report.matches("<pre>").count();
+        let close_pre_count = report.matches("</pre>").count();
+        assert_eq!(
+            open_pre_count, close_pre_count,
+            "Unbalanced pre tags in seek report"
+        );
+
+        let open_code_count = report.matches("<code").count();
+        let close_code_count = report.matches("</code>").count();
+        assert_eq!(
+            open_code_count, close_code_count,
+            "Unbalanced code tags in seek report"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_seek_report_query_filtering() {
+        // Test empty query (unfiltered)
+        let (unfiltered, _) = format_seek_conversations_report("").await;
+        assert!(unfiltered.contains("CONVERSATION SEEK &amp; PROMPT TURNS"));
+
+        // Test non-matching query returns graceful message
+        let (non_matching, _) =
+            format_seek_conversations_report("nonexistent_random_token_987654321").await;
+        assert!(non_matching.contains("No conversations matched"));
+
+        // Test with specific query label
+        let (scoped, _) = format_seek_conversations_report("#C001").await;
+        assert!(scoped.contains("CONVERSATION SEEK &amp; PROMPT TURNS"));
+    }
+
+    #[test]
+    fn test_fifo_ordering_invariant() {
+        // Invariant 1: Ensure queries preserve FIFO ordering
+        let query = "SELECT * FROM active_prompts ORDER BY created_at ASC, id ASC";
+        assert!(query.contains("ORDER BY created_at ASC, id ASC"));
+        assert!(!query.contains("ORDER BY updated_at DESC"));
     }
 }

@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use super::*;
 
-/// 获取令牌的所有 IP 绑定
+/// Get all IP bindings for the token
 pub fn get_token_ips(token_id: &str) -> Result<Vec<TokenIpBinding>, String> {
     let conn = connect_db()?;
     let mut stmt = conn
@@ -33,7 +33,7 @@ pub fn get_token_ips(token_id: &str) -> Result<Vec<TokenIpBinding>, String> {
     Ok(bindings)
 }
 
-/// 记录/更新令牌使用情况 (同时处理 user_tokens 和 token_ip_bindings)
+/// Log/update token usage (handles both user_tokens and token_ip_bindings)
 pub fn record_token_usage_and_ip(
     token_id: &str,
     ip: &str,
@@ -49,7 +49,7 @@ pub fn record_token_usage_and_ip(
         .map_err(|e| format!("Failed to create transaction: {}", e))?;
     let now = Utc::now().timestamp();
 
-    // 1. 更新 user_tokens 主表
+    // 1. Update user_tokens main table
     tx.execute(
         "UPDATE user_tokens SET 
             last_used_at = ?1, 
@@ -60,7 +60,7 @@ pub fn record_token_usage_and_ip(
     )
     .map_err(|e| format!("Failed to update user_tokens stats: {}", e))?;
 
-    // 2. 更新或插入 token_ip_bindings 表
+    // 2. Update or insert the token_ip_bindings table
     let binding_exists: bool = tx.query_row(
         "SELECT EXISTS(SELECT 1 FROM token_ip_bindings WHERE token_id = ?1 AND ip_address = ?2)",
         params![token_id, ip],
@@ -88,7 +88,7 @@ pub fn record_token_usage_and_ip(
         .map_err(|e| format!("Failed to insert ip binding: {}", e))?;
     }
 
-    // 3. 插入 token_usage_logs 表
+    // 3. Insert into token_usage_logs table
     let log_id = Uuid::new_v4().to_string();
     tx.execute(
         "INSERT INTO token_usage_logs (
@@ -113,13 +113,13 @@ pub fn record_token_usage_and_ip(
     Ok(())
 }
 
-/// 检查 Token 是否有效 (包含过期时间检查和 IP 限制检查)
-/// 返回: (是否有效, 拒绝原因)
+/// Check whether the Token is valid (including expiration time check and IP restriction check)
+/// Return: (valid, rejection reason)
 pub fn validate_token(token_str: &str, ip: &str) -> Result<(bool, Option<String>), String> {
     let token_opt = get_token_by_value(token_str)?;
 
     if let Some(token) = token_opt {
-        // 1. 检查过期时间
+        // 1. Check the expiration date
         if token.expires_type != "never" {
             if let Some(expires_at) = token.expires_at {
                 if expires_at < Utc::now().timestamp() {
@@ -134,11 +134,11 @@ pub fn validate_token(token_str: &str, ip: &str) -> Result<(bool, Option<String>
             }
         }
 
-        // 2. 检查 IP 限制
+        // 2. Check IP restrictions
         if token.max_ips > 0 {
             let conn = connect_db()?;
 
-            // 检查当前 IP 是否已绑定
+            // Check if the current IP is bound
             let is_bound: bool = conn.query_row(
                 "SELECT EXISTS(SELECT 1 FROM token_ip_bindings WHERE token_id = ?1 AND ip_address = ?2)",
                 params![token.id, ip],
@@ -146,7 +146,7 @@ pub fn validate_token(token_str: &str, ip: &str) -> Result<(bool, Option<String>
             ).unwrap_or(false);
 
             if !is_bound {
-                // 如果未绑定，检查是否达到上限
+                // If not bound, check whether the upper limit has been reached
                 let current_ip_count: i32 = conn
                     .query_row(
                         "SELECT COUNT(*) FROM token_ip_bindings WHERE token_id = ?1",
@@ -161,10 +161,10 @@ pub fn validate_token(token_str: &str, ip: &str) -> Result<(bool, Option<String>
             }
         }
 
-        // 3. 检查宵禁时间 (Curfew)
-        // 逻辑：如果当前北京时间在 start 和 end 之间，则拒绝
-        // 格式：HH:MM
-        // 使用固定 UTC+8 (北京时间)，不依赖服务器本地时区
+        // 3. Check curfew times (Curfew)
+        // Logic: If the current Beijing time is between start and end, reject
+        // Format: HH:MM
+        // Uses fixed UTC+8 (Beijing time) and does not rely on the server's local time zone
         if let (Some(start_str), Some(end_str)) = (&token.curfew_start, &token.curfew_end) {
             if !start_str.is_empty() && !end_str.is_empty() {
                 let beijing_offset = FixedOffset::east_opt(8 * 3600).unwrap();
@@ -172,8 +172,8 @@ pub fn validate_token(token_str: &str, ip: &str) -> Result<(bool, Option<String>
                 let current_time_str =
                     format!("{:02}:{:02}", now_beijing.hour(), now_beijing.minute());
 
-                // 跨午夜处理: start > end (e.g. 23:00 to 06:00)
-                // 正常: start < end (e.g. 09:00 to 18:00)
+                // Processing across midnight: start > end (e.g. 23:00 to 06:00)
+                // Normal: start < end (e.g. 09:00 to 18:00)
                 let is_curfew = if start_str > end_str {
                     current_time_str >= *start_str || current_time_str < *end_str
                 } else {
@@ -186,7 +186,7 @@ pub fn validate_token(token_str: &str, ip: &str) -> Result<(bool, Option<String>
             }
         }
 
-        // 一切正常，Token 有效
+        // Everything is fine, the Token is valid
         Ok((true, None))
     } else {
         Ok((
@@ -196,8 +196,8 @@ pub fn validate_token(token_str: &str, ip: &str) -> Result<(bool, Option<String>
     }
 }
 
-/// 获取 IP 关联的用户名 (用于 IP 管理页面)
-/// 返回最近一次使用该 IP 的 Token 所属的用户名
+/// Get the username associated with the IP (used in the IP management page)
+/// Returns the username to which the Token that last used this IP belongs.
 pub fn get_username_for_ip(ip: &str) -> Result<Option<String>, String> {
     let conn = connect_db()?;
     let result: Option<String> = conn

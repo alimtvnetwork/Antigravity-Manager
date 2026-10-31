@@ -36,6 +36,7 @@ pub(crate) fn dispatch_system_domain(subcommand: &str, args: &[String]) {
         "doctor" => cmd_system_doctor(args),
         "db-stats" => cmd_system_db_stats(args),
         "vacuum" => cmd_system_vacuum(args),
+        "paths" | "dirs" | "path" => cmd_system_paths(args),
         _ => crate::common::handle_unknown_domain_command("system", subcommand, args),
     }
 }
@@ -148,6 +149,45 @@ pub(crate) fn cmd_system_vacuum(args: &[String]) {
         CliEnvelope::ok("system vacuum", None, data).print_and_exit();
     }
     println!("[SUCCESS] Vacuumed {} database(s).", count);
+}
+
+pub(crate) fn cmd_system_paths(args: &[String]) {
+    let ctx = CliContext::parse(args);
+    let data_dir = account::get_data_dir().unwrap_or_default();
+    let current_exe = env::current_exe().unwrap_or_default();
+    let current_dir = env::current_dir().unwrap_or_default();
+    let repo_db = data_dir.join("repo_prompts.db");
+    let backup_db = data_dir.join("backup-prompts").join("backup-prompts.db");
+    let error_db = data_dir.join("errors.db");
+    let logs_dir = data_dir.join("logs");
+    let instances_dir = data_dir.join("instances");
+    let config_file = data_dir.join("gui_config.json");
+
+    if ctx.json_output {
+        let data = serde_json::json!({
+            "data_dir": data_dir.to_string_lossy(),
+            "current_exe": current_exe.to_string_lossy(),
+            "working_dir": current_dir.to_string_lossy(),
+            "repo_db": repo_db.to_string_lossy(),
+            "backup_db": backup_db.to_string_lossy(),
+            "error_db": error_db.to_string_lossy(),
+            "logs_dir": logs_dir.to_string_lossy(),
+            "instances_dir": instances_dir.to_string_lossy(),
+            "config_file": config_file.to_string_lossy(),
+        });
+        CliEnvelope::ok("system paths", None, data).print_and_exit();
+    }
+
+    println!("AGM System & Storage Paths:");
+    println!("  Data Directory:    {}", data_dir.display());
+    println!("  Repo DB:           {}", repo_db.display());
+    println!("  Backup DB:         {}", backup_db.display());
+    println!("  Error DB:          {}", error_db.display());
+    println!("  Logs Directory:    {}", logs_dir.display());
+    println!("  Instances Dir:     {}", instances_dir.display());
+    println!("  Config File:       {}", config_file.display());
+    println!("  Binary Path:       {}", current_exe.display());
+    println!("  Working Dir:       {}", current_dir.display());
 }
 
 pub(crate) fn cmd_clear_terminal(_args: &[String]) {

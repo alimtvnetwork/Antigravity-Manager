@@ -1,12 +1,12 @@
 use super::*;
 
-/// 精简报文字段的**展示顺序**：按用户 / 开发者关注度从高到低排列。
-/// 未列入的字段按其原有相对顺序追加在后面（依赖 `serde_json` 的 `preserve_order`）。
-/// 目标：模型 → 思考块 → 上下文 → 用量/缓存 → 工具调用 → 其余，四协议行为一致。
+/// **Display order** of streamlined text fields: Sort by user/developer attention from high to low.
+/// Unlisted fields are appended in their original relative order (depending on `preserve_order` of `serde_json`).
+/// Goal: Model → Thinking Block → Context → Usage/Cache → Tool Call → Rest, the four protocols behave consistently.
 const CORE_FIELD_ORDER: [&str; 22] = [
-    // 1. 模型标识
+    // 1. Model identification
     "model",
-    // 2. 思考块：开关 / 强度 / 内容 / 签名
+    // 2. Think blocks: Switch/Intensity/Content/Signature
     "thinking",
     "reasoning_effort",
     "reasoning",
@@ -18,23 +18,23 @@ const CORE_FIELD_ORDER: [&str; 22] = [
     "signature",
     "thoughtSignature",
     "_session_thinking_id",
-    // 3. 上下文：系统提示词与对话
+    // 3. Context: system prompt words and dialogue
     "system",
     "systemInstruction",
     "instructions",
     "messages",
     "contents",
     "input",
-    // 4. 用量与缓存
+    // 4. Usage and caching
     "usage",
     "usageMetadata",
-    // 5. 工具调用（关注度次之）
+    // 5. Tool calling (the second most concerned)
     "tool_calls",
     "tools",
 ];
 
-/// 按关注度重排顶层字段 —— **只调整顺序，不删减任何字段**。
-/// 四协议与调试日志共用，保证展示顺序一致；`request` 包装层递归重排并保持在前。
+/// Rearrange top-level fields by attention - **Only adjust the order, do not delete any fields**.
+/// The four protocols are shared with debugging logs to ensure consistent display order; the `request` packaging layer is recursively rearranged and kept at the front.
 pub fn reorder_payload_fields(value: &Value) -> Value {
     let Value::Object(map) = value else {
         return value.clone();

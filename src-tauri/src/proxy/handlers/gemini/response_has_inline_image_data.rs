@@ -80,7 +80,7 @@ pub(crate) async fn handle_generate_success(
     image_permit: &mut Option<crate::proxy::server::image_scheduler::ImagePermit>,
     last_error: &mut String,
 ) -> Result<HandleSuccessOutcome, (StatusCode, String)> {
-    // 6. 响应处理
+    // 6. Response processing
     if is_stream {
         use axum::body::Body;
         use axum::response::Response;
@@ -111,8 +111,8 @@ pub(crate) async fn handle_generate_success(
         let mut first_chunk = None;
         let mut retry_gemini = false;
 
-        // [NEW] 实施双阶段超时：第一阶段为 FirstChunkTimeout (300s / 5min)
-        // 这精准对齐了官方 Worker 在模型冷启动（Initialization）阶段的极度耐心
+        // [NEW] Implement two-phase timeout: the first phase is FirstChunkTimeout (300s / 5min)
+        // This accurately aligns with the official Worker’s extreme patience in the model cold start (Initialization) phase.
         match tokio::time::timeout(std::time::Duration::from_secs(300), response_stream.next())
             .await
         {
@@ -161,8 +161,8 @@ pub(crate) async fn handle_generate_success(
             let mut thinking_acc = crate::proxy::thinking_store::TurnAccumulator::new();
 
             loop {
-                // [NEW] 阶段 6.2: 补全 __cloudCodeMeta 响应元数据透传
-                // 官方 Worker 会将 TraceID 作为 SSE 流的第 0 个数据包下发
+                // [NEW] Phase 6.2: Complete __cloudCodeMeta response metadata transparent transmission
+                // The official Worker will deliver the TraceID as the 0th packet of the SSE flow.
                 if !meta_sent {
                     if let Some(tid) = &cloud_code_trace_id {
                         let meta_pkg = serde_json::json!({
@@ -178,7 +178,7 @@ pub(crate) async fn handle_generate_success(
                 let item = if let Some(fd) = first_data.take() {
                     Some(Ok(fd))
                 } else {
-                    // [NEW] 第二阶段为 StreamIdleTimeout (300s / 5min)
+                    // [NEW] The second stage is StreamIdleTimeout (300s / 5min)
                     match tokio::time::timeout(std::time::Duration::from_secs(300), response_stream.next()).await {
                         Ok(next_item) => next_item,
                         Err(_) => {
@@ -288,8 +288,8 @@ pub(crate) async fn handle_generate_success(
                 }
             }
 
-            // 仅在流式完整传输、没有发生网络中断或异常失败时，才原子提交思维链到持久化存储
-            // 防止因 connection reset by peer / unexpected EOF 导致半截残废思维块污染历史记忆
+            // Atomically commit the thought chain to persistent storage only when the stream is completely transmitted and no network interruption or abnormal failure occurs.
+            // Prevent half-disabled thinking blocks from contaminating historical memory due to connection reset by peer / unexpected EOF
             if !stream_failed {
                 thinking_acc.commit(&s_id_for_stream);
             } else {

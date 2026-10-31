@@ -1,5 +1,11 @@
+use crate::error::AppError;
 use crate::models::instance::{InstanceConfig, InstanceStatus};
 use crate::modules::instance;
+use crate::modules::instance::post_switch_resume::{
+    cancel_post_switch_resume as cancel_resume_internal, force_dispatch_resume,
+    get_instance_pending_resume as get_inst_resume_internal, get_pending_resumes,
+    ScheduledResumeEntry,
+};
 
 #[tauri::command]
 pub fn list_instances() -> Result<Vec<InstanceStatus>, String> {
@@ -45,8 +51,63 @@ pub fn create_instance(
 }
 
 #[tauri::command]
-pub fn stop_instance(instance_id: String) -> Result<(), String> {
-    instance::stop_instance(&instance_id)
+pub fn stop_instance(instance_id: String, target_pid: Option<u32>) -> Result<(), String> {
+    // Explicit GUI action: allow stopping instance even if AGM was spawned from an IDE terminal
+    std::env::set_var("AGM_FORCE_CALLER_OVERRIDE", "1");
+
+    let mut audit = crate::modules::task_history_db::AuditTask::start(
+        crate::modules::audit_action::AuditAction::StopInstance,
+        &format!("Stop instance {}", instance_id),
+        Some(&instance_id),
+    );
+
+    if let Some(pid) = target_pid {
+        if pid > 0 {
+            if let Ok(reg) = instance::load_registry() {
+                if let Some(inst) = reg.instances.iter().find(|i| i.id == instance_id) {
+                    // Justification: best effort recording of target pid before stopping
+                    crate::error::record_ignored(
+                        instance::record_instance_pid(&instance_id, pid, &inst.data_dir),
+                        "record target pid before stop",
+                    );
+                }
+            }
+            #[cfg(target_os = "windows")]
+            {
+                use std::os::windows::process::CommandExt;
+                if instance::is_pid_alive_targeted(pid) {
+                    crate::error::record_ignored(
+                        std::process::Command::new("taskkill")
+                            .args(["/F", "/T", "/PID", &pid.to_string()])
+                            .creation_flags(0x08000000)
+                            .output(),
+                        "taskkill target pid directly",
+                    );
+                }
+            }
+        }
+    }
+    let res = instance::stop_instance(&instance_id);
+    if let Err(ref e) = res {
+        audit.fail(e);
+        return Err(e.clone());
+    }
+    audit.succeed(&format!("Instance {} stopped successfully", instance_id));
+
+    if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+        use tauri::Emitter;
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("instances://refreshed", ()),
+            "emit instances://refreshed",
+        );
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("accounts://refreshed", ()),
+            "emit accounts://refreshed",
+        );
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -97,6 +158,7 @@ pub async fn fast_forward_instance(instance_id: String) -> Result<String, String
         crate::modules::auto_switcher::trigger_manual_rotation_for_instance(Some(&instance_id))
             .await;
     // Justification: UI audit recording is observability; never block fast-forward on it.
+    let ff_res_clone = res.clone();
     crate::error::record_ignored(
         crate::modules::audit::record_interaction(crate::modules::audit::RecordInteractionInput {
             actor: crate::modules::audit::InteractionActor::User,
@@ -105,37 +167,114 @@ pub async fn fast_forward_instance(instance_id: String) -> Result<String, String
             component: Some("InstanceCardActions".to_string()),
             element_id: Some(format!("fast-forward-{instance_id}")),
             trigger: crate::modules::audit::InteractionTrigger::Click,
-            params: Some(serde_json::json!({ "instance_id": instance_id })),
+            params: Some(serde_json::json!({
+                "instance_id": instance_id,
+                "stepSummary": format!(
+                    "User executed Fast-Forward profile rotation on instance '{instance_id}'"
+                ),
+                "cleanMethodLabel": "Fast-Forward Profile Rotation",
+                "elementHierarchy": [
+                    format!("Instance: {instance_id}"),
+                    "Instances Grid".to_string(),
+                    "Instance Card Actions".to_string(),
+                    "Fast-Forward Rotation Trigger".to_string(),
+                ],
+                "container": format!("Instance Card: {instance_id}"),
+                "textSnippet": "Fast Forward Shortcut",
+                "tag": "action-button",
+                "action_description": format!(
+                    "Initiated manual 4-tier fast-forward account evaluation for instance '{}'. \
+                     Candidate selection enforces 15% weekly quota floor, 100% 4-hour headroom, \
+                     zero cross-instance fleet usage, and earliest reset timestamp prioritization.",
+                    instance_id
+                ),
+                "executive_briefing": {
+                    "headline": format!("Fast-Forward Profile Rotation: {}", instance_id),
+                    "operation": "Manual Fast-Forward Account Switch",
+                    "rationale": "User triggered instant profile fast-forward shortcut",
+                    "instance_id": instance_id,
+                    "safeguard": "4-Tier Candidate Resolution Ladder & Quota Headroom Invariants",
+                }
+            })),
             result: if res.is_ok() {
                 "ok".to_string()
             } else {
                 "error".to_string()
             },
-            message: Some(match &res {
+            message: Some(match &ff_res_clone {
                 Ok(msg) => msg.clone(),
                 Err(err) => err.clone(),
             }),
         }),
         "audit fast_forward_instance",
     );
+
+    let status = if res.is_ok() {
+        crate::modules::task_history_db::AuditTaskStatus::Succeeded
+    } else {
+        crate::modules::task_history_db::AuditTaskStatus::Failed
+    };
+    let detail = match &res {
+        Ok(msg) => msg.clone(),
+        Err(err) => format!("Fast-forward rotation failed: {err}"),
+    };
+    crate::modules::task_history_db::record_instance_lifecycle_event_with_status(
+        crate::modules::audit_action::AuditAction::SwitchAccount,
+        Some(&instance_id),
+        &format!("Fast-forward rotation for {}", instance_id),
+        status,
+        &detail,
+    );
+
     res
 }
 
 #[tauri::command]
-pub fn copy_instance(
+pub async fn copy_instance(
+    app: tauri::AppHandle,
     source_id: String,
     target_name: String,
     clone_mode: Option<String>,
     copy_projects: Option<bool>,
 ) -> Result<InstanceConfig, String> {
+    use tauri::Emitter;
     let resolved_src = instance::resolve_instance_id(&source_id).unwrap_or(source_id);
     let should_copy_projs = copy_projects.unwrap_or(true);
-    instance::copy_instance_with_options(
-        &resolved_src,
-        target_name,
-        clone_mode.as_deref(),
-        should_copy_projs,
-    )
+    let effective_mode = clone_mode.unwrap_or_else(|| "full".to_string());
+    let app_handle = app.clone();
+
+    tokio::task::spawn_blocking(move || {
+        let target_name_clone = target_name.clone();
+        let resolved_src_clone = resolved_src.clone();
+        let emit_progress = move |stage: &str, percentage: u8, msg: &str| {
+            let payload = instance::clone::CloneProgressPayload {
+                source_id: resolved_src_clone.clone(),
+                target_name: target_name_clone.clone(),
+                stage: stage.to_string(),
+                percentage,
+                message: msg.to_string(),
+                timestamp_ms: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64,
+            };
+            // Justification: best-effort UI event emission; UI state is re-derived on completion
+            crate::error::record_ignored(
+                app_handle.emit("instance-clone-progress", payload),
+                "emit instance-clone-progress",
+            );
+        };
+
+        instance::clone::copy_instance_with_progress(
+            &resolved_src,
+            target_name,
+            Some(&effective_mode),
+            should_copy_projs,
+            emit_progress,
+        )
+    })
+    .await
+    .map_err(|e| format!("Clone task join error: {}", e))?
 }
 
 #[tauri::command]
@@ -165,7 +304,76 @@ pub fn wipe_instance_session(instance_id: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn launch_instance(instance_id: String) -> Result<(), crate::error::AppError> {
-    instance::launch_instance(&instance_id)
+    let mut audit = crate::modules::task_history_db::AuditTask::start(
+        crate::modules::audit_action::AuditAction::StartInstance,
+        &format!("Launch instance {}", instance_id),
+        Some(&instance_id),
+    );
+    let res = instance::launch_instance(&instance_id);
+    if res.is_ok() {
+        audit.succeed(&format!("Instance {} launched", instance_id));
+    } else if let Err(ref e) = res {
+        audit.fail(&e.to_string());
+    }
+    res
+}
+
+#[tauri::command]
+pub fn launch_all_instances() -> Result<Vec<String>, crate::error::AppError> {
+    let mut audit = crate::modules::task_history_db::AuditTask::start(
+        crate::modules::audit_action::AuditAction::StartInstance,
+        "Launch all stopped instances",
+        None,
+    );
+
+    let instances = instance::list_instances().map_err(crate::error::AppError::Process)?;
+    let mut launched = Vec::new();
+    let mut errors = Vec::new();
+
+    for inst in instances {
+        if !inst.is_running {
+            match instance::launch_instance(&inst.config.id) {
+                Ok(_) => {
+                    launched.push(inst.config.id.clone());
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "[Instance] Failed to launch instance '{}' during launch_all: {}",
+                        inst.config.id,
+                        e
+                    );
+                    errors.push(format!("{}: {}", inst.config.id, e));
+                }
+            }
+        }
+    }
+
+    if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+        use tauri::Emitter;
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("instances://refreshed", ()),
+            "emit instances://refreshed",
+        );
+    }
+
+    if errors.is_empty() {
+        audit.succeed(&format!("Launched {} instance(s)", launched.len()));
+    } else if launched.is_empty() {
+        audit.fail(&format!(
+            "Failed to launch stopped instance(s): {}",
+            errors.join("; ")
+        ));
+    } else {
+        audit.succeed(&format!(
+            "Launched {} instance(s) with {} failure(s): {}",
+            launched.len(),
+            errors.len(),
+            errors.join("; ")
+        ));
+    }
+
+    Ok(launched)
 }
 
 #[tauri::command]
@@ -200,7 +408,21 @@ pub fn set_instance_executable(
 
 #[tauri::command]
 pub fn close_instance(instance_id: String) -> Result<(), String> {
-    instance::close_instance(&instance_id)
+    instance::close_instance(&instance_id)?;
+    if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+        use tauri::Emitter;
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("instances://refreshed", ()),
+            "emit instances://refreshed",
+        );
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("accounts://refreshed", ()),
+            "emit accounts://refreshed",
+        );
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -223,10 +445,30 @@ pub async fn switch_account_to_instance(
     account_id: String,
     instance_id: Option<String>,
 ) -> Result<(), crate::error::AppError> {
+    // Explicit GUI action: allow switching even if AGM was spawned from an IDE terminal
+    std::env::set_var("AGM_FORCE_CALLER_OVERRIDE", "1");
     let res = instance::switch_account_to_instance(&account_id, instance_id.as_deref())
         .await
         .map_err(crate::error::AppError::Process);
+    if res.is_ok() {
+        if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+            use tauri::Emitter;
+            // Justification: best-effort UI event emission; UI state is re-derived on poll
+            crate::error::record_ignored(
+                handle.emit("instances://refreshed", ()),
+                "emit instances://refreshed",
+            );
+            // Justification: best-effort UI event emission; UI state is re-derived on poll
+            crate::error::record_ignored(
+                handle.emit("accounts://refreshed", ()),
+                "emit accounts://refreshed",
+            );
+        }
+    }
     // Justification: UI audit recording is observability; never block account switch on it.
+    let target_label = instance_id
+        .as_deref()
+        .unwrap_or("auto-detected active instance");
     crate::error::record_ignored(
         crate::modules::audit::record_interaction(crate::modules::audit::RecordInteractionInput {
             actor: crate::modules::audit::InteractionActor::User,
@@ -237,7 +479,32 @@ pub async fn switch_account_to_instance(
             trigger: crate::modules::audit::InteractionTrigger::Click,
             params: Some(serde_json::json!({
                 "account_id": account_id,
-                "instance_id": instance_id,
+                "instance_id": target_label,
+                "stepSummary": format!(
+                    "User switched account '{account_id}' to instance '{target_label}'"
+                ),
+                "cleanMethodLabel": "Switch Profile to Instance",
+                "elementHierarchy": [
+                    "/accounts".to_string(),
+                    "Accounts Table".to_string(),
+                    format!("Account Row: {account_id}"),
+                    format!("Target Instance: {target_label}"),
+                ],
+                "container": format!("Account Row: {account_id}"),
+                "textSnippet": format!("Switch to {target_label}"),
+                "tag": "action-button",
+                "action_description": format!(
+                    "Explicit user profile switch binding account '{}' to instance '{}'. \
+                     Running prompts and active state snapshotted, post-switch 10s settling window armed.",
+                    account_id, target_label
+                ),
+                "executive_briefing": {
+                    "headline": format!("Account Switch: {} → {}", account_id, target_label),
+                    "operation": "Manual Account Profile Switch",
+                    "rationale": "Direct user selection from accounts management table",
+                    "instance_id": target_label,
+                    "safeguard": "Prompt Continuity Preservation & Settling Delay",
+                }
             })),
             result: if res.is_ok() {
                 "ok".to_string()
@@ -381,24 +648,41 @@ pub async fn send_prompt_now(
     repo_path: String,
     prompt_content: String,
     conversation_id: Option<String>,
+    media_paths: Option<Vec<String>>,
 ) -> Result<crate::modules::repo_db::ActivePrompt, String> {
     let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
     let audit_inst = resolved_id.clone();
     let audit_repo = repo_path.clone();
     let audit_conv = conversation_id.clone();
+    let media_paths_clone = media_paths.clone();
+    let media_paths_audit = media_paths.clone();
     let res = tokio::task::spawn_blocking(move || {
         run_caught_prompt_task("send_prompt_now", move || {
-            crate::modules::repo_db::send_prompt_now_for_instance(
+            let mut prompt = crate::modules::repo_db::send_prompt_now_for_instance(
                 &resolved_id,
                 &repo_path,
                 &prompt_content,
                 conversation_id.as_deref(),
-            )
+            )?;
+            if let Some(ref paths) = media_paths_clone {
+                if !paths.is_empty() {
+                    prompt.image_payload = Some(paths.join(";"));
+                    // Justification: updating image_payload in SQLite cache after successful dispatch is best-effort
+                    crate::error::record_ignored(
+                        crate::modules::repo_db::save_or_requeue_prompt(&prompt),
+                        "update prompt image payload in database",
+                    );
+                }
+            }
+            Ok(prompt)
         })
     })
     .await
     .map_err(|e| format!("send_prompt_now task failed: {e}"))?;
     // Justification: UI audit recording is observability; never block prompt dispatch on it.
+    let send_inst_for_audit = audit_inst.clone();
+    let send_repo_for_audit = audit_repo.clone();
+    let media_count = media_paths_audit.as_ref().map(|m| m.len()).unwrap_or(0);
     crate::error::record_ignored(
         crate::modules::audit::record_interaction(crate::modules::audit::RecordInteractionInput {
             actor: crate::modules::audit::InteractionActor::User,
@@ -408,10 +692,36 @@ pub async fn send_prompt_now(
             element_id: Some("send-prompt-btn".to_string()),
             trigger: crate::modules::audit::InteractionTrigger::Click,
             params: Some(serde_json::json!({
-                "instance_id": audit_inst,
-                "repo_path": audit_repo,
+                "instance_id": send_inst_for_audit,
+                "repo_path": send_repo_for_audit,
                 "conversation_id": audit_conv,
                 "prompt_id": res.as_ref().ok().map(|p| p.id.clone()),
+                "media_count": media_count,
+                "stepSummary": format!(
+                    "User dispatched immediate prompt to instance '{send_inst_for_audit}' ({send_repo_for_audit})"
+                ),
+                "cleanMethodLabel": "Send Prompt Now (Immediate Dispatch)",
+                "elementHierarchy": [
+                    "/instances".to_string(),
+                    format!("Instance: {send_inst_for_audit}"),
+                    "Prompt Tree View".to_string(),
+                    "Immediate Dispatch Action".to_string(),
+                ],
+                "container": format!("Instance Prompt Tree: {send_inst_for_audit}"),
+                "textSnippet": "Send Now",
+                "tag": "action-button",
+                "action_description": format!(
+                    "Direct interactive dispatch bypassing FIFO backlog queue for immediate \
+                     execution in instance '{}' (Repository: {}, Attached Media: {}).",
+                    send_inst_for_audit, send_repo_for_audit, media_count
+                ),
+                "executive_briefing": {
+                    "headline": format!("Prompt Dispatched: {}", send_inst_for_audit),
+                    "operation": "Immediate Prompt Execution",
+                    "rationale": "Interactive user 'Send Prompt Now' action",
+                    "instance_id": send_inst_for_audit,
+                    "safeguard": "Active CDP Channel Injection",
+                }
             })),
             result: if res.is_ok() {
                 "ok".to_string()
@@ -432,24 +742,47 @@ pub async fn enqueue_prompt(
     prompt_content: String,
     conversation_id: Option<String>,
     _project_id: Option<String>,
+    media_paths: Option<Vec<String>>,
 ) -> Result<crate::modules::repo_db::ActivePrompt, String> {
     let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
     let audit_inst = resolved_id.clone();
     let audit_repo = repo_path.clone();
     let audit_conv = conversation_id.clone();
+    let media_paths_clone = media_paths.clone();
+    let media_paths_audit = media_paths.clone();
     let res = tokio::task::spawn_blocking(move || {
         run_caught_prompt_task("enqueue_prompt", move || {
-            crate::modules::repo_db::enqueue_prompt_for_instance(
+            let mut prompt = crate::modules::repo_db::enqueue_prompt_for_instance(
                 &resolved_id,
                 &repo_path,
                 &prompt_content,
                 conversation_id.as_deref(),
-            )
+            )?;
+            if let Some(ref paths) = media_paths_clone {
+                if !paths.is_empty() {
+                    prompt.image_payload = Some(paths.join(";"));
+                    // Justification: updating image_payload in SQLite cache after successful enqueue is best-effort
+                    crate::error::record_ignored(
+                        crate::modules::repo_db::save_or_requeue_prompt(&prompt),
+                        "update queued prompt image payload in database",
+                    );
+                }
+            }
+            crate::modules::scheduler::notify_prompt_queue();
+            // Justification: immediate dispatch check for idle instance is best-effort; background scheduler retries if busy or failed
+            crate::error::record_ignored(
+                crate::modules::repo_db::check_and_dispatch_enqueued_prompts(Some(&resolved_id)),
+                "dispatch enqueued prompt immediately",
+            );
+            Ok(prompt)
         })
     })
     .await
     .map_err(|e| format!("enqueue_prompt task failed: {e}"))?;
     // Justification: UI audit recording is observability; never block prompt enqueue on it.
+    let enq_inst_for_audit = audit_inst.clone();
+    let enq_repo_for_audit = audit_repo.clone();
+    let enq_media_count = media_paths_audit.as_ref().map(|m| m.len()).unwrap_or(0);
     crate::error::record_ignored(
         crate::modules::audit::record_interaction(crate::modules::audit::RecordInteractionInput {
             actor: crate::modules::audit::InteractionActor::User,
@@ -459,10 +792,37 @@ pub async fn enqueue_prompt(
             element_id: Some("enqueue-prompt-btn".to_string()),
             trigger: crate::modules::audit::InteractionTrigger::Click,
             params: Some(serde_json::json!({
-                "instance_id": audit_inst,
-                "repo_path": audit_repo,
+                "instance_id": enq_inst_for_audit,
+                "repo_path": enq_repo_for_audit,
                 "conversation_id": audit_conv,
                 "prompt_id": res.as_ref().ok().map(|p| p.id.clone()),
+                "media_count": enq_media_count,
+                "stepSummary": format!(
+                    "User enqueued prompt for sequential FIFO processing on instance '{enq_inst_for_audit}' ({enq_repo_for_audit})"
+                ),
+                "cleanMethodLabel": "Enqueue Prompt (FIFO Queue)",
+                "elementHierarchy": [
+                    "/instances".to_string(),
+                    format!("Instance: {enq_inst_for_audit}"),
+                    "Prompt Tree View".to_string(),
+                    "FIFO Enqueue Action".to_string(),
+                ],
+                "container": format!("Instance Prompt Tree: {enq_inst_for_audit}"),
+                "textSnippet": "Enqueue for Later",
+                "tag": "action-button",
+                "action_description": format!(
+                    "Appended prompt turn to persistent SQLite FIFO queue on instance '{}' \
+                     (Repository: {}, Attached Media: {}). Execution will occur sequentially via \
+                     background queue dispatcher.",
+                    enq_inst_for_audit, enq_repo_for_audit, enq_media_count
+                ),
+                "executive_briefing": {
+                    "headline": format!("Prompt Enqueued: {}", enq_inst_for_audit),
+                    "operation": "FIFO Background Queue Insertion",
+                    "rationale": "Interactive user 'Enqueue Prompt' action",
+                    "instance_id": enq_inst_for_audit,
+                    "safeguard": "Strict FIFO Monotonicity (created_at ASC, id ASC) in active_prompts",
+                }
             })),
             result: if res.is_ok() {
                 "ok".to_string()
@@ -474,6 +834,22 @@ pub async fn enqueue_prompt(
         "audit enqueue_prompt",
     );
     res
+}
+
+#[tauri::command]
+pub async fn cancel_running_prompt(
+    instance_id: String,
+    repo_path: Option<String>,
+) -> Result<bool, String> {
+    let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
+    tokio::task::spawn_blocking(move || {
+        crate::modules::repo_db::cancel_running_prompt_for_instance(
+            &resolved_id,
+            repo_path.as_deref(),
+        )
+    })
+    .await
+    .map_err(|e| format!("cancel_running_prompt task failed: {e}"))?
 }
 
 #[tauri::command]
@@ -596,14 +972,33 @@ pub async fn get_project_conversation_tree(
 }
 
 #[tauri::command]
-pub fn reset_prompt_tree_cache(instance_id: Option<String>) -> Result<String, String> {
-    crate::modules::repo_db::invalidate_prompt_tree_cache(instance_id.as_deref());
-    tracing::info!(
-        target: "prompt_tree",
-        instance_id = instance_id.as_deref().unwrap_or("all"),
-        "reset prompt tree cache"
-    );
-    Ok("prompt tree cache cleared".to_string())
+pub async fn reset_prompt_tree_cache(instance_id: Option<String>) -> Result<String, String> {
+    let id_clone = instance_id.clone();
+    tokio::task::spawn_blocking(move || {
+        let count = crate::modules::repo_db::wipe_and_rescan_repo_db(id_clone.as_deref())?;
+        tracing::info!(
+            target: "prompt_tree",
+            instance_id = id_clone.as_deref().unwrap_or("all"),
+            count = count,
+            "wiped database and regenerated prompt tree from disk transcripts"
+        );
+        Ok(format!(
+            "Prompt tree wiped and regenerated ({} projects)",
+            count
+        ))
+    })
+    .await
+    .map_err(|e| format!("wipe_and_rescan_repo_db task failed: {e}"))?
+}
+
+#[tauri::command]
+pub async fn wipe_and_rescan_repo_db(instance_id: Option<String>) -> Result<usize, String> {
+    let id_clone = instance_id.clone();
+    tokio::task::spawn_blocking(move || {
+        crate::modules::repo_db::wipe_and_rescan_repo_db(id_clone.as_deref())
+    })
+    .await
+    .map_err(|e| format!("wipe_and_rescan_repo_db task failed: {e}"))?
 }
 
 #[tauri::command]
@@ -635,4 +1030,141 @@ pub async fn sync_instance_pid_and_quota(instance_id: String) -> Result<Instance
 #[tauri::command]
 pub async fn sync_all_instances_and_quotas() -> Result<Vec<InstanceStatus>, String> {
     instance::sync_all_instances_and_quotas_logic().await
+}
+
+#[tauri::command]
+pub async fn get_pending_post_switch_resumes() -> Result<Vec<ScheduledResumeEntry>, AppError> {
+    Ok(get_pending_resumes())
+}
+
+#[tauri::command]
+pub async fn get_instance_pending_resume(
+    instance_id: String,
+) -> Result<Option<ScheduledResumeEntry>, AppError> {
+    let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
+    Ok(get_inst_resume_internal(&resolved_id))
+}
+
+#[tauri::command]
+pub async fn cancel_post_switch_resume(instance_id: String) -> Result<bool, AppError> {
+    let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
+    Ok(cancel_resume_internal(
+        &resolved_id,
+        "User requested cancellation",
+    ))
+}
+
+#[tauri::command]
+pub async fn force_dispatch_pending_resume(
+    app: tauri::AppHandle,
+    instance_id: String,
+) -> Result<(), AppError> {
+    let resolved_id = instance::resolve_instance_id(&instance_id).unwrap_or(instance_id);
+    force_dispatch_resume(&app, &resolved_id).await
+}
+
+#[tauri::command]
+pub async fn rename_conversation(
+    instance_id: Option<String>,
+    conversation_id: String,
+    new_title: String,
+) -> Result<(), AppError> {
+    let clean_title = new_title.trim();
+    if clean_title.is_empty() {
+        return Err(AppError::Config(
+            "Conversation title cannot be empty".to_string(),
+        ));
+    }
+    if conversation_id.trim().is_empty() {
+        return Err(AppError::Config(
+            "Conversation ID cannot be empty".to_string(),
+        ));
+    }
+
+    let resolved_inst = instance_id
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "default".to_string());
+    let title_owned = clean_title.to_string();
+
+    tokio::task::spawn_blocking(move || {
+        crate::modules::repo_db::sequences::rename_conversation_dual_store(
+            &resolved_inst,
+            &conversation_id,
+            &title_owned,
+        )
+    })
+    .await
+    .map_err(|e| AppError::Process(format!("Task execution failed: {e}")))?
+}
+
+// -----------------------------------------------------------------------------
+// IDE Profile Bundle, Clean Purge & Multi-IDE Installer Commands
+// -----------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn export_ide_bundle(
+    instance_id: String,
+    output_path: Option<String>,
+) -> Result<crate::modules::instance::AgmIdeProfileBundle, AppError> {
+    tokio::task::spawn_blocking(move || {
+        let out = output_path.as_deref().map(std::path::Path::new);
+        crate::modules::instance::export_ide_profile_bundle(&instance_id, out)
+    })
+    .await
+    .map_err(|e| AppError::Process(format!("Bundle export thread join failed: {e}")))?
+}
+
+#[tauri::command]
+pub async fn import_ide_bundle(
+    bundle_path: String,
+    target_instance_id: Option<String>,
+    new_instance_name: Option<String>,
+    force: Option<bool>,
+) -> Result<crate::modules::instance::ImportResult, AppError> {
+    tokio::task::spawn_blocking(move || {
+        let path = std::path::Path::new(&bundle_path);
+        let options = crate::modules::instance::ImportOptions {
+            target_instance_id,
+            new_instance_name,
+            force: force.unwrap_or(false),
+        };
+        crate::modules::instance::import_ide_profile_bundle(path, options)
+    })
+    .await
+    .map_err(|e| AppError::Process(format!("Bundle import thread join failed: {e}")))?
+}
+
+#[tauri::command]
+pub async fn execute_purge_reinstall(
+    options: crate::modules::instance::PurgeOptions,
+) -> Result<crate::modules::instance::PurgeSummary, AppError> {
+    tokio::task::spawn_blocking(move || crate::modules::instance::execute_purge_protocol(options))
+        .await
+        .map_err(|e| AppError::Process(format!("Purge protocol thread join failed: {e}")))?
+}
+
+#[tauri::command]
+pub async fn install_ide_target(
+    target: String,
+    dry_run: Option<bool>,
+) -> Result<crate::modules::ide_installer::InstallResult, AppError> {
+    tokio::task::spawn_blocking(move || {
+        let parsed_target = crate::modules::ide_installer::IdeTarget::from_str(&target)
+            .ok_or_else(|| AppError::Config(format!("Unknown IDE target: {target}")))?;
+        let options = crate::modules::ide_installer::InstallOptions {
+            dry_run: dry_run.unwrap_or(false),
+            verbose: true,
+        };
+        crate::modules::ide_installer::install_ide(parsed_target, options)
+    })
+    .await
+    .map_err(|e| AppError::Process(format!("IDE installation thread join failed: {e}")))?
+}
+
+#[tauri::command]
+pub async fn detect_ide_installation_status(
+) -> Result<Vec<crate::modules::ide_installer::IdeStatusInfo>, AppError> {
+    tokio::task::spawn_blocking(move || crate::modules::ide_installer::detect_all_ide_status())
+        .await
+        .map_err(|e| AppError::Process(format!("IDE status scan thread join failed: {e}")))?
 }

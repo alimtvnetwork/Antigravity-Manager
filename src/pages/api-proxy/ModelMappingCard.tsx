@@ -40,7 +40,7 @@ export function ModelMappingCard({
 }: ModelMappingCardProps) {
     const [editingKey, setEditingKey] = useState<string | null>(null);
     const [editingValue, setEditingValue] = useState<string>('');
-    const [customMappingValue, setCustomMappingValue] = useState(''); // 自定义映射表单的选中值
+    const [customMappingValue, setCustomMappingValue] = useState(''); // Selected value of custom mapping form
 
     const {
         defaultPresets,
@@ -67,7 +67,7 @@ export function ModelMappingCard({
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2.5 bg-white dark:bg-base-100 p-1.5 rounded-xl border border-gray-100 dark:border-gray-700/50 shadow-sm">
-                        {/* 仅暴露真实配额模型开关 */}
+                        {/* Expose only real quota model switches */}
                         <label
                             className="flex items-center gap-2 px-3 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-base-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-base-300 transition-colors h-9 select-none"
                             title={t('proxy.router.only_raw_quota_models_tooltip')}
@@ -83,7 +83,7 @@ export function ModelMappingCard({
                             />
                         </label>
 
-                        {/* 预设选择下拉框 */}
+                        {/* Default selection drop-down box */}
                         <div className="relative min-w-[140px]">
                             <select
                                 value={selectedPreset}
@@ -196,12 +196,12 @@ export function ModelMappingCard({
                             <span className="text-amber-600 dark:text-amber-400">{t('proxy.router.custom_mapping_warning')}</span>
                         </p>
                         <p className="text-[9px] text-amber-600 dark:text-amber-400 leading-relaxed">
-                            {t('proxy.router.wildcard_rule_notice') || '通配符规则 gemini-3.x-flash：x 必须大于 8，统一转为 3.x-flash-tiered'}
+                            {t('proxy.router.wildcard_rule_notice') || 'Wildcard rule gemini-3.x-flash: x must be greater than 8, uniformly converted to 3.x-flash-tiered'}
                         </p>
                     </div>
                 </div>
                 <div className="flex flex-col gap-4">
-                    {/* 当前映射列表 (置顶 2 列) */}
+                    {/* Current mapping list (top 2 columns) */}
                     <div className="w-full flex flex-col">
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
@@ -217,7 +217,7 @@ export function ModelMappingCard({
                                                 <div className="flex items-center gap-1.5 min-w-0">
                                                     <span className="font-mono text-[10px] font-bold text-blue-600 dark:text-blue-400 truncate max-w-[140px]" title={key}>{key}</span>
                                                     {key.toLowerCase() === BUILT_IN_WILDCARD_KEY && (
-                                                        <span className="badge badge-warning badge-outline text-[11px] font-bold font-mono py-0.5 px-1.5 h-5 shrink-0 ml-0.5 cursor-help shadow-xs" title={t('proxy.router.wildcard_rule_notice') || "x 必须大于 8，自动转为 3.x-flash-tiered"}>
+                                                        <span className="badge badge-warning badge-outline text-[11px] font-bold font-mono py-0.5 px-1.5 h-5 shrink-0 ml-0.5 cursor-help shadow-xs" title={t('proxy.router.wildcard_rule_notice') || "x must be greater than 8, automatically converted to 3.x-flash-tiered"}>
                                                             x &gt; 8
                                                         </span>
                                                     )}
@@ -292,7 +292,7 @@ export function ModelMappingCard({
                         </div>
                     </div>
 
-                    {/* 添加映射表单 (置底单行) */}
+                    {/* Add mapping form (single row at the bottom) */}
                     <div className="w-full bg-gray-50/50 dark:bg-white/5 p-2.5 rounded-xl border border-gray-100 dark:border-white/5 shadow-inner">
                         <div className="flex flex-col sm:flex-row items-center gap-3">
                             <div className="flex items-center gap-1.5 shrink-0">
@@ -325,7 +325,7 @@ export function ModelMappingCard({
                                     if (k && v) {
                                         onMappingUpdate('custom', k, v);
                                         (document.getElementById('custom-key') as HTMLInputElement).value = '';
-                                        setCustomMappingValue(''); // 清空选择
+                                        setCustomMappingValue(''); // Clear selection
                                     }
                                 }}
                             >

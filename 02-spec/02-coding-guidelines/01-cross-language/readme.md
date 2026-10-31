@@ -52,6 +52,8 @@ Rules for braces, spacing, blank lines, function size, struct size, chaining, an
 |---|------|-------------|
 | 04 | `04-code-style/` | Braces, nesting ban, blank lines, function/struct size limits, dead code, comment spacing, docs (subfolder — 8 files) |
 | 21 | `21-newline-styling-examples.md` | Before/after newline examples, Go newline constants |
+| 38 | `38-no-inline-function-calls-in-if.md` | Zero inline function calls in if statements, statement separation |
+| 39 | `39-multiline-parameter-and-argument-formatting.md` | Multiline parameter & argument formatting (>2 arguments vertical layout) |
 
 ### 📛 Naming Conventions
 
@@ -75,6 +77,7 @@ SOLID, DRY, complexity limits, and structural patterns.
 | 08 | `08-dry-principles.md` | Don't Repeat Yourself — deduplication rules |
 | 09 | `09-dry-refactoring-summary.md` | DRY refactoring examples and techniques |
 | 23 | `23-solid-principles.md` | SOLID principles with cross-language examples |
+| 40 | `40-database-repository-pattern-and-error-sovereignty.md` | Database repository pattern, Split-DB encapsulation, error sovereignty |
 
 ### 🛡️ Type Safety & Data Handling
 
@@ -90,6 +93,8 @@ Strict typing, casting elimination, null safety, mutation avoidance.
 | 32 | `32-branch-immutability-and-clean-construction.md` | Branch immutability, constructor helper returns, condition decomposition |
 | 33 | `33-variadic-and-spread-parameters.md` | Variadic and spread parameters, zero wrapper calls, slice forwarding |
 | 34 | `34-string-normalization-and-equalfoldany.md` | String normalization, EqualFoldAnyTrim utility standard, Search First protocol |
+| 36 | `36-mime-and-media-type-enum-standards.md` | MIME and media type enum standards, Blob/Clipboard/Header type safety |
+| 37 | `37-datetime-and-timeutil-standards.md` | Centralized timeutil date-time standards, UTC ISO 8601 formatting |
 
 ### 🔧 Patterns & Techniques
 
@@ -100,6 +105,7 @@ Nesting resolution, lazy evaluation, regex usage.
 | 16 | `16-lazy-evaluation-patterns.md` | Defer computation until needed |
 | 17 | `17-regex-usage-guidelines.md` | Compile once, named groups, readability |
 | 20 | `20-nesting-resolution-patterns.md` | Flatten nested code, avoid else after return |
+| 35 | `35-map-dispatch-and-handler-lookup.md` | Declarative map dispatch tables, handler lookup, and code smell elimination |
 
 ### 🧪 Testing
 
@@ -154,11 +160,17 @@ Consolidated reference, audit logs, contradiction checks.
 | 32 | `32-branch-immutability-and-clean-construction.md` | Type Safety |
 | 33 | `33-variadic-and-spread-parameters.md` | Type Safety |
 | 34 | `34-string-normalization-and-equalfoldany.md` | Type Safety |
+| 35 | `35-map-dispatch-and-handler-lookup.md` | Patterns |
+| 36 | `36-mime-and-media-type-enum-standards.md` | Type Safety |
+| 37 | `37-datetime-and-timeutil-standards.md` | Type Safety |
+| 38 | `38-no-inline-function-calls-in-if.md` | Style |
+| 39 | `39-multiline-parameter-and-argument-formatting.md` | Style |
+| 40 | `40-database-repository-pattern-and-error-sovereignty.md` | Architecture |
 | 97 | `97-acceptance-criteria.md` | Meta |
 | 98 | `98-changelog.md` | Meta |
 | 99 | `99-consistency-report.md` | Meta |
 
-**Total:** 32 files (28 spec files + 1 overview + 3 meta)
+**Total:** 34 files (30 spec files + 1 overview + 3 meta)
 
 ---
 
@@ -195,6 +207,8 @@ Consolidated reference, audit logs, contradiction checks.
 | 32-branch-immutability-and-clean-construction.md |
 | 33-variadic-and-spread-parameters.md |
 | 34-string-normalization-and-equalfoldany.md |
+| 35-map-dispatch-and-handler-lookup.md |
+| 36-mime-and-media-type-enum-standards.md |
 | 97-acceptance-criteria.md |
 | 98-changelog.md |
 | 99-consistency-report.md |

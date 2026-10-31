@@ -10,7 +10,7 @@
 
 - **Screenshot 1** (`assets/screenshots/fixing-auto-switching-and-progress-bar-issues-01-accounts-progress-switch.png`):
   - Shows the Accounts view in Antigravity Manager v4.200.1 with `#2 Default Copy` selected in the top instance selector.
-  - Hovering the account row switch button shows the hardcoded tooltip `"Switch to Antigravity (Classic) (右键选择实例)"` instead of targeting the selected `#2 Default Copy` instance.
+  - Hovering the account row switch button shows the hardcoded tooltip `"Switch to Antigravity (Classic)"` instead of targeting the selected `#2 Default Copy` instance.
   - Progress bars in the Quota column exhibit an excessive outer neon box-shadow halo around the entire rectangular pill container rather than confining the glow strictly inside the 5 circular milestone dots (`#1af18d` green sample).
 - **Screenshot 2** (`assets/screenshots/fixing-auto-switching-and-progress-bar-issues-02-prompt-send-agy-error.png`):
   - Shows the Prompt Tree View (`Prompt Tree · Default`) with red banner:
@@ -43,7 +43,7 @@
   - Even when `#2 Default Copy` (`default-copy-5597`) or another instance is selected in the top bar (`activeInstanceId` in `useInstanceStore`), `ActionsCell.tsx` and `AccountRow.tsx` hardcode `title={t('accounts.switch_to_classic')}` and call `onSwitch()` with `targetIde = undefined`.
 - **Architecture Fix**:
   - Resolve `activeInstance` from `instances` and `activeInstanceId`.
-  - When `activeInstanceId` is set to a non-default instance, render the tooltip as `Switch to <Instance Name> (右键选择实例)` and pass `instance:${activeInstanceId}` to `onSwitch(...)` on left-click.
+  - When `activeInstanceId` is set to a non-default instance, render the tooltip as `Switch to <Instance Name> (right-click to select instance)` and pass `instance:${activeInstanceId}` to `onSwitch(...)` on left-click.
   - In `src-tauri/src/modules/instance/switch.rs`, ensure switching an account onto a target instance cleanly unbinds any stale/stopped sibling binding or re-verifies the same instance without error.
 
 ### 2.3 Root Cause C — Missing CLI Audit Recorder Controls (`agm ui record`) & Backend Action Instrumentation

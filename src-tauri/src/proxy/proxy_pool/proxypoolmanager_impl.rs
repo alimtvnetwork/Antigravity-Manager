@@ -212,12 +212,18 @@ impl ProxyPoolManager {
             .collect::<Vec<_>>()
             .await;
 
-        // Update statuses in batch
+        // Update statuses in batch with exponential decay latency scoring
         let mut config = self.config.write().await;
         for (id, is_healthy, latency) in results {
             if let Some(proxy) = config.proxies.iter_mut().find(|p| p.id == id) {
                 proxy.is_healthy = is_healthy;
-                proxy.latency = latency;
+                // Imp-52: Exponential moving average to smooth transient spikes (70% new + 30% previous)
+                proxy.latency = match (proxy.latency, latency) {
+                    (Some(prev), Some(curr)) => {
+                        Some(((prev as f64 * 0.3) + (curr as f64 * 0.7)).round() as u64)
+                    }
+                    (_, curr) => curr,
+                };
                 proxy.last_check_time = Some(chrono::Utc::now().timestamp());
             }
         }
@@ -262,26 +268,35 @@ impl ProxyPoolManager {
             }
         };
 
-        let start = std::time::Instant::now();
-        match client.get(check_url).send().await {
-            Ok(resp) => {
-                let latency = start.elapsed().as_millis() as u64;
-                if resp.status().is_success() {
-                    (true, Some(latency))
-                } else {
-                    tracing::warn!(
-                        "Proxy {} health check status error: {}",
-                        entry.url,
-                        resp.status()
-                    );
-                    (false, None)
+        // Imp-83: Egress Proxy Failover Retries on initial handshake reset
+        let mut last_err = None;
+        for attempt in 0..2 {
+            if attempt > 0 {
+                tokio::time::sleep(Duration::from_millis(150)).await;
+            }
+            let start = std::time::Instant::now();
+            match client.get(check_url).send().await {
+                Ok(resp) => {
+                    let latency = start.elapsed().as_millis() as u64;
+                    if resp.status().is_success() {
+                        return (true, Some(latency));
+                    } else {
+                        last_err = Some(format!("status error: {}", resp.status()));
+                    }
+                }
+                Err(e) => {
+                    last_err = Some(format!("request failed: {}", e));
                 }
             }
-            Err(e) => {
-                tracing::warn!("Proxy {} health check request failed: {}", entry.url, e);
-                (false, None)
-            }
         }
+        if let Some(err) = last_err {
+            tracing::warn!(
+                "Proxy {} health check failed after retry: {}",
+                entry.url,
+                err
+            );
+        }
+        (false, None)
     }
 
     /// Start background health check loop

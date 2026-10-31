@@ -1,7 +1,84 @@
 use crate::modules::logger;
+use std::fmt;
 
 use super::telegram_alerts::dispatch_telegram_switch_alert;
 use super::*;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NotificationChannelType {
+    Email,
+    Telegram,
+    Supabase,
+}
+
+impl NotificationChannelType {
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Email => "email",
+            Self::Telegram => "telegram",
+            Self::Supabase => "supabase",
+        }
+    }
+
+    #[inline]
+    pub const fn display_name(&self) -> &'static str {
+        match self {
+            Self::Email => "Email Alert",
+            Self::Telegram => "Telegram Bot",
+            Self::Supabase => "Supabase Fleet Sync",
+        }
+    }
+}
+
+impl fmt::Display for NotificationChannelType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// Imp-72: Multi-Channel Alert Severity Matrix
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum AlertSeverity {
+    Info,
+    Warning,
+    Critical,
+}
+
+impl AlertSeverity {
+    #[inline]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Info => "info",
+            Self::Warning => "warning",
+            Self::Critical => "critical",
+        }
+    }
+
+    /// Determines which channels should be dispatched for a given alert severity
+    pub fn target_channels(&self) -> &'static [NotificationChannelType] {
+        match self {
+            Self::Info => &[NotificationChannelType::Supabase],
+            Self::Warning => &[
+                NotificationChannelType::Telegram,
+                NotificationChannelType::Supabase,
+            ],
+            Self::Critical => &[
+                NotificationChannelType::Email,
+                NotificationChannelType::Telegram,
+                NotificationChannelType::Supabase,
+            ],
+        }
+    }
+}
+
+impl fmt::Display for AlertSeverity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+pub const DUP_SWITCH_SUPPRESSION_SECS: i64 = 30;
 
 /// Dispatch rich notifications across Email and Telegram upon account/instance switch
 pub async fn notify_account_switched_details(mut details: SwitchNotificationDetails) -> String {
@@ -9,10 +86,12 @@ pub async fn notify_account_switched_details(mut details: SwitchNotificationDeta
     let selected_clean = details.selected_email.trim().to_string();
 
     if let Ok(mut guard) = LAST_SWITCH_DISPATCH.lock() {
-        if guard.0.eq_ignore_ascii_case(&selected_clean) && (now_ts - guard.1).abs() <= 5 {
+        if guard.0.eq_ignore_ascii_case(&selected_clean)
+            && (now_ts - guard.1).abs() <= DUP_SWITCH_SUPPRESSION_SECS
+        {
             let line = format!(
-                "[Notify] skipped duplicate switch to {} within 5s",
-                selected_clean
+                "[Notify] skipped duplicate switch to {} within {}s",
+                selected_clean, DUP_SWITCH_SUPPRESSION_SECS
             );
             logger::log_info(&line);
             println!("  [OK] {}", line);
@@ -153,7 +232,11 @@ pub(crate) fn redact_secrets(text: &str) -> String {
     out
 }
 
-pub(crate) fn record_channel(name: &str, result: Result<String, String>) -> String {
+pub(crate) fn record_channel(
+    channel: NotificationChannelType,
+    result: Result<String, String>,
+) -> String {
+    let name = channel.as_str();
     match result {
         Ok(msg) => {
             let line = format!("[Notify] {}: OK {}", name, msg);
@@ -162,30 +245,72 @@ pub(crate) fn record_channel(name: &str, result: Result<String, String>) -> Stri
             line
         }
         Err(err) => {
-            let trace = std::backtrace::Backtrace::force_capture();
-            let line = format!(
-                "[Notify] {}: FAIL {}\n{}",
-                name,
-                redact_secrets(&err),
-                trace
-            );
-            logger::log_error(&line);
-            eprintln!("{}", line);
-            format!("[Notify] {}: FAIL {}", name, redact_secrets(&err))
+            let redacted = redact_secrets(&err);
+            if redacted.contains("cooldown active") || redacted.contains("call suppressed") {
+                let line = format!("[Notify] {}: SKIPPED ({})", name, redacted);
+                logger::log_warn(&line);
+                eprintln!("{}", line);
+                format!("[Notify] {}: SKIPPED {}", name, redacted)
+            } else {
+                let trace = std::backtrace::Backtrace::force_capture();
+                let line = format!("[Notify] {}: FAIL {}\n{}", name, redacted, trace);
+                logger::log_error(&line);
+                eprintln!("{}", line);
+                format!("[Notify] {}: FAIL {}", name, redacted)
+            }
         }
     }
 }
 
 async fn deliver_switch_channels(details: &SwitchNotificationDetails) -> String {
-    let email = record_channel("email", dispatch_email_switch_alert(details));
-    dispatch_self_json_in_use_broadcast(details);
-    let telegram = record_channel("telegram", dispatch_telegram_switch_alert(details).await);
-    let supabase = record_channel(
-        "supabase",
-        crate::modules::supabase_sync::push_and_read_instance_email(&details.instance_id)
-            .await
-            .map_err(|err| redact_secrets(&err.to_string())),
-    );
+    let email_details = details.clone();
+    let email_task = tokio::task::spawn_blocking(move || {
+        record_channel(
+            NotificationChannelType::Email,
+            dispatch_email_switch_alert(&email_details),
+        )
+    });
+
+    let self_broadcast_details = details.clone();
+    let self_broadcast_task = tokio::task::spawn_blocking(move || {
+        dispatch_self_json_in_use_broadcast(&self_broadcast_details);
+    });
+
+    let telegram_fut = async {
+        record_channel(
+            NotificationChannelType::Telegram,
+            dispatch_telegram_switch_alert(details).await,
+        )
+    };
+
+    let supabase_fut = async {
+        record_channel(
+            NotificationChannelType::Supabase,
+            crate::modules::supabase_sync::push_and_read_instance_email(&details.instance_id)
+                .await
+                .map_err(|err| redact_secrets(&err.to_string())),
+        )
+    };
+
+    let (email_res, self_broadcast_res, telegram, supabase) =
+        tokio::join!(email_task, self_broadcast_task, telegram_fut, supabase_fut,);
+
+    crate::error::record_ignored(
+        self_broadcast_res.as_ref().map(|_| ()),
+        "deliver_switch_channels: self_broadcast_task",
+    ); // Justification: self JSON in-use broadcast is best-effort and failure does not halt other channels
+
+    crate::error::record_ignored(
+        email_res.as_ref().map(|_| ()),
+        "deliver_switch_channels: email_task",
+    ); // Justification: email dispatch is best-effort and failure does not halt other notification channels
+
+    let email = email_res.unwrap_or_else(|join_err| {
+        let err_msg = format!("email task panicked or cancelled: {}", join_err);
+        logger::log_error(&format!("[Notify] email: FAIL {}", err_msg));
+        format!("[Notify] email: FAIL {}", err_msg)
+    });
+
     format!("{}\n{}\n{}", email, telegram, supabase)
 }
 

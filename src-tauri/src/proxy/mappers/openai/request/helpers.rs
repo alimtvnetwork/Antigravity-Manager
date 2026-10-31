@@ -1,5 +1,5 @@
 // Request helper functions (split from request.rs).
-// OpenAI → Gemini 请求转换
+// OpenAI → Gemini request conversion
 use super::super::models::*;
 use crate::proxy::model_specs;
 use crate::proxy::token_manager::ProxyToken;
@@ -30,10 +30,10 @@ pub(crate) fn collect_system_instruction_blocks(request: &OpenAIRequest) -> Vec<
     }
 
     // [JEIKCODE FROZEN SYSTEM PRINCIPLE]
-    // 严格遵循系统指令绝对冻结法则：仅收集最开头的连续 system / developer 消息。
-    // 一旦遇到首个非 system/developer 消息（即对话已进入多轮状态），立即停止收集！
-    // 对话中途出现的任何 system/developer 消息一律保留在 contents 中作为 synthetic user 处理，
-    // 绝对严禁提取并追加至 systemInstruction，杜绝顶层系统前缀突变破坏 KV Cache！
+    // Strictly follow the absolute freezing rule of system instructions: only collect the first consecutive system / developer messages.
+    // Stop collecting as soon as you encounter the first non-system/developer message (i.e. the conversation has entered multiple rounds)!
+    // Any system/developer messages that appear in the middle of the conversation are retained in contents and processed as synthetic user.
+    // It is absolutely forbidden to extract and append to systemInstruction to prevent top-level system prefix mutations from destroying KV Cache!
     for msg in &request.messages {
         if msg.role != "system" && msg.role != "developer" {
             break;

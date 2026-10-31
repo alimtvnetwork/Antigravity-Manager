@@ -141,8 +141,8 @@ pub fn simplify_message(msg: &Value) -> Value {
     Value::Object(out)
 }
 
-/// OpenAI Responses 的 `input` 项结构与 chat message 不同（`type` / `call_id` / `arguments` /
-/// `output` 等），单独裁剪：沿用 `simplify_message` 的体积控制，再补回调试必需的字段。
+/// The `input` item structure of OpenAI Responses is different from that of chat message (`type` / `call_id` / `arguments` /
+/// `output`, etc.), individual tailoring: follow the volume control of `simplify_message`, and then fill in the fields necessary for debugging.
 pub(crate) fn simplify_responses_input_item(item: &Value) -> Value {
     let mut out = simplify_message(item);
     if let Some(obj) = out.as_object_mut() {

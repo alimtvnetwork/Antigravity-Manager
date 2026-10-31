@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Ban,
@@ -13,15 +14,14 @@ import { TierBadge } from '../../common/TierBadge';
 import { PriorityBadge } from '../PriorityBadge';
 import { QuotaProgressBar } from '../QuotaProgressBar';
 import { ACTIVE_PILL_CLASSES } from '../../common/selectedState';
-import { formatDateTimeShort } from './types';
-import { formatDateTime } from '../../../utils/date';
+import { AlgorithmScoreCell } from './cells/AlgorithmScoreCell';
 import type { AccountRowContentProps } from './types';
 import { useAccountRowState } from './useAccountRowState';
 import { ActionsCell } from './cells/ActionsCell';
 
 /**
- * 账号行内容组件
- * 渲染邮箱、配额、最后使用时间和操作按钮等列
+ * Account row content component
+ * Render columns such as mailbox, quota, last used, and action buttons
  */
 export function AccountRowContent(props: AccountRowContentProps) {
     const {
@@ -53,6 +53,16 @@ export function AccountRowContent(props: AccountRowContentProps) {
         fourHourModel, weeklyCell,
     } = rowState;
 
+    const inUseAccountIds = useMemo(() => {
+        const ids = (rowState.instances || [])
+            .filter((inst) => inst.is_running && inst.config.bound_account_id)
+            .map((inst) => inst.config.bound_account_id as string);
+        if (rowState.leaseInfo && !ids.includes(account.id)) {
+            ids.push(account.id);
+        }
+        return ids;
+    }, [rowState.instances, rowState.leaseInfo, account.id]);
+
     return (
         <>
             <td
@@ -63,12 +73,12 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span
                         className={cn(
-                        "font-medium text-xs break-all transition-colors cursor-pointer select-text",
-                        isFocused || selected
-                            ? "text-blue-950 dark:text-blue-200 font-bold"
-                            : isCurrent
-                            ? "text-blue-900 dark:text-amber-300 font-bold drop-shadow-xs"
-                            : "text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-cyan-300"
+                            "font-medium text-xs break-all transition-colors cursor-pointer select-text",
+                            isFocused || selected
+                                ? "text-blue-950 dark:text-blue-200"
+                                : isCurrent
+                                ? "text-blue-900 dark:text-amber-300 drop-shadow-xs"
+                                : "text-gray-900 dark:text-gray-100"
                         )}
                         title={showAllEmails || showEmail || isHoverUnmasked ? account.email : maskEmail(account.email)}
                         onDoubleClick={(event) => {
@@ -117,12 +127,12 @@ export function AccountRowContent(props: AccountRowContentProps) {
                             </span>
                         ) : null}
 
-                        {/* 订阅类型徽章 */}
+                        {/* Subscription type badge */}
                         <TierBadge tier={account.quota?.subscription_tier} size="xs" />
-                        {/* 绑定实例徽章 */}
+                        {/* Bind instance badge */}
                         {boundInstance && (
                             <span
-                                className="flex items-center gap-1 px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-[9px] font-bold shadow-xs border border-indigo-200/50 dark:border-indigo-800/50 cursor-default"
+                                className="flex items-center gap-1 px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-950 border-indigo-300 font-black dark:bg-indigo-950 dark:text-indigo-200 dark:border-indigo-500 text-[9px] shadow-xs border cursor-default"
                                 title={`Bound to profile: ${boundInstance.config.name}`}
                             >
                                 <span className={cn(
@@ -132,7 +142,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                                 <span>{boundInstance.config.name}</span>
                             </span>
                         )}
-                        {/* 优先级徽章 */}
+                        {/* Priority badge */}
                         {showPriority && (
                             <PriorityBadge
                                 priority={account.priority}
@@ -143,7 +153,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                                 size="xs"
                             />
                         )}
-                        {/* 远程节点租赁徽章 */}
+                        {/* Remote node rental badge */}
                         {leaseInfo && (
                             <span
                                 className="flex items-center gap-1 px-1.5 py-0.2 rounded bg-purple-50 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-[9px] font-bold shadow-xs border border-purple-200/50 dark:border-purple-800/50 cursor-default"
@@ -153,7 +163,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                                 <span>{leaseInfo.node_alias}</span>
                             </span>
                         )}
-                        {/* 自定义标签 */}
+                        {/* Custom labels */}
                         {account.custom_label ? (
                             isEditingLabel ? null : (
                                 <span className="flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 text-[9px] font-bold shadow-xs border border-orange-200/50 dark:border-orange-800/50">
@@ -162,7 +172,7 @@ export function AccountRowContent(props: AccountRowContentProps) {
                                 </span>
                             )
                         ) : null}
-                        {/* 标签编辑输入框 */}
+                        {/* Tag editing input box */}
                         {isEditingLabel && (
                             <div className="flex items-center gap-1">
                                 <input
@@ -177,12 +187,18 @@ export function AccountRowContent(props: AccountRowContentProps) {
                                     onClick={(e) => e.stopPropagation()}
                                 />
                                 <button
+                                    type="button"
+                                    role="button"
+                                    aria-label={t('common.save', 'Save')}
                                     className="p-0.5 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 rounded-[5px] transition-all"
                                     onClick={(e) => { e.stopPropagation(); handleSaveLabel(); }}
                                 >
                                     <Check className="w-3 h-3" />
                                 </button>
                                 <button
+                                    type="button"
+                                    role="button"
+                                    aria-label={t('common.cancel', 'Cancel')}
                                     className="p-0.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-[5px] transition-all"
                                     onClick={(e) => { e.stopPropagation(); handleCancelLabel(); }}
                                 >
@@ -195,31 +211,36 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 </div>
             </td>
 
-            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 border-l border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90">
+            <td className="px-2 py-px align-middle min-w-[185px] bg-transparent border-l border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90 transition-colors">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
                     <div className={cn(
-                        "flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-md border group/error",
-                        account.validation_blocked ? "bg-amber-50/50 dark:bg-amber-900/10 border-amber-100/50 dark:border-amber-900/20" : "bg-red-50/50 dark:bg-red-900/10 border-red-100/50 dark:border-red-900/20"
+                        "flex items-center justify-center gap-1.5 py-0.5 px-2 rounded-md border group/error transition-colors",
+                        account.validation_blocked
+                            ? "bg-amber-50/50 dark:bg-amber-900/10 border-amber-100/50 dark:border-amber-900/20 group-hover:bg-amber-50 dark:group-hover:bg-amber-900/20"
+                            : "bg-red-50/50 dark:bg-red-900/10 border-red-100/50 dark:border-red-900/20 group-hover:bg-red-50 dark:group-hover:bg-red-900/20"
                     )}>
                         <div className={cn(
-                            "flex items-center gap-1",
+                            "flex items-center gap-1 transition-colors",
                             account.validation_blocked ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"
                         )}>
                             {account.validation_blocked ? <Clock className="w-2.5 h-2.5" /> : (account.quota?.is_forbidden ? <Lock className="w-2.5 h-2.5" /> : <Ban className="w-2.5 h-2.5" />)}
                             <span className={cn(
-                                "text-[9px] font-bold truncate max-w-[80px]",
+                                "text-[9px] font-bold truncate max-w-[80px] transition-colors",
                                 account.validation_blocked ? "text-amber-700/80 dark:text-amber-400" : "text-red-700/80 dark:text-red-400"
                             )}>
                                 {account.validation_blocked ? validationBlockedLabel : (isDisabled ? t('accounts.status.disabled') : t('accounts.forbidden_msg'))}
                             </span>
                         </div>
                         <div className={cn(
-                            "w-px h-2.5",
+                            "w-px h-2.5 transition-colors",
                             account.validation_blocked ? "bg-amber-200 dark:bg-amber-800/50" : "bg-red-200 dark:bg-red-800/50"
                         )} />
                         <button
+                            type="button"
+                            role="button"
+                            aria-label={t('accounts.view_error')}
                             onClick={(e) => { e.stopPropagation(); onViewError(); }}
-                            className="text-[9px] font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center shrink-0"
+                            className="text-[9px] font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center shrink-0 transition-colors"
                         >
                             {t('accounts.view_error')}
                         </button>
@@ -236,9 +257,9 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 )}
             </td>
 
-            <td className="px-2 py-px align-middle min-w-[185px] bg-slate-50/50 dark:bg-slate-900/40 border-r border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90">
+            <td className="px-2 py-px align-middle min-w-[185px] bg-transparent border-r border-slate-300 dark:border-[#40285e] border-b border-slate-200/90 dark:border-slate-800/90 transition-colors">
                 {isDisabled || account.quota?.is_forbidden || account.validation_blocked ? (
-                    <span className="text-[10px] text-gray-400 italic">--</span>
+                    <span className="text-[10px] text-gray-400 italic transition-colors">--</span>
                 ) : (
                     <QuotaProgressBar
                         className="w-full"
@@ -250,11 +271,11 @@ export function AccountRowContent(props: AccountRowContentProps) {
                 )}
             </td>
 
-            <td className="px-2.5 py-0.5 align-middle whitespace-nowrap w-[95px] border-b border-slate-200/90 dark:border-slate-800/90">
-                <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400 font-mono" title={formatDateTime(account.last_used)}>
-                    {formatDateTimeShort(account.last_used)}
-                </span>
-            </td>
+            <AlgorithmScoreCell
+                account={account}
+                inUseAccountIds={inUseAccountIds}
+                currentAccountId={isCurrent ? account.id : undefined}
+            />
 
             <ActionsCell {...props} rowState={rowState} />
         </>

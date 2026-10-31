@@ -218,7 +218,7 @@ fn live_pid_is_instance_window(pid: u32, instance_id: &str, data_dir: &str) -> b
     command_is_instance_window(instance_id, data_dir, &name, &exe, &args)
 }
 
-fn first_live_window_pid(instance_id: &str, data_dir: &str) -> Option<u32> {
+pub(crate) fn first_live_window_pid(instance_id: &str, data_dir: &str) -> Option<u32> {
     let is_default = instance_id == "default" || instance_id == "__default__";
     let from_scan = find_pids_for_data_dir(data_dir, is_default)
         .into_iter()
@@ -251,8 +251,42 @@ fn first_live_window_pid(instance_id: &str, data_dir: &str) -> Option<u32> {
 pub fn is_instance_running(instance_id: &str, data_dir: &str, config_pid: Option<u32>) -> bool {
     let saved = config_pid.or_else(|| get_instance_saved_pid(instance_id));
     if let Some(pid) = saved {
-        if saved_pid_matches(pid) && live_pid_is_instance_window(pid, instance_id, data_dir) {
-            return true;
+        if saved_pid_matches(pid) {
+            if live_pid_is_instance_window(pid, instance_id, data_dir) {
+                return true;
+            }
+            #[cfg(target_os = "windows")]
+            {
+                let mut sys = System::new();
+                let target_pid = sysinfo::Pid::from_u32(pid);
+                sys.refresh_processes_specifics(
+                    sysinfo::ProcessesToUpdate::Some(&[target_pid]),
+                    sysinfo::ProcessRefreshKind::new()
+                        .with_exe(sysinfo::UpdateKind::OnlyIfNotSet)
+                        .with_cmd(sysinfo::UpdateKind::OnlyIfNotSet),
+                );
+                if let Some(proc) = sys.process(target_pid) {
+                    let name = proc.name().to_string_lossy().to_string();
+                    let exe = proc
+                        .exe()
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    let args = proc
+                        .cmd()
+                        .iter()
+                        .map(|arg| arg.to_string_lossy().to_string())
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    if (args.is_empty() || !args.contains("--user-data-dir"))
+                        && process_identity_matches(&name, &exe)
+                    {
+                        let (protected_pids, markers) = other_instance_protection(instance_id);
+                        if !should_spare_pid(pid, &args, &exe, &name, &protected_pids, &markers) {
+                            return true;
+                        }
+                    }
+                }
+            }
         }
     }
     let Some(pid) = first_live_window_pid(instance_id, data_dir) else {

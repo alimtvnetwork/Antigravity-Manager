@@ -22,6 +22,34 @@ pub fn get_canonical_host_home() -> Option<PathBuf> {
     None
 }
 
+/// Helper to determine if an instance identifier or name refers to the default instance or its copies/aliases.
+pub fn is_default_instance_match(inst_id: &str) -> bool {
+    let clean = inst_id.trim();
+    if clean.is_empty()
+        || clean.eq_ignore_ascii_case("default")
+        || clean.eq_ignore_ascii_case("__default__")
+        || clean.starts_with("default-copy")
+    {
+        return true;
+    }
+    let lower = clean.to_ascii_lowercase();
+    if lower == "#1 default"
+        || lower == "1 default"
+        || lower == "#1 (default)"
+        || lower == "default (active)"
+        || lower == "#1 default (active)"
+        || (lower.starts_with("#1") && lower.contains("default"))
+    {
+        return true;
+    }
+    let stripped = lower
+        .trim_start_matches('#')
+        .trim_start_matches("ins-")
+        .trim_start_matches("instance-")
+        .trim();
+    stripped == "default" || stripped == "1 default"
+}
+
 /// Helper to verify whether a path belongs to an isolated secondary instance sandbox
 fn is_secondary_sandbox_path(path: &Path) -> bool {
     if let Ok(instances_dir) = crate::modules::instance::get_instances_dir() {
@@ -34,7 +62,9 @@ fn is_secondary_sandbox_path(path: &Path) -> bool {
     }
     if let Ok(registry) = crate::modules::instance::load_registry() {
         for inst in &registry.instances {
-            let is_default = inst.is_default || inst.id == "default" || inst.id == "__default__";
+            let is_default = inst.is_default
+                || is_default_instance_match(&inst.id)
+                || is_default_instance_match(&inst.name);
             if !is_default {
                 let data_path = PathBuf::from(&inst.data_dir);
                 if path.starts_with(&data_path) {
@@ -52,6 +82,10 @@ fn is_secondary_sandbox_path(path: &Path) -> bool {
 }
 
 pub fn gemini_dirs_for_instance(instance_id: &str) -> Vec<PathBuf> {
+    let is_cli = instance_id == "__cli__"
+        || instance_id == "cli"
+        || instance_id == "antigravity-cli"
+        || instance_id == "caller-cli";
     let is_named_instance = instance_id != "all"
         && instance_id != "default"
         && !instance_id.is_empty()
@@ -59,9 +93,30 @@ pub fn gemini_dirs_for_instance(instance_id: &str) -> Vec<PathBuf> {
 
     let mut dirs = Vec::new();
 
+    if is_cli {
+        let mut candidate_homes = Vec::new();
+        if let Some(host_home) = get_canonical_host_home() {
+            if !is_secondary_sandbox_path(&host_home) {
+                candidate_homes.push(host_home);
+            }
+        }
+        if let Some(raw_home) = dirs::home_dir() {
+            if !is_secondary_sandbox_path(&raw_home) && !candidate_homes.contains(&raw_home) {
+                candidate_homes.push(raw_home);
+            }
+        }
+        for home in candidate_homes {
+            let path = home.join(".gemini").join("antigravity-cli");
+            if path.exists() && !is_secondary_sandbox_path(&path) && !dirs.contains(&path) {
+                dirs.push(path);
+            }
+        }
+        return dirs;
+    }
+
     if is_named_instance {
         if let Ok(home) = crate::modules::instance::get_instance_home_dir(instance_id) {
-            for sub in ["antigravity", "antigravity-ide", "antigravity-cli"] {
+            for sub in ["antigravity", "antigravity-ide"] {
                 let path = home.join(".gemini").join(sub);
                 if path.exists() && !dirs.contains(&path) {
                     dirs.push(path);
@@ -89,7 +144,7 @@ pub fn gemini_dirs_for_instance(instance_id: &str) -> Vec<PathBuf> {
             {
                 dirs.push(gemini_root.clone());
             }
-            for sub in ["antigravity", "antigravity-ide", "antigravity-cli"] {
+            for sub in ["antigravity", "antigravity-ide"] {
                 let path = gemini_root.join(sub);
                 if path.exists() && !is_secondary_sandbox_path(&path) && !dirs.contains(&path) {
                     dirs.push(path);
@@ -105,7 +160,7 @@ pub fn gemini_dirs_for_instance(instance_id: &str) -> Vec<PathBuf> {
                 if sandbox_gemini.exists() && !dirs.contains(&sandbox_gemini) {
                     dirs.push(sandbox_gemini.clone());
                 }
-                for sub in ["antigravity", "antigravity-ide", "antigravity-cli"] {
+                for sub in ["antigravity", "antigravity-ide"] {
                     let path = sandbox_gemini.join(sub);
                     if path.exists() && !dirs.contains(&path) {
                         dirs.push(path);
@@ -124,7 +179,7 @@ pub fn gemini_dirs_for_instance(instance_id: &str) -> Vec<PathBuf> {
             if def_gemini.exists() && !dirs.contains(&def_gemini) {
                 dirs.push(def_gemini.clone());
             }
-            for sub in ["antigravity", "antigravity-ide", "antigravity-cli"] {
+            for sub in ["antigravity", "antigravity-ide"] {
                 let path = def_gemini.join(sub);
                 if path.exists() && !dirs.contains(&path) {
                     dirs.push(path);
@@ -174,5 +229,46 @@ pub fn gemini_dirs_tagged(instance_id: Option<&str>) -> Vec<(String, PathBuf)> {
         }
     }
 
+    // 3. Add isolated CLI directories, tagged with "__cli__"
+    for dir in gemini_dirs_for_instance("__cli__") {
+        let is_secondary = secondary_dirs.contains(&dir) || is_secondary_sandbox_path(&dir);
+        if !is_secondary && !tagged.iter().any(|(_, d)| d == &dir) {
+            tagged.push(("__cli__".to_string(), dir));
+        }
+    }
+
     tagged
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_gemini_dirs_default_excludes_cli() {
+        let default_dirs = gemini_dirs_for_instance("default");
+        for d in default_dirs {
+            let s = d.to_string_lossy().to_ascii_lowercase();
+            assert!(
+                !s.ends_with("antigravity-cli"),
+                "Default instance directory candidate list must not contain antigravity-cli: {:?}",
+                d
+            );
+        }
+    }
+
+    #[test]
+    fn test_gemini_dirs_tagged_tags_cli() {
+        let tagged = gemini_dirs_tagged(Some("all"));
+        for (tag, path) in tagged {
+            let s = path.to_string_lossy().to_ascii_lowercase();
+            if s.ends_with("antigravity-cli") {
+                assert_eq!(
+                    tag, "__cli__",
+                    "antigravity-cli directory must be tagged with __cli__, found: {}",
+                    tag
+                );
+            }
+        }
+    }
 }

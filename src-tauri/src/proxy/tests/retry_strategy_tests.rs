@@ -1,5 +1,5 @@
-//! 测试 determine_retry_strategy 和 should_rotate_account 的所有分支，
-//! 重点覆盖 404 重试与账号轮换逻辑。
+//! Test all branches of determine_retry_strategy and should_rotate_account,
+//! Focus on covering 404 retry and account rotation logic.
 
 use crate::proxy::handlers::common::{
     determine_retry_strategy, should_rotate_account, RetryStrategy,
@@ -148,7 +148,7 @@ fn test_rotate_account_false_cases() {
     }
 }
 
-// ===== 自适应多轮次与单账号等待综合回归单测 (Refs #3485) =====
+// ===== Adaptive multi-round and single account waiting for comprehensive regression single test (Refs #3485) =====
 
 #[test]
 fn test_calculate_max_retry_attempts_adaptive() {
@@ -167,7 +167,7 @@ fn test_adaptive_retry_single_account_waits_quota_reset_delay() {
     use crate::proxy::handlers::common::determine_retry_strategy_adaptive;
     let err_json = r#"{"error":{"message":"Resource has been exhausted (e.g. check quota).","details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","quotaResetDelay":"4s"}]}}"#;
 
-    // 单账号 (pool_size = 1): 绝不 50ms 闪电刷死，必须原地 GraceRetry 等待 quotaResetDelay (4s + 200ms = 4200ms)
+    // Single account (pool_size = 1): Never 50ms lightning flash death, must wait for quotaResetDelay in place GraceRetry (4s + 200ms = 4200ms)
     let strategy = determine_retry_strategy_adaptive(429, err_json, None, false, true, 0, 1);
     match strategy {
         RetryStrategy::GraceRetry(d) => assert_eq!(d, Duration::from_millis(4200)),
@@ -180,7 +180,7 @@ fn test_adaptive_retry_multi_account_round_1_fast_rotates() {
     use crate::proxy::handlers::common::determine_retry_strategy_adaptive;
     let err_json = r#"{"error":{"message":"Resource has been exhausted","details":[{"quotaResetDelay":"4s"}]}}"#;
 
-    // 多账号 Round 1 (attempt = 0, pool_size = 3): 闪电轮换 (50ms)，优先切向号池中其他健康账号
+    // Multiple accounts Round 1 (attempt = 0, pool_size = 3): Lightning rotation (50ms), giving priority to other healthy accounts in the pool
     let strategy = determine_retry_strategy_adaptive(429, err_json, None, false, true, 0, 3);
     match strategy {
         RetryStrategy::FixedDelay(d) => assert_eq!(d, Duration::from_millis(50)),
@@ -193,7 +193,7 @@ fn test_adaptive_retry_multi_account_round_2_small_gap_micro_waits() {
     use crate::proxy::handlers::common::determine_retry_strategy_adaptive;
     let err_json = r#"{"error":{"message":"Resource has been exhausted","details":[{"quotaResetDelay":"3s"}]}}"#;
 
-    // 多账号 Round 2 (attempt = 3, pool_size = 3): 全池已试过一遍，遇到小间隙 (3s <= 5s)，小等并原地重试
+    // Multi-account Round 2 (attempt = 3, pool_size = 3): The whole pool has been tried once. If a small gap is encountered (3s <= 5s), wait and try again in place.
     let strategy = determine_retry_strategy_adaptive(429, err_json, None, false, true, 3, 3);
     match strategy {
         RetryStrategy::GraceRetry(d) => assert_eq!(d, Duration::from_millis(3200)),
@@ -206,7 +206,7 @@ fn test_adaptive_retry_multi_account_round_2_large_gap_rotates_if_more_than_two_
     use crate::proxy::handlers::common::determine_retry_strategy_adaptive;
     let err_json = r#"{"error":{"message":"Resource has been exhausted","details":[{"quotaResetDelay":"15s"}]}}"#;
 
-    // 多账号 Round 2 (attempt = 3, pool_size = 3): 延迟为 15s (> 5s) 且还有其他账号，继续闪电轮换寻找已恢复账号
+    // Multiple accounts Round 2 (attempt = 3, pool_size = 3): The delay is 15s (> 5s) and there are other accounts, continue the lightning rotation to find the recovered account
     let strategy = determine_retry_strategy_adaptive(429, err_json, None, false, true, 3, 3);
     match strategy {
         RetryStrategy::FixedDelay(d) => assert_eq!(d, Duration::from_millis(50)),

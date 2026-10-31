@@ -25,6 +25,12 @@ pub fn handle_cli_arguments() -> bool {
     };
 
     match cmd.as_str() {
+        // IDE Profile Bundle, Clean Purge & Reinstall, and IDE Installer commands
+        "ide" => {
+            handle_ide_subcommand(&rest_args);
+            true
+        }
+
         // Multi-Instance & Profile commands
         "instances" | "instance" | "intrance" | "intrances" | "profile" | "profiles" | "ls" => {
             handle_instance_subcommand(&rest_args);
@@ -151,11 +157,12 @@ pub fn handle_cli_arguments() -> bool {
                 let sub_low = sub.trim_start_matches('-').to_lowercase();
                 match sub_low.as_str() {
                     "instance" | "instances" | "intrance" | "create" => print_instance_cli_help(),
+                    "ide" => print_ide_cli_help(),
                     "switch" | "switch-account" | "account" => print_switch_cli_help(),
                     "auto-switch" | "autoswitch" | "auto" => print_auto_switch_cli_help(),
                     "agy" | "cache" | "clean" => print_agy_cli_help(),
                     "supabase" | "sb" => print_supabase_cli_help(),
-                    "prompts" | "prompt" | "tree" => print_prompts_cli_help(),
+                    "prompts" | "prompt" | "tree" | "restore" => print_prompts_cli_help(),
                     "doctor" | "check" | "health" => print_doctor_cli_help(),
                     _ => print_all_cli_help(),
                 }
@@ -218,6 +225,13 @@ pub fn handle_cli_arguments() -> bool {
         // Prompt management commands
         "prompts" | "prompt" | "tree" => {
             handle_prompts_subcommand(&rest_args, cmd.as_str());
+            true
+        }
+
+        "restore" => {
+            let mut prompt_args = vec!["restore".to_string()];
+            prompt_args.extend(rest_args);
+            handle_prompts_subcommand(&prompt_args, "prompts");
             true
         }
 

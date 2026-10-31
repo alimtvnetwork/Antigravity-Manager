@@ -189,7 +189,7 @@ mod tests {
             "si".to_string(),
             "tools".to_string(),
             "model".to_string(),
-            Some(0), // TTL=0 立即过期
+            Some(0), // TTL=0 expires immediately
         );
 
         thread::sleep(Duration::from_millis(10));

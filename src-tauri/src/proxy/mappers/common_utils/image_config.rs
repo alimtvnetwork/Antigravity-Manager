@@ -58,11 +58,11 @@ fn parse_image_config_with_normalized_params(
 ) -> (Value, String) {
     let mut aspect_ratio = "1:1";
 
-    // 1. 优先从 size 参数解析宽高比
+    // 1. First parse the aspect ratio from the size parameter.
     if let Some(parsed_ratio) = size.and_then(image_aspect_ratio_from_size) {
         aspect_ratio = parsed_ratio;
     } else {
-        // 2. 回退到模型后缀解析（保持向后兼容）
+        // 2. Fallback to model suffix parsing (maintaining backward compatibility)
         if model_name.contains("-21x9") || model_name.contains("-21-9") {
             aspect_ratio = "21:9";
         } else if model_name.contains("-16x9") || model_name.contains("-16-9") {
@@ -89,15 +89,15 @@ fn parse_image_config_with_normalized_params(
     let mut config = serde_json::Map::new();
     config.insert("aspectRatio".to_string(), json!(aspect_ratio));
 
-    // [NEW] 0. 最高优先级：直接使用 image_size 参数
+    // [NEW] 0. Highest priority: use image_size parameter directly
     if let Some(image_size) = image_size {
         config.insert("imageSize".to_string(), json!(image_size));
     } else {
-        // 3. 优先从 quality 参数解析分辨率
+        // 3. Prioritize resolution from the quality parameter
         if let Some(image_size) = quality.and_then(image_size_from_quality) {
             config.insert("imageSize".to_string(), json!(image_size));
         } else {
-            // 4. 回退到模型后缀解析（保持向后兼容）
+            // 4. Fall back to model suffix resolution (maintaining backward compatibility)
             let is_hd = model_name.contains("-4k") || model_name.contains("-hd");
             let is_2k = model_name.contains("-2k");
             let is_1k = model_name.contains("-1k") || model_name.contains("-standard");
@@ -194,16 +194,16 @@ pub fn clean_image_model_name(model_name: &str) -> String {
     clean_name
 }
 
-/// 动态计算宽高比（解决硬编码问题）
+/// Calculate aspect ratio on the fly (solve hardcoding issue)
 ///
-/// 从 "WIDTHxHEIGHT" 格式的字符串解析并计算宽高比，
-/// 使用容差匹配常见的标准比例。
+/// Parses and calculates aspect ratio from a string in "WIDTHxHEIGHT" format,
+/// Use tolerances to match common standard proportions.
 ///
 /// # Arguments
-/// * `size` - 尺寸字符串，格式为 "WIDTHxHEIGHT" (e.g., "1280x720", "1792x1024")
+/// * `size` - size string in the format "WIDTHxHEIGHT" (e.g., "1280x720", "1792x1024")
 ///
 /// # Returns
-/// 标准宽高比字符串 ("1:1", "16:9", "9:16", "4:3", "3:4", "21:9")
+/// Standard aspect ratio strings ("1:1", "16:9", "9:16", "4:3", "3:4", "21:9")
 pub fn image_aspect_ratio_from_size(size: &str) -> Option<&'static str> {
     let size = size.trim();
     if size.is_empty() || size.eq_ignore_ascii_case("auto") {
@@ -230,7 +230,7 @@ pub fn image_aspect_ratio_from_size(size: &str) -> Option<&'static str> {
             if width > 0.0 && height > 0.0 {
                 let ratio = width / height;
 
-                // 容差匹配常见比例（容差 0.05，避免 3:4 和 2:3 重叠）
+                // Tolerance matches common ratios (0.05 tolerance to avoid overlap of 3:4 and 2:3)
                 if (ratio - 21.0 / 9.0).abs() < 0.05 {
                     return Some("21:9");
                 }

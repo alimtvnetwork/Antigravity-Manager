@@ -11,7 +11,7 @@ pub fn compare_versions(latest: &str, current: &str) -> bool {
                 .split('.')
                 .filter_map(|s| s.parse::<u32>().ok())
                 .collect();
-            // 解析预发布段，如 beta.2 -> ("beta", 2)
+            // Parse the pre-release segment, such as beta.2 -> ("beta", 2)
             let pre_info = if let Some((tag, num_str)) = pre_part.split_once('.') {
                 Some((tag.to_lowercase(), num_str.parse::<u32>().unwrap_or(0)))
             } else {
@@ -30,7 +30,7 @@ pub fn compare_versions(latest: &str, current: &str) -> bool {
     let (latest_nums, latest_pre) = parse_semver(latest);
     let (current_nums, current_pre) = parse_semver(current);
 
-    // 1. 先比较主版本号 [major, minor, patch]
+    // 1. First compare the major version numbers [major, minor, patch]
     for i in 0..latest_nums.len().max(current_nums.len()) {
         let l = latest_nums.get(i).copied().unwrap_or(0);
         let c = current_nums.get(i).copied().unwrap_or(0);
@@ -41,10 +41,10 @@ pub fn compare_versions(latest: &str, current: &str) -> bool {
         }
     }
 
-    // 2. 主版本号完全相同时，检查 pre-release (标准 SemVer 规则：无 pre-release > 有 pre-release)
+    // 2. When the major version numbers are exactly the same, check pre-release (standard SemVer rule: no pre-release > yes pre-release)
     match (latest_pre, current_pre) {
-        (None, Some(_)) => true,  // e.g. latest 4.8.1 正式版 > current 4.8.1-beta.2
-        (Some(_), None) => false, // e.g. latest 4.8.1-beta.2 < current 4.8.1 正式版
+        (None, Some(_)) => true, // e.g. latest 4.8.1 official version > current 4.8.1-beta.2
+        (Some(_), None) => false, // e.g. latest 4.8.1-beta.2 < current 4.8.1 official version
         (Some((l_tag, l_num)), Some((c_tag, c_num))) => {
             if l_tag != c_tag {
                 l_tag > c_tag
@@ -52,7 +52,7 @@ pub fn compare_versions(latest: &str, current: &str) -> bool {
                 l_num > c_num // e.g. beta.2 > beta.1
             }
         }
-        (None, None) => false, // 完全相同版本
+        (None, None) => false, // identical version
     }
 }
 

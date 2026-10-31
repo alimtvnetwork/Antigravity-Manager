@@ -164,7 +164,7 @@ fn test_sqlite_penetration_fallback_when_memory_missing() {
     let tool_id = "call_fallback_999";
     let real_sig = "s".repeat(60);
 
-    // 1. 模拟旧轮次已持久化入库 SQLite（但在内存缓存中已被淘汰或未命中）
+    // 1. Simulate that the old round has been persisted into SQLite (but has been eliminated or missed in the memory cache)
     crate::modules::proxy_db::save_thinking_record(
         key,
         "fp_fallback",
@@ -176,10 +176,10 @@ fn test_sqlite_penetration_fallback_when_memory_missing() {
     )
     .unwrap();
 
-    // 确保内存缓存是完全清空的，逼迫触发 L2 SQLite 穿透点查
+    // Make sure the memory cache is completely cleared, forcing L2 SQLite penetration check to be triggered
     store.clear();
 
-    // 2. 构造客户端回传的历史请求（缺少思考块，仅占位符）
+    // 2. Construct the historical request returned by the client (missing thinking block, only placeholder)
     let mut contents = vec![json!({
         "role": "model",
         "parts": [
@@ -198,7 +198,7 @@ fn test_sqlite_penetration_fallback_when_memory_missing() {
         ]
     })];
 
-    // 3. 执行思考复活：应当穿透到 SQLite 成功捞回！
+    // 3. Execute thinking resurrection: it should penetrate into SQLite and retrieve it successfully!
     let restored = store.restore_gemini_contents(key, &mut contents);
     assert_eq!(restored, 1, "Must penetrate to SQLite and restore 1 turn!");
 

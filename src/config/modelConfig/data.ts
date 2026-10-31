@@ -2,7 +2,7 @@ import { Gemini, Claude, OpenAI, DeepSeek, Qwen, Meta } from '@lobehub/icons';
 import type { ModelConfig } from './types';
 
 export const MODEL_CONFIG: Record<string, ModelConfig> = {
-    // Gemini 3.x 系列
+    // Gemini 3.x series
     'gemini-3.8-flash': {
         label: 'Gemini 3.8 Flash',
         shortLabel: 'G3.8 Flash',
@@ -285,7 +285,7 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
 
 
 
-    // Claude 系列
+    // Claude series
     'claude-sonnet-4-6': {
         label: 'Claude 4.6',
         shortLabel: 'Claude 4.6',
@@ -357,7 +357,7 @@ export const MODEL_CONFIG: Record<string, ModelConfig> = {
         capabilities: ['chat', 'reasoning', 'code'],
         speed: 'balanced',
     },
-    // Open Source 系列 (newer open-source models)
+    // Open Source Series (newer open-source models)
     'gpt-oss-20b': {
         label: 'GPT-OSS 20B',
         shortLabel: 'GPT-OSS 20B',

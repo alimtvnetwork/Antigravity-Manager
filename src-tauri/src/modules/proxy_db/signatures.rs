@@ -28,7 +28,7 @@ pub fn normalize_and_heal_signature(sig: &str) -> Option<String> {
     if sig.is_empty() || sig == SENTINEL_SIGNATURE {
         return None;
     }
-    // 自愈防裂化：若签名被误传或脏存储为原始 Protobuf 二进制 (首字节 0x12)，自动纠正编码为标准 Base64
+    // Self-healing and anti-cracking: If the signature is misrepresented or dirty, it is stored as the original Protobuf binary (first byte 0x12), automatically corrects the encoding to standard Base64
     let normalized = if sig.as_bytes().first() == Some(&0x12) {
         use base64::Engine;
         base64::engine::general_purpose::STANDARD.encode(sig.as_bytes())

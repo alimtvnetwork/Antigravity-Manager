@@ -5,7 +5,7 @@ use std::collections::HashMap;
 static CLAUDE_TO_GEMINI: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     let mut m = HashMap::new();
 
-    // ── Claude 系列核心标准映射 ──
+    // ── Claude series core standard mapping ──
     m.insert("claude-sonnet-4-6", "claude-sonnet-4-6");
     m.insert("claude-sonnet-4-6-thinking", "claude-sonnet-4-6-thinking");
     m.insert("claude-opus-4-6", "claude-opus-4-6-thinking");
@@ -16,14 +16,14 @@ static CLAUDE_TO_GEMINI: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|
     m.insert("claude-haiku-4-5", "claude-sonnet-4-6");
     m.insert("claude-haiku-4", "claude-sonnet-4-6");
 
-    // ── OpenAI 核心标准映射 ──
+    // ──OpenAI Core Standard Mapping──
     m.insert("gpt-4o", "gemini-2.5-flash");
     m.insert("gpt-4o-mini", "gemini-2.5-flash");
     m.insert("gpt-4-turbo", "gemini-2.5-flash");
     m.insert("gpt-4", "gemini-2.5-flash");
     m.insert("gpt-3.5-turbo", "gemini-2.5-flash");
 
-    // ── Gemini 核心标准映射 ──
+    // ── Gemini core standard mapping ──
     m.insert("gemini-3.8-flash", "gemini-3.8-flash-tiered");
     m.insert("gemini-3.7-flash", "gemini-3.7-flash-tiered");
     m.insert("gemini-3.7-flash-tiered", "gemini-3.7-flash-tiered");
@@ -49,37 +49,37 @@ static CLAUDE_TO_GEMINI: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|
 
 /// Map Claude model names to Gemini model names
 ///
-/// # 映射策略
-/// 1. **精确匹配**: 检查 CLAUDE_TO_GEMINI 映射表
-/// 2. **已知前缀透传**: gemini-* 和 *-thinking 模型直接透传
-/// 3. **[NEW] 直接透传**: 未知模型 ID 直接传递给 Google API (支持体验未发布模型)
+/// # Mapping strategy
+/// 1. **Exact Match**: Check CLAUDE_TO_GEMINI mapping table
+/// 2. **Known prefix transparent transmission**: gemini-* and *-thinking models are directly transparently transmitted
+/// 3. **[NEW] Direct transparent transmission**: Unknown model ID is directly passed to Google API (supports experiencing unreleased models)
 ///
-/// # 参数
-/// - `input`: 原始模型名称
+/// # Parameters
+/// - `input`: original model name
 ///
-/// # 返回
-/// 映射后的目标模型名称
+/// # Return
+/// The mapped target model name
 ///
-/// # 示例
+/// # Example
 /// ```ignore
 /// use antigravity_tools_lib::proxy::common::model_mapping::map_claude_model_to_gemini;
-/// // 精确匹配
+/// //Exact match
 /// assert_eq!(map_claude_model_to_gemini("claude-opus-4"), "claude-opus-4-5-thinking");
 ///
-/// // Gemini 模型透传
+/// // Gemini model transparent transmission
 /// assert_eq!(map_claude_model_to_gemini("gemini-2.5-flash"), "gemini-2.5-flash");
 ///
-/// // 直接透传未知模型 (NEW!)
+/// // Directly transparently transmit the unknown model (NEW!)
 /// assert_eq!(map_claude_model_to_gemini("claude-opus-4-6"), "claude-opus-4-6");
 /// assert_eq!(map_claude_model_to_gemini("claude-sonnet-5"), "claude-sonnet-5");
 /// ```
 pub fn map_claude_model_to_gemini(input: &str) -> String {
-    // 1. 精确匹配标准映射表
+    // 1. Exactly match the standard mapping table
     if let Some(mapped) = CLAUDE_TO_GEMINI.get(input) {
         return mapped.to_string();
     }
 
-    // 2. 兼容历史老版本 ID 重定向 (不泄漏到外部列表)
+    // 2. Compatible with historical old version ID redirection (not leaked to external lists)
     match input {
         "claude-3-5-sonnet-20241022" | "claude-3-5-sonnet-20240620" | "claude-3-haiku-20240307" => {
             return "claude-sonnet-4-6".to_string()
@@ -99,14 +99,14 @@ pub fn map_claude_model_to_gemini(input: &str) -> String {
         return input.to_string();
     }
 
-    // 4. 直接透传未知模型 ID
+    // 4. Directly and transparently transmit the unknown model ID
     input.to_string()
 }
 
-/// 获取所有内置支持的标准公开模型列表 (已清理过期实验模型、重复笛卡尔积及旧快照)
+/// Get a list of all built-in supported standard public models (expired experimental models, repeated Cartesian products and old snapshots have been cleaned)
 pub fn get_supported_models() -> Vec<String> {
     vec![
-        // Gemini 3.x 主力系列
+        // Gemini 3.x main series
         "gemini-3.8-flash",
         "gemini-3.7-flash",
         "gemini-3.7-flash-high",
@@ -120,15 +120,15 @@ pub fn get_supported_models() -> Vec<String> {
         "gemini-3.1-pro-low",
         "gemini-3.1-pro-preview",
         "gemini-3.1-flash-lite",
-        // Gemini 图像生成主力模型 (统一保留规范名称，彻底消除 21 种宽高比/分辨率组合噪点)
+        // Gemini image generation main model (unified to retain standard names, completely eliminate noise in 21 aspect ratio/resolution combinations)
         "gemini-3.1-flash-image",
         "gemini-3-pro-image",
-        // Gemini 2.5 经典系列
+        // Gemini 2.5 Classic Series
         "gemini-2.5-pro",
         "gemini-2.5-flash",
         "gemini-2.5-flash-thinking",
         "gemini-2.5-flash-lite",
-        // Claude 系列
+        // Claude series
         "claude-sonnet-4-6",
         "claude-sonnet-4-6-thinking",
         "claude-opus-4-6",
@@ -137,7 +137,7 @@ pub fn get_supported_models() -> Vec<String> {
         "claude-sonnet-4-5-thinking",
         "claude-haiku-4-5",
         "claude-haiku-4",
-        // OpenAI GPT 核心兼容系列
+        // OpenAI GPT core compatible series
         "gpt-4o",
         "gpt-4o-mini",
         "gpt-4-turbo",
@@ -149,7 +149,7 @@ pub fn get_supported_models() -> Vec<String> {
     .collect()
 }
 
-/// 动态获取所有可用模型列表 (包含内置与用户自定义与官方端点动态下发)
+/// Dynamically obtain a list of all available models (including built-in and user-defined and official endpoint dynamic distribution)
 pub async fn get_all_dynamic_models(
     custom_mapping: &tokio::sync::RwLock<std::collections::HashMap<String, String>>,
     token_manager: Option<&crate::proxy::token_manager::TokenManager>,
@@ -158,16 +158,16 @@ pub async fn get_all_dynamic_models(
     use std::collections::HashSet;
     let mut model_ids = HashSet::new();
 
-    // 1. 获取所有账号从官方接口汇聚而来的动态模型 (Quota Models)
+    // 1. Get the dynamic models (Quota Models) of all accounts gathered from the official interface
     if let Some(tm) = token_manager {
         for dynamic_model in tm.get_all_collected_models() {
             model_ids.insert(dynamic_model);
         }
     }
 
-    // 如果未开启 only_raw_quota_models，则追加 custom_mapping 与内置标准公开模型
+    // If only_raw_quota_models is not turned on, add custom_mapping and built-in standard public models
     if !only_raw_quota_models {
-        // 2. 获取所有自定义映射模型 (Custom)
+        // 2. Get all custom mapping models (Custom)
         {
             let mapping = custom_mapping.read().await;
             for key in mapping.keys() {
@@ -175,19 +175,19 @@ pub async fn get_all_dynamic_models(
             }
         }
 
-        // 3. 获取所有内置标准模型
+        // 3. Get all built-in standard models
         for m in get_supported_models() {
             model_ids.insert(m);
         }
 
-        // 4. 确保包含常用的画画与配额模型 ID (去重)
+        // 4. Make sure to include commonly used drawing and quota model IDs (remove duplicates)
         model_ids.insert("gemini-3.1-flash-image".to_string());
         model_ids.insert("gemini-3-pro-image".to_string());
         model_ids.insert("gemini-3.1-pro-high".to_string());
         model_ids.insert("gemini-3.1-pro-low".to_string());
     }
 
-    // 5. 过滤掉内部虚拟 ID 和已下线的过期实验模型
+    // 5. Filter out internal virtual IDs and expired experimental models that have been offline
     model_ids.remove("internal-background-task");
     model_ids.remove("gemini-2.0-flash-exp");
 

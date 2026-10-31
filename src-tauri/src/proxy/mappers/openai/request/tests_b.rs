@@ -96,7 +96,7 @@ fn test_issue_1602_custom_mode_gemini_capping() {
         update_thinking_budget_config, ThinkingBudgetConfig, ThinkingBudgetMode,
     };
 
-    // 设置自定义模式，且数值超过 24k
+    // Set custom mode and the value exceeds 24k
     update_thinking_budget_config(ThinkingBudgetConfig {
         mode: ThinkingBudgetMode::Custom,
         custom_value: 32000,
@@ -131,7 +131,7 @@ fn test_issue_1602_custom_mode_gemini_capping() {
         ..Default::default()
     };
 
-    // 验证针对 Gemini 模型即使是 Custom 模式也会被修正为 24576
+    // Verification for Gemini model even Custom mode will be corrected to 24576
     let (result, _sid, _msg_count, _) =
         transform_openai_request(&req, "test-v", "gemini-2.0-flash-thinking", None);
     let budget = result["request"]["generationConfig"]["thinkingConfig"]["thinkingBudget"]
@@ -142,17 +142,17 @@ fn test_issue_1602_custom_mode_gemini_capping() {
         "Gemini custom budget must be capped to 24576"
     );
 
-    // 验证非 Gemini 模型（如 Claude 原生路径，假设映射后名不含 gemini）则不应截断
-    // 注意：这里的 transform_openai_request 第三个参数是 mapped_model
+    // Verification of non-Gemini models (such as Claude's native path, assuming the mapped suffix does not contain gemini) should not be truncated
+    // Note: The third parameter of transform_openai_request here is mapped_model
     let (result_claude, _, _, _) =
         transform_openai_request(&req, "test-v", "claude-3-7-sonnet", None);
     let _budget_claude =
         result_claude["request"]["generationConfig"]["thinkingConfig"]["thinkingBudget"].as_i64();
-    // 如果不是 gemini模型且协议中没带 thinking 配置，可能会是 None 或 32000
-    // 在该测试环境下，由于模拟的是 OpenAI 格式转 Gemini 路径，如果没有 gemini 关键词通常不进入 thinking 逻辑
-    // 我们只需确保 gemini 路径正确受限即可。
+    // If it is not a gemini model and there is no thinking configuration in the protocol, it may be None or 32000
+    // In this test environment, since the OpenAI format to Gemini path is simulated, the thinking logic usually does not enter if there is no gemini keyword.
+    // We just need to make sure the gemini path is properly restricted.
 
-    // 恢复默认配置
+    // Restore default configuration
     update_thinking_budget_config(ThinkingBudgetConfig::default());
 }
 

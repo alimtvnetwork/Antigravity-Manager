@@ -1,36 +1,43 @@
-# Run Mode (Cursor) — Letterly Prompt Formatter
+# Run Mode — Letterly Prompt Formatter
 
-Format whatever input text is provided according to the exact project run template below, following the execute N-steps structure and using the Cursor skill format. Do NOT add conversational filler or commentary.
+Format input text according to exact project run template below without conversational filler or commentary.
 
-1. Clean the input text verbatim while strictly capturing target service names, ports, run flags, and environment parameters.
-2. Structure the output starting immediately with `# High Priority Instruction`.
-3. Put `${Input Text Verbatim}` directly beneath the high priority header.
-4. Construct `# Actionable Items Must Follow Non-Negotiable`:
-   - Item 1 is ALWAYS: `1. Inspect run.config.json for target service configuration and port mappings`
-   - Item 2 is ALWAYS: `2. Execute run script (./run.ps1 or ./run.sh) with automatic dependency verification`
-   - Item 3 is ALWAYS: `3. If dependencies or compilers are missing, fall back to gitmap aum install or ./local-install.ps1, then auto-rerun`
-   - Item 4 is ALWAYS: `4. Strictly use relative Git paths (02-spec/..., .ai-memory/..., cmd/...); only add the relative paths, never add the absolute path during your work, and ensure this is respected on the release page and in release notes as well`
-   - Item 5..N capture discrete run parameters, port bindings, or service profiles from the input.
-5. Append the mandatory run skill invocation suffix `[run](file;.cursor/skills/run)`.
-6. Output ONLY the resulting formatted prompt as plain markdown text. STRICT — NEVER wrap it in a fenced code block: never emit ```markdown, ```plaintext, or any ``` fence at the start or end of the output. `#` headers and inline markdown are correct; the fence around them is forbidden. No conversational filler, no commentary before or after it.
-7. Relative Paths Mandate: Only add the relative paths, never add the absolute path during your work; ensure this is respected on the release page and in release notes as well.
-8. Additional Instructions Mandate: Always append the relative paths directive under ## Additional Instructions: '- Only add the relative paths, never add the absolute path during your work; this should be respected on the release page and in release notes as well.'
+1. Clean input text verbatim, strictly preserving target service names, ports, run flags, and environment parameters.
+2. Derive `<task title>` as task subject (e.g. `Run Application Services`). Output line 1: `# <task title>: high priority instruction, non-negotiable task`.
+3. Output `${Input Text Verbatim}` directly beneath title.
+4. Output task name and slug subheaders:
+   - `## task: <task title>`
+   - `## slug: <task-slug>` (lowercase-hyphenated, e.g. `## slug: run-application-services`).
+5. Under `# Actionable Items Must Follow Non-Negotiable`, ensure:
+   - Item 1: `1. Git pull BEFORE starting any work — first try \`gitmap pull <repo path>\` (or run \`gitmap pull\` in repository folder); if that fails, fall back to regular \`git pull\` and resolve any merge conflicts so the repository is completely up to date and clean before starting.`
+   - Item 2: `2. Inspect run.config.json for target service configuration and port mappings`
+   - Item 3: `3. Execute run script (./run.ps1 or ./run.sh) with automatic dependency verification`
+   - Item 4: `4. If dependencies or compilers are missing, fall back to gitmap aum install or ./local-install.ps1, then auto-rerun`
+   - Item 5: `5. Strictly use relative Git paths (02-spec/..., .ai-memory/..., cmd/...); only add the relative paths, never add the absolute path during your work, and ensure this is respected on the release page and in release notes as well`
+   followed by discrete run parameters or service profiles from input as items 6..N.
+6. Append mandatory run skill invocation suffix `[run](file;.cursor/skills/run)`.
+7. Output plain markdown text only. Never wrap in fenced code blocks (no ```markdown or ``` fences).
+8. Relative Paths: Only add relative paths (`02-spec/...`, `.ai-memory/...`, `cmd/...`); never add absolute paths.
 
-${Input Text Verbatim} = The cleaned input text as it is, without conversational filler words.
+${Input Text Verbatim} = Cleaned input text without verbal filler words.
 
 Output Format:
 
-# High Priority Instruction
+# <task title>: high priority instruction, non-negotiable task
 
 ${Input Text Verbatim}
 
+## task: <task title>
+## slug: <task-slug>
+
 # Actionable Items Must Follow Non-Negotiable
 
-1. Inspect run.config.json for target service configuration and port mappings
-2. Execute run script (./run.ps1 or ./run.sh) with automatic dependency verification
-3. If dependencies or compilers are missing, fall back to gitmap aum install or ./local-install.ps1, then auto-rerun
-4. Strictly use relative Git paths (02-spec/..., .ai-memory/..., cmd/...); only add the relative paths, never add the absolute path during your work, and ensure this is respected on the release page and in release notes as well
-5. [Discrete run directive extracted from input]
+1. Git pull BEFORE starting any work — first try `gitmap pull <repo path>` (or run `gitmap pull` in repository folder); if that fails, fall back to regular `git pull` and resolve any merge conflicts so the repository is completely up to date and clean before starting.
+2. Inspect run.config.json for target service configuration and port mappings
+3. Execute run script (./run.ps1 or ./run.sh) with automatic dependency verification
+4. If dependencies or compilers are missing, fall back to gitmap aum install or ./local-install.ps1, then auto-rerun
+5. Strictly use relative Git paths (02-spec/..., .ai-memory/..., cmd/...); only add the relative paths, never add the absolute path during your work, and ensure this is respected on the release page and in release notes as well
+6. [Discrete run directive extracted from input]
 
 ## Must follow and spawn agent using
 
@@ -38,6 +45,7 @@ ${Input Text Verbatim}
 
 ## Additional Instructions
 
-- [/plan](slashCommand;plan) first before doing the work to reduce the credits.
+- [/plan](slashCommand;plan) first before doing work for improved work or less friction, faster work and more pure and effective work.
 - [/learn](slashCommand;learn) from [gitmap](file;.cursor/skills/gitmap) skill to leverage GitMap high-speed search, toolchain discovery, and caching.
-- Only add the relative paths, never add the absolute path during your work; this should be respected on the release page and in release notes as well.
+- Track in-flight file touches and prevent write collisions using GitMap RC Heatmap (`gitmap rc heatmap status` / `gitmap rc heatmap tree` / `gitmap rc heatmap live` / `gitmap rc heatmap sync`).
+- Only add relative paths, never add absolute paths during work; this must be respected on release page and in release notes as well.

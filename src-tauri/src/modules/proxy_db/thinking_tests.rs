@@ -132,7 +132,7 @@ pub(crate) mod thinking_sqlite_tests {
         let tool_id = "call_abc999";
         let real_sig = "s".repeat(60);
 
-        // 1. 首次写入：实质思考 + tool_id
+        // 1. First write: substantive thinking + tool_id
         save_thinking_record(
             session_key,
             "fp_turn1",
@@ -144,7 +144,7 @@ pub(crate) mod thinking_sqlite_tests {
         )
         .unwrap();
 
-        // 2. 二次写入相同 tool_id（例如客户端再次回传包含占位符的相同轮次）：绝不叠加新行，绝不将实质思考覆盖为占位符！
+        // 2. Write the same tool_id twice (for example, the client returns the same round containing the placeholder again): never superimpose new lines, and never overwrite the actual thoughts as placeholders!
         save_thinking_record(
             session_key,
             "fp_turn1",
@@ -156,7 +156,7 @@ pub(crate) mod thinking_sqlite_tests {
         )
         .unwrap();
 
-        // 3. 验证 SQLite 中仅存 1 行，且保留高质量思考
+        // 3. Verify that there is only 1 row left in SQLite and retain high-quality thinking
         let all = load_thinking_records(session_key).unwrap();
         assert_eq!(all.len(), 1, "Duplicate tool saves must be deduplicated!");
         assert_eq!(
@@ -165,7 +165,7 @@ pub(crate) mod thinking_sqlite_tests {
         );
         assert_eq!(all[0].signature, Some(real_sig.clone()));
 
-        // 4. 精准穿透点查 tool_id
+        // 4. Accurate penetration check tool_id
         let loaded = load_thinking_by_tool_id(session_key, tool_id).unwrap();
         assert!(loaded.is_some());
         let rec = loaded.unwrap();
@@ -175,11 +175,11 @@ pub(crate) mod thinking_sqlite_tests {
         );
         assert_eq!(rec.signature, Some(real_sig));
 
-        // 5. 不存在的 tool_id 应当正确返回 None
+        // 5. Non-existent tool_id should correctly return None
         let missing = load_thinking_by_tool_id(session_key, "call_nonexistent").unwrap();
         assert!(missing.is_none());
 
-        // 6. 纯文本指纹点查测试
+        // 6. Plain text fingerprint check test
         let text_fp = "fp_pure_text_1";
         save_thinking_record(
             session_key,
@@ -205,7 +205,7 @@ pub(crate) mod thinking_sqlite_tests {
         let session_key = "test_tenant:sess-healing";
         let tool_id = "call_corrupted_1";
 
-        // 构造一个典型的被错误解码为 UTF-8 原始 Protobuf 二进制的签名 (首字节 0x12)
+        // Constructs a signature of a typical raw Protobuf binary that is incorrectly decoded as UTF-8 (first byte 0x12)
         let raw_proto_bytes = [
             0x12, 0x26, 0x0a, 0x24, b'e', b'2', b'4', b'8', b'3', b'0', b'a', b'7', b'-', b'5',
             b'c', b'd', b'6', b'-', b'4', b'2', b'f', b'e', b'-', b'9', b'9', b'8', b'b', b'-',
@@ -218,7 +218,7 @@ pub(crate) mod thinking_sqlite_tests {
             "EiYKJGUyNDgzMGE3LTVjZDYtNDJmZS05OThiLWVlNTM5ZTcyYjljMw=="
         );
 
-        // 1. normalize_and_heal_signature 单测
+        // 1. normalize_and_heal_signature single test
         assert_eq!(
             normalize_and_heal_signature(&raw_corrupted_sig),
             Some(expected_base64.clone())
@@ -230,12 +230,12 @@ pub(crate) mod thinking_sqlite_tests {
         assert_eq!(normalize_and_heal_signature(SENTINEL_SIGNATURE), None);
         assert_eq!(normalize_and_heal_signature("short"), None);
 
-        // 2. save_tool_signature 会自动自愈为 Base64 存储
+        // 2. save_tool_signature will automatically recover to Base64 storage
         save_tool_signature(tool_id, &raw_corrupted_sig).unwrap();
         let loaded_tool_sig = load_tool_signature(tool_id).unwrap();
         assert_eq!(loaded_tool_sig, Some(expected_base64.clone()));
 
-        // 3. 模拟底层 SQLite 已经脏存了原始二进制签名的历史数据
+        // 3. Simulate that the underlying SQLite has dirty stored historical data of the original binary signature
         let conn = connect_db().unwrap();
         conn.execute(
             "INSERT OR REPLACE INTO tool_signatures (tool_id, signature, created_at) VALUES (?1, ?2, ?3)",
@@ -243,11 +243,11 @@ pub(crate) mod thinking_sqlite_tests {
         ).unwrap();
         drop(conn);
 
-        // load_tool_signature 读出时自动识别并修复，且反向写回 SQLite
+        // load_tool_signature is automatically recognized and repaired when reading, and written back to SQLite in reverse
         let loaded_dirty = load_tool_signature("call_legacy_dirty").unwrap();
         assert_eq!(loaded_dirty, Some(expected_base64.clone()));
 
-        // 验证 SQLite 中确实已被写回替换为标准 Base64 格式
+        // Verify that the writeback in SQLite has indeed been replaced with the standard Base64 format
         let conn = connect_db().unwrap();
         let in_db: String = conn
             .query_row(
@@ -258,7 +258,7 @@ pub(crate) mod thinking_sqlite_tests {
             .unwrap();
         assert_eq!(in_db, expected_base64);
 
-        // 4. thinking_records 自愈与反向写回测试
+        // 4. thinking_records self-healing and reverse writeback testing
         let think_conn = thinking_db().unwrap();
         think_conn.execute(
             "INSERT INTO thinking_records (session_key, fingerprint, thought, signature, tool_ids, tool_names, visible, created_at, primary_tool_id, causal_tool_id)
@@ -267,13 +267,13 @@ pub(crate) mod thinking_sqlite_tests {
         ).unwrap();
         drop(think_conn);
 
-        // load_thinking_by_tool_id 点查时触发反向自愈写回
+        // Load_thinking_by_tool_id triggers reverse self-healing writeback when checking
         let loaded_rec = load_thinking_by_tool_id(session_key, "call_corrupted_1")
             .unwrap()
             .unwrap();
         assert_eq!(loaded_rec.signature, Some(expected_base64.clone()));
 
-        // 验证 thinking_records 表中 signature 字段已被更新为自愈后的 Base64
+        // Verify that the signature field in the thinking_records table has been updated to the self-healed Base64
         let think_conn = thinking_db().unwrap();
         let sig_in_db: String = think_conn
             .query_row(

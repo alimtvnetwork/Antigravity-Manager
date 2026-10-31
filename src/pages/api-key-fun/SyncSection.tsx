@@ -52,10 +52,10 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                 </div>
                 <div className="flex flex-col">
                     <span className="text-sm font-bold text-base-content">
-                        {t('apiKeyFun.cli.quickConfig', { defaultValue: '一键配置本地开发环境' })}
+                        {t('apiKeyFun.cli.quickConfig', { defaultValue: 'Configure local development environment with one click' })}
                     </span>
                     <span className="text-[10px] text-base-content/60 font-medium">
-                        {t('apiKeyFun.cli.syncDesc', { defaultValue: '同步至官方标准配置' })}
+                        {t('apiKeyFun.cli.syncDesc', { defaultValue: 'Synchronized to official standard configuration' })}
                     </span>
                 </div>
             </div>
@@ -68,7 +68,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                 });
                 const hasClaude = models.some(m => m.toLowerCase().includes('claude'));
 
-                // 默认都显示，除非明确检测到只支持其中一种
+                // Both are displayed by default unless it is explicitly detected that only one is supported.
                 const showCodex = !hasModels || hasGpt || (!hasGpt && !hasClaude);
                 const showClaude = !hasModels || hasClaude || (!hasGpt && !hasClaude);
 

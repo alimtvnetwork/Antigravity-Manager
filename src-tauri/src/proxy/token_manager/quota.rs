@@ -1,4 +1,4 @@
-//! 配额读取与统计：check_and_protect_quota 及配额 JSON 查询。
+//! Quota reading and statistics: check_and_protect_quota and quota JSON query.
 
 use super::helpers::update_account_json;
 use super::TokenManager;
@@ -7,21 +7,21 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 impl TokenManager {
-    /// 检查账号是否应该被配额保护
-    /// 如果配额低于阈值，自动禁用账号并返回 true
+    /// Check if the account should be quota protected
+    /// If the quota is below the threshold, automatically disable the account and return true
     pub(crate) async fn check_and_protect_quota(
         &self,
         account_json: &mut serde_json::Value,
         account_path: &PathBuf,
     ) -> bool {
-        // 1. 加载配额保护配置
+        // 1. Load quota protection configuration
         let config = match crate::modules::config::load_app_config() {
             Ok(cfg) => cfg.quota_protection,
-            Err(_) => return false, // 配置加载失败，跳过保护
+            Err(_) => return false, // Configuration loading failed, protection skipped
         };
 
         if !config.enabled {
-            // [FIX] 当配额保护在全局关闭时，清空受保护模型列表，避免遗留锁定显示与调度过滤
+            // [FIX] When quota protection is turned off globally, clear the protected model list to avoid legacy lock display and scheduling filtering
             if let Some(arr) = account_json
                 .get_mut("protected_models")
                 .and_then(|v| v.as_array_mut())
@@ -38,17 +38,17 @@ impl TokenManager {
                     );
                 }
             }
-            return false; // 配额保护未启用
+            return false; // Quota protection is not enabled
         }
 
-        // 2. 获取配额信息
-        // 注意：我们需要 clone 配额信息来遍历，避免借用冲突，但修改是针对 account_json 的
+        // 2. Get quota information
+        // Note: We need clone quota information to traverse to avoid borrowing conflicts, but the modification is for account_json
         let quota = match account_json.get("quota") {
             Some(q) => q.clone(),
-            None => return false, // 无配额信息，跳过
+            None => return false, // No quota information, skip
         };
 
-        // 3. [兼容性 #621] 检查是否被旧版账号级配额保护禁用,尝试恢复并转为模型级
+        // 3. [Compatibility #621] Check whether it is disabled by the old version of account-level quota protection, try to restore and convert to model level
         let is_proxy_disabled = account_json
             .get("proxy_disabled")
             .and_then(|v| v.as_bool())
@@ -60,22 +60,22 @@ impl TokenManager {
             .unwrap_or("");
 
         if is_proxy_disabled && reason == "quota_protection" {
-            // 如果是被旧版账号级保护禁用的,尝试恢复并转为模型级
+            // If it was disabled by the old version of account-level protection, try to restore it and convert it to model level.
             return self
                 .check_and_restore_quota(account_json, account_path, &quota, &config)
                 .await;
         }
 
-        // [修复 #1344] 不再处理其他禁用原因,让调用方负责检查手动禁用
+        // [Fix #1344] No longer handles other reasons for disabling, leaving the caller responsible for checking for manual disabling
 
-        // 4. 获取模型列表
+        // 4. Get model list
         let models = match quota.get("models").and_then(|m| m.as_array()) {
             Some(m) => m,
             None => return false,
         };
 
-        // 5. [重构] 聚合判定逻辑：按 Standard ID 对账号所有型号进行分组
-        // 解决如 Pro-Low (0%) 和 Pro-High (100%) 在同一账号内导致状态冲突的问题
+        // 5. [Reconstruction] Aggregation decision logic: Group all models of the account according to Standard ID
+        // Resolved an issue where Pro-Low (0%) and Pro-High (100%) caused status conflicts within the same account
         let mut group_max_percentage: HashMap<String, i32> = HashMap::new();
 
         for model in models {
@@ -95,7 +95,7 @@ impl TokenManager {
             }
         }
 
-        // 6. 遍历受监控的 Standard ID，根据组内“最好状态”执行锁定或恢复
+        // 6. Traverse the monitored Standard IDs and perform locking or recovery based on the "best status" within the group
         let threshold = config.threshold_percentage as i32;
         let account_id = account_json
             .get("id")
@@ -105,18 +105,18 @@ impl TokenManager {
         let mut changed = false;
 
         for std_id in &config.monitored_models {
-            // [FIX] 归一化监控模型为标准 ID（例如用户在 UI 选了 gemini-3.7-flash，对齐到 gemini-3-flash）
+            // [FIX] The normalized monitoring model is a standard ID (for example, if the user selects gemini-3.7-flash in the UI, it is aligned to gemini-3-flash)
             let lookup_key = crate::proxy::common::model_mapping::normalize_to_standard_id(std_id)
                 .unwrap_or_else(|| std_id.clone());
 
-            // 获取该组的最高百分比，如果账号没该组型号则视为 100%
+            // Get the highest percentage of the group. If the account does not have the model of the group, it will be regarded as 100%.
             let max_pct = group_max_percentage
                 .get(&lookup_key)
                 .cloned()
                 .unwrap_or(100);
 
             if max_pct < threshold {
-                // 只有组内所有模型都不行，才触发全组保护
+                // Only when all models in the group fail will the whole group protection be triggered.
                 if self
                     .trigger_quota_protection(
                         account_json,
@@ -132,7 +132,7 @@ impl TokenManager {
                     changed = true;
                 }
             } else {
-                // 只有全组都好（或者没这型号），才尝试从之前受限状态恢复
+                // Only if the whole group is fine (or if this model is not available), try to recover from the previous restricted state.
                 let protected_models = account_json
                     .get("protected_models")
                     .and_then(|v| v.as_array());
@@ -158,15 +158,15 @@ impl TokenManager {
             }
         }
 
-        let _ = changed; // 避免 unused 警告，如果后续逻辑需要可以继续使用
+        let _ = changed; // Avoid unused warnings and continue to use them if subsequent logic requires it.
 
-        // 我们不再因为配额原因返回 true（即不再跳过账号），
-        // 而是加载并在 get_token 时进行过滤。
+        // We no longer return true due to quota reasons (i.e. no longer skip accounts),
+        // Instead load and filter on get_token.
         false
     }
 
-    /// 计算账号的最大剩余配额百分比（用于排序）
-    /// 返回值: Option<i32> (max_percentage)
+    /// Calculate the maximum remaining quota percentage of the account (used for sorting)
+    /// Return value: Option<i32> (max_percentage)
     pub(crate) fn calculate_quota_stats(&self, quota: &serde_json::Value) -> Option<i32> {
         let models = match quota.get("models").and_then(|m| m.as_array()) {
             Some(m) => m,
@@ -193,12 +193,12 @@ impl TokenManager {
         }
     }
 
-    /// 从磁盘读取特定模型的 quota 百分比 [FIX] 排序使用目标模型的 quota 而非 max
+    /// Read model-specific quota percentage from disk [FIX] Sorting uses target model's quota instead of max
     ///
-    /// # 参数
-    /// * `account_path` - 账号 JSON 文件路径
-    /// * `model_name` - 目标模型名称（已标准化）
-    #[allow(dead_code)] // 预留给精确配额读取逻辑
+    /// # Parameters
+    /// * `account_path` - Account JSON file path
+    /// * `model_name` - target model name (normalized)
+    #[allow(dead_code)] // Reserved for exact quota read logic
     pub(crate) fn get_model_quota_from_json(
         account_path: &PathBuf,
         model_name: &str,
@@ -241,14 +241,14 @@ impl TokenManager {
         Some(result)
     }
 
-    /// 从账号文件获取配额刷新时间
+    /// Get quota refresh time from account file
     ///
-    /// 返回该账号最近的配额刷新时间字符串（ISO 8601 格式）
+    /// Returns the most recent quota refresh time string for this account (ISO 8601 format)
     ///
-    /// # 参数
-    /// - `account_id`: 账号 ID（用于查找账号文件）
+    /// # Parameters
+    /// - `account_id`: account ID (used to find account files)
     pub fn get_quota_reset_time(&self, account_id: &str) -> Option<String> {
-        // 直接用 account_id 查找账号文件（文件名是 {account_id}.json）
+        // Directly use account_id to find the account file (the file name is {account_id} .json)
         let account_path = self
             .data_dir
             .join("accounts")
@@ -257,7 +257,7 @@ impl TokenManager {
         let content = std::fs::read_to_string(&account_path).ok()?;
         let account: serde_json::Value = serde_json::from_str(&content).ok()?;
 
-        // 获取 quota.models 中最早的 reset_time（最保守的锁定策略）
+        // Get the earliest reset_time in quota.models (the most conservative locking strategy)
         account
             .get("quota")
             .and_then(|q| q.get("models"))

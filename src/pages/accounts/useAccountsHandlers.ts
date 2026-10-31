@@ -4,6 +4,7 @@ import { isTauri } from "../../utils/env";
 import { request as invoke } from "../../utils/request";
 import type { Account } from "../../types/account";
 import { useAccountStore } from "../../stores/useAccountStore";
+import { useErrorStore } from "../../stores/error-store";
 import type { useAccountsState } from "./useAccountsState";
 
 type AccountsState = ReturnType<typeof useAccountsState>;
@@ -176,12 +177,16 @@ export function useAccountsHandlers(state: AccountsState) {
       setSelectedIds(new Set());
       console.log("[Accounts] Batch delete success");
       showToast(t("common.success"), "success");
-      setIsBatchDelete(false);
     } catch (error) {
       console.error("[Accounts] Batch delete failed:", error);
+      useErrorStore.getState().trackWarning(error, {
+        source: "useAccountsHandlers.executeBatchDelete",
+        triggerAction: "deleteAccounts",
+      });
       showToast(`${t("common.error")}: ${error}`, "error");
     } finally {
       setIsDeleting(false);
+      setIsBatchDelete(false);
     }
   };
 
@@ -201,12 +206,66 @@ export function useAccountsHandlers(state: AccountsState) {
       await deleteAccount(idToDelete);
       console.log("[Accounts] Delete success");
       showToast(t("common.success"), "success");
-      setDeleteConfirmId(null);
     } catch (error) {
       console.error("[Accounts] Delete failed:", error);
+      useErrorStore.getState().trackWarning(error, {
+        source: "useAccountsHandlers.executeDelete",
+        triggerAction: "deleteAccount",
+      });
       showToast(`${t("common.error")}: ${error}`, "error");
     } finally {
       setIsDeleting(false);
+      setDeleteConfirmId(null);
+    }
+  };
+
+  const handleToggleDisable = async (accountId: string, currentlyDisabled: boolean) => {
+    try {
+      const nextDisabled = !currentlyDisabled;
+      await useAccountStore.getState().toggleAccountDisabled(
+        accountId,
+        nextDisabled,
+        nextDisabled ? t("accounts.disabled_reason_user", "Disabled by user") : undefined
+      );
+      showToast(
+        nextDisabled
+          ? t("accounts.account_disabled_toast", "Account disabled")
+          : t("accounts.account_enabled_toast", "Account enabled"),
+        "success"
+      );
+    } catch (error) {
+      console.error("[Accounts] Toggle disabled failed:", error);
+      useErrorStore.getState().trackWarning(error, {
+        source: "useAccountsHandlers.handleToggleDisable",
+        triggerAction: "toggleAccountDisabled",
+      });
+      showToast(`${t("common.error")}: ${error}`, "error");
+    }
+  };
+
+  const handleBatchToggleDisable = async (disabled: boolean) => {
+    if (selectedIds.size === 0) return;
+    try {
+      const ids = Array.from(selectedIds);
+      await useAccountStore.getState().setAccountsDisabled(
+        ids,
+        disabled,
+        disabled ? t("accounts.disabled_reason_user", "Disabled by user") : undefined
+      );
+      showToast(
+        disabled
+          ? t("accounts.batch_disabled_toast", { count: ids.length, defaultValue: `${ids.length} accounts disabled` })
+          : t("accounts.batch_enabled_toast", { count: ids.length, defaultValue: `${ids.length} accounts enabled` }),
+        "success"
+      );
+      setSelectedIds(new Set());
+    } catch (error) {
+      console.error("[Accounts] Batch toggle disabled failed:", error);
+      useErrorStore.getState().trackWarning(error, {
+        source: "useAccountsHandlers.handleBatchToggleDisable",
+        triggerAction: "setAccountsDisabled",
+      });
+      showToast(`${t("common.error")}: ${error}`, "error");
     }
   };
 
@@ -478,6 +537,8 @@ export function useAccountsHandlers(state: AccountsState) {
     exportAccountsToJson,
     handleExportOne,
     handleViewDetails,
-    handleViewDevice
+    handleViewDevice,
+    handleToggleDisable,
+    handleBatchToggleDisable
   };
 }

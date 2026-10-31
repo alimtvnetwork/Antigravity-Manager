@@ -1,7 +1,7 @@
 // $ref / allOf / union helpers (split from json_schema.rs).
 use serde_json::Value;
 
-/// [NEW] 合并 allOf 数组中的所有子 Schema
+/// [NEW] Merge all sub-Schemas in allOf array
 pub(crate) fn merge_all_of(map: &mut serde_json::Map<String, Value>) {
     if let Some(Value::Array(all_of)) = map.remove("allOf") {
         let mut merged_properties = serde_json::Map::new();
@@ -10,14 +10,14 @@ pub(crate) fn merge_all_of(map: &mut serde_json::Map<String, Value>) {
 
         for sub_schema in all_of {
             if let Value::Object(sub_map) = sub_schema {
-                // 合并属性
+                // Merge properties
                 if let Some(Value::Object(props)) = sub_map.get("properties") {
                     for (k, v) in props {
                         merged_properties.insert(k.clone(), v.clone());
                     }
                 }
 
-                // 合并 required
+                // Merge required
                 if let Some(Value::Array(reqs)) = sub_map.get("required") {
                     for req in reqs {
                         if let Some(s) = req.as_str() {
@@ -26,7 +26,7 @@ pub(crate) fn merge_all_of(map: &mut serde_json::Map<String, Value>) {
                     }
                 }
 
-                // 合并其余字段 (第一个出现的胜出)
+                // Merge remaining fields (first occurrence wins)
                 for (k, v) in sub_map {
                     if k != "properties"
                         && k != "required"
@@ -39,7 +39,7 @@ pub(crate) fn merge_all_of(map: &mut serde_json::Map<String, Value>) {
             }
         }
 
-        // 应用合并后的字段
+        // Apply merged fields
         for (k, v) in other_fields {
             if !map.contains_key(&k) {
                 map.insert(k, v);
@@ -76,8 +76,8 @@ pub(crate) fn merge_all_of(map: &mut serde_json::Map<String, Value>) {
     }
 }
 
-/// [NEW] 计算 Schema 分支的复杂度得分 (用于 anyOf/oneOf 择优)
-/// 评分标准: Object (3) > Array (2) > Scalar (1) > Null (0)
+/// [NEW] Calculate the complexity score of Schema branches (for use in anyOf/oneOf selection)
+/// Scoring criteria: Object (3) > Array (2) > Scalar (1) > Null (0)
 fn score_schema_option(val: &Value) -> i32 {
     if let Value::Object(obj) = val {
         if obj.contains_key("properties")
@@ -97,7 +97,7 @@ fn score_schema_option(val: &Value) -> i32 {
     0
 }
 
-/// 从 anyOf/oneOf 联合类型数组中选取最佳非 null Schema 分支
+/// Select the best non-null Schema branch from anyOf/oneOf union type array
 pub(crate) fn extract_best_schema_from_union(union_array: &[Value]) -> Option<Value> {
     let mut best_option: Option<&Value> = None;
     let mut best_score = -1;

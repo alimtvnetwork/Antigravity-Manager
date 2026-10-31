@@ -1,8 +1,6 @@
 //! Repo DB: backup
 
-use super::detection::{
-    detect_running_projects, extract_image_payload_or_path, resume_task_document,
-};
+use super::detection::{detect_running_projects, resume_task_document};
 use super::discovery::discover_running_prompts_from_antigravity;
 use super::models::{ActivePrompt, RunningProject};
 use super::project_queries::get_live_project_execution_info;
@@ -19,6 +17,33 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use uuid::Uuid;
+
+thread_local! {
+    /// Regression guard: set while `resend_queued_prompts_for_instance` runs.
+    /// `backup_prompts_db::restore_running_prompts_for_instance` must never
+    /// execute on the resend path — it dispatches internally, so calling it
+    /// from resend would double-dispatch. The restore entry point checks this
+    /// flag and fails loudly if the invariant is violated.
+    pub(crate) static RESEND_IN_PROGRESS: std::cell::Cell<bool> =
+        std::cell::Cell::new(false);
+}
+
+/// RAII guard that marks the resend path as active for the current thread.
+/// Dropping the guard (including on early return / `?`) clears the flag.
+struct ResendPathGuard;
+
+impl ResendPathGuard {
+    fn enter() -> Self {
+        RESEND_IN_PROGRESS.with(|f| f.set(true));
+        ResendPathGuard
+    }
+}
+
+impl Drop for ResendPathGuard {
+    fn drop(&mut self) {
+        RESEND_IN_PROGRESS.with(|f| f.set(false));
+    }
+}
 
 /// Outcome of re-sending backed-up queued prompts via a single dispatch pass.
 /// Counts are real — nothing is reported as sent unless the dispatch pass
@@ -85,6 +110,11 @@ pub fn resend_queued_prompts_for_instance(
     instance_id: Option<&str>,
     limit: usize,
 ) -> Result<ResendQueuedOutcome, String> {
+    // Regression guard (Step 4): mark the resend path active so a nested
+    // restore_running_prompts_for_instance call fails loudly instead of
+    // double-dispatching. Cleared on drop, including early returns.
+    let _resend_guard = ResendPathGuard::enter();
+
     let unscoped = instance_id.is_none();
     let target_inst = instance_id.unwrap_or("default");
     let now = Utc::now().timestamp();
@@ -288,6 +318,20 @@ pub fn resend_queued_prompts_for_instance(
                 reinjected_ids.insert(rec.prompt_id.clone());
                 live_by_id.insert(rec.prompt_id.clone(), "queued".to_string());
                 live_by_sig.insert(sig, "queued".to_string());
+                let (extracted_uris, img_paths) =
+                    super::detection::extract_image_uris_or_paths(&active_p.prompt_content);
+                let final_uris = super::detection::effective_image_uris(
+                    active_p.image_payload.as_deref(),
+                    extracted_uris,
+                );
+                let image_count = img_paths.len() + final_uris.len();
+                let byte_size = active_p.prompt_content.len();
+                tracing::info!(
+                    "[PROMPT_RESTORE] Restoring running prompt for instance {} from backup (images: {}, bytes: {})",
+                    eff_inst,
+                    image_count,
+                    byte_size
+                );
                 crate::modules::logger::log_info(&format!(
                     "[RepoDB] Resend-queued: re-injected '{}' as queued on '{}'",
                     rec.prompt_id, eff_inst
@@ -356,7 +400,7 @@ pub fn count_backed_up_prompts(instance_id: &str) -> usize {
     conn.query_row(
         "SELECT COUNT(*) FROM active_prompts
          WHERE status = 'backed_up'
-           AND (instance_id = ?1 OR (?1 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))",
+           AND (instance_id = ?1 OR (?1 = 'default' AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL)))",
         [instance_id],
         |row| row.get::<_, i64>(0),
     )
@@ -390,26 +434,26 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
 
     let is_all_or_default =
         instance_id == "all" || instance_id == "__default__" || instance_id == "default";
-    let recent_dispatched_cutoff = now - 120;
 
-    // Transition in-flight and active prompts in active_prompts to 'backed_up' before switch (scoped to target instance).
-    // Only recently dispatched prompts (within 120s) are treated as in-flight so old finished rows are not resurrected.
+    // Transition all uncompleted prompts in active_prompts to 'backed_up' before switch (scoped to target instance).
+    // Incomplete-prompt sweep: transition ALL uncompleted prompts (WHERE status NOT IN ('completed', 'succeeded', 'backed_up'))
+    // so long-running, pending, or interrupted prompts are never dropped when switching or when quota expires.
     let transitioned = if instance_id == "all" {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE (status IN ('running', 'in_flight') OR (status = 'dispatched' AND updated_at >= ?2))",
-            params![now, recent_dispatched_cutoff],
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status NOT IN ('completed', 'succeeded', 'backed_up')",
+            params![now],
         )
         .unwrap_or(0)
     } else if is_all_or_default {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE (status IN ('running', 'in_flight') OR (status = 'dispatched' AND updated_at >= ?2)) AND instance_id IN ('default', '__default__')",
-            params![now, recent_dispatched_cutoff],
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status NOT IN ('completed', 'succeeded', 'backed_up') AND (instance_id IN ('default', '__default__', '') OR instance_id IS NULL)",
+            params![now],
         )
         .unwrap_or(0)
     } else {
         conn.execute(
-            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE (status IN ('running', 'in_flight') OR (status = 'dispatched' AND updated_at >= ?2)) AND instance_id = ?3",
-            params![now, recent_dispatched_cutoff, instance_id],
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE status NOT IN ('completed', 'succeeded', 'backed_up') AND instance_id = ?2",
+            params![now, instance_id],
         )
         .unwrap_or(0)
     };
@@ -419,11 +463,12 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
             for p in map.values_mut() {
                 let matches_inst = instance_id == "all"
                     || (is_all_or_default
-                        && (p.instance_id == "default" || p.instance_id == "__default__"))
+                        && (p.instance_id.is_empty()
+                            || p.instance_id == "default"
+                            || p.instance_id == "__default__"))
                     || p.instance_id == instance_id;
-                let is_inflight_status = p.status == "running"
-                    || p.status == "in_flight"
-                    || (p.status == "dispatched" && p.updated_at >= recent_dispatched_cutoff);
+                let is_inflight_status =
+                    p.status != "completed" && p.status != "succeeded" && p.status != "backed_up";
                 if is_inflight_status && matches_inst {
                     p.status = "backed_up".to_string();
                     p.updated_at = now;
@@ -446,8 +491,28 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
 
         if res.is_ok() {
             backed_up_count += 1;
-            let (extracted_img, img_paths) = extract_image_payload_or_path(&p.prompt_content);
-            let final_img = p.image_payload.clone().or(extracted_img);
+            let (extracted_uris, img_paths) =
+                super::detection::extract_image_uris_or_paths(&p.prompt_content);
+            let final_uris =
+                super::detection::effective_image_uris(p.image_payload.as_deref(), extracted_uris);
+            let mut final_img = super::detection::serialize_image_uris(&final_uris);
+            if final_img.is_none() && !img_paths.is_empty() {
+                final_img = Some(img_paths.join(";"));
+            }
+            let byte_size = p.prompt_content.len();
+            let image_count = img_paths.len() + final_uris.len();
+            let seq_code = p
+                .session_id
+                .as_deref()
+                .and_then(super::sequences::get_sequence_code_for_conversation);
+            tracing::info!(
+                "[PROMPT_BACKUP] Backed up running prompt for instance {} (seq: {:?}, images: {}, bytes: {})",
+                p.instance_id,
+                seq_code,
+                image_count,
+                byte_size
+            );
+
             // Write disk resume snapshot file inside project repo directory.
             // session_id is the live conversation, so the IDE reopens that chat.
             let task_file = PathBuf::from(&p.repo_path).join(".antigravity_resume_task.json");
@@ -478,30 +543,60 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                     s.spawn(move || {
                         let mut extracted: Vec<(String, Option<String>)> = Vec::new();
 
-                        // Check workspace state.vscdb for active prompts / tasks
-                        if let Some(ref ws_storage) = project.workspace_storage_path {
-                            let ws_db_path = PathBuf::from(ws_storage).join("state.vscdb");
-                            if ws_db_path.exists() {
-                                if let Ok(ws_conn) = Connection::open_with_flags(
-                                    &ws_db_path,
-                                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
-                                        | rusqlite::OpenFlags::SQLITE_OPEN_URI,
-                                ) {
-                                    let mut stmt = ws_conn
-                                        .prepare("SELECT key, value FROM ItemTable WHERE key LIKE '%prompt%' OR key LIKE '%chat%' OR key LIKE '%task%'")
-                                        .ok();
+                        // Check workspace state.vscdb for active prompts / tasks strictly if project is running
+                        if project.is_running {
+                            if let Some(ref ws_storage) = project.workspace_storage_path {
+                                let ws_db_path = PathBuf::from(ws_storage).join("state.vscdb");
+                                if ws_db_path.exists() {
+                                    if let Ok(ws_conn) = Connection::open_with_flags(
+                                        &ws_db_path,
+                                        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                                            | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+                                    ) {
+                                        let mut stmt = ws_conn
+                                            .prepare(
+                                                "SELECT key, value FROM ItemTable \
+                                                 WHERE key IN ('workbench.action.chat.interactiveInputHistory', 'interactive.inputHistory') \
+                                                    OR key LIKE 'workbench.panel.chat%input%'"
+                                            )
+                                            .ok();
 
-                                    if let Some(ref mut prepared) = stmt {
-                                        if let Ok(rows) = prepared.query_map([], |row| {
-                                            let key: String = row.get(0)?;
-                                            let val: String = row.get(1)?;
-                                            Ok((key, val))
-                                        }) {
-                                            for item in rows.flatten() {
-                                                let content = item.1;
-                                                if !content.trim().is_empty() && content.len() > 10 {
-                                                    let (img_payload, _) = extract_image_payload_or_path(&content);
-                                                    extracted.push((content, img_payload));
+                                        if let Some(ref mut prepared) = stmt {
+                                            if let Ok(rows) = prepared.query_map([], |row| {
+                                                let key: String = row.get(0)?;
+                                                let val: String = row.get(1)?;
+                                                Ok((key, val))
+                                            }) {
+                                                for (_key, val) in rows.flatten() {
+                                                    // Only extract validated interactive user prompt text from structured chat input history
+                                                    if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&val) {
+                                                        if let Some(arr) = json_val.as_array() {
+                                                            if let Some(last_elem) = arr.last() {
+                                                                let candidate_txt = if let Some(s) = last_elem.as_str() {
+                                                                    Some(s.to_string())
+                                                                } else if let Some(s) = last_elem.get("text").or_else(|| last_elem.get("content")).and_then(|v| v.as_str()) {
+                                                                    Some(s.to_string())
+                                                                } else {
+                                                                    None
+                                                                };
+                                                                if let Some(content) = candidate_txt {
+                                                                    let trimmed = content.trim();
+                                                                    if !trimmed.is_empty() && trimmed.len() > 10 && !trimmed.starts_with('{') {
+                                                                        let (img_uris, img_paths) = super::detection::extract_image_uris_or_paths(trimmed);
+                                                                        let img_payload = super::detection::compose_image_payload(None, img_uris, &img_paths);
+                                                                        extracted.push((trimmed.to_string(), img_payload));
+                                                                    }
+                                                                }
+                                                            }
+                                                        } else if let Some(content) = json_val.get("text").or_else(|| json_val.get("content")).and_then(|v| v.as_str()) {
+                                                            let trimmed = content.trim();
+                                                            if !trimmed.is_empty() && trimmed.len() > 10 && !trimmed.starts_with('{') {
+                                                                let (img_uris, img_paths) = super::detection::extract_image_uris_or_paths(trimmed);
+                                                                let img_payload = super::detection::compose_image_payload(None, img_uris, &img_paths);
+                                                                extracted.push((trimmed.to_string(), img_payload));
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -531,20 +626,21 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                                             .or_else(|| v.get("created_at"))
                                             .and_then(|t| t.as_i64())
                                             .unwrap_or(0);
-                                        let inst_matches = instance_id == "all"
-                                            || file_inst.is_empty()
-                                            || file_inst == instance_id
-                                            || ((instance_id == "default"
-                                                || instance_id == "__default__")
-                                                && (file_inst == "default"
-                                                    || file_inst == "__default__"));
-                                        let is_active_task = (file_status == "running"
+                                        let is_default_target = instance_id == "default"
+                                            || instance_id == "__default__";
+                                        let is_default_file = file_inst.is_empty()
+                                            || file_inst == "default"
+                                            || file_inst == "__default__";
+                                        let is_instance_matched = instance_id == "all"
+                                            || (is_default_target && is_default_file)
+                                            || (!file_inst.is_empty() && file_inst == instance_id);
+                                        let is_fresh_timestamp = file_ts > 0 && file_ts >= now - 600;
+                                        let is_active_status = file_status == "running"
                                             || file_status == "in_flight"
                                             || file_status == "backed_up"
-                                            || (file_status == "dispatched"
-                                                && file_ts >= recent_dispatched_cutoff))
-                                            && (file_ts == 0 || file_ts >= now - 600);
-                                        if inst_matches && is_active_task {
+                                            || file_status == "dispatched";
+                                        let is_active_task = is_active_status && is_fresh_timestamp;
+                                        if is_instance_matched && is_active_task {
                                             if let Some(txt) =
                                                 v.get("prompt_content").and_then(|t| t.as_str())
                                             {
@@ -580,7 +676,7 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
                      WHERE (repo_path = ?1 OR project_id = ?2 OR project_id LIKE ?3) \
                        AND status IN ('running', 'in_flight') \
                        AND (?4 = 'all' OR instance_id = ?4 OR (?4 IN ('default', '__default__') AND instance_id IN ('default', '__default__'))) \
-                     ORDER BY updated_at DESC LIMIT 1",
+                     ORDER BY created_at ASC, id ASC LIMIT 1",
                 )
                 .ok();
             if let Some(ref mut c_stmt) = check_stmt {
@@ -646,8 +742,27 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
 
             if result.is_ok() {
                 backed_up_count += 1;
-                let (extracted_img, img_paths) = extract_image_payload_or_path(&prompt_text);
-                let final_img = image_payload.clone().or(extracted_img);
+                let (extracted_uris, img_paths) =
+                    super::detection::extract_image_uris_or_paths(&prompt_text);
+                let final_uris = super::detection::effective_image_uris(
+                    image_payload.as_deref(),
+                    extracted_uris,
+                );
+                let mut final_img = super::detection::serialize_image_uris(&final_uris);
+                if final_img.is_none() && !img_paths.is_empty() {
+                    // Legacy fallback: paths-only prompts stored the joined paths.
+                    final_img = Some(img_paths.join(";"));
+                }
+                let byte_size = prompt_text.len();
+                let image_count = img_paths.len() + final_uris.len();
+                let seq_code = super::sequences::get_sequence_code_for_conversation(&project.id);
+                tracing::info!(
+                    "[PROMPT_BACKUP] Backed up running prompt for instance {} (seq: {:?}, images: {}, bytes: {})",
+                    instance_id,
+                    seq_code,
+                    image_count,
+                    byte_size
+                );
 
                 let active_prompt = ActivePrompt {
                     id: prompt_id.clone(),
@@ -693,6 +808,99 @@ pub fn backup_running_prompts(instance_id: &str) -> Result<usize, String> {
 
     invalidate_prompt_tree_cache(Some(instance_id));
     Ok(backed_up_count)
+}
+
+/// FIFO-ordered ids of incomplete prompts for an instance scope: rows in
+/// 'running' / 'in_flight' / 'dispatched' / 'pending' / 'queued' / 'blocked'
+/// (not marked 'completed' or 'succeeded', at ANY age).
+/// 'default' and '__default__' share one scope; 'all' is unscoped.
+fn select_incomplete_prompt_ids(
+    conn: &Connection,
+    instance_id: &str,
+) -> Result<Vec<String>, String> {
+    let is_default_scope = instance_id == "default" || instance_id == "__default__";
+    let is_unscoped = instance_id == "all" || is_default_scope;
+    let sql = if instance_id == "all" {
+        "SELECT id FROM active_prompts
+         WHERE status NOT IN ('completed', 'succeeded', 'backed_up')
+         ORDER BY created_at ASC, id ASC"
+    } else if is_default_scope {
+        "SELECT id FROM active_prompts
+         WHERE status NOT IN ('completed', 'succeeded', 'backed_up')
+           AND (instance_id IN ('default', '__default__') OR instance_id IS NULL OR instance_id = '')
+         ORDER BY created_at ASC, id ASC"
+    } else {
+        "SELECT id FROM active_prompts
+         WHERE status NOT IN ('completed', 'succeeded', 'backed_up') AND instance_id = ?1
+         ORDER BY created_at ASC, id ASC"
+    };
+    let mut stmt = conn
+        .prepare(sql)
+        .map_err(|e| format!("Failed to prepare incomplete-prompt sweep query: {}", e))?;
+    let map_id = |row: &rusqlite::Row| row.get::<_, String>(0);
+    let ids: Vec<String> = if is_unscoped {
+        stmt.query_map([], map_id)
+            .map_err(|e| format!("Failed to query incomplete prompts: {}", e))?
+            .flatten()
+            .collect()
+    } else {
+        stmt.query_map(params![instance_id], map_id)
+            .map_err(|e| format!("Failed to query incomplete prompts: {}", e))?
+            .flatten()
+            .collect()
+    };
+    Ok(ids)
+}
+
+/// Mirror swept prompt ids into the in-memory prompt map as 'backed_up'
+/// so live views agree with the database after a sweep.
+fn mark_swept_prompts_in_memory(ids: &[String], now: i64) {
+    if let Ok(mut map) = get_memory_prompts_map().lock() {
+        let id_set: HashSet<&str> = ids.iter().map(|id| id.as_str()).collect();
+        for p in map.values_mut() {
+            if id_set.contains(p.id.as_str()) {
+                p.status = "backed_up".to_string();
+                p.updated_at = now;
+            }
+        }
+    }
+}
+
+/// Incomplete-prompt sweep (RC-1): transition every prompt for
+/// `instance_id` that never reached 'completed' — status 'running',
+/// 'in_flight', or 'dispatched', at ANY age — to 'backed_up', claiming
+/// rows in FIFO order (created_at ASC, id ASC). Prompts dispatched more
+/// than 120s before a switch used to fall out of every restore query;
+/// this sweep makes them visible to restore. Returns the swept count.
+pub fn sweep_incomplete_prompts_for_instance(instance_id: &str) -> Result<usize, String> {
+    let conn = connect_db()?;
+    let now = Utc::now().timestamp();
+    let ids = select_incomplete_prompt_ids(&conn, instance_id)?;
+    let mut swept_ids: Vec<String> = Vec::new();
+    for id in &ids {
+        // The status guard keeps a row that completed after selection
+        // from being clobbered back to 'backed_up'.
+        let changed = conn
+            .execute(
+                "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1
+                 WHERE id = ?2 AND status NOT IN ('completed', 'succeeded', 'backed_up')",
+                params![now, id],
+            )
+            .map_err(|e| format!("Failed to sweep incomplete prompt '{}': {}", id, e))?;
+        if changed > 0 {
+            swept_ids.push(id.clone());
+        }
+    }
+    let swept = swept_ids.len();
+    if swept > 0 {
+        mark_swept_prompts_in_memory(&swept_ids, now);
+        crate::modules::logger::log_info(&format!(
+            "[RepoDB] Swept {} incomplete prompt(s) to 'backed_up' for instance '{}'",
+            swept, instance_id
+        ));
+        invalidate_prompt_tree_cache(Some(instance_id));
+    }
+    Ok(swept)
 }
 
 /// Verified count of active prompts or running processes across workspaces
@@ -757,6 +965,7 @@ pub fn verify_prompts_running() -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::modules::repo_db::detection;
     use crate::modules::repo_db::init_tables;
     use rusqlite::Connection;
 
@@ -807,5 +1016,101 @@ mod tests {
             )
             .unwrap();
         assert_eq!(count, 1, "Must never duplicate records on backup");
+    }
+
+    #[test]
+    fn test_backup_includes_full_prompt_images_sequence_and_workspace_id() {
+        let conn = Connection::open_in_memory().unwrap();
+        assert!(init_tables(&conn).is_ok());
+
+        let now = Utc::now().timestamp();
+        let prompt_text = "Detailed refactoring prompt with embedded image data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+        let image_payload = Some("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==".to_string());
+        let project_id = "proj-workspace-alpha";
+        let conversation_id = "conv-session-101";
+
+        // 1. Ensure conversation sequence exists
+        let seq_id = super::super::sequences::ensure_conversation_sequence_in_conn(
+            &conn,
+            conversation_id,
+            "d:/work/repo-alpha",
+            "Refactoring Task",
+            "default",
+        );
+        assert_eq!(seq_id, 1);
+        let seq_code = super::super::sequences::get_sequence_code_in_conn(&conn, conversation_id);
+        assert_eq!(seq_code, Some("C001".to_string()));
+
+        // 2. Insert running project
+        conn.execute(
+            "INSERT INTO running_projects 
+             (id, instance_id, repo_name, repo_path, workspace_storage_path, is_running, last_detected_at, updated_at)
+             VALUES (?1, 'default', 'repo-alpha', 'd:/work/repo-alpha', NULL, 1, ?2, ?2)",
+            params![project_id, now],
+        ).unwrap();
+
+        // 3. Insert active prompt with full text, image payload, and workspace ID
+        let prompt_id = "prompt-audit-test";
+        conn.execute(
+            "INSERT INTO active_prompts 
+             (id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload)
+             VALUES (?1, ?2, 'default', 'd:/work/repo-alpha', ?3, 'gemini-2.5-pro', ?4, 'running', ?5, ?5, ?6)",
+            params![prompt_id, project_id, prompt_text, conversation_id, now, &image_payload],
+        ).unwrap();
+
+        // 4. Verify backup transitions status to backed_up and preserves all attributes
+        conn.execute(
+            "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 WHERE id = ?2",
+            params![now + 1, prompt_id],
+        )
+        .unwrap();
+
+        let (retrieved_text, retrieved_img, retrieved_proj, retrieved_session, retrieved_status) = conn
+            .query_row(
+                "SELECT prompt_content, image_payload, project_id, session_id, status FROM active_prompts WHERE id = ?1",
+                params![prompt_id],
+                |r| Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, Option<String>>(1)?,
+                    r.get::<_, String>(2)?,
+                    r.get::<_, Option<String>>(3)?,
+                    r.get::<_, String>(4)?,
+                )),
+            )
+            .unwrap();
+
+        assert_eq!(retrieved_text, prompt_text);
+        assert_eq!(retrieved_img, image_payload);
+        assert_eq!(retrieved_proj, project_id);
+        assert_eq!(retrieved_session, Some(conversation_id.to_string()));
+        assert_eq!(retrieved_status, "backed_up");
+
+        // 5. Verify resume_task_document produces canonical document with sequence_code & workspace_id
+        let prompt_obj = ActivePrompt {
+            id: prompt_id.to_string(),
+            project_id: project_id.to_string(),
+            instance_id: "default".to_string(),
+            repo_path: "d:/work/repo-alpha".to_string(),
+            prompt_content: prompt_text.to_string(),
+            model: Some("gemini-2.5-pro".to_string()),
+            session_id: Some(conversation_id.to_string()),
+            status: "backed_up".to_string(),
+            created_at: now,
+            updated_at: now + 1,
+            image_payload: image_payload.clone(),
+        };
+
+        let (extracted_uris, img_paths) = detection::extract_image_uris_or_paths(&prompt_text);
+        assert_eq!(extracted_uris.len(), 1);
+        assert!(img_paths.is_empty());
+        // Legacy single-URI wrapper still returns the first URI verbatim.
+        let (legacy_img, _) = detection::extract_image_payload_or_path(&prompt_text);
+        assert!(legacy_img.is_some());
+        let doc = resume_task_document(&prompt_obj, "backed_up", now + 1, &img_paths);
+        assert_eq!(doc["workspace_id"], project_id);
+        assert_eq!(doc["project_id"], project_id);
+        assert_eq!(doc["prompt_content"], prompt_text);
+        assert_eq!(doc["image_payload"], image_payload.unwrap());
+        assert_eq!(doc["has_image"], true);
     }
 }

@@ -1,5 +1,5 @@
 //! User Token Database Module
-//! UserToken 数据库操作模块
+//! UserToken database operation module
 #![allow(dead_code)]
 
 pub mod db;

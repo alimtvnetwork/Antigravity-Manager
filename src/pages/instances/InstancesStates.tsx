@@ -1,31 +1,49 @@
 import { copyToClipboard } from '../../utils/clipboard';
 import { useState } from 'react';
-import { Search, Plus, Play, RotateCw, Laptop, AlertCircle, Terminal, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
+import { Search, Plus, Play, RotateCw, Laptop, AlertCircle, Terminal, ChevronDown, ChevronRight, Copy, Check, X } from 'lucide-react';
 import type { InstancePageApi } from './instancePageTypes';
+import { forceDispatchPendingResume } from '../../services/instanceService';
 
 export function InstancesFilterBar({ api }: { api: InstancePageApi }) {
     const { t, searchQuery, setSearchQuery, setNewInstanceName, setIsCreateOpen } = api;
 
     return (
         <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 flex-1 max-w-md bg-white dark:bg-base-200 border border-gray-200 dark:border-base-100 rounded-[5px] px-3 py-2 shadow-xs">
-                <Search className="w-4 h-4 text-gray-400 shrink-0" />
+            <div className="flex items-center gap-2 flex-1 max-w-md rounded-full bg-white/90 dark:bg-[#171025]/90 border border-slate-200/90 dark:border-[#40285e]/80 shadow-2xs backdrop-blur-xs px-3.5 py-1.5 transition-all duration-150 focus-within:border-amber-500/60 dark:focus-within:border-amber-500/60 focus-within:ring-2 focus-within:ring-amber-500/20">
+                <Search className="w-4 h-4 text-amber-500 dark:text-amber-400 shrink-0 pointer-events-none transition-colors" />
                 <input
                     type="text"
                     placeholder={t('instances.search_placeholder', 'Search by profile name, ID, or bound email...')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-transparent border-none outline-hidden text-xs text-gray-900 dark:text-base-content"
+                    className="w-full bg-transparent border-none outline-hidden text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-0"
                 />
+                {Boolean(searchQuery) && (
+                    <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="text-slate-400 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 p-0.5 rounded-full hover:bg-slate-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer shrink-0 focus:outline-none focus-visible:ring-1 focus-visible:ring-amber-500/50"
+                        title={t('common.clear', 'Clear search')}
+                        aria-label={t('common.clear', 'Clear search')}
+                    >
+                        <X className="w-3.5 h-3.5" />
+                    </button>
+                )}
             </div>
             <button
                 onClick={() => {
-                    setNewInstanceName('');
-                    setIsCreateOpen(true);
+                    if (api.openCreateDialog) {
+                        api.openCreateDialog();
+                    } else {
+                        const defaultId = api.instances.find((i) => i.config.is_default || i.config.id === 'default')?.config.id || 'default';
+                        api.setNewInstanceFromInstance(defaultId);
+                        setNewInstanceName('');
+                        setIsCreateOpen(true);
+                    }
                 }}
-                className="btn btn-primary btn-sm gap-1.5 shadow-sm rounded-[4px] transition-all duration-150 ease-out active:scale-[0.98]"
+                className="btn btn-primary btn-sm gap-1.5 px-4 rounded-full font-semibold shadow-2xs group hover:shadow-md hover:shadow-primary/25 transition-all duration-300 ease-out cursor-pointer"
             >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-4 h-4 transition-transform duration-300 group-hover:rotate-90 group-hover:scale-110" />
                 <span>{t('instances.create_btn', 'New Instance')}</span>
             </button>
         </div>
@@ -33,10 +51,41 @@ export function InstancesFilterBar({ api }: { api: InstancePageApi }) {
 }
 
 export function InstancesAlerts({ api }: { api: InstancePageApi }) {
-    const { t, storeError, actionError, setActionError, fetchInstances } = api;
+    const { t, storeError, actionError, setActionError, fetchInstances, resumeIndicator } = api;
+
+    const isSettling =
+        resumeIndicator &&
+        (resumeIndicator.status === 'scheduled' ||
+            (resumeIndicator.secondsLeft !== undefined && resumeIndicator.secondsLeft > 0));
+
+    const handleForceDispatch = async () => {
+        if (!resumeIndicator?.instanceId) return;
+        await forceDispatchPendingResume(resumeIndicator.instanceId);
+    };
 
     return (
         <>
+            {isSettling ? (
+                <div className="p-3.5 rounded-[5px] bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs flex items-center justify-between shadow-xs">
+                    <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.6)] animate-ping shrink-0" />
+                        <span className="font-medium">
+                            {t(
+                                'instances.settling_banner',
+                                `Post-switch settling delay active: Restoring prompts in ${resumeIndicator.secondsLeft ?? 10}s for instance '${resumeIndicator.instanceId}'...`
+                            )}
+                        </span>
+                    </div>
+                    <button
+                        onClick={handleForceDispatch}
+                        className="btn btn-xs rounded-full bg-amber-600 hover:bg-amber-700 text-white border-none gap-1 font-semibold px-3 shadow-xs transition-colors cursor-pointer"
+                        title="Bypass 10s settling delay and restore prompts immediately"
+                    >
+                        <Play className="w-3 h-3 fill-current" />
+                        <span>{t('instances.force_restore', 'Force Dispatch Now')}</span>
+                    </button>
+                </div>
+            ) : null}
             {storeError ? (
                 <div className="p-3.5 rounded-[5px] bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -106,12 +155,18 @@ export function InstancesEmptyState({ api }: { api: InstancePageApi }) {
                 </button>
                 <button
                     onClick={() => {
-                        setNewInstanceName('');
-                        setIsCreateOpen(true);
+                        if (api.openCreateDialog) {
+                            api.openCreateDialog();
+                        } else {
+                            const defaultId = api.instances.find((i) => i.config.is_default || i.config.id === 'default')?.config.id || 'default';
+                            api.setNewInstanceFromInstance(defaultId);
+                            setNewInstanceName('');
+                            setIsCreateOpen(true);
+                        }
                     }}
-                    className="btn btn-outline btn-sm gap-1.5 rounded-[5px]"
+                    className="btn btn-outline btn-sm gap-1.5 rounded-[5px] group hover:shadow-md transition-all duration-300 ease-out font-semibold cursor-pointer"
                 >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-90 group-hover:scale-110" />
                     <span>{t('instances.create_custom', 'Create Custom Profile')}</span>
                 </button>
             </div>
@@ -120,16 +175,24 @@ export function InstancesEmptyState({ api }: { api: InstancePageApi }) {
 }
 
 export function InstancesNoResultsState({ api }: { api: InstancePageApi }) {
-    const { t } = api;
+    const { t, setSearchQuery } = api;
     return (
         <div className="flex flex-col items-center justify-center py-12 text-center bg-white dark:bg-base-200 rounded-[5px] border border-gray-200/80 dark:border-base-100">
             <Search className="w-8 h-8 text-gray-400 mb-2" />
             <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 {t('instances.no_search_results', 'No profiles match your search')}
             </p>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-gray-400 mt-1 mb-4">
                 {t('instances.no_search_results_desc', 'Try searching with a different name, profile ID, or email')}
             </p>
+            <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="btn btn-primary btn-sm rounded-[5px] shadow-sm gap-1.5"
+            >
+                <RotateCw className="w-3.5 h-3.5" />
+                <span>{t('instances.reset_search', 'Reset Search')}</span>
+            </button>
         </div>
     );
 }

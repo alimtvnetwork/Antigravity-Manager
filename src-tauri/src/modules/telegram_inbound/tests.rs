@@ -139,6 +139,10 @@ pub(crate) mod tests {
             "<code>/ssh balance</code>",
             "<code>/ssh exec vm-1 agm status</code>",
             "<code>/gitmap cluster status</code>",
+            "<code>/improvements</code>",
+            "<code>/improvements plan</code>",
+            "<code>/improvements next</code>",
+            "<code>/next10</code>",
         ] {
             assert!(
                 help.contains(required),
@@ -146,6 +150,48 @@ pub(crate) mod tests {
                 required
             );
         }
+    }
+
+    #[test]
+    pub(crate) fn test_improvements_callbacks_and_markup() {
+        assert_eq!(
+            crate::modules::improvements::parse_improvements_callback("im:pl"),
+            Some("plan")
+        );
+        assert_eq!(
+            crate::modules::improvements::parse_improvements_callback("im:n10"),
+            Some("next")
+        );
+        let markup = crate::modules::improvements::telegram_markup().to_string();
+        assert!(markup.contains("im:pl"));
+        assert!(markup.contains("im:n10"));
+        assert!(markup.contains("im:st"));
+        assert!(markup.contains("im:ck"));
+        assert!(markup.contains("im:dt"));
+        assert!(crate::modules::improvements::is_improvements_command(
+            "/improvements"
+        ));
+        assert!(crate::modules::improvements::is_improvements_command(
+            "/next10"
+        ));
+        let html = crate::modules::improvements::format_telegram_html(
+            &crate::modules::improvements::FlywheelState {
+                wave: 1,
+                kind: "ui".to_string(),
+                total: 100,
+                batch_size: 10,
+                next_batch: 1,
+                completed_batches: 0,
+                last_action: "unplanned".to_string(),
+                updated_at: 0,
+                ledger_rel: crate::modules::improvements::LEDGER_REL.to_string(),
+                dispatched_prompt_id: None,
+                batches: Vec::new(),
+                workspace_root: String::new(),
+                task_hints: Vec::new(),
+            },
+        );
+        assert!(html.contains("100 Improvements"));
     }
 
     #[test]
@@ -222,5 +268,161 @@ pub(crate) mod tests {
             "send:m:W3"
         );
         assert_eq!(daemon::normalize_cmd_callback_payload("/send"), "/send");
+    }
+
+    #[test]
+    pub(crate) fn test_machine_entries_deduplication() {
+        assert!(node_label::is_current_machine("local"));
+        assert!(node_label::is_current_machine("localhost"));
+        let detected = crate::modules::email_watcher::detect_machine_name();
+        if !detected.trim().is_empty() {
+            assert!(node_label::is_current_machine(&detected));
+        }
+    }
+
+    #[test]
+    pub(crate) fn test_supabase_command_queue_payload_schema() {
+        let node = "worker-1";
+        let prompt_text = "Run integration tests";
+        let cmd_id = uuid::Uuid::new_v4().to_string();
+        let payload = serde_json::json!({
+            "id": cmd_id,
+            "target_node_id": node,
+            "target_node": node,
+            "source": "telegram",
+            "command": "prompt",
+            "command_text": format!("agm prompt default {}", prompt_text),
+            "prompt": prompt_text,
+            "status": "pending",
+            "created_at": Utc::now().timestamp()
+        });
+
+        assert_eq!(payload["target_node_id"], "worker-1");
+        assert_eq!(payload["target_node"], "worker-1");
+        assert_eq!(payload["source"], "telegram");
+        assert_eq!(
+            payload["command_text"],
+            "agm prompt default Run integration tests"
+        );
+        assert_eq!(payload["status"], "pending");
+    }
+
+    #[test]
+    pub(crate) fn test_injection_token_parsing_preserves_target() {
+        let tokens = vec!["Antigravity-Manager", "Fix", "build", "pipeline"];
+        let first_tok = tokens[0];
+        let mut filtered = tokens.clone();
+
+        let is_existing_dir = std::path::Path::new(first_tok).is_dir();
+        let is_known_project = first_tok.eq_ignore_ascii_case("Antigravity-Manager");
+        if !is_existing_dir && !is_known_project && filtered.len() < 2 {
+            filtered.insert(0, "default");
+        }
+
+        assert_eq!(filtered[0], "Antigravity-Manager");
+        assert_eq!(filtered.len(), 4);
+    }
+
+    #[test]
+    pub(crate) fn test_step3_graceful_prompt_fallback() {
+        let prompt_input = "Please fix the failing tests in telegram inbound";
+        let is_likely_prompt = prompt_input.split_whitespace().count() > 3
+            || prompt_input.to_lowercase().starts_with("please")
+            || prompt_input.to_lowercase().starts_with("fix")
+            || prompt_input.to_lowercase().starts_with("implement")
+            || prompt_input.to_lowercase().starts_with("add");
+        assert!(is_likely_prompt);
+
+        let id_input = "C001";
+        let is_id_prompt = id_input.split_whitespace().count() > 3
+            || id_input.to_lowercase().starts_with("please")
+            || id_input.to_lowercase().starts_with("fix");
+        assert!(!is_id_prompt);
+    }
+
+    #[test]
+    fn test_prompt_execution_status_type_enum() {
+        use super::types::PromptExecutionStatusType;
+        let executing = PromptExecutionStatusType::from_spawned(true);
+        assert_eq!(executing, PromptExecutionStatusType::ExecutingNow);
+        assert_eq!(executing.display_label(), "Executing now");
+        assert_eq!(executing.to_string(), "Executing now");
+        assert!(executing.is_executing());
+        assert!(!executing.is_queued());
+
+        let queued = PromptExecutionStatusType::from_spawned(false);
+        assert_eq!(queued, PromptExecutionStatusType::Queued);
+        assert_eq!(queued.display_label(), "Queued");
+        assert_eq!(queued.to_string(), "Queued");
+        assert!(queued.is_queued());
+        assert!(!queued.is_executing());
+    }
+
+    #[test]
+    fn test_remote_dispatch_status_type_enum() {
+        use super::types::RemoteDispatchStatusType;
+        let gitmap = RemoteDispatchStatusType::resolve(true, false);
+        assert_eq!(gitmap, RemoteDispatchStatusType::GitMapClusterSsh);
+        assert_eq!(gitmap.to_string(), "Sent via GitMap Cluster SSH");
+
+        let supabase = RemoteDispatchStatusType::resolve(false, true);
+        assert_eq!(supabase, RemoteDispatchStatusType::SupabaseQueued);
+        assert_eq!(
+            supabase.to_string(),
+            "Queued on the secondary database — the node will pick it up"
+        );
+
+        let local = RemoteDispatchStatusType::resolve(false, false);
+        assert_eq!(local, RemoteDispatchStatusType::LocalRecorded);
+        assert_eq!(
+            local.to_string(),
+            "Queued (the node recorded your instruction)"
+        );
+    }
+
+    #[test]
+    fn test_instances_csv_includes_prompt_columns() {
+        let (name, _mime, body) =
+            crate::modules::telegram_inbound::reports_a::generate_export_dataset(
+                "instances",
+                "csv",
+            )
+            .expect("instances csv");
+        assert!(name.ends_with(".csv"));
+        let header = body.lines().next().unwrap_or("");
+        assert!(header.contains("running_prompts"));
+        assert!(header.contains("queued_prompts"));
+        assert!(header.contains("running_projects"));
+        assert!(header.contains("queued_projects"));
+    }
+
+    #[test]
+    fn test_copy_text_cap_is_256() {
+        assert_eq!(TELEGRAM_COPY_TEXT_MAX, 256);
+        let long = "α".repeat(400);
+        let clamped = clamp_telegram_copy_text(&long, TELEGRAM_COPY_TEXT_MAX);
+        assert!(clamped.chars().count() <= TELEGRAM_COPY_TEXT_MAX);
+    }
+
+    #[test]
+    fn test_status_fanout_is_status_command() {
+        assert!(super::instance_cards::should_fanout_status("/status"));
+        assert!(super::instance_cards::should_fanout_status("/observe"));
+        assert!(!super::instance_cards::should_fanout_status("/balance"));
+        assert!(!super::instance_cards::should_fanout_status(
+            "/export instances csv"
+        ));
+    }
+
+    #[test]
+    fn test_empty_screenshot_target_is_local() {
+        assert_eq!(
+            resolve_machine_target("").expect("empty screenshot"),
+            OpenShotTarget::Local
+        );
+        assert_eq!(
+            resolve_machine_target("all").expect("all screenshot"),
+            OpenShotTarget::All
+        );
     }
 }

@@ -4,49 +4,55 @@ pub(crate) async fn internal_refresh_account_quota(
     app: &tauri::AppHandle,
     account: &mut Account,
 ) -> Result<QuotaData, String> {
-    modules::logger::log_info(&format!("自动触发刷新配额: {}", account.email));
+    modules::logger::log_info(&format!(
+        "Automatically trigger quota refresh: {}",
+        account.email
+    ));
 
-    // 使用带重试的查询 (Shared logic)
+    // Using queries with retries (Shared logic)
     match modules::account::fetch_quota_with_retry(account).await {
         Ok(quota) => {
-            // 更新账号配额
+            // Update account quota
             // Justification: quota cache write is auxiliary; the fetched quota is returned to the caller
             crate::error::record_ignored(
                 modules::update_account_quota(&account.id, quota.clone()),
                 "cache refreshed account quota",
             );
-            // 更新托盘菜单
+            // Update tray menu
             crate::modules::tray::update_tray_menus(app);
             Ok(quota)
         }
         Err(e) => {
-            modules::logger::log_warn(&format!("自动刷新配额失败 ({}): {}", account.email, e));
+            modules::logger::log_warn(&format!(
+                "Automatic quota refresh failed ( {} ): {}",
+                account.email, e
+            ));
             Err(e.to_string())
         }
     }
 }
 
-/// 查询账号配额
+/// Query account quota
 #[tauri::command]
 pub async fn fetch_account_quota(
     app: tauri::AppHandle,
     proxy_state: tauri::State<'_, crate::commands::proxy::ProxyServiceState>,
     account_id: String,
 ) -> crate::error::AppResult<QuotaData> {
-    modules::logger::log_info(&format!("手动刷新配额请求: {}", account_id));
+    modules::logger::log_info(&format!("Manual refresh quota request: {}", account_id));
     let mut account =
         modules::load_account(&account_id).map_err(crate::error::AppError::Account)?;
 
-    // 使用带重试的查询 (Shared logic)
+    // Using queries with retries (Shared logic)
     let mut quota = modules::account::fetch_quota_with_retry(&mut account).await?;
 
-    // 4. 更新账号配额
+    // 4. Update account quota
     modules::update_account_quota(&account_id, quota.clone())
         .map_err(crate::error::AppError::Account)?;
 
     crate::modules::tray::update_tray_menus(&app);
 
-    // 5. 同步到运行中的反代服务（如果已启动）
+    // 5. Synchronize to the running anti-generation service (if it is started)
     let instance_lock = proxy_state.instance.read().await;
     if let Some(instance) = instance_lock.as_ref() {
         if quota.models.iter().any(|model| model.percentage > 0) {
@@ -85,14 +91,14 @@ pub async fn fetch_account_quota(
 
 pub use modules::account::RefreshStats;
 
-/// 刷新所有账号配额 (内部实现)
+/// Refresh all account quotas (implemented internally)
 pub async fn refresh_all_quotas_internal(
     proxy_state: &crate::commands::proxy::ProxyServiceState,
     app_handle: Option<tauri::AppHandle>,
 ) -> Result<RefreshStats, String> {
     let stats = modules::account::refresh_all_quotas_logic().await?;
 
-    // 同步到运行中的反代服务（如果已启动）
+    // Sync to a running anti-generation service (if started)
     let instance_lock = proxy_state.instance.read().await;
     if let Some(instance) = instance_lock.as_ref() {
         // Justification: proxy reload is best-effort sync; the refresh stats are returned regardless
@@ -102,7 +108,7 @@ pub async fn refresh_all_quotas_internal(
         );
     }
 
-    // 发送全局刷新事件给 UI (如果需要)
+    // Send global refresh events to the UI (if needed)
     if let Some(handle) = app_handle {
         use tauri::Emitter;
         // Justification: UI event emission; a missing listener is expected and harmless
@@ -115,7 +121,7 @@ pub async fn refresh_all_quotas_internal(
     Ok(stats)
 }
 
-/// 刷新所有账号配额 (Tauri Command)
+/// Refresh all account quotas (Tauri Command)
 #[tauri::command]
 pub async fn refresh_all_quotas(
     proxy_state: tauri::State<'_, crate::commands::proxy::ProxyServiceState>,

@@ -103,8 +103,8 @@ impl PromptSanitizer {
             return;
         }
 
-        // 铁律：只认 thought: true。若沿用"有签名即思考块"的启发式，会把带签名的正文
-        // 误判为思考块并前移 —— 既改写 part 顺序（= 签名锚点语义），也让真正的前缀错位。
+        // Iron rule: only recognize thought: true. If we follow the heuristic of "if there is a signature, then think about the block", the signed text will be
+        // Misjudged as a think block and moved forward - both rewriting the part order (= signature anchor semantics) and dislocating the real prefix.
         let thought_idx = parts
             .iter()
             .position(|p| crate::proxy::thinking_store::is_thought_part(p));

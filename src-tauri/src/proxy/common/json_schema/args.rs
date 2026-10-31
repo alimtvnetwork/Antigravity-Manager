@@ -1,16 +1,16 @@
 // Tool-call argument fixing (split from json_schema.rs).
 use serde_json::Value;
 
-/// 修正工具调用参数的类型，使其符合 schema 定义
+/// Correct the type of tool call parameters to match the schema definition
 ///
-/// 根据 schema 中的 type 定义，自动转换参数值的类型：
+/// According to the type definition in the schema, the type of the parameter value is automatically converted:
 /// - "123" → 123 (string → number/integer)
 /// - "true" → true (string → boolean)
 /// - 123 → "123" (number → string)
 ///
 /// # Arguments
-/// * `args` - 工具调用的参数对象 (会被原地修改)
-/// * `schema` - 工具的参数 schema 定义 (通常是 parameters 对象)
+/// * `args` - the parameter object of the tool call (will be modified in place)
+/// * `schema` - the tool's parameter schema definition (usually a parameters object)
 pub fn fix_tool_call_args(args: &mut Value, schema: &Value) {
     if let Some(properties) = schema.get("properties").and_then(|p| p.as_object()) {
         if let Some(args_obj) = args.as_object_mut() {
@@ -23,9 +23,9 @@ pub fn fix_tool_call_args(args: &mut Value, schema: &Value) {
     }
 }
 
-/// 递归修正单个参数的类型
+/// Recursively fix the type of a single parameter
 pub fn fix_single_arg_recursive(value: &mut Value, schema: &Value) {
-    // 1. 处理嵌套对象 (properties)
+    // 1. Handle nested objects (properties)
     if let Some(nested_props) = schema.get("properties").and_then(|p| p.as_object()) {
         if let Some(value_obj) = value.as_object_mut() {
             for (key, nested_value) in value_obj.iter_mut() {
@@ -37,7 +37,7 @@ pub fn fix_single_arg_recursive(value: &mut Value, schema: &Value) {
         return;
     }
 
-    // 2. 处理数组 (items)
+    // 2. Process arrays (items)
     let schema_type = schema
         .get("type")
         .and_then(|t| t.as_str())
@@ -54,17 +54,17 @@ pub fn fix_single_arg_recursive(value: &mut Value, schema: &Value) {
         return;
     }
 
-    // 3. 处理基础类型修正
+    // 3. Handle base type corrections
     match schema_type.as_str() {
         "number" | "integer" => {
-            // 字符串 → 数字
+            // string → number
             if let Some(s) = value.as_str() {
-                // [SAFETY] 保护具有前导零的版本号或代码 (如 "01", "007")，不应转为数字
+                // [SAFETY] protects version numbers or codes with leading zeros (e.g. "01", "007") and should not be converted to numbers
                 if s.starts_with('0') && s.len() > 1 && !s.starts_with("0.") {
                     return;
                 }
 
-                // 优先尝试解析为整数
+                // Try parsing as an integer first
                 if let Ok(i) = s.parse::<i64>() {
                     *value = Value::Number(serde_json::Number::from(i));
                 } else if let Ok(f) = s.parse::<f64>() {
@@ -75,7 +75,7 @@ pub fn fix_single_arg_recursive(value: &mut Value, schema: &Value) {
             }
         }
         "boolean" => {
-            // 字符串 → 布尔
+            // string → boolean
             if let Some(s) = value.as_str() {
                 match s.to_lowercase().as_str() {
                     "true" | "1" | "yes" | "on" => *value = Value::Bool(true),
@@ -83,7 +83,7 @@ pub fn fix_single_arg_recursive(value: &mut Value, schema: &Value) {
                     _ => {}
                 }
             } else if let Some(n) = value.as_i64() {
-                // 数字 1/0 -> 布尔
+                // Number 1/0 -> Boolean
                 if n == 1 {
                     *value = Value::Bool(true);
                 } else if n == 0 {
@@ -92,7 +92,7 @@ pub fn fix_single_arg_recursive(value: &mut Value, schema: &Value) {
             }
         }
         "string" => {
-            // 非字符串 → 字符串 (防止客户端误传数字给文本字段)
+            // non-string → string (to prevent clients from mis-passing numbers to text fields)
             if !value.is_string() && !value.is_null() && !value.is_object() && !value.is_array() {
                 *value = Value::String(value.to_string());
             }

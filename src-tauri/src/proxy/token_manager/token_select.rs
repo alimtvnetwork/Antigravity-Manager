@@ -1,4 +1,4 @@
-//! Token 选择：P2C 算法、粘性会话调度、乐观重置。
+//! Token selection: P2C algorithm, sticky session scheduling, optimistic reset.
 
 use super::ProxyToken;
 use super::TokenManager;
@@ -6,15 +6,15 @@ use crate::proxy::sticky_config::SchedulingMode;
 use std::collections::HashSet;
 
 impl TokenManager {
-    /// Power of 2 Choices (P2C) 选择算法
-    /// 从前 5 个候选中随机选 2 个，选择配额更高的 -> 避免热点
-    /// 返回选中的索引
+    /// Power of 2 Choices (P2C) selection algorithm
+    /// Randomly select 2 from the top 5 candidates, choose the one with higher quota -> avoid hotspots
+    /// Return selected index
     ///
-    /// # 参数
-    /// * `candidates` - 已排序的候选 token 列表
-    /// * `attempted` - 已尝试失败的账号 ID 集合
-    /// * `normalized_target` - 归一化后的目标模型名
-    /// * `quota_protection_enabled` - 是否启用配额保护
+    /// # Parameters
+    /// * `candidates` - sorted list of candidate tokens
+    /// * `attempted` - a collection of account IDs that have failed to be attempted
+    /// * `normalized_target` - normalized target model name
+    /// * `quota_protection_enabled` - whether to enable quota protection
     pub(crate) fn select_with_p2c<'a>(
         &self,
         candidates: &'a [ProxyToken],
@@ -24,7 +24,7 @@ impl TokenManager {
     ) -> Option<&'a ProxyToken> {
         use rand::Rng;
 
-        // 过滤可用 token
+        // Filter available tokens
         let mut available: Vec<&ProxyToken> = candidates
             .iter()
             .filter(|t| !attempted.contains(&t.account_id))
@@ -40,13 +40,13 @@ impl TokenManager {
             return Some(available[0]);
         }
 
-        // P2C: 从前 min(P2C_POOL_SIZE, len) 个中随机选 2 个
+        // P2C: randomly select 2 from the previous min(P2C_POOL_SIZE, len)
         let pool_size = available.len().min(Self::P2C_POOL_SIZE);
         let mut rng = rand::thread_rng();
 
         let pick1 = rng.gen_range(0..pool_size);
         let pick2 = rng.gen_range(0..pool_size);
-        // 确保选择不同的两个候选
+        // Make sure to select two different candidates
         let pick2 = if pick2 == pick1 {
             (pick1 + 1) % pool_size
         } else {
@@ -56,7 +56,7 @@ impl TokenManager {
         let c1 = available[pick1];
         let c2 = available[pick2];
 
-        // 选择配额更高的
+        // Choose one with a higher quota
         let selected = if c1.remaining_quota.unwrap_or(0) >= c2.remaining_quota.unwrap_or(0) {
             c1
         } else {
@@ -76,7 +76,7 @@ impl TokenManager {
         Some(selected)
     }
 
-    /// 粘性会话与智能调度逻辑：从候选账号中选择目标 Token，并固化粘性会话绑定。
+    /// Sticky session and intelligent scheduling logic: select the target token from the candidate account and solidify the sticky session binding.
     pub(crate) async fn select_target_token(
         &self,
         tokens_snapshot: &[ProxyToken],
@@ -91,34 +91,34 @@ impl TokenManager {
         last_used_account_id: &Option<(String, std::time::Instant)>,
         need_update_last_used: &mut Option<(String, std::time::Instant)>,
     ) -> Option<ProxyToken> {
-        // ===== 【核心】粘性会话与智能调度逻辑 =====
+        // ===== [Core] Sticky session and intelligent scheduling logic =====
         let mut target_token: Option<ProxyToken> = None;
 
-        // 归一化目标模型名为标准 ID，用于配额保护检查
+        // Normalized target model named Standard ID, used for quota protection checks
         let normalized_target =
             crate::proxy::common::model_mapping::normalize_to_standard_id(target_model)
                 .unwrap_or_else(|| target_model.to_string());
 
-        // 模式 A: 粘性会话处理 (CacheFirst 或 Balance 且有 session_id)
+        // Mode A: Sticky session handling (CacheFirst or Balance with session_id)
         if !rotate && session_id.is_some() && scheduling_mode != SchedulingMode::PerformanceFirst {
             let sid = session_id.unwrap();
 
-            // 1. 检查会话是否已绑定账号
+            // 1. Check whether the session has been bound to an account
             if let Some(bound_id) = self.session_accounts.get(sid).map(|v| v.clone()) {
-                // 【修复】先通过 account_id 找到对应的账号，获取其 email
-                // 2. 转换 email -> account_id 检查绑定的账号是否限流
+                // [Fix] First find the corresponding account through account_id and get its email
+                // 2. Convert email -> account_id to check whether the bound account is restricted.
                 if let Some(bound_token) = tokens_snapshot.iter().find(|t| t.account_id == bound_id)
                 {
                     let key = self
                         .email_to_account_id(&bound_token.email)
                         .unwrap_or_else(|| bound_token.account_id.clone());
-                    // [FIX] 传入目标模型标准化 ID，检查该模型是否已被熔断器精准锁定
+                    // [FIX] Pass in the standardized ID of the target model and check whether the model has been accurately locked by the circuit breaker.
                     let reset_sec = self
                         .rate_limit_tracker
                         .get_remaining_wait(&key, Some(&normalized_target));
                     if reset_sec > 0 {
-                        // 【修复 Issue #284】立即解绑并切换账号，不再阻塞等待
-                        // 原因：阻塞等待会导致并发请求时客户端 socket 超时 (UND_ERR_SOCKET)
+                        // [Fix Issue #284] Immediately unbind and switch accounts, no longer blocked and waiting
+                        // Reason: Blocking and waiting will cause the client socket to time out (UND_ERR_SOCKET) during concurrent requests.
                         tracing::debug!(
                                 "Sticky Session: Bound account {} is rate-limited for {} ({}s), unbinding and switching.",
                                 bound_token.email, normalized_target, reset_sec
@@ -128,7 +128,7 @@ impl TokenManager {
                         && !(quota_protection_enabled
                             && bound_token.protected_models.contains(&normalized_target))
                     {
-                        // 3. 账号可用且未被标记为尝试失败，优先复用
+                        // 3. The account is available and has not been marked as a failed attempt, and will be reused first.
                         tracing::info!(
                             "Sticky Session: Successfully reusing bound account {} for session {}",
                             bound_token.email,
@@ -143,12 +143,12 @@ impl TokenManager {
                         tracing::debug!("Sticky Session: Bound account {} is quota-protected for model {} [{}], unbinding and switching.", bound_token.email, normalized_target, target_model);
                         self.session_accounts.remove(sid);
                     } else if attempted.contains(&bound_id) {
-                        // [FIX] 绑定的账号在当前轮次请求中已尝试失败，立即解绑避免死锁
+                        // [FIX] The bound account has failed in the current round of requests. Unbind it immediately to avoid deadlock.
                         tracing::debug!("Sticky Session: Bound account {} already attempted in current request, unbinding", bound_token.email);
                         self.session_accounts.remove(sid);
                     }
                 } else {
-                    // 绑定的账号已不存在（可能被删除），解绑
+                    // The bound account no longer exists (may be deleted), unbind
                     tracing::debug!(
                         "Sticky Session: Bound account not found for session {}, unbinding",
                         sid
@@ -158,22 +158,22 @@ impl TokenManager {
             }
         }
 
-        // 模式 B: 原子化 60s 全局锁定 (针对无 session_id 情况的默认保护)
-        // 【修复】性能优先模式应跳过 60s 锁定；
+        // Mode B: Atomic 60s global lock (default protection for no session_id)
+        // [Fix] Performance priority mode should skip 60s lock;
         if target_token.is_none()
             && !rotate
             && quota_group != "image_gen"
             && scheduling_mode != SchedulingMode::PerformanceFirst
         {
-            // 仅针对无 session_id 的无状态请求，使用 60s 全局锁定保底避免轮换
+            // Only for stateless requests without session_id, use a 60s global lock guarantee to avoid rotation
             if session_id.is_none() {
                 if let Some((account_id, last_time)) = &last_used_account_id {
-                    // [FIX #3] 60s 锁定逻辑应检查 `attempted` 集合，避免重复尝试失败的账号
+                    // [FIX #3] 60s lock logic should check the `attempted` set to avoid repeated attempts on failed accounts
                     if last_time.elapsed().as_secs() < 60 && !attempted.contains(account_id) {
                         if let Some(found) =
                             tokens_snapshot.iter().find(|t| &t.account_id == account_id)
                         {
-                            // 【修复】检查限流状态和配额保护，避免复用已被锁定的账号
+                            // [Fix] Check current limit status and quota protection to avoid reusing locked accounts
                             if !self
                                 .is_rate_limited(&found.account_id, Some(&normalized_target))
                                 .await
@@ -205,9 +205,9 @@ impl TokenManager {
                 }
             }
 
-            // 若无锁定或带有 session_id（会话首次分配），使用 P2C 均衡选择账号
+            // If there is no lock or with session_id (session first assigned), use P2C balancing to select the account
             if target_token.is_none() {
-                // 先过滤出未限流的账号
+                // First filter out the accounts with no current limit
                 let mut non_limited: Vec<ProxyToken> = Vec::new();
                 for t in tokens_snapshot {
                     if !self
@@ -230,10 +230,10 @@ impl TokenManager {
                 }
             }
         } else if target_token.is_none() {
-            // 模式 C: P2C 选择 (替代纯轮询)
+            // Mode C: P2C selection (alternative to pure polling)
             tracing::debug!("🔄 [Mode C] P2C selection from {} candidates", total);
 
-            // 先过滤出未限流的账号
+            // First filter out the accounts with no current limit
             let mut non_limited: Vec<ProxyToken> = Vec::new();
             for t in tokens_snapshot {
                 if !self
@@ -259,7 +259,7 @@ impl TokenManager {
             }
         }
 
-        // 【核心固化】凡解析出可用账号且当前为粘性会话调度，确保立即固化绑定，防止轮换或会话漂移
+        // [Core Solidification] If available accounts are parsed and are currently scheduled for sticky sessions, ensure that the binding is immediately solidified to prevent rotation or session drift.
         if let Some(ref selected) = target_token {
             if let Some(sid) = session_id {
                 if scheduling_mode != SchedulingMode::PerformanceFirst && !rotate {
@@ -276,7 +276,7 @@ impl TokenManager {
         target_token
     }
 
-    /// 乐观重置策略（双层防护）：从候选 Token 解析出最终可用的 Token。
+    /// Optimistic reset strategy (double-layer protection): parse the final available Token from the candidate Token.
     pub(crate) async fn resolve_token_with_optimistic_reset(
         &self,
         target_token: Option<ProxyToken>,
@@ -288,8 +288,8 @@ impl TokenManager {
         match target_token {
             Some(t) => Ok(t),
             None => {
-                // 乐观重置策略: 双层防护机制
-                // 计算最短等待时间
+                // Optimistic reset strategy: two-layer protection mechanism
+                // Calculate the minimum waiting time
                 let min_wait = tokens_snapshot
                     .iter()
                     .filter_map(|t| {
@@ -304,7 +304,7 @@ impl TokenManager {
                     })
                     .min();
 
-                // Layer 1: 如果最短等待时间 <= 2秒,执行缓冲延迟
+                // Layer 1: If the minimum waiting time <= 2 seconds, execute buffer delay
                 if let Some(wait_sec) = min_wait {
                     if wait_sec <= 2 {
                         let wait_ms = (wait_sec as f64 * 1000.0) as u64;
@@ -313,10 +313,10 @@ impl TokenManager {
                                 wait_sec, wait_ms
                             );
 
-                        // 缓冲延迟
+                        // buffer delay
                         tokio::time::sleep(tokio::time::Duration::from_millis(wait_ms)).await;
 
-                        // 重新尝试选择账号
+                        // Try selecting an account again
                         let mut retry_token = None;
                         for token in tokens_snapshot {
                             if attempted.contains(&token.account_id)
@@ -339,16 +339,16 @@ impl TokenManager {
                             );
                             Ok(t.clone())
                         } else {
-                            // Layer 2: 缓冲后仍无可用账号,执行乐观重置
+                            // Layer 2: There is still no available account after buffering, perform optimistic reset
                             tracing::warn!(
                                     "Buffer delay failed. Executing optimistic reset for all {} accounts...",
                                     tokens_snapshot.len()
                                 );
 
-                            // 清除所有限流记录
+                            // Clear all throttling records
                             self.rate_limit_tracker.clear_for_optimistic_reset();
 
-                            // 再次尝试选择账号 (必须重新校验剩余限流状态，严禁放行周配额耗尽等长锁定账号)
+                            // Try to select the account again (the remaining current limit status must be re-verified, and it is strictly prohibited to lock the account for as long as the weekly quota is exhausted)
                             let final_token = tokens_snapshot.iter().find(|t| {
                                 !attempted.contains(&t.account_id)
                                     && !self

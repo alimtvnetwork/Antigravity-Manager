@@ -1,12 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&family=Ubuntu+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&family=Ubuntu+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* Ubuntu font for sleek, modern headings */
-h1, h2, h3, h4, .font-heading {
+h1, h2, h3, h4, .font-heading, .font-ubuntu {
   font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+/* Poppins for body, inputs, badges, and prompt display text */
+body, input, textarea, button, select, .font-poppins {
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
 }
 
 /* Override dark background utilities so enabled switches remain distinct. */
@@ -95,6 +100,24 @@ input[type="range"] {
   transition-property: none;
 }
 
+/* Exempt interactive buttons from universal 250ms transition delay for instant tactile response */
+button,
+[role="button"],
+.btn {
+  transition-duration: 100ms;
+}
+
+/* Tactile button interaction with micro-scale physics */
+.btn-tactile {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 100ms;
+}
+
+.btn-tactile:active:not(:disabled) {
+  transform: translateY(1px) scale(0.985);
+}
+
 /* 禁止过度滚动和橡皮筋效果 */
 html,
 body {
@@ -133,7 +156,7 @@ body,
 /* 全局样式 */
 body {
   margin: 0;
-  font-family: 'Ubuntu', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -448,13 +471,194 @@ html.palette-vscode-navy-gold {
 html[class*="palette-"] .dark\:bg-base-100,
 html[class*="palette-"] .dark\:bg-base-200,
 html[class*="palette-"] .dark\:bg-\[\#171025\],
+html[class*="palette-"] .dark\:bg-\[\#120a1f\],
+html[class*="palette-"] .dark\:bg-\[\#1a1228\],
 html[class*="palette-"] .dark\:bg-\[\#090611\],
 html[class*="palette-"] .dark\:bg-\[\#0a1e30\],
 html[class*="palette-"] .dark\:bg-\[\#081826\] {
   background-color: var(--surface) !important;
 }
 
+/* ==========================================================================
+   One Dark Pro Theme Overrides:
+   Remap legacy purple tones (#120a1f, #171025, #40285e, #1a1228) to One Dark
+   Pro charcoal colors (#21252b, #282c34, #181a1f, #3a3f4b).
+   ========================================================================== */
+.theme-onedarkpro,
+html.palette-one-dark,
+[data-theme="onedarkpro"] {
+  --app-bg: #21252b;
+  --app-surface: #282c34;
+  --app-border: #3a3f4b;
+}
+
+.theme-onedarkpro .dark\:bg-\[\#120a1f\],
+.theme-onedarkpro .dark\:bg-\[\#171025\],
+.theme-onedarkpro .dark\:bg-\[\#1a1228\],
+html.palette-one-dark .dark\:bg-\[\#120a1f\],
+html.palette-one-dark .dark\:bg-\[\#171025\],
+html.palette-one-dark .dark\:bg-\[\#1a1228\],
+[data-theme="onedarkpro"] .dark\:bg-\[\#120a1f\],
+[data-theme="onedarkpro"] .dark\:bg-\[\#171025\],
+[data-theme="onedarkpro"] .dark\:bg-\[\#1a1228\] {
+  background-color: #282c34 !important;
+}
+
+.theme-onedarkpro .dark\:bg-\[\#090611\],
+html.palette-one-dark .dark\:bg-\[\#090611\],
+[data-theme="onedarkpro"] .dark\:bg-\[\#090611\] {
+  background-color: #21252b !important;
+}
+
+.theme-onedarkpro .dark\:border-\[\#40285e\],
+.theme-onedarkpro .dark\:border-\[\#40285e\]\/60,
+.theme-onedarkpro .dark\:border-\[\#40285e\]\/80,
+.theme-onedarkpro .dark\:divide-\[\#40285e\],
+html.palette-one-dark .dark\:border-\[\#40285e\],
+html.palette-one-dark .dark\:border-\[\#40285e\]\/60,
+html.palette-one-dark .dark\:border-\[\#40285e\]\/80,
+html.palette-one-dark .dark\:divide-\[\#40285e\],
+[data-theme="onedarkpro"] .dark\:border-\[\#40285e\],
+[data-theme="onedarkpro"] .dark\:border-\[\#40285e\]\/60,
+[data-theme="onedarkpro"] .dark\:border-\[\#40285e\]\/80,
+[data-theme="onedarkpro"] .dark\:divide-\[\#40285e\] {
+  border-color: #3a3f4b !important;
+}
+
+.theme-onedarkpro .dark\:hover\:bg-\[\#40285e\],
+.theme-onedarkpro .dark\:hover\:bg-\[\#40285e\]\/60,
+html.palette-one-dark .dark\:hover\:bg-\[\#40285e\],
+html.palette-one-dark .dark\:hover\:bg-\[\#40285e\]\/60,
+[data-theme="onedarkpro"] .dark\:hover\:bg-\[\#40285e\],
+[data-theme="onedarkpro"] .dark\:hover\:bg-\[\#40285e\]\/60 {
+  background-color: #3a3f4b !important;
+}
+
 /* Emerald liveness glow for active running indicators (#1af18d) */
 .emerald-liveness-glow {
   box-shadow: 0 0 6px rgba(26, 241, 141, 0.8), 0 0 2px rgba(26, 241, 141, 0.95);
+}
+
+/* --------------------------------------------------------------------------
+   Hover shade (color / shadow / filter only — never translate position)
+   -------------------------------------------------------------------------- */
+.agm-hover-shade {
+  --agm-wash-ring: rgb(124 58 237 / 0.46);
+  --agm-wash-glow: rgb(124 58 237 / 0.34);
+  --agm-wash-bloom: rgb(168 85 247 / 0.28);
+  --agm-wash-inset: rgb(124 58 237 / 0.12);
+  --agm-wash-sheen: rgb(232 121 249 / 0.3);
+  --agm-wash-mint: rgb(49 201 164 / 0.08);
+  --agm-wash-veil:
+    linear-gradient(
+      128deg,
+      rgb(124 58 237 / 0.14) 0%,
+      rgb(168 85 247 / 0.08) 46%,
+      rgb(49 201 164 / 0.07) 100%
+    );
+  isolation: isolate;
+  position: relative;
+  transform: none;
+  transition:
+    background-color 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    filter 300ms cubic-bezier(0.4, 0, 0.2, 1),
+    color 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dark .agm-hover-shade {
+  --agm-wash-ring: rgb(168 85 247 / 0.58);
+  --agm-wash-glow: rgb(124 58 237 / 0.5);
+  --agm-wash-bloom: rgb(232 121 249 / 0.32);
+  --agm-wash-inset: rgb(124 58 237 / 0.2);
+  --agm-wash-sheen: rgb(232 121 249 / 0.42);
+  --agm-wash-mint: rgb(49 201 164 / 0.12);
+  --agm-wash-veil:
+    linear-gradient(
+      128deg,
+      rgb(124 58 237 / 0.22) 0%,
+      rgb(168 85 247 / 0.12) 48%,
+      rgb(49 201 164 / 0.1) 100%
+    );
+}
+
+@keyframes agm-hover-wash {
+  0% {
+    box-shadow:
+      inset 0 0 0 0 rgb(124 58 237 / 0),
+      inset 0 1px 0 0 rgb(232 121 249 / 0),
+      inset 0 -10px 18px -12px rgb(49 201 164 / 0),
+      0 0 0 0 rgb(124 58 237 / 0),
+      0 0 0 0 rgb(168 85 247 / 0),
+      0 4px 14px -10px rgb(9 6 17 / 0.22);
+    filter: brightness(1) saturate(1) contrast(1);
+  }
+  42% {
+    box-shadow:
+      inset 0 0 26px 0 rgb(124 58 237 / 0.07),
+      inset 0 1px 0 0 rgb(232 121 249 / 0.18),
+      inset 0 -10px 20px -12px rgb(49 201 164 / 0.05),
+      0 0 0 1px rgb(168 85 247 / 0.22),
+      0 0 16px -6px rgb(124 58 237 / 0.2),
+      0 8px 22px -12px rgb(124 58 237 / 0.28);
+    filter: brightness(1.05) saturate(1.1) contrast(1.03);
+  }
+  100% {
+    box-shadow:
+      inset 0 0 42px 2px var(--agm-wash-inset),
+      inset 0 1px 0 0 var(--agm-wash-sheen),
+      inset 0 -14px 26px -10px var(--agm-wash-mint),
+      0 0 0 1px var(--agm-wash-ring),
+      0 0 24px -4px var(--agm-wash-bloom),
+      0 12px 32px -12px var(--agm-wash-glow);
+    filter: brightness(1.09) saturate(1.16) contrast(1.04);
+  }
+}
+
+.agm-hover-shade::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: var(--agm-wash-veil);
+  opacity: 0;
+  transition: opacity 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.agm-hover-shade:hover {
+  animation: agm-hover-wash 300ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  transform: none;
+}
+
+.agm-hover-shade:hover::before {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agm-hover-shade:hover {
+    animation: none;
+    box-shadow:
+      inset 0 0 42px 2px var(--agm-wash-inset),
+      inset 0 1px 0 0 var(--agm-wash-sheen),
+      inset 0 -14px 26px -10px var(--agm-wash-mint),
+      0 0 0 1px var(--agm-wash-ring),
+      0 0 24px -4px var(--agm-wash-bloom),
+      0 12px 32px -12px var(--agm-wash-glow);
+    filter: brightness(1.09) saturate(1.16) contrast(1.04);
+    transform: none;
+  }
+
+  .agm-hover-shade::before,
+  .agm-hover-shade:hover::before {
+    transition: none;
+  }
+}
+
+/* Amber / yellow hover surfaces must keep black text for contrast */
+button:hover[class*="from-[#FDE047]"],
+button:hover[class*="from-\\[\\#FDE047\\]"],
+.agm-hover-amber:hover {
+  color: #090611 !important;
 }

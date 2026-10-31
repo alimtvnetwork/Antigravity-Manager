@@ -46,6 +46,39 @@ async fn dispatch_post_switch_prompt_telemetry(
     } else {
         "Antigravity-Manager".to_string()
     };
+    let meaningful_projects: Vec<String> = {
+        let filtered: Vec<String> = deduped
+            .iter()
+            .filter(|p| {
+                !p.eq_ignore_ascii_case("unnamed-project")
+                    && !p.eq_ignore_ascii_case("project")
+                    && !p.trim().is_empty()
+            })
+            .cloned()
+            .collect();
+        if filtered.is_empty() {
+            deduped
+        } else {
+            filtered
+        }
+    };
+    let total_projects = meaningful_projects.len();
+    let projects_formatted = if total_projects == 0 {
+        "<b>Antigravity-Manager</b>".to_string()
+    } else if total_projects <= 3 {
+        meaningful_projects
+            .iter()
+            .map(|p| format!("<b>{}</b>", escape_telegram_html(p)))
+            .collect::<Vec<_>>()
+            .join(", ")
+    } else {
+        let top3 = meaningful_projects[..3]
+            .iter()
+            .map(|p| format!("<b>{}</b>", escape_telegram_html(p)))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("{} <i>(+{} more)</i>", top3, total_projects - 3)
+    };
 
     let is_emergency = verified_running == 0 && backed_up_count > 0;
 
@@ -53,12 +86,20 @@ async fn dispatch_post_switch_prompt_telemetry(
     if let Ok(config) = telegram_inbound::load_config() {
         if config.is_enabled && !config.bot_token.trim().is_empty() {
             if let Some(chat_id) = config.allowed_chat_id {
-                let telemetry_header = format!(
-                    "🖥️ <b>Machine:</b> <code>{}</code> (<code>{}</code>) | 🏷️ <b>Instance:</b> <code>{}</code>",
-                    escape_telegram_html(&m_name),
-                    escape_telegram_html(&m_ip),
-                    escape_telegram_html(instance_id)
-                );
+                let node_line = if !m_ip.is_empty() && m_ip != "127.0.0.1" && m_ip != "Unknown IP" {
+                    format!(
+                        "🖥️ <b>Machine:</b> <b>{}</b> [<code>{}</code>]\n🏷️ <b>Instance:</b> <b>{}</b>",
+                        escape_telegram_html(&m_name),
+                        escape_telegram_html(&m_ip),
+                        escape_telegram_html(instance_id)
+                    )
+                } else {
+                    format!(
+                        "🖥️ <b>Machine:</b> <b>{}</b>\n🏷️ <b>Instance:</b> <b>{}</b>",
+                        escape_telegram_html(&m_name),
+                        escape_telegram_html(instance_id)
+                    )
+                };
 
                 // Look up active running or backed up prompt preview for this instance
                 let (prompt_preview_text, prompt_words_count, full_prompt_content, detected_images) =
@@ -126,88 +167,81 @@ async fn dispatch_post_switch_prompt_telemetry(
                         palette,
                         "Prompts failed to resume",
                         &[
-                            telegram_inbound::kv(
+                            telegram_inbound::kv_block(
                                 palette,
                                 "Backed up prompts",
-                                &backed_up_count.to_string(),
+                                &format!("<b>{}</b>", backed_up_count),
                             ),
-                            telegram_inbound::kv(
+                            telegram_inbound::kv_block(
                                 palette,
                                 "Restored records",
-                                &restored_count.to_string(),
+                                &format!("<b>{}</b>", restored_count),
                             ),
-                            telegram_inbound::kv(
+                            telegram_inbound::kv_block(
                                 palette,
                                 "Verified running",
-                                "0 — none detected",
+                                "<b>0 — none detected</b>",
                             ),
-                            telegram_inbound::kv(
+                            telegram_inbound::kv_block(
                                 palette,
-                                "Projects",
-                                &escape_telegram_html(&projects_display),
-                            ),
-                            telegram_inbound::kv(
-                                palette,
-                                "Version",
-                                &format!(
-                                    "{} · {}",
-                                    escape_telegram_html(&pkg_ver),
-                                    escape_telegram_html(&now_str)
-                                ),
-                            ),
-                            telegram_inbound::sub_line(
-                                palette,
-                                "Run <code>agm prompts status</code> or <code>agm prompts restore</code>",
+                                &format!("Active projects ({})", total_projects),
+                                &projects_formatted,
                             ),
                         ],
                     );
                     format!(
-                        "{} <b>Antigravity Manager · Emergency</b>\n{}\n{}\n{}\n{}{}{}{}",
+                        "{} <b>Antigravity Manager · Emergency</b>\n\
+                        {}\n\
+                        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+                        {}\
+                        {}\
+                        {}\n\
+                        <i>{} Antigravity Manager {} · {}</i>",
                         palette.mark,
-                        palette.rule,
-                        telemetry_header,
-                        palette.rule,
+                        node_line,
                         body,
                         attached_images_section,
                         prompt_section,
-                        telegram_inbound::theme_footer(palette)
+                        palette.mark,
+                        escape_telegram_html(&pkg_ver),
+                        palette.label
                     )
                 } else {
                     let body = telegram_inbound::section(
                         palette,
                         "Execution status",
                         &[
-                            telegram_inbound::kv(
+                            telegram_inbound::kv_block(
                                 palette,
                                 "Verified running",
-                                &format!("{} of {} backed up", verified_running, backed_up_count),
-                            ),
-                            telegram_inbound::kv(
-                                palette,
-                                "Active projects",
-                                &escape_telegram_html(&projects_display),
-                            ),
-                            telegram_inbound::kv(
-                                palette,
-                                "Version",
                                 &format!(
-                                    "{} · {}",
-                                    escape_telegram_html(&pkg_ver),
-                                    escape_telegram_html(&now_str)
+                                    "<b>{} of {}</b> backed up",
+                                    verified_running, backed_up_count
                                 ),
+                            ),
+                            telegram_inbound::kv_block(
+                                palette,
+                                &format!("Active projects ({})", total_projects),
+                                &projects_formatted,
                             ),
                         ],
                     );
                     format!(
-                        "{} <b>Antigravity Manager · Post-switch liveness</b>\n{}\n{}\n{}\n{}{}{}{}",
+                        "{} <b>Antigravity Manager · Post-switch liveness</b>\n\
+                        {}\n\
+                        ━━━━━━━━━━━━━━━━━━━━━━━━\n\
+                        {}\
+                        {}\
+                        {}\n\
+                        <i>{} Antigravity Manager {} · {}</i>",
                         palette.mark,
-                        palette.rule,
-                        telemetry_header,
-                        palette.rule,
+                        node_line,
                         body,
                         attached_images_section,
                         prompt_section,
-                        telegram_inbound::theme_footer(palette)
+                        palette.mark,
+                        escape_telegram_html(&pkg_ver),
+                        palette.label
                     )
                 };
 

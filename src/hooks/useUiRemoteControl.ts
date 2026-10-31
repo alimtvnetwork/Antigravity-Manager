@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { listen } from '@tauri-apps/api/event';
 import { useErrorStore } from '../stores/error-store';
+import { logUiTrace } from '../utils/uiLogger';
 
 interface UiNavigatePayload {
     route: string;
@@ -62,10 +63,13 @@ export function useUiRemoteControl() {
                     await listen<UiElementActionPayload>('agm://ui-click', (event) => {
                         const id = event.payload?.element_id?.trim();
                         if (!id) return;
+                        const escapedId = id.replace(/"/g, '\\"');
                         const el =
                             document.getElementById(id) ||
-                            (document.querySelector(`[title="${id.replace(/"/g, '\\"')}"]`) as HTMLElement | null) ||
-                            (document.querySelector(`[data-testid="${id.replace(/"/g, '\\"')}"]`) as HTMLElement | null);
+                            (document.querySelector(`[data-ui-id="${escapedId}"]`) as HTMLElement | null) ||
+                            (document.querySelector(`[data-ui-name="${escapedId}"]`) as HTMLElement | null) ||
+                            (document.querySelector(`[data-testid="${escapedId}"]`) as HTMLElement | null) ||
+                            (document.querySelector(`[title="${escapedId}"]`) as HTMLElement | null);
                         if (!el) {
                             useErrorStore.getState().trackWarning(
                                 new Error(`agm://ui-click target #${id} not found in the live DOM`),
@@ -76,6 +80,7 @@ export function useUiRemoteControl() {
                             );
                             return;
                         }
+                        logUiTrace({ step: 'remote_control', action: 'cli_click', target: id });
                         // Same code path as a user click: the audit recorder
                         // logs it with actor=cli on the backend side.
                         el.click();
@@ -92,8 +97,11 @@ export function useUiRemoteControl() {
             for (const unlisten of unlistens) {
                 try {
                     unlisten();
-                } catch {
-                    /* best-effort unsubscribe */
+                } catch (e) {
+                    useErrorStore.getState().trackWarning(e, {
+                        source: 'useUiRemoteControl.cleanup',
+                        triggerAction: 'unsubscribe',
+                    });
                 }
             }
         };

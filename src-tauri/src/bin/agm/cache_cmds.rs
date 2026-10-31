@@ -266,22 +266,28 @@ pub(crate) fn cmd_logs(args: &[String]) {
         .any(|a| a == "--help" || a == "-h" || a == "help")
     {
         println!("AGM System Logs Viewer:");
-        println!("  agm logs [-n <lines>] [-f <filter>]");
+        println!("  agm logs [-n <lines>] [-f <filter>] [-a|--all]");
         println!("\nDescription:");
         println!("  Streams and filters runtime diagnostic logs from the AGM background service.");
+        println!("  By default, noisy background telemetry (HEARTBEAT, TOKEN_USAGE, TELEMETRY) is filtered out.");
         println!("\nAliases: agm logs, agm log");
         println!("\nOptions:");
         println!("    -n, --tail <N>      Number of log lines to show (default: 25)");
         println!("    -f, --filter <str>  Filter log output by substring");
+        println!("    -a, --all           Include noisy background telemetry");
         println!("\nExamples:");
-        println!("  agm logs                            # Display the last 25 log lines");
+        println!("  agm logs                            # Display the last 25 clean log lines");
         println!("  agm logs -n 50                      # View last 50 lines");
         println!("  agm logs -f \"AutoSwitcher\"          # Filter logs matching 'AutoSwitcher'");
+        println!("  agm logs --all                      # Include background heartbeat and token telemetry");
         return;
     }
 
     let mut tail = 25;
     let mut filter: Option<String> = None;
+    let include_telemetry = args
+        .iter()
+        .any(|a| a == "--all" || a == "-a" || a == "--telemetry" || a == "--no-filter");
 
     let mut i = 0;
     while i < args.len() {
@@ -332,6 +338,11 @@ pub(crate) fn cmd_logs(args: &[String]) {
     let mut matched_lines = Vec::new();
 
     for line in reader.lines().map_while(Result::ok) {
+        if !include_telemetry
+            && antigravity_tools_lib::modules::logger::is_noisy_system_telemetry(&line)
+        {
+            continue;
+        }
         if let Some(ref kw) = filter {
             if !line.to_lowercase().contains(&kw.to_lowercase()) {
                 continue;

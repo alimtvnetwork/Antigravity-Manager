@@ -16,7 +16,8 @@ import { maskEmail } from '../../utils/maskEmail';
 import { Gemini } from '@lobehub/icons';
 import { TierBadge } from '../../components/common/TierBadge';
 import { QuotaProgressBar } from '../../components/accounts/QuotaProgressBar';
-import { SELECTED_CARD_CLASSES, ACTIVE_PILL_CLASSES } from '../../components/common/selectedState';
+import { DEFAULT_LATEST_MODEL_LABEL, getModelDisplayName } from '../../config/modelConfig';
+import { SELECTED_CARD_CLASSES } from '../../components/common/selectedState';
 import { showToast } from '../../components/common/ToastContainer';
 import type { InstanceStatus } from '../../services/instanceService';
 import { truncatePath, getActionLabel, type InstanceTheme } from './instancePageUtils';
@@ -24,6 +25,86 @@ import { useInstanceCardData } from './instanceCardData';
 import type { InstancePageApi } from './instancePageTypes';
 import { InstanceCardProjects } from './InstanceCardProjects';
 import { InstanceCardActions } from './InstanceCardActions';
+import { ResumeIndicatorBadge } from '../../components/instances/InstanceCard/InstanceCardHeader';
+
+interface InstanceCardQuotaSectionProps {
+    geminiModel: any;
+    weeklyQuota: any;
+    boundAccount: any;
+    onRefreshQuota: (accountId: string) => void;
+}
+
+function InstanceCardQuotaSection({
+    geminiModel,
+    weeklyQuota,
+    boundAccount,
+    onRefreshQuota,
+}: InstanceCardQuotaSectionProps) {
+    if (geminiModel || weeklyQuota) {
+        return (
+            <div className="p-2 rounded-md bg-slate-50 dark:bg-[#120b1e] border border-slate-200/80 dark:border-[#40285e]/60 space-y-1.5">
+                {geminiModel && (
+                    <div className="space-y-0.5">
+                        <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <Gemini.Color className="w-3.5 h-3.5 shrink-0" />
+                                <span className="font-semibold text-gray-800 dark:text-gray-200 text-xs truncate">
+                                    {geminiModel.display_name || (geminiModel.name ? getModelDisplayName(geminiModel) : DEFAULT_LATEST_MODEL_LABEL)} (4H)
+                                </span>
+                            </div>
+                        </div>
+                        <QuotaProgressBar
+                            percentage={geminiModel.percentage}
+                            resetTime={geminiModel.reset_time}
+                        />
+                    </div>
+                )}
+                {weeklyQuota && (
+                    <div className={cn('space-y-0.5', geminiModel && 'pt-1 border-t border-slate-200/80 dark:border-[#40285e]/60')}>
+                        <div className="flex items-center justify-between text-xs">
+                            <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300">
+                                Weekly Quota
+                            </span>
+                        </div>
+                        <QuotaProgressBar
+                            isWeekly
+                            percentage={weeklyQuota.percentage}
+                            resetTime={weeklyQuota.resetTime}
+                        />
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    if (boundAccount) {
+        return (
+            <div className="p-2 rounded-md bg-slate-50 dark:bg-[#120b1e] border border-slate-200/80 dark:border-[#40285e]/60 flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center gap-1.5">
+                    <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                    <span className="text-[11px] text-gray-500 dark:text-gray-400">Quota not synced</span>
+                </div>
+                <button
+                    onClick={() => onRefreshQuota(boundAccount.id)}
+                    className="text-blue-600 dark:text-blue-400 hover:underline gap-1 text-[11px] cursor-pointer flex items-center"
+                >
+                    <ArrowLeftRight className="w-3 h-3 text-blue-500" />
+                    <span>Sync</span>
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="p-2 rounded-md bg-slate-50/60 dark:bg-[#120b1e]/60 border border-dashed border-slate-200/80 dark:border-[#40285e]/60 flex items-center justify-between text-xs text-gray-400">
+            <div className="flex items-center gap-1.5">
+                <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-40 grayscale" />
+                <span className="text-[10px] italic">No profile bound</span>
+            </div>
+            <span className="text-[10px] text-gray-400/80">Launch to assign</span>
+        </div>
+    );
+}
 
 export interface InstanceCardProps {
     api: InstancePageApi;
@@ -51,6 +132,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
         openPromptTree,
         handleDelete,
         refreshQuota,
+        resumeIndicator,
     } = api;
 
     const [isEmailRevealed, setIsEmailRevealed] = useState(false);
@@ -80,12 +162,13 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
     return (
         <div
             key={inst.config.id}
+            id={`instance-card-${inst.config.id}`}
             ref={isActive ? activeCardRef : undefined}
             className={cn(
-                'group relative rounded-[5px] border transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-lg flex flex-col justify-between overflow-hidden backdrop-blur-xs',
+                'agm-hover-shade group relative rounded-[5px] border flex flex-col justify-between overflow-hidden backdrop-blur-xs',
                 isActive
                     ? SELECTED_CARD_CLASSES
-                    : 'bg-white dark:bg-[var(--ui-surface-1)] border-gray-200/50 dark:border-[var(--ui-border-subtle)] hover:border-gray-300/80 dark:hover:border-[var(--ui-interactive-40)] hover:bg-slate-50/90 dark:hover:bg-[var(--ui-surface-hover)] shadow-xs'
+                    : 'bg-white dark:bg-[#171025]/90 border-slate-200/80 dark:border-[#40285e]/80 hover:border-gray-300/80 hover:dark:border-[#7c3aed]/60 hover:bg-slate-50/90 hover:dark:bg-[#1f1533] shadow-xs'
             )}
         >
             {isBusy && (
@@ -105,7 +188,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                 className={cn(
                                     'w-2.5 h-2.5 rounded-full shrink-0',
                                     inst.is_running
-                                        ? 'bg-[#1af18d] shadow-[0_0_6px_rgba(26,241,141,0.9)] animate-pulse'
+                                        ? 'bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.5)]'
                                         : 'bg-gray-300 dark:bg-gray-600'
                                 )}
                             />
@@ -121,14 +204,19 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                             >
                                 {inst.config.name}
                             </h3>
+                            <ResumeIndicatorBadge
+                                instanceId={inst.config.id}
+                                resumeIndicator={resumeIndicator}
+                                className="shrink-0"
+                            />
                             {hasActiveTask && (
                                 <button
                                     type="button"
                                     onClick={() => openPromptTree(inst.config.id)}
-                                    className="inline-flex items-center gap-1 px-1.5 h-5 rounded-[5px] text-[9px] font-bold bg-[#1af18d]/15 hover:bg-[#1af18d]/25 text-emerald-700 dark:text-[#1af18d] border border-[#1af18d]/30 shrink-0 cursor-pointer transition-colors shadow-2xs"
+                                    className="inline-flex items-center gap-1 px-1.5 h-5 rounded-[5px] text-[9px] font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 shrink-0 cursor-pointer transition-colors shadow-2xs"
                                     title="Active prompt/task running - Click to open Prompt Tree"
                                 >
-                                    <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] shadow-[0_0_4px_rgba(26,241,141,0.9)] animate-pulse shrink-0" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_3px_rgba(16,185,129,0.5)] shrink-0" />
                                     <span>Prompt</span>
                                 </button>
                             )}
@@ -140,7 +228,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                 <button
                                     disabled={isBusy}
                                     onClick={handleSetDefault}
-                                    className="h-5 px-1.5 rounded-[5px] text-[9px] font-medium text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-dashed border-gray-300 dark:border-[#40285e] transition-colors cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="h-5 px-1.5 rounded-[5px] text-[9px] font-medium text-gray-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-slate-200/80 dark:border-[#40285e] transition-colors cursor-pointer flex items-center gap-1 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Set as default profile"
                                 >
                                     <Star className="w-2.5 h-2.5" />
@@ -148,16 +236,16 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                 </button>
                             )}
                         </div>
-                        <div className="shrink-0 flex items-center gap-1">
+                        <div className="shrink-0 inline-flex items-center overflow-hidden rounded-full border border-slate-200 dark:border-[#40285e] divide-x divide-slate-200 dark:divide-[#40285e]">
                             {isActive ? (
-                                <span className={cn(ACTIVE_PILL_CLASSES, 'text-[9px] px-1.5 py-0.2 tracking-wider')}>
+                                <span className="inline-flex items-center justify-center h-5 px-2 bg-amber-500/20 text-amber-600 dark:text-amber-300 text-[9px] font-bold tracking-wider rounded-none border-0">
                                     Active
                                 </span>
                             ) : (
                                 <button
                                     disabled={isBusy}
                                     onClick={() => setActiveInstance(inst.config.id)}
-                                    className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors font-medium mr-0.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="text-[10px] text-gray-500 hover:text-blue-600 transition-colors font-medium px-2 py-0.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                     title="Set as active instance for account switches"
                                 >
                                     Set Active
@@ -169,7 +257,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                     setEditTargetId(inst.config.id);
                                     setEditInstanceName(inst.config.name);
                                 }}
-                                className="p-1 rounded-[5px] text-gray-500 dark:text-[var(--ui-text-secondary)] hover:text-blue-600 dark:hover:text-[var(--ui-interactive)] hover:bg-blue-50 dark:hover:bg-[var(--ui-surface-hover)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="p-1 text-gray-500 dark:text-[var(--ui-text-secondary)] hover:text-blue-600 dark:hover:text-[var(--ui-interactive)] hover:bg-blue-50 dark:hover:bg-[var(--ui-surface-hover)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 title={t('instances.edit_title', 'Rename profile')}
                             >
                                 <Pencil className="w-3 h-3" />
@@ -177,7 +265,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                             <button
                                 disabled={isBusy}
                                 onClick={() => openCopyDialog(inst.config.id, inst.config.name)}
-                                className="p-1 rounded-[5px] text-gray-500 dark:text-[var(--ui-text-secondary)] hover:text-blue-600 dark:hover:text-[var(--ui-interactive)] hover:bg-blue-50 dark:hover:bg-[var(--ui-surface-hover)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="p-1 text-gray-500 dark:text-[var(--ui-text-secondary)] hover:text-blue-600 dark:hover:text-[var(--ui-interactive)] hover:bg-blue-50 dark:hover:bg-[var(--ui-surface-hover)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Clone / Duplicate profile settings and extensions"
                             >
                                 <Copy className="w-3 h-3" />
@@ -186,7 +274,7 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                 <button
                                     onClick={() => handleDelete(inst.config.id)}
                                     disabled={inst.is_running || isBusy || deletingId === inst.config.id}
-                                    className="p-1 rounded-[5px] text-gray-500 dark:text-[var(--ui-text-secondary)] hover:text-red-600 dark:hover:text-[var(--ui-danger)] hover:bg-red-50 dark:hover:bg-[var(--ui-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                                    className="p-1 text-gray-500 dark:text-[var(--ui-text-secondary)] hover:text-red-600 dark:hover:text-[var(--ui-danger)] hover:bg-red-50 dark:hover:bg-[var(--ui-surface-hover)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                                     title="Delete profile"
                                 >
                                     {currentAction === 'delete' ? (
@@ -201,8 +289,8 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
 
                     <div
                         className={cn(
-                            'ui-interactive-row py-1 px-2.5 rounded-md bg-gray-50/80 dark:bg-[var(--ui-surface-2)] border border-gray-100 dark:border-[var(--ui-border-subtle)] mb-2.5 flex items-center justify-between gap-1.5',
-                            'group-hover:border-gray-300 dark:group-hover:bg-[var(--ui-surface-hover)] dark:group-hover:border-[var(--ui-interactive-40)]'
+                            'ui-interactive-row py-1 px-2.5 rounded-md bg-slate-50/80 dark:bg-[#120b1e] border border-slate-200/80 dark:border-[#40285e]/60 mb-2.5 flex items-center justify-between gap-1.5',
+                            'group-hover:border-gray-300 dark:group-hover:bg-[#171025] dark:group-hover:border-[#7c3aed]/40'
                         )}
                     >
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
@@ -226,8 +314,8 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                                             : `${maskEmail(displayEmail)} (Click to reveal)`
                                     }
                                 >
-                                    <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-500 dark:bg-[#1af18d]" />
-                                    <span className="truncate transition-colors group-hover:text-yellow-400 hover:text-yellow-300 dark:group-hover:text-yellow-200 dark:hover:text-yellow-200">
+                                    <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-blue-500 dark:bg-sky-400" />
+                                    <span className="truncate transition-colors">
                                         {isEmailRevealed ? displayEmail : maskEmail(displayEmail)}
                                     </span>
                                 </button>
@@ -241,70 +329,35 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
                     </div>
 
                     <div className="mb-2">
-                        {geminiModel || weeklyQuota ? (
-                            <div className="p-2 rounded-md bg-gray-50/90 dark:bg-[var(--ui-surface-2)] border border-gray-200/70 dark:border-[var(--ui-border-subtle)] space-y-1.5 group-hover:[&_span.font-mono]:text-yellow-400 dark:group-hover:[&_span.font-mono]:text-yellow-200">
-                                {geminiModel && (
-                                    <div className="space-y-0.5">
-                                        <div className="flex items-center justify-between text-xs">
-                                            <div className="flex items-center gap-1.5 min-w-0">
-                                                <Gemini.Color className="w-3.5 h-3.5 shrink-0" />
-                                                <span className="font-semibold text-gray-800 dark:text-gray-200 text-xs truncate transition-colors group-hover:text-yellow-500 dark:group-hover:text-yellow-200">
-                                                    {geminiModel.display_name || geminiModel.name || 'Gemini 3.1 Pro'} (4H)
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <QuotaProgressBar
-                                            percentage={geminiModel.percentage}
-                                            resetTime={geminiModel.reset_time}
-                                        />
-                                    </div>
-                                )}
-                                {weeklyQuota && (
-                                    <div className={cn('space-y-0.5', geminiModel && 'pt-1 border-t border-gray-200/60 dark:border-[#40285e]/60')}>
-                                        <div className="flex items-center justify-between text-xs">
-                                            <span className="text-[11px] font-medium text-gray-600 dark:text-gray-300 transition-colors group-hover:text-yellow-500 dark:group-hover:text-yellow-200">
-                                                Weekly Quota
-                                            </span>
-                                        </div>
-                                        <QuotaProgressBar
-                                            isWeekly
-                                            percentage={weeklyQuota.percentage}
-                                            resetTime={weeklyQuota.resetTime}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        ) : boundAccount ? (
-                            <div className="p-2 rounded-md bg-gray-50/60 dark:bg-[#171025]/90 border border-gray-100 dark:border-[#40285e] flex items-center justify-between text-xs text-gray-500">
-                                <div className="flex items-center gap-1.5">
-                                    <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-70" />
-                                    <span className="text-[11px] text-gray-500 dark:text-gray-400">Quota not synced</span>
-                                </div>
-                                <button
-                                    onClick={() => refreshQuota(boundAccount.id)}
-                                    className="text-blue-600 dark:text-blue-400 hover:underline gap-1 text-[11px] cursor-pointer flex items-center"
-                                >
-                                    <ArrowLeftRight className="w-3 h-3 text-blue-500" />
-                                    <span>Sync</span>
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="p-2 rounded-md bg-gray-50/40 dark:bg-[#171025]/60 border border-dashed border-gray-200 dark:border-[#40285e] flex items-center justify-between text-xs text-gray-400">
-                                <div className="flex items-center gap-1.5">
-                                    <Gemini.Color className="w-3.5 h-3.5 shrink-0 opacity-40 grayscale" />
-                                    <span className="text-[10px] italic">No profile bound</span>
-                                </div>
-                                <span className="text-[10px] text-gray-400/80">Launch to assign</span>
-                            </div>
-                        )}
+                        <InstanceCardQuotaSection
+                            geminiModel={geminiModel}
+                            weeklyQuota={weeklyQuota}
+                            boundAccount={boundAccount}
+                            onRefreshQuota={refreshQuota}
+                        />
                     </div>
 
                     <div className="space-y-1.5 py-2 border-t border-gray-100 dark:border-[#40285e]/80 text-xs">
                         <div className="flex items-center justify-between gap-1.5 flex-wrap">
                             {inst.is_running ? (
-                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] text-[10px] font-semibold bg-[#1af18d]/10 text-emerald-700 dark:text-[#1af18d] border border-[#1af18d]/30 shadow-2xs">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-[#1af18d] shadow-[0_0_4px_rgba(26,241,141,0.9)] animate-pulse" />
-                                    Running {inst.pid ? `(${inst.pid})` : ''}
+                                <span
+                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 shadow-2xs font-mono backdrop-blur-xs"
+                                    title={inst.pid ? `Process ID (PID): ${inst.pid} — Active and Running` : 'Process ID (PID): Active and Running'}
+                                >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_3px_rgba(16,185,129,0.5)] shrink-0" />
+                                    <span>Running</span>
+                                    {inst.pid ? (
+                                        <>
+                                            <span className="text-emerald-500/50 dark:text-emerald-400/50 font-sans select-none">·</span>
+                                            <span>PID: {inst.pid}</span>
+                                        </>
+                                    ) : null}
+                                    {inst.memory_mb ? (
+                                        <>
+                                            <span className="text-emerald-500/50 dark:text-emerald-400/50 font-sans select-none">·</span>
+                                            <span>{Math.round(inst.memory_mb)}MB</span>
+                                        </>
+                                    ) : null}
                                 </span>
                             ) : (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[5px] text-[10px] font-medium bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-400/20">
@@ -368,11 +421,11 @@ export function InstanceCard({ api, inst, index, seqNumber, theme }: InstanceCar
             <div className="relative w-full h-[3px] overflow-hidden rounded-b-[5px]">
                 <div
                     className={cn(
-                        'absolute inset-0 bg-gradient-to-r transition-all duration-300 ease-out transform',
+                        'absolute inset-0 bg-gradient-to-r transition-opacity duration-300 ease-in-out',
                         theme.accentBar,
                         isActive
-                            ? 'opacity-60 scale-x-100 group-hover:opacity-100'
-                            : 'opacity-0 scale-x-95 group-hover:opacity-100 group-hover:scale-x-100'
+                            ? 'opacity-60 group-hover:opacity-100'
+                            : 'opacity-0 group-hover:opacity-100'
                     )}
                 />
             </div>

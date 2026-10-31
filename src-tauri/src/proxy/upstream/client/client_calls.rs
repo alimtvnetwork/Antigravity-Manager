@@ -42,8 +42,8 @@ impl UpstreamClient {
         .await
     }
 
-    /// [FIX #765] 调用 v1internal API，支持透传额外的 Headers
-    /// [ENHANCED] 返回 UpstreamCallResult，包含降级尝试记录，用于 debug 日志
+    /// [FIX #765] Call v1internal API to support transparent transmission of additional headers
+    /// [ENHANCED] Returns an UpstreamCallResult containing downgrade attempt records for debug logging
     pub async fn call_v1_internal_with_headers(
         &self,
         method: &str,
@@ -53,7 +53,7 @@ impl UpstreamClient {
         extra_headers: std::collections::HashMap<String, String>,
         account_id: Option<&str>, // [NEW] Account ID
     ) -> Result<UpstreamCallResult, String> {
-        // [DEFENSE] 全局终极防御拦截：净化所有发往上游报文中的损坏/空 inlineData 以及触发 Google WAF 拦截的违规计费元数据，并最终统一对齐前缀拓扑
+        // [DEFENSE] Global ultimate defense interception: purify damaged/empty inlineData in all upstream packets and illegal accounting metadata that triggers Google WAF interception, and finally align the prefix topology in a unified manner
         if let Some(inner) = body.get_mut("request") {
             crate::proxy::mappers::common_utils::sanitize_gemini_payload_inline_data(inner);
             crate::proxy::mappers::prompt_sanitizer::PromptSanitizer::sanitize_gemini_payload(
@@ -77,7 +77,7 @@ impl UpstreamClient {
         // [NEW] Get client based on account (cached in proxy pool manager)
         let client = self.get_client(account_id).await;
 
-        // 构建 Headers (所有端点复用)
+        // Build Headers (reused by all endpoints)
         let mut headers = header::HeaderMap::new();
         headers.insert(
             header::CONTENT_TYPE,
@@ -97,7 +97,7 @@ impl UpstreamClient {
             }),
         );
 
-        // [ENHANCED] 注入 Antigravity 官方客户端关键特征 Headers
+        // [ENHANCED] Inject Antigravity official client key feature headers
         // 1. Client Identity
         headers.insert(
             "x-client-name",
@@ -140,8 +140,8 @@ impl UpstreamClient {
             }
         }
 
-        // 注入额外的 Headers (如 anthropic-beta)
-        // 严格禁止透传客户端入站的 user-agent，确保出站指纹始终为受支持的 Antigravity 版本
+        // Inject additional headers (such as anthropoc-beta)
+        // Strictly prohibit transparent transmission of the client's inbound user-agent to ensure that the outbound fingerprint is always a supported Antigravity version
         for (k, v) in extra_headers {
             if k.eq_ignore_ascii_case("user-agent") {
                 continue;
@@ -175,14 +175,14 @@ impl UpstreamClient {
 
         let mut has_triggered_downgrade = false;
 
-        // [TEMPORARY FIX #3074] 针对 403 SERVICE_DISABLED 的自动降级重试逻辑
-        // 我们包装一层循环，以便在检测到特定错误时移除 Header 并重试
+        // [TEMPORARY FIX #3074] Auto-downgrade retry logic for 403 SERVICE_DISABLED
+        // We wrap a loop so that when a specific error is detected we remove the header and try again
         loop {
             let mut last_err: Option<String> = None;
             let mut fallback_attempts: Vec<FallbackAttemptLog> = Vec::new();
             let mut should_retry_without_header = false;
 
-            // 遍历所有端点，失败时自动切换
+            // Traverse all endpoints and automatically switch on failure
             for (idx, base_url) in V1_INTERNAL_BASE_URL_FALLBACKS.iter().enumerate() {
                 let url = Self::build_url(base_url, method, query_string);
                 let has_next = idx + 1 < V1_INTERNAL_BASE_URL_FALLBACKS.len();
@@ -191,9 +191,9 @@ impl UpstreamClient {
 
                 let mut req_builder = client.post(&url).headers(headers.clone());
 
-                // [FIX] 仅对流式接口 (streamGenerateContent) 使用分块传输仿真
-                // 对其他接口 (如 generateContent, loadCodeAssist) 发送正常的固定长度 Body
-                // 否则图像生成会因为缺少 Content-Length 而被 Google 服务端拒绝或限流 (429)
+                // [FIX] Use chunked transfer emulation only for streaming interface (streamGenerateContent)
+                // Send normal fixed length Body to other interfaces (such as generateContent, loadCodeAssist)
+                // Otherwise, image generation will be rejected or limited by the Google server due to lack of Content-Length (429)
                 if method == "streamGenerateContent" {
                     let stream_bytes = body_bytes.clone();
                     req_builder = req_builder.body(rquest::Body::wrap_stream(
@@ -229,8 +229,8 @@ impl UpstreamClient {
                             });
                         }
 
-                        // [NEW] 检测 403 错误 (Issue #3074)
-                        // 只要带有项目 Header 且返回 403，我们就尝试降级重试一次
+                        // [NEW] Detecting 403 errors (Issue #3074)
+                        // As long as it has a project header and returns 403, we will try to downgrade and try again.
                         if status == StatusCode::FORBIDDEN
                             && !has_triggered_downgrade
                             && headers.contains_key("x-goog-user-project")
@@ -243,7 +243,7 @@ impl UpstreamClient {
                             break;
                         }
 
-                        // 如果有下一个端点且当前错误可重试，则切换
+                        // Switch if there is a next endpoint and the current error can be retried
                         if has_next && Self::should_try_next_endpoint(status) {
                             let err_msg = format!("Upstream {} returned {}", base_url, status);
                             tracing::warn!(
@@ -252,7 +252,7 @@ impl UpstreamClient {
                                 base_url,
                                 method
                             );
-                            // [NEW] 记录降级尝试
+                            // [NEW] Logging downgrade attempts
                             fallback_attempts.push(FallbackAttemptLog {
                                 endpoint_url: url.clone(),
                                 status: Some(status.as_u16()),
@@ -262,7 +262,7 @@ impl UpstreamClient {
                             continue;
                         }
 
-                        // 不可重试的错误或已是最后一个端点，直接返回
+                        // Non-retryable error or it is the last endpoint, return directly
                         return Ok(UpstreamCallResult {
                             response: resp,
                             fallback_attempts,
@@ -271,7 +271,7 @@ impl UpstreamClient {
                     Err(e) => {
                         let msg = format!("HTTP request failed at {}: {}", base_url, e);
                         tracing::debug!("{}", msg);
-                        // [NEW] 记录网络错误的降级尝试
+                        // [NEW] Log downgrade attempts with network errors
                         fallback_attempts.push(FallbackAttemptLog {
                             endpoint_url: url.clone(),
                             status: None,
@@ -279,7 +279,7 @@ impl UpstreamClient {
                         });
                         last_err = Some(msg);
 
-                        // 如果是最后一个端点，退出循环
+                        // If it is the last endpoint, exit the loop
                         if !has_next {
                             break;
                         }
@@ -288,29 +288,29 @@ impl UpstreamClient {
                 }
             }
 
-            // 处理降级逻辑
+            // Handle downgrade logic
             if should_retry_without_header {
                 headers.remove("x-goog-user-project");
                 has_triggered_downgrade = true;
-                // 重启外层 loop，从第一个端点再次尝试
+                // Restart the outer loop and try again from the first endpoint
                 continue;
             }
 
-            // 如果没有触发降级且所有端点都尝试过，返回最后的错误
+            // If no downgrade was triggered and all endpoints were tried, return the last error
             return Err(last_err.unwrap_or_else(|| "All endpoints failed".to_string()));
         }
     }
 
-    /// 获取可用模型列表
+    /// Get a list of available models
     ///
-    /// 获取远端模型列表，支持多端点自动 Fallback
+    /// Get the remote model list and support automatic fallback of multiple endpoints
     #[allow(dead_code)] // API ready for future model discovery feature
     pub async fn fetch_available_models(
         &self,
         access_token: &str,
         account_id: Option<&str>,
     ) -> Result<Value, String> {
-        // 复用 call_v1_internal，然后解析 JSON
+        // Reuse call_v1_internal and then parse the JSON
         let result = self
             .call_v1_internal(
                 "fetchAvailableModels",
@@ -328,24 +328,24 @@ impl UpstreamClient {
         Ok(json)
     }
 
-    /// 辅助型 v1internal 调用（非用户请求路径，例如后台上下文摘要）。
+    /// Auxiliary v1internal calls (non-user request paths, such as background context digests).
     ///
-    /// 为什么需要它：这类调用点位于 mapper / 辅助函数里，历史上拿不到 `AppState.upstream`
-    /// 便手写 URL —— 结果形状与 host 双双漂移
+    /// Why it is needed: This type of call point is located in the mapper / auxiliary function, and `AppState.upstream` cannot be obtained historically.
+    /// Just handwrite the URL - the result shape and host both drift
     /// （`{host}/v1internal/projects/{p}/locations/global/models/{m}:generateContent`
-    /// 在 daily / sandbox / prod 三个 host 上一律返回 HTML 404，导致该功能从未成功过）。
+    /// HTML 404 is always returned on the three hosts daily / sandbox / prod, causing this function to never succeed).
     ///
-    /// 这里复用与主请求路径**完全相同**的四个来源，避免再次漂移：
-    /// - 客户端 `self.get_client(account_id)` —— 同一套按账号代理池选择与 `client_cache`，
-    ///   并随上游代理热更新一并生效（见 `rebuild_default_client` / `clear_client_cache`）。
-    ///   账号绑定专属代理时辅助请求同样走它，不会从真实 IP 泄漏出去。
-    /// - 端点顺序 `V1_INTERNAL_BASE_URL_FALLBACKS`（Daily → Sandbox → Prod）
-    /// - URL 形状 `Self::build_url`（`{base}:{method}`，模型名放在 body 里）
-    /// - 回退判定 `Self::should_try_next_endpoint`（408 / 404 / 5xx 才换端点）
+    /// Here we reuse four sources that are exactly the same as the main request path to avoid drifting again:
+    /// - Client `self.get_client(account_id)` - the same set of proxy pool selection by account and `client_cache`,
+    ///   It will take effect with the hot update of the upstream proxy (see `rebuild_default_client` / `clear_client_cache`).
+    ///   When the account is bound to a dedicated proxy, auxiliary requests will also go through it and will not leak out from the real IP.
+    /// - Endpoint order `V1_INTERNAL_BASE_URL_FALLBACKS` (Daily → Sandbox → Prod)
+    /// - URL shape `Self::build_url` (` {base} : {method} `, the model name is placed in the body)
+    /// - Fallback determination `Self::should_try_next_endpoint` (change the endpoint only when 408 / 404 / 5xx)
     ///
-    /// 与 `call_v1_internal` 的差异（有意为之）：不注入请求级 Header
-    /// （`x-vscode-sessionid` 等）。超时由调用方用 `timeout_secs` 指定 ——
-    /// 客户端默认 600s，对摘要过长，故显式收紧。
+    /// Difference from `call_v1_internal` (intentional): no request-level headers are injected
+    /// (`x-vscode-sessionid` etc.). Timeout is specified by the caller using `timeout_secs` -
+    /// The client defaults to 600s, which is too long for the summary, so it is explicitly tightened.
     pub async fn call_v1_internal_auxiliary(
         &self,
         method: &str,
@@ -386,8 +386,8 @@ impl UpstreamClient {
                 let text = response.text().await.unwrap_or_default();
                 last_error = format!("{} returned {}: {}", url, status, text);
 
-                // 与主请求路径同一判定：仅 408 / 404 / 5xx 换端点；
-                // 其余状态（如 400）说明请求本身有问题，直接终止，不做三倍重试。
+                // Same determination as the main request path: only 408 / 404 / 5xx endpoints are changed;
+                // The remaining status (such as 400) indicates that there is a problem with the request itself and is terminated directly without triple retry.
                 if !Self::should_try_next_endpoint(status) {
                     return Err(last_error);
                 }

@@ -35,6 +35,7 @@ pub async fn get_supabase_config() -> AppResult<SupabaseConfig> {
 pub async fn save_supabase_config(config: SupabaseConfig) -> AppResult<()> {
     let is_enabled = config.is_sync_enabled;
     supabase_sync::save_config(&config)?;
+    supabase_sync::reset_supabase_circuit_breaker();
 
     if is_enabled {
         supabase_sync::start_sync_worker();
@@ -55,7 +56,13 @@ pub async fn test_supabase_endpoint(endpoint: SupabaseEndpoint) -> AppResult<End
             });
         }
     };
-    client.test_connection().await
+    let res = client.test_connection().await;
+    if let Ok(ref test_res) = res {
+        if test_res.is_success {
+            supabase_sync::reset_supabase_circuit_breaker();
+        }
+    }
+    res
 }
 
 #[tauri::command]
@@ -115,10 +122,9 @@ pub async fn list_active_account_leases() -> AppResult<Vec<WorkspaceLease>> {
 
 #[tauri::command]
 pub async fn get_local_node_info() -> AppResult<LocalNodeInfo> {
-    let config = supabase_sync::load_config().unwrap_or_default();
     Ok(LocalNodeInfo {
         node_id: supabase_sync::get_local_node_id(),
-        node_alias: config.node_alias,
+        node_alias: supabase_sync::resolve_local_node_alias(),
         ip_address: supabase_sync::get_local_ip(),
         uptime_seconds: supabase_sync::get_uptime_seconds(),
     })

@@ -174,6 +174,56 @@ export function AdvancedMaintenanceSection(props: SettingsPageApi) {
                 </div>
             </div>
 
+            {/* Prompt Preview Word Limit */}
+            <div className="border-t border-gray-200 dark:border-base-200 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                    <div>
+                        <h3 className="font-medium text-gray-900 dark:text-base-content">
+                            {t('settings.advanced.prompt_preview_words_title', 'Prompt Preview Word Limit')}
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                            {t('settings.advanced.prompt_preview_words_desc', 'Maximum words displayed in conversation preview cards and tree leaves before truncation (default: 200 words, range: 50–500).')}
+                        </p>
+                    </div>
+                    <span className="text-sm font-semibold font-mono px-2.5 py-1 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                        {formData.prompt_preview_words ?? 200} words
+                    </span>
+                </div>
+                <div className="bg-gray-50 dark:bg-base-200 p-4 rounded-lg border border-gray-200 dark:border-base-300 mb-3 space-y-3">
+                    <div className="flex items-center gap-4">
+                        <input
+                            type="range"
+                            min="50"
+                            max="500"
+                            step="10"
+                            className="flex-1 accent-blue-600 cursor-pointer"
+                            value={formData.prompt_preview_words ?? 200}
+                            onChange={(e) => setFormData({
+                                ...formData,
+                                prompt_preview_words: Math.min(500, Math.max(50, parseInt(e.target.value) || 200)),
+                            })}
+                        />
+                        <input
+                            type="number"
+                            min="50"
+                            max="500"
+                            className="w-24 px-3 py-1.5 text-center text-sm font-mono border border-gray-200 dark:border-base-300 rounded-lg bg-white dark:bg-base-100 text-gray-900 dark:text-base-content font-semibold"
+                            value={formData.prompt_preview_words ?? 200}
+                            onChange={(e) => setFormData({
+                                ...formData,
+                                prompt_preview_words: Math.min(500, Math.max(50, parseInt(e.target.value) || 200)),
+                            })}
+                        />
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-400 font-mono">
+                        <span>50 min</span>
+                        <span>100 compact</span>
+                        <span>200 default</span>
+                        <span>500 max</span>
+                    </div>
+                </div>
+            </div>
+
             <div className="border-t border-gray-200 dark:border-base-200 pt-4">
                 <div className="space-y-3">
                     <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-base-200 rounded-lg border border-gray-100 dark:border-base-300">

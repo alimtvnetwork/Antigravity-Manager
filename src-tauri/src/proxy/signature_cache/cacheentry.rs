@@ -85,7 +85,7 @@ impl SignatureCache {
 
     /// Store a tool call signature
     pub fn cache_tool_signature(&self, tool_use_id: &str, signature: String) {
-        // 自愈防裂化：若签名被误传为原始 Protobuf 二进制 (首字节 0x12)，自动纠正编码为标准 Base64
+        // Self-healing and anti-cracking: If the signature is misrepresented as the original Protobuf binary (first byte 0x12), the automatic correction encoding is standard Base64
         let signature = if signature.as_bytes().first() == Some(&0x12) {
             use base64::Engine;
             base64::engine::general_purpose::STANDARD.encode(signature.as_bytes())
@@ -100,14 +100,14 @@ impl SignatureCache {
         let norm_id = crate::proxy::common::utils::normalize_tool_id(tool_use_id);
         let id_str = norm_id.to_string();
 
-        // 1. 持久化到 SQLite L2 数据库 (支持代理重启后秒级恢复)
+        // 1. Persistence to SQLite L2 database (supports second-level recovery after agent restart)
         // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
         crate::error::record_ignored(
             crate::modules::proxy_db::save_tool_signature(&id_str, &signature),
             "save_tool_signature",
         );
 
-        // 2. 写入内存 L1 缓存
+        // 2. Write to memory L1 cache
         if let Ok(mut cache) = self.tool_signatures.lock() {
             tracing::debug!("[SignatureCache] Caching tool signature for id: {}", id_str);
             cache.insert(id_str, CacheEntry::new(signature));
@@ -137,7 +137,7 @@ impl SignatureCache {
         }
 
         for candidate in candidate_ids {
-            // 1. 先查内存 L1 缓存
+            // 1. First check the memory L1 cache
             if let Ok(cache) = self.tool_signatures.lock() {
                 if let Some(entry) = cache.get(candidate) {
                     if !entry.is_expired() {
@@ -150,7 +150,7 @@ impl SignatureCache {
                 }
             }
 
-            // 2. 内存未命中（如代理重启过），从 SQLite L2 数据库恢复
+            // 2. Memory miss (such as agent restart), restore from SQLite L2 database
             if let Ok(Some(sig)) = crate::modules::proxy_db::load_tool_signature(candidate) {
                 let sig: String = sig;
                 if let Ok(mut cache) = self.tool_signatures.lock() {
@@ -238,7 +238,7 @@ impl SignatureCache {
         signature: String,
         message_count: usize,
     ) {
-        // 自愈防裂化：若签名被误传为原始 Protobuf 二进制 (首字节 0x12)，自动纠正编码为标准 Base64
+        // Self-healing and anti-cracking: If the signature is misrepresented as the original Protobuf binary (first byte 0x12), the automatic correction encoding is standard Base64
         let signature = if signature.as_bytes().first() == Some(&0x12) {
             use base64::Engine;
             base64::engine::general_purpose::STANDARD.encode(signature.as_bytes())
@@ -319,7 +319,7 @@ impl SignatureCache {
     /// Returns None if not found or expired.
     pub fn get_session_signature(&self, session_id: &str) -> Option<String> {
         if let Ok(cache) = self.session_signatures.lock() {
-            // 1. 精确匹配
+            // 1. Exact match
             if let Some(entry) = cache.get(session_id) {
                 if !entry.is_expired() {
                     // Find the signature with the maximum message_count (the latest one)
@@ -337,7 +337,7 @@ impl SignatureCache {
                 }
             }
 
-            // 2. 租户前缀容错后缀匹配 (兼容传入裸 session_id 匹配 tenant:session_id)
+            // 2. Tenant prefix fault-tolerant suffix matching (compatible with incoming bare session_id matching tenant:session_id)
             let suffix = format!(":{}", session_id);
             for (key, entry) in cache.iter() {
                 if (key.ends_with(&suffix) || session_id.ends_with(&format!(":{}", key)))
@@ -451,8 +451,8 @@ impl SignatureCache {
         None
     }
 
-    /// 删除指定会话的缓存签名
-    #[allow(dead_code)] // 预留给管理接口或调试使用
+    /// Delete cached signatures for specified session
+    #[allow(dead_code)] // Reserved for management interface or debugging use
     pub fn delete_session_signature(&self, session_id: &str) {
         if let Ok(mut cache) = self.session_signatures.lock() {
             if cache.remove(session_id).is_some() {

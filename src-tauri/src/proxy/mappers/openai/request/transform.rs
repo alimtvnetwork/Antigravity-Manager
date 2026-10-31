@@ -1,5 +1,5 @@
 // Request transform entry points (split from request.rs).
-// OpenAI → Gemini 请求转换
+// OpenAI → Gemini request conversion
 use super::super::models::*;
 use crate::proxy::model_specs;
 use crate::proxy::token_manager::ProxyToken;
@@ -32,6 +32,13 @@ pub fn enforce_uppercase_types(value: &mut Value) {
         if let Some(type_val) = map.get_mut("type") {
             if let Value::String(ref mut s) = type_val {
                 *s = s.to_uppercase();
+            }
+        } else {
+            // Imp-82: Deep parameter normalizer for Gemini schema compliance
+            if map.contains_key("properties") {
+                map.insert("type".to_string(), Value::String("OBJECT".to_string()));
+            } else if map.contains_key("items") {
+                map.insert("type".to_string(), Value::String("ARRAY".to_string()));
             }
         }
         if let Some(properties) = map.get_mut("properties") {

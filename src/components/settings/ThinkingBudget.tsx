@@ -45,7 +45,7 @@ export default function ThinkingBudget({
             showToast(
                 t("proxy.config.thinking_budget.clear_success", {
                     count,
-                    defaultValue: `已成功清空思考块存储 (共清理 ${count} 条历史记录)`,
+                    defaultValue: `Successfully cleared thinking store (purged  records)`,
                 }),
                 "success"
             );
@@ -54,7 +54,7 @@ export default function ThinkingBudget({
             showToast(
                 t("proxy.config.thinking_budget.clear_error", {
                     error: String(err),
-                    defaultValue: `清空思考块失败: ${String(err)}`,
+                    defaultValue: `Failed to clear thinking store: ${String(err)}`,
                 }),
                 "error"
             );
@@ -68,7 +68,7 @@ export default function ThinkingBudget({
         ...config,
     };
 
-    // 预算输入框本地编辑文本状态，允许用户清空退格为 "" 或输入负号 "-"
+    // The local edit text state of the budget input box allows the user to clear the backspace to "" or enter a negative sign "-"
     const [inputValues, setInputValues] = useState<Record<string, string>>(() => {
         const init: Record<string, string> = {};
         for (const [key, defaultVal] of Object.entries(BUDGET_DEFAULTS)) {
@@ -78,7 +78,7 @@ export default function ThinkingBudget({
         return init;
     });
 
-    // 外部配置实质性更新时同步（保留正在编辑的空值状态）
+    // Synchronize when the external configuration is substantially updated (retain the null value status being edited)
     const lastConfigRef = useRef(config);
     useEffect(() => {
         if (config && config !== lastConfigRef.current) {
@@ -127,7 +127,7 @@ export default function ThinkingBudget({
         });
     };
 
-    // 输入框变更处理：允许清空为 ""，允许 "-"，不自动补 -1
+    // Input box change processing: allow clearing to "", allow "-", do not automatically add -1
     const handleInputChange = (field: BudgetFieldKey, rawVal: string) => {
         if (rawVal !== "" && rawVal !== "-") {
             if (!/^-?\d+$/.test(rawVal)) {
@@ -139,7 +139,7 @@ export default function ThinkingBudget({
             [field]: rawVal,
         }));
 
-        // 如果是合法完整数字，实时同步给配置对象；空值时不写入，留待最后保存阶段回填默认值
+        // If it is a legal complete number, it will be synchronized to the configuration object in real time; if it is empty, it will not be written and will be left to backfill the default value in the final save stage.
         const trimmed = rawVal.trim();
         if (trimmed !== "" && trimmed !== "-") {
             const parsed = parseInt(trimmed, 10);
@@ -152,7 +152,7 @@ export default function ThinkingBudget({
         }
     };
 
-    // 最后保存配置阶段：对处于清空/非法状态的预算输入框自动回填为默认值
+    // Final save configuration phase: automatically backfill the budget input box in the empty/illegal state with the default value
     const handleSave = async () => {
         const nextInputs = { ...inputValues };
         const nextConfig: ThinkingBudgetConfig = { ...currentConfig };
@@ -170,9 +170,9 @@ export default function ThinkingBudget({
             (nextConfig as any)[key] = finalVal;
         }
 
-        // 回填到输入框界面显示
+        // Backfill to input box interface display
         setInputValues(nextInputs);
-        // 同步给父组件配置
+        // Synchronize configuration to parent component
         onChange(nextConfig);
 
         if (onSave) {
@@ -190,52 +190,52 @@ export default function ThinkingBudget({
     const getPresetTooltip = (val: number): string => {
         if (val === 32768) {
             return t("proxy.config.thinking_budget.tooltip_32768", {
-                defaultValue: "32,768 Tokens：适合复杂编程与深度架构任务",
+                defaultValue: "32,768 Tokens: Suitable for complex programming and deep architecture tasks",
             });
         }
         if (val === 16384 || val === 16000) {
             return t("proxy.config.thinking_budget.tooltip_16384", {
-                defaultValue: "1.6w 档位 (16,384 Tokens)：适合复杂 Agent 任务",
+                defaultValue: "1.6w level (16,384 Tokens): suitable for complex Agent tasks",
             });
         }
         if (val === 8192) {
             return t("proxy.config.thinking_budget.tooltip_8192", {
-                defaultValue: "8,192 Tokens：适合中等复杂度多步推理与代码排错",
+                defaultValue: "8,192 Tokens: suitable for medium-complexity multi-step reasoning and code debugging",
             });
         }
         if (val === 4096) {
             return t("proxy.config.thinking_budget.tooltip_4096", {
-                defaultValue: "4,096 Tokens：标准平衡档，兼顾思考质量与响应速度",
+                defaultValue: "4,096 Tokens: Standard balanced file, taking into account quality of thinking and speed of response",
             });
         }
         if (val === 2048) {
             return t("proxy.config.thinking_budget.tooltip_2048", {
-                defaultValue: "2,048 Tokens：日常轻量推理档",
+                defaultValue: "2,048 Tokens: Daily lightweight reasoning file",
             });
         }
         if (val === 1024) {
             return t("proxy.config.thinking_budget.tooltip_1024", {
-                defaultValue: "1,024 Tokens：轻量极速思考，消耗极低",
+                defaultValue: "1,024 Tokens: lightweight, fast thinking, extremely low consumption",
             });
         }
         if (val === 65536) {
             return t("proxy.config.thinking_budget.tooltip_65536", {
-                defaultValue: "65,536 Tokens：超长深度思考链极限档",
+                defaultValue: "65,536 Tokens: Extremely long deep thinking chain limit",
             });
         }
         if (val === 1001) {
             return t("proxy.config.thinking_budget.tooltip_1001", {
-                defaultValue: "1,001 Tokens：Google 官方 3.1 Pro 低思考基准档",
+                defaultValue: "1,001 Tokens: Google official 3.1 Pro low-thinking benchmark file",
             });
         }
         if (val === 10001) {
             return t("proxy.config.thinking_budget.tooltip_10001", {
-                defaultValue: "10,001 Tokens：Google 官方 3.1 Pro 深度推理主力档",
+                defaultValue: "10,001 Tokens: Google’s official 3.1 Pro deep inference main file",
             });
         }
         if (val === -1) {
             return t("proxy.config.thinking_budget.tooltip_adaptive", {
-                defaultValue: "自适应 (-1)：完全由上游模型根据问题难度自动分配",
+                defaultValue: "Adaptive (-1): Completely automatically assigned by the upstream model based on problem difficulty",
             });
         }
         return `${val.toLocaleString()} Tokens`;

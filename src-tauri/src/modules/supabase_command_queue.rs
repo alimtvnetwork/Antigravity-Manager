@@ -26,6 +26,39 @@ pub struct InboundDbCommand {
     pub completed_at: i64,
 }
 
+/// Execution outcome for commands processed from the secondary Supabase queue
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CommandExecutionStatusType {
+    Completed,
+    Failed,
+}
+
+impl CommandExecutionStatusType {
+    #[inline]
+    pub fn from_exit_code(exit_code: i32) -> Self {
+        if exit_code == 0 {
+            Self::Completed
+        } else {
+            Self::Failed
+        }
+    }
+
+    #[inline]
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Completed => "completed",
+            Self::Failed => "failed",
+        }
+    }
+}
+
+impl std::fmt::Display for CommandExecutionStatusType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
 /// Retrieve secondary endpoints sorted by priority
 pub fn get_secondary_endpoints(config: &SupabaseConfig) -> Vec<SupabaseEndpoint> {
     let mut endpoints: Vec<SupabaseEndpoint> = config
@@ -143,11 +176,7 @@ pub async fn execute_and_report_command(
     };
 
     let finish_time = Utc::now().timestamp();
-    let final_status = if exit_code == 0 {
-        "completed"
-    } else {
-        "failed"
-    };
+    let final_status = CommandExecutionStatusType::from_exit_code(exit_code);
 
     // 3. Record telemetry
     let telemetry_payload = json!({
@@ -170,7 +199,7 @@ pub async fn execute_and_report_command(
 
     // 4. Update command queue status
     let finish_payload = json!({
-        "status": final_status,
+        "status": final_status.as_str(),
         "completed_at": finish_time
     });
     if let Err(e) = client.update("command_queue", &query, finish_payload).await {
@@ -178,7 +207,18 @@ pub async fn execute_and_report_command(
             target: "supabase_command_queue",
             command_id = %cmd.id,
             error = %e,
-            "Failed to update final status in command_queue"
+            "Failed to update final status in command_queue; recording to local task history as offline fallback"
+        );
+        crate::modules::task_history_db::record(
+            crate::modules::audit_action::AuditAction::Unknown,
+            &format!("cmd_offline_{}", cmd.id),
+            final_status.as_str(),
+            &format!(
+                "Exit code {}: {}",
+                exit_code,
+                stdout.chars().take(200).collect::<String>()
+            ),
+            None,
         );
     }
 
@@ -275,5 +315,23 @@ mod tests {
         assert_eq!(cmd.command_text, "git status");
         assert_eq!(cmd.status, "pending");
         assert_eq!(cmd.created_at, 1700000000);
+    }
+
+    #[test]
+    fn test_command_execution_status_type_resolution() {
+        let completed = CommandExecutionStatusType::from_exit_code(0);
+        assert_eq!(completed, CommandExecutionStatusType::Completed);
+        assert_eq!(completed.as_str(), "completed");
+        assert_eq!(completed.to_string(), "completed");
+
+        let failed_nonzero = CommandExecutionStatusType::from_exit_code(1);
+        assert_eq!(failed_nonzero, CommandExecutionStatusType::Failed);
+        assert_eq!(failed_nonzero.as_str(), "failed");
+        assert_eq!(failed_nonzero.to_string(), "failed");
+
+        let failed_neg = CommandExecutionStatusType::from_exit_code(-1);
+        assert_eq!(failed_neg, CommandExecutionStatusType::Failed);
+        assert_eq!(failed_neg.as_str(), "failed");
+        assert_eq!(failed_neg.to_string(), "failed");
     }
 }

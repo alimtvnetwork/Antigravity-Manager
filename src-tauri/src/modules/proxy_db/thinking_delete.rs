@@ -53,7 +53,7 @@ pub fn delete_thinking_records_for_session(session_key: &str) -> Result<usize, S
     .map_err(|e| e.to_string())
 }
 
-/// 精准净化思考记录表中的非法异构签名（保留思考文本与其它健康签名）
+/// Precisely purify illegal heterogeneous signatures in the thinking record table (retaining the thinking text and other health signatures)
 pub fn purge_foreign_signatures_for_session_with_model(
     session_key: &str,
     target_model: &str,
@@ -107,15 +107,15 @@ pub fn purge_foreign_signatures_for_session_with_model(
     Ok(total_updated)
 }
 
-/// 兼容旧接口：默认按 Gemini 清洗
+/// Compatible with old interfaces: Clean by Gemini by default
 pub fn purge_foreign_signatures_for_session(session_key: &str) -> Result<usize, String> {
     purge_foreign_signatures_for_session_with_model(session_key, "gemini")
 }
 
-/// 全量清空思考块数据库 (仅清空 thinking_records / thinking_sessions / tool_signatures，绝不触碰 request_logs 日志)
+/// Clear all the thinking block database (only clear thinking_records / thinking_sessions / tool_signatures, never touch the request_logs log)
 pub fn clear_all_thinking_data() -> Result<usize, String> {
     let mut total_deleted = 0;
-    // 1. 清空 thinking_store.db 中的记录与会话
+    // 1. Clear the records and sessions in thinking_store.db
     let conn = thinking_db()?;
     let deleted = conn
         .execute("DELETE FROM thinking_records", [])
@@ -132,7 +132,7 @@ pub fn clear_all_thinking_data() -> Result<usize, String> {
         "vacuum thinking database after full clear",
     );
 
-    // 2. 清空 proxy_logs.db 中残留的历史工具签名表与陈旧思考表 (绝不触碰 request_logs)
+    // 2. Clear the remaining historical tool signature table and old thinking table in proxy_logs.db (never touch request_logs)
     if let Ok(log_conn) = connect_db() {
         // Justification: residual cleanup in the legacy logs database
         crate::error::record_ignored(

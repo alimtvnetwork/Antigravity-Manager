@@ -116,28 +116,82 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
             const cur = get().instances.find(i => i.config.id === instId);
             const instanceName = cur?.config.name || instId;
 
-            // 1. Discover accounts (always fetch fresh from backend to prevent stale state)
+            // Primary: Execute unified backend Fast-Forward rotation
+            try {
+                await instanceService.fastForwardInstance(instId);
+                const { useAccountStore } = await import('../useAccountStore');
+                await Promise.all([
+                    get().fetchInstances(true),
+                    useAccountStore.getState().fetchAccounts(),
+                    useAccountStore.getState().fetchCurrentAccount(),
+                ]);
+                const finalInst = get().instances.find(i => i.config.id === instId);
+                const finalEmail = finalInst?.config.bound_email || useAccountStore.getState().currentAccount?.email || '';
+                const resolvedInstanceName = finalInst?.config.name || instanceName;
+                set({ activeInstanceId: instId, isLoading: false });
+                return {
+                    accountEmail: finalEmail,
+                    instanceName: resolvedInstanceName,
+                    daysUntilRefill: 0,
+                    resumedProjectsCount: 1,
+                    skippedProjectsCount: 0,
+                };
+            } catch (backendFfErr: unknown) {
+                useErrorStore.getState().trackWarning(backendFfErr, {
+                    source: 'useInstanceStore.smartRotateProfileAccount',
+                    triggerAction: 'fast_forward_backend_delegation_fallback',
+                });
+            }
+
+            // Fallback: Discover accounts (always fetch fresh from backend to prevent stale state)
             const { useAccountStore } = await import('../useAccountStore');
             await useAccountStore.getState().fetchAccounts();
             const accounts = useAccountStore.getState().accounts;
-            const currentAccountId = cur?.config.bound_account_id || useAccountStore.getState().currentAccount?.id;
+            const curAccount = cur?.config.bound_account_id
+                ? accounts.find(a => a.id === cur.config.bound_account_id)
+                : cur?.config.bound_email
+                ? accounts.find(a => a.email.toLowerCase() === cur.config.bound_email?.toLowerCase())
+                : useAccountStore.getState().currentAccount;
+            const currentAccountId = curAccount?.id;
+            const currentAccountEmail = curAccount?.email || cur?.config.bound_email;
 
             // 2. Discover active non-stale instances and exclude in-use accounts with >0% credits
             //    Bindings older than stale_binding_timeout_hours (default 6h) with no running process or 0% credits are treated as inactive
             const activeInUseAccountIds = get()
                 .instances.filter(i => {
-                    if (!i.config.bound_account_id) return false;
+                    const hasBinding = Boolean(i.config.bound_account_id || i.config.bound_email);
+                    if (!hasBinding) return false;
                     if (instanceService.isInstanceBindingStale(i, 6)) return false;
-                    const boundAcc = accounts.find(a => a.id === i.config.bound_account_id);
+                    const boundAcc = accounts.find(
+                        a =>
+                            (i.config.bound_account_id && a.id === i.config.bound_account_id) ||
+                            (i.config.bound_email && a.email.toLowerCase() === i.config.bound_email.toLowerCase())
+                    );
                     if (boundAcc && instanceService.extract4hWindowQuotaPercent(boundAcc) <= 0) {
                         return false;
                     }
                     return i.is_running;
                 })
-                .map(i => i.config.bound_account_id as string)
-                .filter(id => id !== currentAccountId);
+                .flatMap(i => {
+                    const idsOrEmails: string[] = [];
+                    if (i.config.bound_account_id) idsOrEmails.push(i.config.bound_account_id);
+                    if (i.config.bound_email) idsOrEmails.push(i.config.bound_email);
+                    const acc = accounts.find(
+                        a =>
+                            (i.config.bound_account_id && a.id === i.config.bound_account_id) ||
+                            (i.config.bound_email && a.email.toLowerCase() === i.config.bound_email.toLowerCase())
+                    );
+                    if (acc) {
+                        if (!idsOrEmails.includes(acc.id)) idsOrEmails.push(acc.id);
+                        if (!idsOrEmails.includes(acc.email)) idsOrEmails.push(acc.email);
+                    }
+                    return idsOrEmails;
+                });
             if (currentAccountId && !activeInUseAccountIds.includes(currentAccountId)) {
                 activeInUseAccountIds.push(currentAccountId);
+            }
+            if (currentAccountEmail && !activeInUseAccountIds.some(x => x.toLowerCase() === currentAccountEmail.toLowerCase())) {
+                activeInUseAccountIds.push(currentAccountEmail);
             }
 
             // 3. Filter eligible accounts (not disabled, not proxy_disabled, not forbidden, not blocked)
@@ -283,20 +337,8 @@ export function createSmartSlice(set: SetState, get: GetState): Pick<InstanceSta
 
             const targetCandidate = verifiedCandidate as Account & { instanceId?: string };
 
-            // Detect if the target candidate belongs to another instance
-            const candidateBoundInstance = get().instances.find(
-                i => i.config.bound_account_id === targetCandidate.id
-            );
-            const candidateInstanceId =
-                targetCandidate.instanceId || candidateBoundInstance?.config.id;
-
-            if (candidateInstanceId && candidateInstanceId !== instId) {
-                // Gracefully close the depleted instance first
-                await get().closeInstance(instId);
-                await instanceService.setActiveInstance(candidateInstanceId);
-            }
-
-            const effectiveInstanceId = candidateInstanceId || instId;
+            // Invariant: Fast-Forward rotates the requested instance in place; never hijack or switch to another instance
+            const effectiveInstanceId = instId;
 
             // 7. Delegate execution directly to proven switchAccount command (Button 2 delegation)
             let targetIdeParam: string | undefined;

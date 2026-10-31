@@ -4,10 +4,10 @@ use std::process::Command;
 
 /// Returns the application package version
 pub fn get_app_version() -> &'static str {
-    env!("CARGO_PKG_VERSION")
+    crate::VERSION
 }
 
-fn run_git_command(args: &[&str]) -> Option<String> {
+fn run_raw_git_command(args: &[&str]) -> Option<String> {
     let mut cmd = Command::new("git");
     cmd.args(args);
     #[cfg(target_os = "windows")]
@@ -22,6 +22,38 @@ fn run_git_command(args: &[&str]) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
+/// Verify that the current directory's git repository is genuinely Antigravity-Manager,
+/// preventing external workspace tags (e.g. v1.9.0) from polluting AGM version reporting.
+fn is_agm_repo() -> bool {
+    if let Some(toplevel) = run_raw_git_command(&["rev-parse", "--show-toplevel"]) {
+        let p = std::path::Path::new(&toplevel);
+        let cargo_toml = p.join("src-tauri").join("Cargo.toml");
+        if cargo_toml.exists() {
+            if let Ok(content) = std::fs::read_to_string(&cargo_toml) {
+                if content.contains("agm-ui") || content.contains("antigravity_tools_lib") {
+                    return true;
+                }
+            }
+        }
+        let root_cargo = p.join("Cargo.toml");
+        if root_cargo.exists() {
+            if let Ok(content) = std::fs::read_to_string(&root_cargo) {
+                if content.contains("agm-ui") || content.contains("antigravity_tools_lib") {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
+fn run_git_command(args: &[&str]) -> Option<String> {
+    if !is_agm_repo() {
+        return None;
+    }
+    run_raw_git_command(args)
+}
+
 /// Returns the short Git commit hash
 pub fn get_git_hash() -> String {
     if let Some(h) = option_env!("AGM_GIT_HASH") {
@@ -30,8 +62,8 @@ pub fn get_git_hash() -> String {
             return trimmed.to_string();
         }
     }
-    // Runtime fallback if binary runs inside a git repository
-    run_git_command(&["rev-parse", "--short", "HEAD"]).unwrap_or_else(|| "unknown".to_string())
+    // Runtime fallback if binary runs inside the AGM git repository
+    run_git_command(&["rev-parse", "--short", "HEAD"]).unwrap_or_else(|| "release".to_string())
 }
 
 /// Returns the active Git branch name
@@ -54,7 +86,7 @@ pub fn get_last_release() -> String {
         }
     }
     run_git_command(&["describe", "--tags", "--abbrev=0"])
-        .unwrap_or_else(|| format!("v{}", env!("CARGO_PKG_VERSION")))
+        .unwrap_or_else(|| format!("v{}", crate::VERSION))
 }
 
 /// Returns the full 40-character Git commit hash

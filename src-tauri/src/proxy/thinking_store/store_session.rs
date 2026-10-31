@@ -20,7 +20,7 @@ impl ThinkingStore {
         }
     }
 
-    /// 精准定向净化指定会话中的异构污染签名（保留思考文本与健康签名）
+    /// Precisely targeted purification of heterogeneous pollution signatures in specified sessions (retaining thought text and healthy signatures)
     pub fn purge_corrupted_signatures(&self, store_key: &str, target_model: &str) -> usize {
         if store_key.is_empty() {
             return 0;
@@ -33,7 +33,7 @@ impl ThinkingStore {
 
         let mut purged_count = 0;
 
-        // 1. 精准净化内存缓存 (RAM)
+        // 1. Precisely purify memory cache (RAM)
         if let Some(mut entry) = self.sessions.get_mut(store_key) {
             let mut new_turns = Vec::with_capacity(entry.turns.len());
             for rec in &entry.turns {
@@ -58,7 +58,7 @@ impl ThinkingStore {
             entry.turns = new_turns;
         }
 
-        // 2. 精准净化持久化数据库 (SQLite)
+        // 2. Precisely purify the persistent database (SQLite)
         // Justification: best-effort call; failure logged without changing control flow
         crate::error::record_ignored(
             crate::modules::proxy_db::purge_foreign_signatures_for_session_with_model(

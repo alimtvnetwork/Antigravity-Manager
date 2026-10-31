@@ -64,7 +64,21 @@ export async function auditIsRecording(): Promise<boolean> {
  */
 export async function auditRecord(payload: AuditRecordPayload): Promise<boolean> {
     try {
-        await invoke(AUDIT_COMMANDS.record, { input: payload });
+        const route = payload.route
+            ?? (typeof window !== 'undefined'
+                ? (window.location.hash?.replace(/^#/, '') || window.location.pathname || '/')
+                : '/');
+        const enriched: AuditRecordPayload = {
+            ...payload,
+            actor: payload.actor || 'user',
+            methodName: payload.methodName || payload.method_name || 'unknown',
+            trigger: payload.trigger || 'click',
+            result: payload.result || 'ok',
+            uiTarget: payload.uiTarget || payload.ui_target || 'unknown',
+            params: payload.params || {},
+            route: route || '/',
+        };
+        await invoke(AUDIT_COMMANDS.record, { input: enriched });
         return true;
     } catch (error) {
         warn(error, AUDIT_COMMANDS.record, { trigger: payload.trigger, methodName: payload.methodName });

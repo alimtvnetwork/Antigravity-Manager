@@ -2,21 +2,21 @@
 use super::cwd::{anchor_probe, has_cwd_candidate};
 use super::normalize::is_unified_hunk_range_header;
 use super::read::read_patch_file;
-// apply_patch **pre-flight 自动修复**:在把 V4A patch 发给 Codex apply 之前,读目标文件比对,
-// 自动对齐**安全**的上下文失配(尾随空格 / 首尾空白差异),消灭 V4A 头号失败
+// apply_patch **pre-flight automatic repair**: Before sending the V4A patch to Codex apply, read the target file for comparison.
+// Automatically align **safe** context mismatch (trailing spaces / leading and trailing whitespace differences), eliminating the number one failure of V4A
 // `apply_patch verification failed: Failed to find expected lines`。
 //
-// ## 为什么需要
-// 弱一点的 chat 模型(非 OpenAI)在大文件上常无法逐字节复刻 `Update File` 的 context/删除行
-// (尾随空格、缩进、记忆偏差)→ Codex 找不到锚点 → apply 失败 → 模型整文件重写,浪费时间和 token。
-// 实测真机报错(rollout 地面真相)正是这类。
+// ## Why is it needed?
+// Weaker chat models (non-OpenAI) are often unable to reproduce the context/delete lines of `Update File` byte-by-byte on large files.
+// (Trailing spaces, indentation, memory deviation) → Codex cannot find the anchor point → apply fails → the entire model file is rewritten, wasting time and tokens.
+// The error reported by the actual machine (rollout ground truth) is exactly this type.
 //
-// ## 安全边界(绝不损坏文件 —— 对齐用户「不做破坏性降级」硬规则)
-// - **只动锚点**:`Update File` 里的 context(空格前缀)/ 删除(`-`)行。`+新增` 行**绝不改动**。
-// - **只在唯一匹配时修**:锚点块在文件里按「忽略尾随空格 / 首尾空白」找候选,**恰好一个**位置才对齐;
-//   0 个(模型真改错内容)或 ≥2 个(歧义)一律**原样放行**,交给 Codex parse_patch 暴露真坏,绝不靠猜。
-// - **Add File / Delete File 不碰**(无锚点,不涉及匹配)。读不到文件 / 无 cwd → 原样放行。
-// - 每条修复 / 放行都记进 apply-patch 诊断页,可审计。
+// ## Safety boundary (never damage files - align users with the hard rule of "no destructive downgrades")
+// - **Move anchor point only**: context(space prefix)/ delete (`-`) line in `Update File`. `+New` lines **never change**.
+// - **Only fix when there is a unique match**: The anchor block is found in the file by "Ignore trailing spaces/leading and trailing blanks" to find candidates, and **exactly one** position will be aligned;
+//   0 (the model is really wrong) or ≥2 (ambiguous) will be **released as is** and handed over to Codex parse_patch to expose the real bad, never rely on guessing.
+// - **Add File / Delete File does not touch** (no anchor, no matching involved). Unable to read file / no cwd → release as is.
+// - Each repair/release is recorded in the apply-patch diagnostic page and can be audited.
 
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
@@ -25,10 +25,10 @@ use std::sync::{Mutex, OnceLock};
 use crate::proxy::adapters::apply_patch_preflight::Repair;
 use serde_json::Value;
 
-/// 一条 pre-flight 处理记录(给诊断页 / 日志)。
+/// A record of pre-flight processing (for diagnostic pages/logs).
 
-/// 发送给 Codex 自定义 apply_patch 前的后验校验。发现明确非法的 V4A 时,调用方应把该工具项
-/// 标成 incomplete,避免 Codex 执行后再把失败历史喂回模型形成循环。
+/// Post-verification before sending to Codex to customize apply_patch. When an explicitly illegal V4A is found, the caller should replace the tool item
+/// Mark it as incomplete to avoid feeding the failure history back to the model after the Codex is executed to form a loop.
 pub fn validate_v4a_for_codex(v4a: &str) -> Option<(usize, String)> {
     let meaningful: Vec<(usize, &str)> = v4a
         .lines()
@@ -126,10 +126,10 @@ pub fn validate_v4a_for_codex(v4a: &str) -> Option<(usize, String)> {
     None
 }
 
-/// **规则 G:Add File 内容行漏 `+` 前缀 → 补全**(grammar `add_hunk: … add_line+`、
-/// `add_line: "+" /(.*)/`)。Add File 语义 = 后续每行都是新文件的**字面内容**、必须 `+` 前缀;
-/// 模型偶尔漏写 `+` → Codex 不认作内容。Add File section 内**无歧义**(全是新增),给非 `+` 行
-/// 统一补 `+`(空行 → 裸 `+`);已是 `+` 的不动(不重复成 `++`)。纯字符串、不读盘。
+/// **Rule G:Add File content line omission `+` prefix → completion**(grammar `add_hunk: … add_line+`,
+/// `add_line: "+" /(.*)/`). Add File semantics = Each subsequent line is the **literal content** of the new file and must be prefixed with `+`;
+/// The model occasionally misses writing `+` → Codex does not recognize it as content. **No ambiguity** in Add File section (all new), give non-`+` lines
+/// Unified complement `+` (blank line → bare `+`); it is already the fixed version of `+` (not repeated into `++`). Pure string, no disk reading.
 pub(crate) fn ensure_add_file_plus(v4a: &str) -> (String, Vec<Repair>) {
     if !v4a.contains("*** Add File:") {
         return (v4a.to_owned(), Vec::new());
@@ -143,7 +143,7 @@ pub(crate) fn ensure_add_file_plus(v4a: &str) -> (String, Vec<Repair>) {
             out.push(lines[i].to_owned()); // header
             i += 1;
             let mut fixed = 0usize;
-            // body 到下一个 `*** ` 控制行 / EOF;Add File body 全是 `+` 内容行。
+            // body to the next `*** ` control line / EOF;Add File body is all `+` content lines.
             while i < lines.len() && !lines[i].starts_with("*** ") {
                 if lines[i].starts_with('+') {
                     out.push(lines[i].to_owned());
@@ -157,7 +157,9 @@ pub(crate) fn ensure_add_file_plus(v4a: &str) -> (String, Vec<Repair>) {
                 repairs.push(Repair {
                     file: path.trim().to_owned(),
                     kind: "repaired".to_owned(),
-                    detail: format!("Add File {fixed} 行漏 `+` 前缀 → 补全(lark add_line)"),
+                    detail: format!(
+                        "Add File {fixed} line missing `+` prefix → completion (lark add_line)"
+                    ),
                 });
             }
         } else {
@@ -172,11 +174,11 @@ pub(crate) fn ensure_add_file_plus(v4a: &str) -> (String, Vec<Repair>) {
     (joined, repairs)
 }
 
-/// **规则:`@@ <header>` 锚点对齐文件真实行**(真机 seq181:`Failed to find context 'X'`)。
-/// V4A 的 `@@ <header>` 是单边锚点,Codex 按**精确整行**匹配文件里的 section 行;模型常写**残缺**
-/// 头(如 `@@ 系统架构建议`,而文件真实行是 `## 6. 系统架构建议`)→ 找不到锚点。当 `<header>` 不是
-/// 文件里任何**整行**、但**恰好唯一包含于**某一文件行时,把 `@@ <header>` 对齐成 `@@ <该文件整行>`;
-/// 0 个 / 多个包含 → 歧义,原样放行(不猜)。裸 `@@`(无 header)不动。需 `cwd`。
+/// **Rule: `@@ <header>` Anchor alignment file real line** (real machine seq181: `Failed to find context 'X'`).
+/// V4A's `@@ <header>` is a single-sided anchor point. Codex matches the section line in the file according to **exact whole line**; the model often writes **incomplete**
+/// Header (such as `@@ System Architecture Suggestion`, and the real line of the file is `## 6. System Architecture Suggestion`) → The anchor point cannot be found. When `<header>` is not
+/// When any **whole line** in the file happens to be uniquely contained in a certain file line, align `@@ <header>` to `@@ <whole line of the file>`;
+/// 0/Multiple Contains → Ambiguity, leave it as is (no guessing). Naked `@@` (no header) does not move. Requires `cwd`.
 pub(crate) fn align_at_headers(v4a: &str, cwd: Option<&str>) -> (String, Vec<Repair>) {
     if !has_cwd_candidate(cwd) {
         return (v4a.to_owned(), Vec::new());
@@ -193,7 +195,7 @@ pub(crate) fn align_at_headers(v4a: &str, cwd: Option<&str>) -> (String, Vec<Rep
     let mut i = 0;
     while i < lines.len() {
         if let Some(path) = lines[i].strip_prefix("*** Update File: ") {
-            // 切到新 Update File section → 按候选 cwd + 锚点 probe 解析目标文件(MOC-263 P1/P2)
+            // Switch to the new Update File section → parse the target file by candidate cwd + anchor probe (MOC-263 P1/P2)
             let mut se = i + 1;
             while se < lines.len() && !lines[se].starts_with("*** ") {
                 se += 1;
@@ -207,7 +209,7 @@ pub(crate) fn align_at_headers(v4a: &str, cwd: Option<&str>) -> (String, Vec<Rep
             i += 1;
             continue;
         }
-        // `@@ <header>` 锚点(非裸 `@@`),且文件已载入
+        // `@@ <header>` anchor (not naked `@@`), and the file has been loaded
         if have_file {
             if let Some(header) = lines[i].strip_prefix("@@ ") {
                 let h = header.trim();
@@ -230,7 +232,7 @@ pub(crate) fn align_at_headers(v4a: &str, cwd: Option<&str>) -> (String, Vec<Rep
         repairs.push(Repair {
             file: "(@@ anchor)".to_owned(),
             kind: "repaired".to_owned(),
-            detail: format!("@@ 锚点残缺 → 对齐文件真实整行: {fixed} 处(Failed to find context)"),
+            detail: format!("@@ Anchor point is incomplete → Align the entire line of the file: {fixed} (Failed to find context)"),
         });
     }
     let mut joined = out.join("\n");

@@ -6,7 +6,7 @@ import { cn } from '../../../utils/cn';
 import { maskEmail } from '../../../utils/maskEmail';
 import type { Account } from '../../../types/account';
 import { QuotaProgressBar } from '../../accounts/QuotaProgressBar';
-import { formatPathEnding, getActionLabel, resolveDataDir } from './instanceTableUtils';
+import { formatPathEnding, formatShortPath, getActionLabel, resolveDataDir } from './instanceTableUtils';
 import type { InstanceActionType } from './instanceTableTypes';
 import type { InstanceStatus } from '../../../services/instanceService';
 
@@ -147,7 +147,7 @@ export function ProfileCell({ inst, data, onToggleEmail, onSetActive, onSetDefau
                         title={inst.is_running ? 'Running' : 'Idle'}
                     />
                     {data.isDefault ? (
-                        <span className="px-1.5 py-0.5 rounded-[5px] text-[9px] font-bold bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-300/40">
+                        <span className="px-2 py-0.5 rounded-[5px] text-[9.5px] font-extrabold bg-amber-200 text-amber-900 dark:bg-amber-950 dark:text-amber-200 border border-amber-400/90 dark:border-amber-500/70 shadow-xs tracking-wider">
                             DEFAULT
                         </span>
                     ) : onSetDefault ? (
@@ -155,14 +155,14 @@ export function ProfileCell({ inst, data, onToggleEmail, onSetActive, onSetDefau
                             type="button"
                             disabled={data.isBusy}
                             onClick={onSetDefault}
-                            className="px-1 py-0.5 rounded-[5px] text-[9px] text-slate-400 hover:text-amber-500 hover:bg-amber-500/10 transition-colors cursor-pointer disabled:opacity-40"
+                            className="px-1 py-0.5 rounded-[5px] text-[9px] text-slate-400 hover:text-amber-500 hover:bg-amber-500/10 transition-all duration-300 ease-out cursor-pointer disabled:opacity-40"
                             title="Set as default profile"
                         >
                             Set Default
                         </button>
                     ) : null}
                     {data.isActive ? (
-                        <span className="px-1.5 py-0.5 rounded-[5px] text-[9px] font-bold bg-sky-600 text-white shadow-2xs">
+                        <span className="px-2 py-0.5 rounded-[5px] text-[9.5px] font-extrabold bg-sky-700 dark:bg-sky-500 text-white border border-sky-800 dark:border-sky-400 shadow-xs tracking-wider">
                             ACTIVE
                         </span>
                     ) : (
@@ -170,7 +170,7 @@ export function ProfileCell({ inst, data, onToggleEmail, onSetActive, onSetDefau
                             type="button"
                             disabled={data.isBusy}
                             onClick={onSetActive}
-                            className="px-1 py-0.5 rounded-[5px] text-[9px] text-slate-400 hover:text-sky-500 hover:bg-sky-500/10 transition-colors cursor-pointer disabled:opacity-40"
+                            className="px-1 py-0.5 rounded-[5px] text-[9px] text-slate-400 hover:text-sky-500 hover:bg-sky-500/10 transition-all duration-300 ease-out cursor-pointer disabled:opacity-40"
                             title="Set as active target for account rotations"
                         >
                             Set Active
@@ -182,7 +182,7 @@ export function ProfileCell({ inst, data, onToggleEmail, onSetActive, onSetDefau
                     {data.boundEmail ? (
                         <span
                             onClick={onToggleEmail}
-                            className="cursor-pointer hover:underline text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate max-w-[150px] transition-colors group-hover:text-yellow-400 hover:text-yellow-300 dark:group-hover:text-yellow-200 dark:hover:text-yellow-200"
+                            className="cursor-pointer hover:underline text-[11px] text-slate-600 dark:text-slate-300 font-mono truncate max-w-[150px] transition-colors duration-300 ease-out group-hover:text-amber-600 hover:text-amber-700 dark:group-hover:text-amber-300 dark:hover:text-amber-200 font-medium"
                             title={data.isEmailRevealed ? data.boundEmail : 'Click to unmask email'}
                         >
                             {data.displayedEmail}
@@ -215,9 +215,9 @@ export function ProfileCell({ inst, data, onToggleEmail, onSetActive, onSetDefau
 
 export function QuotaCell({ data }: { data: RowCellData }) {
     return (
-        <td className="px-2 py-1 whitespace-nowrap min-w-[280px] w-[34%] group-hover:[&_span.font-mono]:text-yellow-400 dark:group-hover:[&_span.font-mono]:text-yellow-200">
+        <td className="px-2 py-1 whitespace-nowrap min-w-[190px] w-[26%] group-hover:[&_span.font-mono]:text-yellow-400 dark:group-hover:[&_span.font-mono]:text-yellow-200">
             {data.percentage !== null || data.weeklyQuota !== null ? (
-                <div className="space-y-1.5 w-full min-w-[240px]">
+                <div className="space-y-1.5 w-full min-w-[180px]">
                     {data.percentage !== null && (
                         <div className="space-y-0.5 w-full">
                             <div className="flex items-center justify-between text-[10px] font-mono">
@@ -252,18 +252,132 @@ export function QuotaCell({ data }: { data: RowCellData }) {
     );
 }
 
+
+
+export interface StatusProcessEnvCellProps {
+    inst: InstanceStatus;
+    data: RowCellData;
+    isCopied: boolean;
+    onCopy: () => void;
+}
+
+export function StatusProcessEnvCell({ inst, data, isCopied, onCopy }: StatusProcessEnvCellProps) {
+    const [isExeCopied, setIsExeCopied] = useState(false);
+    const fullPath = resolveDataDir(inst);
+    const exeFull = inst.config.executable_path || '';
+    const isWindows = fullPath.includes('\\') || exeFull.includes('\\') || /^[a-zA-Z]:/.test(fullPath) || /^[a-zA-Z]:/.test(exeFull);
+    const sep = isWindows ? '\\' : '/';
+    const defaultExeTail = `...${sep}Antigravity.exe`;
+    const exeTail = exeFull
+        ? (formatShortPath(exeFull) || formatPathEnding(exeFull))
+        : (inst.config.is_default || inst.config.id === 'default' ? defaultExeTail : 'Default IDE');
+    const exeEnding = exeTail;
+    const dataEnding = fullPath ? (formatShortPath(fullPath) || formatPathEnding(fullPath)) : '—';
+
+    const handleCopyExe = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        try {
+            await copyToClipboard(exeFull || exeEnding);
+            setIsExeCopied(true);
+            setTimeout(() => setIsExeCopied(false), 1500);
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'InstanceRowCells.StatusProcessEnvCell',
+                triggerAction: 'copy_exe_path',
+            });
+        }
+    };
+
+    return (
+        <td
+            className="px-2 py-1 whitespace-nowrap min-w-[220px] max-w-[280px]"
+            title={`Status: ${data.isBusy ? getActionLabel(data.currentAction) : inst.is_running ? (inst.pid ? `Running (PID: ${inst.pid})` : 'Running') : 'Idle'}\nIDE Executable: ${exeFull || exeEnding}\nData Directory: ${fullPath}`}
+        >
+            <div className="flex flex-col gap-1 text-[11px] font-mono">
+                {/* Line 1: Status Pill & IDE Executable */}
+                <div className="flex items-center justify-between gap-1.5 min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate">
+                        {data.isBusy ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-blue-100 text-blue-900 dark:bg-cyan-950 dark:text-cyan-200 border border-blue-400/80 dark:border-cyan-400/80 backdrop-blur-xs animate-pulse shadow-xs shrink-0 whitespace-nowrap">
+                                <RotateCw className="w-2.5 h-2.5 animate-spin text-blue-600 dark:text-cyan-300 shrink-0" />
+                                <span>{getActionLabel(data.currentAction)}</span>
+                            </span>
+                        ) : inst.is_running ? (
+                            <span
+                                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-100 text-emerald-900 dark:bg-emerald-950/80 dark:text-[#1af18d] border border-emerald-400/80 dark:border-emerald-500/60 backdrop-blur-xs shadow-xs font-mono shrink-0 whitespace-nowrap"
+                                title={inst.pid ? `Process ID (PID): ${inst.pid} — Active and Running` : 'Process ID (PID): Active and Running'}
+                            >
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 dark:bg-[#1af18d] animate-pulse shrink-0" />
+                                <span>{inst.pid ? `PID: ${inst.pid}` : 'Running'}</span>
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9.5px] font-semibold bg-slate-200 text-slate-800 dark:bg-[#1c132b] dark:text-slate-200 border border-slate-300 dark:border-[#523478] backdrop-blur-xs shrink-0 whitespace-nowrap">
+                                Idle
+                            </span>
+                        )}
+
+                        <div
+                            className="flex items-center gap-1 min-w-0 flex-1 truncate text-slate-700 dark:text-slate-200 font-semibold text-[10.5px]"
+                            title={`IDE: ${exeFull || exeEnding}`}
+                        >
+                            <Terminal className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span className="truncate whitespace-nowrap">{exeEnding}</span>
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={handleCopyExe}
+                        data-ui-name="copy-exe-btn"
+                        data-ui-id={`copy-exe-${inst.config.id}`}
+                        className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60 transition-all duration-300 ease-out cursor-pointer shrink-0"
+                        title={isExeCopied ? 'Copied executable path!' : 'Copy executable path'}
+                    >
+                        {isExeCopied ? <Check className="w-3 h-3 text-emerald-500" /> : <Terminal className="w-3 h-3" />}
+                    </button>
+                </div>
+
+                {/* Line 2: Data Environment Directory */}
+                <div className="flex items-center justify-between gap-1.5 min-w-0">
+                    <div
+                        className="flex items-center gap-1 min-w-0 flex-1 text-[10px] text-slate-500 dark:text-slate-400 truncate"
+                        title={`Data: ${fullPath}`}
+                    >
+                        <Folder className="w-3 h-3 text-slate-400 shrink-0" />
+                        <span className="truncate whitespace-nowrap">{dataEnding}</span>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={onCopy}
+                        data-ui-name="copy-path-btn"
+                        data-ui-id={`copy-path-${inst.config.id}`}
+                        className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-[#40285e]/60 transition-all duration-300 ease-out cursor-pointer shrink-0"
+                        title={isCopied ? 'Copied data path!' : 'Copy full data path'}
+                    >
+                        {isCopied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                </div>
+            </div>
+        </td>
+    );
+}
+
 export function StatusCell({ inst, data }: { inst: InstanceStatus; data: RowCellData }) {
     return (
-        <td className="px-2 py-1 whitespace-nowrap min-w-[118px] max-w-[140px]">
+        <td className="px-2 py-1 whitespace-nowrap min-w-[130px] max-w-[170px]">
             {data.isBusy ? (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50/90 text-blue-700 dark:bg-cyan-950/60 dark:text-cyan-300 border border-blue-300/60 dark:border-cyan-500/40 backdrop-blur-xs animate-pulse shadow-2xs">
                     <RotateCw className="w-2.5 h-2.5 animate-spin text-blue-500 dark:text-cyan-400 shrink-0" />
                     <span>{getActionLabel(data.currentAction)}</span>
                 </span>
             ) : inst.is_running ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-50/90 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-300/50 dark:border-teal-800/80 backdrop-blur-xs" title={inst.pid ? `Process id ${inst.pid}` : 'Running'}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
-                    {inst.pid ? `PID ${inst.pid}` : 'Running'}
+                <span
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 dark:text-[#1af18d] border border-emerald-500/30 backdrop-blur-xs shadow-2xs font-mono"
+                    title={inst.pid ? `Process ID (PID): ${inst.pid} — Active and Running` : 'Process ID (PID): Active and Running'}
+                >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-[#1af18d] animate-pulse shrink-0" />
+                    <span>{inst.pid ? `PID: ${inst.pid}` : 'Running'}</span>
                 </span>
             ) : (
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100/90 text-slate-600 dark:bg-[#090611]/90 dark:text-slate-400 border border-slate-200 dark:border-[#40285e] backdrop-blur-xs">
@@ -278,6 +392,87 @@ interface PathCellProps {
     inst: InstanceStatus;
     isCopied: boolean;
     onCopy: () => void;
+}
+
+export interface IdeExeAndDataCellProps {
+    inst: InstanceStatus;
+    isCopied: boolean;
+    onCopy: () => void;
+}
+
+export function IdeExeAndDataCell({ inst, isCopied, onCopy }: IdeExeAndDataCellProps) {
+    const [isExeCopied, setIsExeCopied] = useState(false);
+    const fullPath = resolveDataDir(inst);
+    const exeFull = inst.config.executable_path || '';
+    const exeTail = exeFull
+        ? (exeFull.split(/[/\\]/).filter(Boolean).pop() || formatPathEnding(exeFull))
+        : (inst.config.is_default || inst.config.id === 'default' ? 'Antigravity.exe' : 'Default IDE');
+    const exeEnding = exeTail;
+    const dataEnding = formatPathEnding(fullPath) || '—';
+
+    const handleCopyExe = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        try {
+            await copyToClipboard(exeFull || exeEnding);
+            setIsExeCopied(true);
+            setTimeout(() => setIsExeCopied(false), 1500);
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'InstanceRowCells.IdeExeAndDataCell',
+                triggerAction: 'copy_exe_path',
+            });
+        }
+    };
+
+    return (
+        <td
+            className="px-2 py-1 whitespace-nowrap min-w-[220px] max-w-[340px]"
+            title={`IDE Executable: ${exeFull || exeEnding}\nData Directory: ${fullPath}`}
+        >
+            <div className="flex items-center justify-between gap-1.5 text-[11px] font-mono whitespace-nowrap flex-nowrap">
+                <div className="flex items-center gap-1.5 min-w-0 font-mono text-[11px] truncate flex-1 whitespace-nowrap flex-nowrap">
+                    <div
+                        className="flex items-center gap-1 min-w-0 shrink-0 text-slate-700 dark:text-slate-200 font-semibold truncate max-w-[140px] whitespace-nowrap flex-nowrap"
+                        title={`IDE: ${exeFull || exeEnding}`}
+                    >
+                        <Terminal className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate whitespace-nowrap">{exeEnding}</span>
+                    </div>
+                    <span className="text-slate-400 dark:text-slate-500 shrink-0 select-none text-[10px]">·</span>
+                    <div
+                        className="flex items-center gap-1 min-w-0 text-[10px] text-slate-500 dark:text-slate-400 truncate max-w-[150px] whitespace-nowrap flex-nowrap"
+                        title={`Data: ${fullPath}`}
+                    >
+                        <Folder className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate whitespace-nowrap">{dataEnding}</span>
+                    </div>
+                </div>
+                <div className="inline-flex items-center rounded-full border border-slate-200 dark:border-[#40285e] bg-slate-100/80 dark:bg-[#090611]/80 backdrop-blur-xs p-0.5 shrink-0 ml-1 shadow-2xs">
+                    <button
+                        type="button"
+                        onClick={handleCopyExe}
+                        data-ui-name="copy-exe-btn"
+                        data-ui-id={`copy-exe-${inst.config.id}`}
+                        className="px-1.5 py-0.5 rounded-l-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
+                        title={isExeCopied ? 'Copied executable path!' : 'Copy executable path'}
+                    >
+                        {isExeCopied ? <Check className="w-3 h-3 text-emerald-500" /> : <Terminal className="w-3 h-3" />}
+                    </button>
+                    <span className="w-px h-2.5 bg-slate-200 dark:bg-[#40285e] shrink-0" />
+                    <button
+                        type="button"
+                        onClick={onCopy}
+                        data-ui-name="copy-path-btn"
+                        data-ui-id={`copy-path-${inst.config.id}`}
+                        className="px-1.5 py-0.5 rounded-r-full text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#40285e] transition-colors cursor-pointer"
+                        title={isCopied ? 'Copied data path!' : 'Copy full data path'}
+                    >
+                        {isCopied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                </div>
+            </div>
+        </td>
+    );
 }
 
 export function PathCell({ inst, isCopied, onCopy }: PathCellProps) {

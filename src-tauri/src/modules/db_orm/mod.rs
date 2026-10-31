@@ -1,0 +1,311 @@
+//! Type-safe Rust ORM framework and Split-DB generator abstractions.
+
+pub mod audit_table_archiver;
+pub mod backup_snapshot_verifier;
+pub mod builder;
+pub mod busy_handler;
+pub mod busy_retry;
+pub mod busy_timeout_scaler;
+pub mod cache_size_tuner;
+pub mod checkpoint_scheduler;
+pub mod column_default_validator;
+pub mod column_nullability_validator;
+pub mod column_type_affinity_validator;
+pub mod commit_latency_observer;
+pub mod compile_options;
+pub mod connection;
+pub mod connection_busy_timeout_scaler;
+pub mod connection_checkout_limiter;
+pub mod connection_pool_metrics;
+pub mod connection_starvation_watchdog;
+pub mod database_snapshot_manifest;
+pub mod db_size_watchdog;
+pub mod deadlock_detector;
+pub mod dump;
+pub mod fifo_dead_letter_queue_spillover_guard;
+pub mod fifo_prompt_order_enforcer;
+pub mod fifo_prompt_queue_coordinator;
+pub mod fifo_prompt_queue_partition_allocator;
+pub mod fifo_prompt_restore_concurrency_limiter;
+pub mod fifo_prompt_restore_cursor_stepper;
+pub mod fifo_prompt_restore_transaction_guard;
+pub mod fifo_prompt_restore_validator;
+pub mod fifo_queue_batch_drain_guard;
+pub mod fifo_queue_compaction_guard;
+pub mod fifo_queue_drain_monotonicity_verifier;
+pub mod fifo_queue_index_analyzer;
+pub mod fifo_restore_transaction_coordinator;
+pub mod fk_resolver;
+pub mod foreign_key_action_validator;
+pub mod foreign_key_watchdog;
+pub mod foreign_keys;
+pub mod fragmentation;
+pub mod free_page_stepper;
+pub mod generated;
+pub mod header_checksum_guard;
+pub mod health_probe_aggregator;
+pub mod highwater;
+pub mod index_cardinality_analyzer;
+pub mod index_coverage_verifier;
+pub mod index_fragmentation_analyzer;
+pub mod index_fragmentation_scorer;
+pub mod index_health;
+pub mod index_health_checker;
+pub mod index_usage_inspector;
+pub mod json_extract;
+pub mod lock_checker;
+pub mod lock_contention_profiler;
+pub mod lock_contention_watchdog;
+pub mod lock_detector;
+pub mod lock_escalation_guard;
+pub mod lock_timeout_escalator;
+pub mod migration_checksum;
+pub mod migration_gate;
+pub mod migration_version_stamp;
+pub mod mmap_tuner;
+pub mod page_budget_controller;
+pub mod page_cache_adjuster;
+pub mod page_cache_manager;
+pub mod page_freelist_analyzer;
+pub mod pagination;
+pub mod pool_limiter;
+pub mod pool_starvation_guard;
+pub mod pragma_diagnostic_reporter;
+pub mod pragmas;
+pub mod query_cost_estimator;
+pub mod query_latency_histogram;
+pub mod query_profile_exporter;
+pub mod query_timeout_guard;
+pub mod read_sandbox;
+pub mod read_uncommitted_guard;
+pub mod rollback_guard;
+pub mod rollback_telemetry;
+pub mod row_size;
+pub mod safety_guard;
+pub mod schema_inspector;
+pub mod schema_integrity_gate;
+pub mod schema_migration_journal;
+pub mod schema_version_checker;
+pub mod split_db_orphan_checker;
+pub mod stale_wal_cleanup_sentinel;
+pub mod statistics;
+pub mod table_column_stats_collector;
+pub mod table_page_counter;
+pub mod table_profiler;
+pub mod table_row_size_profiler;
+pub mod temp_db_cleanup_sentinel;
+pub mod temp_store;
+pub mod temp_store_memory_guard;
+pub mod traits;
+pub mod transaction_logger;
+pub mod truncate;
+pub mod vacuum_backup;
+pub mod vacuum_optimizer;
+pub mod vacuum_scheduler;
+pub mod vacuum_stepper;
+pub mod version_drift;
+pub mod wal_fragmentation_surveyor;
+pub mod wal_header_inspector;
+pub mod wal_passive_checkpoint_scheduler;
+pub mod wal_recovery_sentinel;
+pub mod wal_stepped_checkpoint;
+pub mod wal_truncate_scheduler;
+pub mod wal_watchdog;
+pub mod write_ahead_flush;
+
+#[cfg(test)]
+pub mod tests;
+#[cfg(test)]
+pub mod tests_busy_timeout_scaler;
+#[cfg(test)]
+pub mod tests_column_default_validator;
+#[cfg(test)]
+pub mod tests_column_nullability_validator;
+#[cfg(test)]
+pub mod tests_column_type_affinity_validator;
+#[cfg(test)]
+pub mod tests_commit_latency_observer;
+#[cfg(test)]
+pub mod tests_compile_options;
+#[cfg(test)]
+pub mod tests_connection_checkout_limiter;
+#[cfg(test)]
+pub mod tests_connection_starvation_watchdog;
+#[cfg(test)]
+pub mod tests_db_size_watchdog;
+#[cfg(test)]
+pub mod tests_deadlock_detector;
+#[cfg(test)]
+pub mod tests_fifo_dead_letter_queue_spillover_guard;
+#[cfg(test)]
+pub mod tests_fifo_prompt_order_enforcer;
+#[cfg(test)]
+pub mod tests_fifo_prompt_queue_coordinator;
+#[cfg(test)]
+pub mod tests_fifo_prompt_queue_partition_allocator;
+#[cfg(test)]
+pub mod tests_fifo_prompt_restore_concurrency_limiter;
+#[cfg(test)]
+pub mod tests_fifo_prompt_restore_cursor_stepper;
+#[cfg(test)]
+pub mod tests_fifo_prompt_restore_transaction_guard;
+#[cfg(test)]
+pub mod tests_fifo_prompt_restore_validator;
+#[cfg(test)]
+pub mod tests_fifo_queue_batch_drain_guard;
+#[cfg(test)]
+pub mod tests_fifo_queue_compaction_guard;
+#[cfg(test)]
+pub mod tests_fifo_queue_drain_monotonicity_verifier;
+#[cfg(test)]
+pub mod tests_fifo_queue_index_analyzer;
+#[cfg(test)]
+pub mod tests_fifo_restore_transaction_coordinator;
+#[cfg(test)]
+pub mod tests_free_page_stepper;
+#[cfg(test)]
+pub mod tests_index_cardinality_analyzer;
+#[cfg(test)]
+pub mod tests_index_coverage_verifier;
+#[cfg(test)]
+pub mod tests_index_fragmentation_scorer;
+#[cfg(test)]
+pub mod tests_lock_contention_watchdog;
+#[cfg(test)]
+pub mod tests_lock_timeout_escalator;
+#[cfg(test)]
+pub mod tests_mmap_tuner;
+#[cfg(test)]
+pub mod tests_page_budget_controller;
+#[cfg(test)]
+pub mod tests_page_cache_adjuster;
+#[cfg(test)]
+pub mod tests_page_cache_manager;
+#[cfg(test)]
+pub mod tests_page_freelist;
+#[cfg(test)]
+pub mod tests_query_latency_histogram;
+#[cfg(test)]
+pub mod tests_schema_integrity_gate;
+#[cfg(test)]
+pub mod tests_vacuum_stepper;
+#[cfg(test)]
+pub mod tests_wal_fragmentation_surveyor;
+#[cfg(test)]
+pub mod tests_wal_schedulers;
+
+pub use audit_table_archiver::*;
+pub use backup_snapshot_verifier::*;
+pub use builder::{Order, QueryBuilder, ViewQueryBuilder};
+pub use busy_handler::*;
+pub use busy_retry::*;
+pub use busy_timeout_scaler::*;
+pub use cache_size_tuner::*;
+pub use checkpoint_scheduler::*;
+pub use column_default_validator::*;
+pub use column_nullability_validator::*;
+pub use column_type_affinity_validator::*;
+pub use commit_latency_observer::*;
+pub use compile_options::*;
+pub use connection::{
+    init_split_db_schema, open_diesel_split_db, open_split_db, open_split_db_readonly,
+    verify_split_db_integrity,
+};
+pub use connection_busy_timeout_scaler::*;
+pub use connection_checkout_limiter::*;
+pub use connection_pool_metrics::*;
+pub use connection_starvation_watchdog::*;
+pub use database_snapshot_manifest::*;
+pub use db_size_watchdog::*;
+pub use deadlock_detector::*;
+pub use dump::*;
+pub use fifo_dead_letter_queue_spillover_guard::*;
+pub use fifo_prompt_order_enforcer::*;
+pub use fifo_prompt_queue_coordinator::*;
+pub use fifo_prompt_queue_partition_allocator::*;
+pub use fifo_prompt_restore_concurrency_limiter::*;
+pub use fifo_prompt_restore_cursor_stepper::*;
+pub use fifo_prompt_restore_transaction_guard::*;
+pub use fifo_prompt_restore_validator::*;
+pub use fifo_queue_batch_drain_guard::*;
+pub use fifo_queue_compaction_guard::*;
+pub use fifo_queue_drain_monotonicity_verifier::*;
+pub use fifo_queue_index_analyzer::*;
+pub use fifo_restore_transaction_coordinator::*;
+pub use fk_resolver::*;
+pub use foreign_key_action_validator::*;
+pub use foreign_key_watchdog::*;
+pub use foreign_keys::*;
+pub use fragmentation::*;
+pub use free_page_stepper::*;
+pub use generated::*;
+pub use header_checksum_guard::*;
+pub use health_probe_aggregator::*;
+pub use highwater::*;
+pub use index_cardinality_analyzer::*;
+pub use index_coverage_verifier::*;
+pub use index_fragmentation_analyzer::*;
+pub use index_fragmentation_scorer::*;
+pub use index_health::*;
+pub use index_health_checker::*;
+pub use index_usage_inspector::*;
+pub use json_extract::*;
+pub use lock_checker::*;
+pub use lock_contention_profiler::*;
+pub use lock_contention_watchdog::*;
+pub use lock_detector::*;
+pub use lock_escalation_guard::*;
+pub use lock_timeout_escalator::*;
+pub use migration_checksum::*;
+pub use migration_gate::*;
+pub use migration_version_stamp::*;
+pub use mmap_tuner::*;
+pub use page_budget_controller::*;
+pub use page_cache_adjuster::*;
+pub use page_cache_manager::*;
+pub use page_freelist_analyzer::*;
+pub use pagination::*;
+pub use pool_limiter::*;
+pub use pool_starvation_guard::*;
+pub use pragma_diagnostic_reporter::*;
+pub use pragmas::*;
+pub use query_cost_estimator::*;
+pub use query_latency_histogram::*;
+pub use query_profile_exporter::*;
+pub use query_timeout_guard::*;
+pub use read_sandbox::*;
+pub use read_uncommitted_guard::*;
+pub use rollback_guard::*;
+pub use rollback_telemetry::*;
+pub use row_size::*;
+pub use safety_guard::*;
+pub use schema_inspector::*;
+pub use schema_integrity_gate::*;
+pub use schema_migration_journal::*;
+pub use schema_version_checker::*;
+pub use split_db_orphan_checker::*;
+pub use stale_wal_cleanup_sentinel::*;
+pub use statistics::*;
+pub use table_column_stats_collector::*;
+pub use table_page_counter::*;
+pub use table_profiler::*;
+pub use table_row_size_profiler::*;
+pub use temp_db_cleanup_sentinel::*;
+pub use temp_store::*;
+pub use temp_store_memory_guard::*;
+pub use traits::{Entity, FromRow, ToValues, ValueParam, ViewEntity};
+pub use transaction_logger::*;
+pub use truncate::*;
+pub use vacuum_backup::*;
+pub use vacuum_optimizer::*;
+pub use vacuum_scheduler::*;
+pub use vacuum_stepper::*;
+pub use version_drift::*;
+pub use wal_fragmentation_surveyor::*;
+pub use wal_header_inspector::*;
+pub use wal_passive_checkpoint_scheduler::*;
+pub use wal_recovery_sentinel::*;
+pub use wal_stepped_checkpoint::*;
+pub use wal_truncate_scheduler::*;
+pub use wal_watchdog::*;
+pub use write_ahead_flush::*;

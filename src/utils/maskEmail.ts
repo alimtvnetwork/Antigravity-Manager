@@ -1,22 +1,38 @@
 /**
  * Strict privacy mask for user email addresses.
- * Preserves initial distinguishing characters while masking the remainder of the local part.
- * Example: `riseup.asia.team@gmail.com` -> `ris***@gmail.com`
+ * Displays 4 characters from the email local part first,
+ * and hides `@gmail` / `@googlemail` domains completely.
+ *
+ * Examples:
+ *  - `david.smith@gmail.com` -> `davi***`
+ *  - `kevin@gmail.com` -> `kevi***`
+ *  - `dan@gmail.com` -> `dan***`
+ *  - `ab@gmail.com` -> `ab***`
+ *  - `x@gmail.com` -> `x***`
+ *  - `worker.alpha@example.com` -> `work***@example.com`
+ *  - `not-an-email` -> `not-an-email`
+ *  - `""` -> `—`
  */
 export function maskEmail(email: string): string {
     const trimmed = (email || '').trim();
-    if (!trimmed) return '***';
-    const parts = trimmed.split('@');
-    const local = parts[0] || '';
-    const domain = parts[1];
+    if (!trimmed) return '—';
 
-    const shown = local.length <= 2
-        ? Math.min(1, local.length)
-        : Math.min(3, Math.max(1, local.length - 2));
+    if (!trimmed.includes('@')) {
+        return trimmed;
+    }
 
-    const maskedLocal = `${local.slice(0, shown)}***`;
+    const [local, domain] = trimmed.split('@');
+    const localPart = local || '';
+    const shown = Math.min(4, Math.max(1, localPart.length));
+    const maskedLocal = `${localPart.slice(0, shown)}***`;
 
     if (!domain) {
+        return maskedLocal;
+    }
+
+    const lowerDomain = domain.toLowerCase();
+    // Hide @gmail.com and @googlemail.com completely as requested
+    if (lowerDomain.includes('gmail') || lowerDomain.includes('googlemail')) {
         return maskedLocal;
     }
 

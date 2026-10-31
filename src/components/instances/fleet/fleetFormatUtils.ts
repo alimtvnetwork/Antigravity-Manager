@@ -1,14 +1,7 @@
+import { maskEmail } from '../../../utils/maskEmail';
+
 export function maskEmailAddress(email: string): string {
-    if (!email || !email.includes('@')) {
-        return email || '—';
-    }
-    const [local, domain] = email.split('@');
-    if (!local || local.length <= 2) {
-        return `${local ? local[0] : '*'}***@${domain || ''}`;
-    }
-    const firstChar = local[0];
-    const lastChar = local[local.length - 1];
-    return `${firstChar}***${lastChar}@${domain}`;
+    return maskEmail(email);
 }
 
 export function formatRelativeHeartbeat(timestamp?: number | null): string {

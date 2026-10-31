@@ -25,7 +25,7 @@ pub fn sync_openclaw_provider(
     let mut config = read_openclaw_config(&path)?;
     create_backup(&path)?;
 
-    // 1. 构建 Provider 模型数组
+    // 1. Build Provider model array
     let model_items: Vec<Value> = models
         .iter()
         .map(|m| {
@@ -42,7 +42,7 @@ pub fn sync_openclaw_provider(
         })
         .collect();
 
-    // 2. 写入 models.providers.antigravity-manager
+    // 2. Write models.providers.antigravity-manager
     let provider_entry = json!({
         "baseUrl": normalized_url,
         "apiKey": api_key.trim(),
@@ -59,7 +59,7 @@ pub fn sync_openclaw_provider(
     }
     config["models"]["providers"][PROVIDER_ID] = provider_entry;
 
-    // 3. 针对不同版本进行模型与白名单匹配
+    // 3. Match models and whitelists for different versions
     if config.get("agents").is_none() {
         config["agents"] = json!({});
     }
@@ -70,12 +70,12 @@ pub fn sync_openclaw_provider(
     let is_v1 = target_version.eq_ignore_ascii_case("v1");
 
     if is_v1 {
-        // v1.0 规范 (< 2026.8.1): 使用 agents.defaults.models 字典注册可用模型
+        // v1.0 specification (< 2026.8.1): Use the agents.defaults.models dictionary to register available models
         if config["agents"]["defaults"].get("models").is_none() {
             config["agents"]["defaults"]["models"] = json!({});
         }
         if let Some(map) = config["agents"]["defaults"]["models"].as_object_mut() {
-            // 清理旧的 antigravity-manager 记录
+            // Clean up old antigravity-manager records
             let keys_to_remove: Vec<String> = map
                 .keys()
                 .filter(|k| k.starts_with(&format!("{PROVIDER_ID}/")))
@@ -84,13 +84,13 @@ pub fn sync_openclaw_provider(
             for k in keys_to_remove {
                 map.remove(&k);
             }
-            // 批量添加新同步模型
+            // Add new synchronization models in batches
             for m in &models {
                 map.insert(format!("{PROVIDER_ID}/{m}"), json!({}));
             }
         }
     } else {
-        // v2.0 规范 (>= 2026.8.1): 使用 agents.defaults.modelPolicy.allow 白名单
+        // v2.0 spec (>= 2026.8.1): Use agents.defaults.modelPolicy.allow whitelist
         if config["agents"]["defaults"].get("modelPolicy").is_none() {
             config["agents"]["defaults"]["modelPolicy"] = json!({});
         }
@@ -112,7 +112,7 @@ pub fn sync_openclaw_provider(
         config["agents"]["defaults"]["modelPolicy"]["allow"] = json!(next_allow);
     }
 
-    // 4. 激活默认模型 (如勾选)
+    // 4. Activate the default model (if checked)
     let selected_default = default_model
         .as_deref()
         .filter(|m| !m.trim().is_empty())
@@ -152,7 +152,7 @@ pub fn clear_openclaw_config() -> Result<(), String> {
     let mut config = read_openclaw_config(&path)?;
     create_backup(&path)?;
 
-    // 1. 移除 models.providers.antigravity-manager
+    // 1. Remove models.providers.antigravity-manager
     if let Some(providers) = config
         .get_mut("models")
         .and_then(|m| m.get_mut("providers"))
@@ -161,7 +161,7 @@ pub fn clear_openclaw_config() -> Result<(), String> {
         providers.remove(PROVIDER_ID);
     }
 
-    // 2. 清理 agents.defaults.models 里面的 antigravity-manager/*
+    // 2. Clean up antigravity-manager/* in agents.defaults.models
     if let Some(agent_models) = config
         .get_mut("agents")
         .and_then(|a| a.get_mut("defaults"))
@@ -178,7 +178,7 @@ pub fn clear_openclaw_config() -> Result<(), String> {
         }
     }
 
-    // 3. 清理 agents.defaults.modelPolicy.allow
+    // 3. Clean up agents.defaults.modelPolicy.allow
     if let Some(allow) = config
         .get_mut("agents")
         .and_then(|a| a.get_mut("defaults"))
@@ -192,7 +192,7 @@ pub fn clear_openclaw_config() -> Result<(), String> {
         });
     }
 
-    // 4. 若主模型指向 antigravity-manager，则清理
+    // 4. If the main model points to antigravity-manager, clean it up
     if let Some(primary) = config
         .get("agents")
         .and_then(|a| a.get("defaults"))
@@ -250,7 +250,7 @@ pub async fn get_openclaw_sync_status(proxy_url: Option<String>) -> Result<OpenC
             return Ok(status);
         };
 
-        // 读取 provider 配置
+        // Read provider configuration
         if let Some(provider) = config
             .get("models")
             .and_then(|m| m.get("providers"))
@@ -277,7 +277,7 @@ pub async fn get_openclaw_sync_status(proxy_url: Option<String>) -> Result<OpenC
             }
         }
 
-        // 读取 active 模型与版本特征
+        // Read active model and version characteristics
         if let Some(primary) = config
             .get("agents")
             .and_then(|a| a.get("defaults"))
@@ -293,7 +293,7 @@ pub async fn get_openclaw_sync_status(proxy_url: Option<String>) -> Result<OpenC
             }
         }
 
-        // 判断当前配置更偏向 v1 还是 v2
+        // Determine whether the current configuration is more biased towards v1 or v2
         let has_v1_models = config
             .get("agents")
             .and_then(|a| a.get("defaults"))
@@ -393,13 +393,13 @@ pub(crate) mod tests {
 
     #[test]
     fn test_resolve_model_specs() {
-        // Gemini 3.8 / 3.0 / 2.5 系列 (1024000 上下文, 65536 输出)
+        // Gemini 3.8 / 3.0 / 2.5 series (1024000 contexts, 65536 outputs)
         let (cw_gemini, max_gemini, _, input_gemini) = resolve_model_specs("gemini-3.8-flash-high");
         assert_eq!(cw_gemini, 1024000);
         assert_eq!(max_gemini, 65536);
         assert_eq!(input_gemini, vec!["text", "image"]);
 
-        // Claude 系列 (256000 上下文, 65536 输出)
+        // Claude family (256000 contexts, 65536 outputs)
         let (cw_claude, max_claude, _, input_claude) =
             resolve_model_specs("claude-3-5-sonnet-latest");
         assert_eq!(cw_claude, 256000);

@@ -129,7 +129,7 @@ impl ContextManager {
                     msg.reasoning_content = None;
                     modified = true;
                 }
-                // [REMOVED 2026-09-27] 带 tool_calls 的 reasoning 不再压缩为 "..."，保持原样透传。
+                // [REMOVED 2026-09-27] Reasoning with tool_calls is no longer compressed into "..." and remains transparently transmitted as it is.
             }
             if msg.role == "user" || msg.role == "assistant" {
                 if let Some(ref mut content) = msg.content {
@@ -358,7 +358,7 @@ impl ContextManager {
                                     total += estimate_media_tokens_from_url(&audio_url.url);
                                 }
                                 crate::proxy::mappers::openai::models::OpenAIContentBlock::InputAudio { input_audio } => {
-                                    // input_audio 携带裸 base64，直接按 inlineData 估算
+                                    // input_audio carries bare base64 and is estimated directly by inlineData
                                     total += estimate_inline_data_tokens(
                                         &input_audio.mime_type(),
                                         input_audio.data.len(),

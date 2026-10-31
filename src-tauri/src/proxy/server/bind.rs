@@ -17,6 +17,14 @@ fn bind_single_socket(
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(socket.set_reuse_address(true), "set_reuse_address");
 
+    // Imp-23: TCP No-Delay SSE Socket Optimization
+    // Justification: best-effort call; eliminates streaming packet buffering latency
+    crate::error::record_ignored(socket.set_nodelay(true), "set_nodelay");
+
+    // Imp-23: TCP No-Delay SSE Socket Optimization
+    // Justification: best-effort call; eliminates streaming packet buffering latency
+    crate::error::record_ignored(socket.set_nodelay(true), "set_nodelay");
+
     #[cfg(unix)]
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(socket.set_reuse_port(true), "set_reuse_port");
@@ -63,6 +71,10 @@ fn bind_dual_stack_socket(port: u16) -> Result<tokio::net::TcpListener, String> 
 
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(socket.set_reuse_address(true), "set_reuse_address");
+
+    // Imp-23: TCP No-Delay SSE Socket Optimization
+    // Justification: best-effort call; eliminates streaming packet buffering latency
+    crate::error::record_ignored(socket.set_nodelay(true), "set_nodelay");
 
     #[cfg(unix)]
     // Justification: best-effort call; failure logged without changing control flow

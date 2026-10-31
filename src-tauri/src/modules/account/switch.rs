@@ -28,15 +28,44 @@ pub async fn switch_account(
     }
 
     let mut account = load_account(account_id)?;
+    let normalized_instance_id = match target_ide {
+        None | Some("antigravity") | Some("agy") | Some("ide") | Some("classic") | Some("") => {
+            Some("default")
+        }
+        other => other,
+    };
     let mut audit = crate::modules::task_history_db::AuditTask::start(
         crate::modules::audit_action::AuditAction::SwitchAccount,
         &account.email,
-        target_ide,
+        normalized_instance_id,
     );
-    if account.disabled || account.proxy_disabled || account.validation_blocked {
+    // Validation block strictly forbids all switches (anti-abuse / CAPTCHA required)
+    if account.validation_blocked {
         return Err(format!(
-            "Cannot switch to account '{}': Account is disabled or blocked (disabled: {}, proxy_disabled: {}, validation_blocked: {})",
-            account.email, account.disabled, account.proxy_disabled, account.validation_blocked
+            "Cannot switch to account '{}': Account is blocked for verification (validation_blocked: true)",
+            account.email
+        ));
+    }
+
+    // If account was disabled by invalid_grant (revoked credentials), block with clear instruction
+    if account.disabled
+        && account
+            .disabled_reason
+            .as_deref()
+            .unwrap_or("")
+            .contains("invalid_grant")
+    {
+        return Err(format!(
+            "Cannot switch to account '{}': Refresh token is expired or revoked (invalid_grant). Please re-authenticate.",
+            account.email
+        ));
+    }
+
+    // User-disabled accounts are permitted for manual switch
+    if account.disabled {
+        crate::modules::logger::log_info(&format!(
+            "[Switch] Manual user switch to user-disabled account '{}' permitted.",
+            account.email
         ));
     }
 
@@ -132,7 +161,12 @@ pub async fn switch_account(
     let (prev_4h, prev_weekly) = if prev_email.is_some() {
         prev_acc_opt
             .as_ref()
-            .map(|a| crate::modules::auto_switcher::extract_dual_window_quotas(a, "gemini-2.5-pro"))
+            .map(|a| {
+                crate::modules::auto_switcher::extract_dual_window_quotas(
+                    a,
+                    crate::models::config::DEFAULT_TARGET_MODEL,
+                )
+            })
             .unwrap_or((None, None))
     } else {
         (None, None)
@@ -175,8 +209,10 @@ pub async fn switch_account(
         account.email
     ));
 
-    let (target_4h, target_weekly) =
-        crate::modules::auto_switcher::extract_dual_window_quotas(&account, "gemini-2.5-pro");
+    let (target_4h, target_weekly) = crate::modules::auto_switcher::extract_dual_window_quotas(
+        &account,
+        crate::models::config::DEFAULT_TARGET_MODEL,
+    );
 
     let followup_id = account.id.clone();
     let followup_email = account.email.clone();
@@ -190,7 +226,7 @@ pub async fn switch_account(
         }
         let predicted_next_email = crate::modules::auto_switcher::select_candidate_profiles(
             &followup_target,
-            "gemini-2.5-pro",
+            crate::models::config::DEFAULT_TARGET_MODEL,
             15.0,
             &pred_exclusions,
         )

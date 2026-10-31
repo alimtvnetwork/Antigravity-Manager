@@ -1,6 +1,6 @@
 [package]
 name = "agm-ui"
-version = "4.216.2"
+version = "4.279.1"
 default-run = "agm-ui"
 description = "Antigravity Manager Tools - Maintained by Alim, Sponsored by RISEUP ASIA LLC"
 authors = ["Alim <alim.karim@riseup-asia.com> (sponsored by RISEUP ASIA LLC)"]
@@ -38,16 +38,18 @@ yaml-rt = { version = "0.3.0", default-features = false }
 uuid = { version = "1.10", features = ["v4", "serde"] }
 chrono = "0.4"
 dirs = "5.0"
-reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "socks", "blocking", "rustls-tls", "multipart"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "socks", "blocking", "rustls-tls", "multipart", "http2"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "time"] }
-rusqlite = { version = "0.32", features = ["bundled", "backup"] }
+rusqlite = { version = "0.32", features = ["bundled", "backup", "hooks"] }
+diesel = { version = "2.2", features = ["sqlite", "returning_clauses_for_sqlite_3_35"] }
+libsqlite3-sys = { version = "0.30", features = ["bundled"] }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 base64 = "0.22"
 sysinfo = "0.31"
 boring2 = "4.15.15"
 sys-locale = "0.3.2"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["full", "test-util"] }
 url = "2.5.7"
 tauri-plugin-dialog = "2.6.0"
 tauri-plugin-fs = "2.4.5"
@@ -68,6 +70,9 @@ dashmap = "6.1"
 anyhow = "1.0"
 futures = "0.3"
 rand = "0.8"                        # Generate sessionId and mock project_id
+fastrand = "2"                      # Lightweight RNG for jitter and synthetic ID generation
+hostname = "0.4"                    # Local node hostname for audit/telemetry context
+hex = "0.4"                         # Hex encoding for content fingerprints
 async-stream = "0.3.6"              # Simplify async stream generation
 regex = "1.12.2"                    # Duration parsing
 once_cell = "1.19"                  # Static initialization (model mapping table)
@@ -109,7 +114,7 @@ incremental = false
 
 [profile.release]
 opt-level = 1
-codegen-units = 16
+codegen-units = 1
 lto = false
 incremental = false
 panic = "abort"

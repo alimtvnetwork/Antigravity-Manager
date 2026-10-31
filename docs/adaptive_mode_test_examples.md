@@ -1,94 +1,94 @@
-# Claude 4.6 Adaptive Thinking Mode: 测试示例指南
+# Claude 4.6 Adaptive Thinking Mode: A Guide to Testing Examples
 
-为了验证 Claude 4.6 Adaptive (自适应) Thinking 模式的集成效果，特别是 `effort` 参数的生效情况及 Token 限制的自动调整，请参考以下测试场景。
+In order to verify the integration effect of Claude 4.6 Adaptive Thinking mode, especially the effectiveness of the `effort` parameter and the automatic adjustment of Token limits, please refer to the following test scenario.
 
-## 1. 验证 Adaptive 模式激活与 Effort 控制
+## 1. Verify Adaptive mode activation and Effort control
 
-此测试验证系统能否正确传递 `thinking: { type: "adaptive", effort: "..." }` 参数，并观察模型行为差异。
+This test verifies that the system can correctly pass the `thinking: { type: "adaptive", effort: "..." }` parameter and observes differences in model behavior.
 
-### 前置条件
-*   确保使用支持 Adaptive Thinking 的模型 ID (如 `claude-opus-4-6-thinking` 或映射后的 ID)。
-*   在设置中将 "Thinking Budget" 模式设置为 **"Adaptive (自适应)"**。
+### Preconditions
+* Make sure to use a model ID that supports Adaptive Thinking (such as `claude-opus-4-6-thinking` or a mapped ID).
+* Set "Thinking Budget" mode to **"Adaptive"** in settings.
 
-### 测试指令示例
+### Test command example
 
-#### 场景 A: Low Effort (低强度思考)
-*   **配置**: 将 Effort 设置为 `Low`。
-*   **指令**: `写一个并通过 Rust 编译的 Hello World 程序。`
-*   **预期结果**:
-    *   Thinking 块应该比较简短，模型认为这是一个简单任务，不需要深入推理。
-    *   响应速度较快。
+#### Scenario A: Low Effort (low intensity thinking)
+* **Configuration**: Set Effort to `Low`.
+* **Instructions**: `Write a Hello World program and compile it with Rust. `
+* **Expected results**:
+    * Thinking blocks should be short and the model thinks it is a simple task that does not require in-depth reasoning.
+    * The response speed is faster.
 
-#### 场景 B: High Effort (高强度思考)
-*   **配置**: 将 Effort 设置为 `High`。
-*   **指令**: `请详细分析 Rust 的 async/await 状态机生成机制，并对比 Go 的 Goroutine 调度模型。请通过思维链深入推导两者的内存开销差异。`
-*   **预期结果**:
-    *   Thinking 块应该非常长且详细（可能超过 5k tokens）。
-    *   模型会尝试进行深度的对比分析和推理。
-    *   **关键验证点**: 检查 Antigravity 日志，确认 `generationConfig` 中包含了 `thinkingConfig: { type: "adaptive", effort: "high" }`。
-
----
-
-## 2. 验证多轮对话中的 Adaptive 状态维持
-
-验证在多轮对话中，Adaptive 模式是否能持续生效，且 Token 限制 (128k) 是否正常工作。
-
-### 场景：复杂算法设计迭代
-
-#### Round 1: 初始设计
-*   **指令**:
-    ```bash
-    claude "设计一个分布式的高并发秒杀系统。需要考虑缓存一致性、库存防超卖、防刷接口等核心问题。请使用 High Effort 进行深度思考。"
-    ```
-*   **验证点**:
-    *   生成了包含架构图和详细逻辑的设计文档。
-    *   Thinking 过程详细记录了对不同方案（如 Redis Lua vs 数据库悲观锁）的权衡。
-    *   验证响应头或日志中，确认 `maxOutputTokens` 被提升至 **128,000** (或更高)，以容纳长输出。
-
-#### Round 2: 方案挑战 (模拟用户反馈)
-*   **指令**:
-    ```bash
-    claude "你的设计中，Redis 集群如果发生脑裂，如何保证库存数据的强一致性？请重新思考并修正方案。"
-    ```
-*   **验证点**:
-    *   Thinking 块继续保持深度推理，分析 Redlock 或其他一致性算法的适用性。
-    *   **签名验证**: 确保多轮对话中 Thinking Block 的签名验证通过（无 `Invalid signature` 报错）。
-
-#### Round 3: 代码实现
-*   **指令**:
-    ```bash
-    claude "请给出库存扣减核心逻辑的 Rust 代码实现。"
-    ```
-*   **验证点**:
-    *   能生成符合之前设计思路的代码。
-    *   在高上下文压力下，系统是否自动触发了 Thinking 剥离（如果配置了动态剥离），或者能够正常携带完整历史继续生成。
+#### Scenario B: High Effort (high-intensity thinking)
+* **Configuration**: Set Effort to `High`.
+* **Instructions**: `Please analyze Rust’s async/await state machine generation mechanism in detail and compare it with Go’s Goroutine scheduling model. Please deduce the difference in memory overhead between the two through the chain of thought. `
+* **Expected results**:
+    * Thinking blocks should be very long and detailed (maybe over 5k tokens).
+    * The model attempts to perform in-depth comparative analysis and inference.
+    * **Key Verification Point**: Check Antigravity logs to confirm that `generationConfig` contains `thinkingConfig: { type: "adaptive", effort: "high" }`.
 
 ---
 
-## 3. 验证 Budget 模式与 Adaptive 模式的自动切换
+## 2. Verify Adaptive state maintenance in multiple rounds of dialogue
 
-此测试验证当用户在“固定 Budget”与“Adaptive”模式间切换时，后端能否正确转换参数。
+Verify that Adaptive mode continues to take effect across multiple rounds of conversations and that the Token limit (128k) works properly.
 
-### 测试流程
-1.  **设置为 Fixed Budget**: 在设置中选择 "Custom" 并设置 Budget 为 `16384`。
-    *   发送请求。
-    *   *验证*: 后端请求应只包含 `thinkingConfig: { budget: 16384 }`，**不应包含** `effort`。
+### Scenario: Complex algorithm design iteration
 
-2.  **切换为 Adaptive**: 在设置中选择 "Adaptive" 并设置 Effort 为 `Medium`。
-    *   发送请求。
-    *   *验证*: 后端请求应只包含 `thinkingConfig: { type: "adaptive", effort: "medium" }`，**不应包含** `budget`。
+#### Round 1: Initial Design
+* **instruction**:
+    ```bash
+    claude "Design a distributed high-concurrency flash sale system. Core issues such as cache consistency, inventory anti-overselling, and anti-brushing interfaces need to be considered. Please use High Effort for in-depth thinking."
+    ```
+* **Verification Point**:
+    * Design documents containing architectural diagrams and detailed logic were generated.
+    * The Thinking process details the trade-offs of different options (such as Redis Lua vs database pessimistic locking).
+    * Verify in the response headers or logs that `maxOutputTokens` is raised to **128,000** (or higher) to accommodate long output.
+
+#### Round 2: Solution Challenge (Simulated User Feedback)
+* **instruction**:
+    ```bash
+    claude "In your design, if a split-brain occurs in the Redis cluster, how to ensure the strong consistency of the inventory data? Please rethink and correct the plan."
+    ```
+* **Verification Point**:
+    * The Thinking block continues deep reasoning, analyzing the suitability of Redlock or other consensus algorithms.
+    * **Signature verification**: Ensure that the signature verification of Thinking Block in multiple rounds of dialogue passes (no `Invalid signature` error is reported).
+
+#### Round 3: Code Implementation
+* **instruction**:
+    ```bash
+    claude "Please provide the Rust code implementation of the core logic of inventory deduction."
+    ```
+* **Verification Point**:
+    * Can generate code that conforms to previous design ideas.
+    * Under high context pressure, does the system automatically trigger Thinking stripping (if dynamic stripping is configured), or can it continue to generate the complete history normally.
 
 ---
 
-## 4. 调试建议
+## 3. Verify automatic switching between Budget mode and Adaptive mode
 
-在运行上述测试时，建议开启 Debug 日志以观察参数传递：
+This test verifies that the backend converts parameters correctly when the user switches between Fixed Budget and Adaptive modes.
+
+### Test process
+1. **Set to Fixed Budget**: Select "Custom" in settings and set Budget to `16384`.
+    * Send a request.
+    * *Validation*: Backend requests should only contain `thinkingConfig: { budget: 16384 }` and **should not contain** `effort`.
+
+2. **Switch to Adaptive**: Select "Adaptive" in settings and set Effort to `Medium`.
+    * Send a request.
+    * *Validation*: Backend requests should only contain `thinkingConfig: { type: "adaptive", effort: "medium" }` and **should not contain** `budget`.
+
+---
+
+## 4. Debugging suggestions
+
+When running the above test, it is recommended to turn on the Debug log to observe the parameter passing:
 
 ```bash
 RUST_LOG=debug npm run tauri dev
 ```
 
-在日志中搜索关键词：
-*   `[Claude-Request]`: 查看转换后的请求体。
-*   `thinkingConfig`: 确认配置注入情况。
-*   `maxOutputTokens`: 确认 Token 上限调整情况。
+Search keywords in logs:
+* `[Claude-Request]`: View the converted request body.
+* `thinkingConfig`: Confirm configuration injection.
+* `maxOutputTokens`: Confirm the adjustment of the Token upper limit.

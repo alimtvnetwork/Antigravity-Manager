@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useErrorStore } from '../../stores/error-store';
 import type { InstanceConfig } from './types';
-import type { InstanceSwitchHistoryResponse } from '../../types/audit';
+import type { InstanceSwitchHistoryResponse, TaskRecord } from '../../types/audit';
 
 export interface RunningProject {
     id: string;
@@ -62,7 +62,7 @@ export async function getInstanceSwitchHistory(
 export async function getInstanceAuditTrail(
     instanceId: string,
     limit: number = 50
-): Promise<any[]> {
+): Promise<TaskRecord[]> {
     try {
         return await invoke('get_instance_audit_trail', { instanceId, limit });
     } catch (e: any) {

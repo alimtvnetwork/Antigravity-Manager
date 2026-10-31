@@ -76,6 +76,7 @@ export function useInstanceSelector(): InstanceSelectorApi {
 
     useEffect(() => {
         if (isOpen) {
+            fetchInstances();
             const frameId = requestAnimationFrame(() => {
                 const timer = setTimeout(() => {
                     activeItemRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -84,13 +85,13 @@ export function useInstanceSelector(): InstanceSelectorApi {
             });
             return () => cancelAnimationFrame(frameId);
         }
-    }, [isOpen, activeInstanceId]);
+    }, [isOpen, activeInstanceId, fetchInstances]);
 
     useEffect(() => {
         const canRun = isTauri();
         if (!canRun) return;
         fetchInstances();
-        const interval = setInterval(fetchInstances, 4000);
+        const interval = setInterval(fetchInstances, 60000);
         return () => clearInterval(interval);
     }, [fetchInstances]);
 

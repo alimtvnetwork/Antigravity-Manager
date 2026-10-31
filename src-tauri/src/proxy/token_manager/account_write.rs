@@ -1,4 +1,4 @@
-//! 账号写操作：停用、持久化刷新后的 Token、验证拦截。
+//! Account write operations: deactivation, persistence of refreshed Token, and verification interception.
 
 use super::helpers::truncate_reason;
 use super::helpers::update_account_json;
@@ -35,14 +35,14 @@ impl TokenManager {
         })
         .await?;
 
-        // 【修复 Issue #3】从内存中移除禁用的账号，防止被60s锁定逻辑继续使用
+        // [Fix Issue #3] Remove disabled accounts from memory to prevent continued use by 60s lock logic
         self.remove_account(account_id);
 
         tracing::warn!("Account disabled: {} ({:?})", account_id, path);
         Ok(())
     }
 
-    /// 保存 project_id 到账号文件
+    /// Save project_id to account file
     pub(crate) async fn save_project_id(
         &self,
         account_id: &str,
@@ -51,7 +51,7 @@ impl TokenManager {
         let path = self
             .tokens
             .get(account_id)
-            .ok_or("账号不存在")?
+            .ok_or("Account does not exist")?
             .account_path
             .clone();
         let project_id_owned = project_id.to_string();
@@ -60,11 +60,11 @@ impl TokenManager {
         })
         .await?;
 
-        tracing::debug!("已保存 project_id 到账号 {}", account_id);
+        tracing::debug!("Saved project_id to account {}", account_id);
         Ok(())
     }
 
-    /// 保存刷新后的 token 到账号文件
+    /// Save the refreshed token to the account file
     pub(crate) async fn save_refreshed_token(
         &self,
         account_id: &str,
@@ -73,7 +73,7 @@ impl TokenManager {
         let path = self
             .tokens
             .get(account_id)
-            .ok_or("账号不存在")?
+            .ok_or("Account does not exist")?
             .account_path
             .clone();
         let now = chrono::Utc::now().timestamp();
@@ -88,19 +88,22 @@ impl TokenManager {
             content["token"]["expiry_timestamp"] =
                 serde_json::Value::Number(expiry_timestamp.into());
 
-            // 如果获取到了新的 id_token，则保存它
+            // If a new id_token is obtained, save it
             if let Some(it) = id_token {
                 content["token"]["id_token"] = serde_json::Value::String(it);
             }
 
-            // 如果获取到了新的 refresh_token（Token 轮转），也一并保存
+            // If a new refresh_token (Token rotation) is obtained, it will also be saved.
             if let Some(rt) = refresh_token {
                 content["token"]["refresh_token"] = serde_json::Value::String(rt);
             }
         })
         .await?;
 
-        tracing::debug!("已保存刷新后的 token 到账号 {}", account_id);
+        tracing::debug!(
+            "The refreshed token has been saved to account {}",
+            account_id
+        );
         Ok(())
     }
 
@@ -126,11 +129,11 @@ impl TokenManager {
             return Err(format!("Account file not found: {:?}", path));
         }
 
-        // [NEW] 尝试从消息中提取验证链接 (#1522)
+        // [NEW] Try to extract verification link from message (#1522)
         let extracted_url = if let Ok(parsed_json) =
             serde_json::from_str::<serde_json::Value>(reason)
         {
-            // 尝试从特定的 Google RPC error 结构中取
+            // Try to get from a specific Google RPC error structure
             let mut url = None;
             if let Some(details) = parsed_json.pointer("/error/details") {
                 if let Some(arr) = details.as_array() {
@@ -151,7 +154,7 @@ impl TokenManager {
             }
             url
         } else {
-            // 回退方案：通过更严格的正则及反序列化解码可能的 \u0026
+            // Fallback solution: Decode possible \u0026 through stricter regularization and deserialization
             let url_regex = regex::Regex::new(r#"https://[^\s"'\\]+"#).unwrap();
             url_regex.find(reason).map(|m| {
                 let raw_url = m.as_str().to_string();
@@ -203,13 +206,13 @@ impl TokenManager {
 
     /// Set is_forbidden status for an account (called when proxy encounters 403)
     pub async fn set_forbidden(&self, account_id: &str, reason: &str) -> Result<(), String> {
-        // [FIX] 调用封装好的模块函数，确保线程安全地更新账号文件和索引
+        // [FIX] Call encapsulated module functions to ensure thread-safe update of account files and indexes
         crate::modules::account::mark_account_forbidden(account_id, reason)?;
 
         // Clear sticky session if forbidden
         self.session_accounts.retain(|_, v| *v != account_id);
 
-        // [FIX] 从内存池中移除账号，避免重试时再次选中
+        // [FIX] Remove account from memory pool to avoid re-selecting when retrying
         self.remove_account(account_id);
 
         tracing::warn!(

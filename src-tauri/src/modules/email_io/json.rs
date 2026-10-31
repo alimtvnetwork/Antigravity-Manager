@@ -105,6 +105,8 @@ pub fn import_from_json_with_password(
         let mut summary = ImportSummary {
             accounts_imported: 0,
             recipients_imported: 0,
+            recipients_skipped_duplicates: 0,
+            recipients_failed: 0,
             settings_updated: false,
             errors: Vec::new(),
         };
@@ -169,9 +171,8 @@ pub fn import_from_json_with_password(
                 is_active: Some(rec.is_active),
             };
 
-            if let Ok(_) = email_vault_db::add_notify_recipient(input) {
-                summary.recipients_imported += 1;
-            }
+            let outcome = email_vault_db::add_notify_recipient_outcome(input);
+            summary.record_recipient_outcome(&outcome);
         }
 
         if let Ok(_) = email_vault_db::save_notification_settings(bundle.settings) {
@@ -275,6 +276,8 @@ pub fn import_from_json_with_password(
     let mut summary = ImportSummary {
         accounts_imported: 0,
         recipients_imported: 0,
+        recipients_skipped_duplicates: 0,
+        recipients_failed: 0,
         settings_updated: false,
         errors: Vec::new(),
     };
@@ -319,9 +322,8 @@ pub fn import_from_json_with_password(
             group_name: Some("default".to_string()),
             is_active: Some(true),
         };
-        if email_vault_db::add_notify_recipient(rec_input).is_ok() {
-            summary.recipients_imported += 1;
-        }
+        let outcome = email_vault_db::add_notify_recipient_outcome(rec_input);
+        summary.record_recipient_outcome(&outcome);
     }
 
     if let Some(rcpts) = val.get("recipients").and_then(|v| v.as_array()) {
@@ -344,9 +346,8 @@ pub fn import_from_json_with_password(
                     group_name: Some(grp),
                     is_active: Some(act),
                 };
-                if email_vault_db::add_notify_recipient(rec_input).is_ok() {
-                    summary.recipients_imported += 1;
-                }
+                let outcome = email_vault_db::add_notify_recipient_outcome(rec_input);
+                summary.record_recipient_outcome(&outcome);
             }
         }
     }

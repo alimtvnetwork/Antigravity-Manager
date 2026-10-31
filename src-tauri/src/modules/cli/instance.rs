@@ -326,3 +326,286 @@ pub(crate) fn handle_instance_create(args: &[String]) {
         }
     }
 }
+
+// -----------------------------------------------------------------------------
+// IDE Subcommand Handler (Export, Import, Purge-Reinstall, Install)
+// -----------------------------------------------------------------------------
+
+pub fn handle_ide_subcommand(args: &[String]) {
+    if args.is_empty()
+        || args
+            .iter()
+            .any(|a| a == "--help" || a == "-h" || a == "help")
+    {
+        print_ide_cli_help();
+        std::process::exit(0);
+    }
+
+    let sub = args[0].to_lowercase();
+    let rest = &args[1..];
+
+    match sub.as_str() {
+        "export" | "exp" => {
+            let is_json = is_flag_present(rest, &["--json", "-j"]);
+            let out_flag = extract_flag_value(rest, &["--out", "-o"]);
+
+            let non_flags: Vec<&String> = rest
+                .iter()
+                .filter(|a| {
+                    !a.starts_with('-') && !out_flag.as_ref().map(|o| o == *a).unwrap_or(false)
+                })
+                .collect();
+
+            let target_inst = non_flags.first().map(|s| s.as_str()).unwrap_or("default");
+
+            let default_filename = format!("{}-profile.agmide", target_inst);
+            let out_path_buf = out_flag
+                .map(std::path::PathBuf::from)
+                .unwrap_or_else(|| std::path::PathBuf::from(default_filename));
+
+            match crate::modules::instance::export_ide_profile_bundle(
+                target_inst,
+                Some(&out_path_buf),
+            ) {
+                Ok(bundle) => {
+                    if is_json {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&bundle).unwrap_or_default()
+                        );
+                    } else {
+                        println!(
+                            "\n[SUCCESS] Exported IDE profile bundle for '{}':",
+                            target_inst
+                        );
+                        println!("  File:            {}", out_path_buf.display());
+                        println!("  Bundle Version:  {}", bundle.agm_bundle_version);
+                        println!(
+                            "  Workspaces:      {}",
+                            bundle
+                                .metadata
+                                .item_counts
+                                .get("workspaces")
+                                .copied()
+                                .unwrap_or(0)
+                        );
+                        println!(
+                            "  Pinned Projects: {}",
+                            bundle
+                                .metadata
+                                .item_counts
+                                .get("pinned_projects")
+                                .copied()
+                                .unwrap_or(0)
+                        );
+                        println!(
+                            "  Active Prompts:  {} (Strict FIFO)",
+                            bundle
+                                .metadata
+                                .item_counts
+                                .get("active_prompts")
+                                .copied()
+                                .unwrap_or(0)
+                        );
+                        println!("  SHA-256 Checksum: {}", bundle.metadata.bundle_checksum);
+                        println!();
+                    }
+                    std::process::exit(0);
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Bundle export failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        "import" | "imp" => {
+            let target_flag = extract_flag_value(rest, &["--target", "-t"]);
+            let new_name_flag = extract_flag_value(rest, &["--new-name", "-n", "--name"]);
+            let force = is_flag_present(rest, &["--force", "-f"]);
+
+            let non_flags: Vec<&String> = rest
+                .iter()
+                .filter(|a| {
+                    !a.starts_with('-')
+                        && !target_flag.as_ref().map(|t| t == *a).unwrap_or(false)
+                        && !new_name_flag.as_ref().map(|n| n == *a).unwrap_or(false)
+                })
+                .collect();
+
+            if non_flags.is_empty() {
+                eprintln!("[ERROR] Missing bundle file path.");
+                eprintln!("Usage: antigravity-manager ide import <bundle_file.agmide> [--target <id>] [--new-name <name>] [--force]");
+                std::process::exit(1);
+            }
+
+            let bundle_path_str = non_flags[0];
+            let bundle_path = std::path::Path::new(bundle_path_str);
+
+            let options = crate::modules::instance::bundle_types::ImportOptions {
+                target_instance_id: target_flag,
+                new_instance_name: new_name_flag,
+                force,
+            };
+
+            match crate::modules::instance::import_ide_profile_bundle(bundle_path, options) {
+                Ok(res) => {
+                    println!(
+                        "\n[SUCCESS] Imported IDE profile bundle into '{}' ({}):",
+                        res.instance_id, res.instance_name
+                    );
+                    println!("  Settings & Keybindings applied: {}", res.settings_applied);
+                    println!("  Projects & Sequences restored: {}", res.projects_restored);
+                    println!(
+                        "  Active Prompts queued:          {} (FIFO)",
+                        res.prompts_queued
+                    );
+                    println!();
+                    std::process::exit(0);
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Bundle import failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        "purge-reinstall" | "purge" | "clean-reinstall" => {
+            let wipe_all = is_flag_present(rest, &["--wipe-all", "--wipe", "--all"]);
+            let keep_accounts =
+                !wipe_all && !is_flag_present(rest, &["--no-accounts", "--wipe-accounts"]);
+            let force = is_flag_present(rest, &["--force", "-f"]);
+            let is_json = is_flag_present(rest, &["--json", "-j"]);
+            let uninstall_binaries =
+                wipe_all || is_flag_present(rest, &["--uninstall-binaries", "--uninstall"]);
+
+            let options = crate::modules::instance::purge_reinstall::PurgeOptions {
+                keep_accounts,
+                purge_instances: true,
+                uninstall_binaries,
+                force,
+            };
+
+            println!("[*] Initiating safe 4-stage Antigravity clean purge & re-provisioning...");
+            match crate::modules::instance::purge_reinstall::execute_purge_protocol(options) {
+                Ok(summary) => {
+                    if is_json {
+                        println!(
+                            "{}",
+                            serde_json::to_string_pretty(&summary).unwrap_or_default()
+                        );
+                    } else {
+                        println!("\n[SUCCESS] Full purge & clean re-provisioning completed successfully:");
+                        println!("  Processes Terminated:   {}", summary.processes_terminated);
+                        println!(
+                            "  Directories Purged:     {}",
+                            summary.directories_purged.len()
+                        );
+                        println!(
+                            "  Bytes Reclaimed:        {:.2} MB",
+                            (summary.bytes_reclaimed as f64) / (1024.0 * 1024.0)
+                        );
+                        println!(
+                            "  Accounts Safeguarded:   {}",
+                            if summary.accounts_safeguarded {
+                                "YES"
+                            } else {
+                                "NO"
+                            }
+                        );
+                        println!();
+                    }
+                    std::process::exit(0);
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Purge protocol failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        "install" | "inst" => {
+            let dry_run = is_flag_present(rest, &["--dry-run", "-d"]);
+            let verbose = is_flag_present(rest, &["--verbose", "-v"]);
+
+            let non_flags: Vec<&String> = rest.iter().filter(|a| !a.starts_with('-')).collect();
+            let target_str = non_flags
+                .first()
+                .map(|s| s.as_str())
+                .unwrap_or("antigravity");
+
+            let target = match crate::modules::ide_installer::types::IdeTarget::from_str(target_str)
+            {
+                Some(t) => t,
+                None => {
+                    eprintln!("[ERROR] Unknown IDE target '{}'.", target_str);
+                    eprintln!("Valid options: antigravity, cursor, vscode");
+                    std::process::exit(1);
+                }
+            };
+
+            let options = crate::modules::ide_installer::types::InstallOptions { dry_run, verbose };
+
+            println!(
+                "[*] Resolving and executing installer for '{}'...",
+                target.display_name()
+            );
+
+            match crate::modules::ide_installer::install_ide(target, options) {
+                Ok(res) => {
+                    if res.success {
+                        println!(
+                            "\n[SUCCESS] {} installed successfully.",
+                            target.display_name()
+                        );
+                        println!("  Command Executed: {}", res.command_executed);
+                        if let Some(ref path) = res.installed_path {
+                            println!("  Detected Path:    {}", path);
+                        }
+                        if verbose && !res.output.is_empty() {
+                            println!("  Output:\n{}", res.output);
+                        }
+                        println!();
+                        std::process::exit(0);
+                    } else {
+                        eprintln!("\n[ERROR] Installation exited with failure.");
+                        eprintln!("  Command: {}", res.command_executed);
+                        eprintln!("  Output:\n{}", res.output);
+                        std::process::exit(1);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[ERROR] Failed to execute IDE installation: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        _ => {
+            eprintln!("[ERROR] Unknown ide subcommand '{}'.", sub);
+            print_ide_cli_help();
+            std::process::exit(1);
+        }
+    }
+}
+
+pub fn print_ide_cli_help() {
+    println!("\nAntigravity Manager IDE Lifecycle Engine (`agm ide`):");
+    println!("  agm ide export [spec] [--out <path>] [--json]");
+    println!("  agm ide import <bundle_path> [--target <id>] [--new-name <name>] [--force]");
+    println!("  agm ide purge-reinstall [--keep-accounts] [--wipe-all] [--force] [--json]");
+    println!("  agm ide install [antigravity|cursor|vscode] [--dry-run] [--verbose]");
+    println!("\nSubcommands:");
+    println!("  export           Package IDE settings, projects, and FIFO prompts into an .agmide bundle");
+    println!("  import           Restore and unpack an .agmide profile bundle into a new or existing profile");
+    println!("  purge-reinstall  Execute 4-stage deep purge of ~/.gemini/antigravity and caches with caller guard");
+    println!("  install          Automated platform package installation for Antigravity, Cursor, or VS Code");
+    println!("\nOptions:");
+    println!("  --out, -o <path>       Specify destination path for profile bundle export");
+    println!("  --target, -t <id>      Specify target instance profile for import or merge");
+    println!(
+        "  --new-name, -n <name>  Specify new instance name when creating profile from bundle"
+    );
+    println!("  --keep-accounts        Preserve accounts.json and secure token vaults across purge (default: true)");
+    println!("  --wipe-all             Complete wipe removing all credentials, caches, and installed binaries");
+    println!("  --force, -f            Bypass Caller IDE Self-Preservation protection");
+    println!("  --dry-run, -d          Simulate installation command without executing");
+    println!("  --json, -j             Output structured JSON format");
+    println!();
+}

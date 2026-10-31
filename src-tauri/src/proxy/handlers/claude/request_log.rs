@@ -6,11 +6,11 @@ pub(crate) fn log_request_summary(
     request: &crate::proxy::mappers::claude::models::ClaudeRequest,
     trace_id: &str,
 ) {
-    // 获取最新一条“有意义”的消息内容（用于日志记录和后台任务检测）
-    // 策略：反向遍历，首先筛选出所有角色为 "user" 的消息，然后从中找到第一条非 "Warmup" 且非空的文本消息
-    // 获取最新一条“有意义”的消息内容（用于日志记录和后台任务检测）
-    // 策略：反向遍历，首先筛选出所有和用户相关的消息 (role="user")
-    // 然后提取其文本内容，跳过 "Warmup" 或系统预设的 reminder
+    // Get the latest "meaningful" message content (for logging and background task detection)
+    // Strategy: Reverse traversal, first filter out all messages with the role "user", and then find the first non-"Warmup" and non-empty text message
+    // Get the latest "meaningful" message content (for logging and background task detection)
+    // Strategy: Reverse traversal, first filter out all user-related messages (role="user")
+    // Then extract its text content, skipping "Warmup" or system-preset reminders
     let meaningful_msg = request
         .messages
         .iter()
@@ -20,7 +20,7 @@ pub(crate) fn log_request_summary(
             let content = match &m.content {
                 crate::proxy::mappers::claude::models::MessageContent::String(s) => s.to_string(),
                 crate::proxy::mappers::claude::models::MessageContent::Array(arr) => {
-                    // 对于数组，提取所有 Text 块并拼接，忽略 ToolResult
+                    // For arrays, extract all Text blocks and concatenate, ignoring ToolResult
                     arr.iter()
                         .filter_map(|block| match block {
                             crate::proxy::mappers::claude::models::ContentBlock::Text { text } => {
@@ -33,10 +33,10 @@ pub(crate) fn log_request_summary(
                 }
             };
 
-            // 过滤规则：
-            // 1. 忽略空消息
-            // 2. 忽略 "Warmup" 消息
-            // 3. 忽略 <system-reminder> 标签的消息
+            // Filter rules:
+            // 1. Ignore empty messages
+            // 2. Ignore "Warmup" messages
+            // 3. Ignore messages from the <system-reminder> tag
             if content.trim().is_empty()
                 || content.starts_with("Warmup")
                 || content.contains("<system-reminder>")
@@ -47,7 +47,7 @@ pub(crate) fn log_request_summary(
             }
         });
 
-    // 如果经过过滤还是找不到（例如纯工具调用），则回退到最后一条消息的原始展示
+    // If it is still not found after filtering (such as a pure tool call), it will fall back to the original display of the last message.
     let latest_msg = meaningful_msg.unwrap_or_else(|| {
         request
             .messages
@@ -61,7 +61,7 @@ pub(crate) fn log_request_summary(
             .unwrap_or_else(|| "[No Messages]".to_string())
     });
 
-    // INFO 级别: 简洁的一行摘要
+    // INFO level: concise one-line summary
     info!(
         "[{}] Claude Request | Model: {} | Stream: {} | Messages: {} | Tools: {}",
         trace_id,
@@ -71,7 +71,7 @@ pub(crate) fn log_request_summary(
         request.tools.is_some()
     );
 
-    // DEBUG 级别: 详细的调试信息
+    // DEBUG level: Detailed debugging information
     debug!(
         "========== [{}] CLAUDE REQUEST DEBUG START ==========",
         trace_id
@@ -89,13 +89,13 @@ pub(crate) fn log_request_summary(
     );
     debug!("[{}] Content Preview: {:.100}...", trace_id, latest_msg);
 
-    // 输出每一条消息的详细信息
+    // Output detailed information for each message
     for (idx, msg) in request.messages.iter().enumerate() {
         let content_preview = match &msg.content {
             crate::proxy::mappers::claude::models::MessageContent::String(s) => {
                 let char_count = s.chars().count();
                 if char_count > 200 {
-                    // 【修复】使用 chars().take() 安全截取，避免 UTF-8 字符边界 panic
+                    // [Fix] Use chars().take() to safely intercept and avoid UTF-8 character boundary panics
                     let preview: String = s.chars().take(200).collect();
                     format!("{}... (total {} chars)", preview, char_count)
                 } else {

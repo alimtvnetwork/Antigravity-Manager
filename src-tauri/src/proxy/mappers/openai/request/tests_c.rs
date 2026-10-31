@@ -96,8 +96,8 @@ fn test_vertex_ai_drops_sentinel_injection() {
         .find(|p: &&serde_json::Value| p.get("functionCall").is_some())
         .expect("Should find functionCall part");
 
-    // 铁律：functionCall **绝不**携带哨兵 —— 官方报文 0/23 处出现哨兵，
-    // 它不属于 Antigravity 协议；签名归位统一交给流水线终审 `place_turn_signature`。
+    // Iron rule: functionCall **never** carries a sentinel - a sentinel appears at 0/23 in the official message,
+    // It does not belong to the Antigravity protocol; the signature return is uniformly handed over to the pipeline for final review `place_turn_signature`.
     assert!(
         tool_part.get("thoughtSignature").is_none(),
         "functionCall must not carry a sentinel signature"
@@ -106,7 +106,7 @@ fn test_vertex_ai_drops_sentinel_injection() {
 
 #[test]
 fn test_issue_2167_gemini_flash_thinking_signature() {
-    // [FIX #2167] gemini-3-flash / gemini-3.1-flash 在无缓存签名时，functionCall 必须携带 thoughtSignature
+    // [FIX #2167] gemini-3-flash / gemini-3.1-flash When there is no cached signature, functionCall must carry thoughtSignature
     for model in &["gemini-3-flash", "gemini-3.1-flash"] {
         let req = OpenAIRequest {
             model: model.to_string(),
@@ -132,7 +132,7 @@ fn test_issue_2167_gemini_flash_thinking_signature() {
         let contents = result["request"]["contents"]
             .as_array()
             .expect("Should have request.contents");
-        // flash 模型的 assistant role → Gemini "model" role
+        // flash model assistant role → Gemini "model" role
         let model_msg = contents
             .iter()
             .find(|c| c["role"] == "model")
@@ -143,9 +143,9 @@ fn test_issue_2167_gemini_flash_thinking_signature() {
             .find(|p: &&serde_json::Value| p.get("functionCall").is_some())
             .expect(&format!("[{model}] Should find functionCall part"));
 
-        // 铁律：无缓存签名时**留空**（字段缺席），绝不发明哨兵。
-        // 官方报文里哨兵出现 0 次；签名缺失是被上游容忍的（在飞轮即缺席），
-        // 且该轮签名由流水线终审 `place_turn_signature` 按锚点归位。
+        // Iron rule: when there is no cached signature, leave it blank (field is absent) and never create a sentinel.
+        // The sentinel appears 0 times in the official message; the lack of signature is tolerated by the upstream (it is absent in the flywheel).
+        // And the signature of this round is returned to the anchor point by the pipeline final review `place_turn_signature`.
         assert!(
             tool_part.get("thoughtSignature").is_none(),
             "[{model}] functionCall must not carry a sentinel signature when unsigned"
@@ -198,9 +198,9 @@ fn test_openai_image_thinking_mode_disabled() {
 
 #[test]
 fn test_mixed_tools_injection_openai() {
-    // 验证 OpenAI 协议在 Gemini 2.0+ 下支持混合工具
+    // Verify OpenAI protocol supports hybrid tools under Gemini 2.0+
     let req = OpenAIRequest {
-        model: "gpt-4o-online".to_string(), // -online 触发联网
+        model: "gpt-4o-online".to_string(), // -online triggers networking
         messages: vec![OpenAIMessage {
             role: "user".to_string(),
             content: Some(OpenAIContent::String("Hello".to_string())),
@@ -221,7 +221,7 @@ fn test_mixed_tools_injection_openai() {
         ..Default::default()
     };
 
-    // 使用 gemini-2.0-flash 模型执行转换
+    // Perform conversion using gemini-2.0-flash model
     let (result, _, _, _) = transform_openai_request(&req, "proj", "gemini-2.0-flash", None);
 
     let tools = result["request"]["tools"]
@@ -236,7 +236,7 @@ fn test_mixed_tools_injection_openai() {
         .any(|t: &serde_json::Value| t.get("googleSearch").is_some());
 
     assert!(has_functions, "Should contain functionDeclarations");
-    // 在 v1internal 架构下，不开启混合调用以避免 400 报错
+    // Under the v1internal architecture, mixed calls are not enabled to avoid 400 errors.
     assert!(
         !has_google_search,
         "v1internal should avoid mixed Google Search when functionDeclarations present"
@@ -338,8 +338,8 @@ fn test_issue_3391_claude_without_thinking_suffix_incompatible_history() {
         .find(|m| m["role"] == "model")
         .expect("Should have model message");
     let parts = assistant_msg["parts"].as_array().unwrap();
-    // 【2026-09-27】客户端无 reasoning 时不再填充 "..." 占位思考块；
-    // 无思考块是官方标准形态（锚点签名由流水线终审回填）。
+    // 【2026-09-27】The "..." placeholder thinking block will no longer be filled in when the client has no reasoning;
+    // The non-thinking block is the official standard form (the anchor signature is backfilled by the pipeline final review).
     assert!(
         !parts
             .iter()

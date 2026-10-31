@@ -65,10 +65,10 @@ export function createLifecycleSlice(set: SetState, get: GetState): Pick<Instanc
         }
     },
 
-    stopInstance: async (instanceId: string) => {
+    stopInstance: async (instanceId: string, targetPid?: number) => {
         set({ isLoading: true, error: null });
         try {
-            await instanceService.stopInstance(instanceId);
+            await instanceService.stopInstance(instanceId, targetPid);
             await get().fetchInstances(true);
             set({ isLoading: false });
         } catch (err: any) {
@@ -152,6 +152,8 @@ export function createLifecycleSlice(set: SetState, get: GetState): Pick<Instanc
         } catch (err: any) {
             set({ isLoading: false, error: err?.toString() || 'Failed to switch account to instance' });
             useErrorStore.getState().captureError(err, { source: 'useInstanceStore.switchAccountToInstance' });
+            // Always refresh instances so UI is never left with desynchronized state
+            void get().fetchInstances(true);
             throw err;
         }
     },

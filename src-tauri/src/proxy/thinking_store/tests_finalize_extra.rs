@@ -7,7 +7,7 @@ fn test_restore_and_finalize_gemini_contents_with_model_claude_target_rejects_ge
     let key = "t:cross_model_test_session";
     let gemini_sig = "Ep4KCpsKAWkUfRMa5ZYMDdlPjxrQTLzVZ6MZeopI88888888888888888888888888888888";
 
-    // 模拟上一轮 Gemini 存储的思考记录（带有 Gemini 原生签名）
+    // Simulate the last round of Gemini stored thinking records (with Gemini native signature)
     store.record(
         key,
         ThinkingRecord {
@@ -20,7 +20,7 @@ fn test_restore_and_finalize_gemini_contents_with_model_claude_target_rejects_ge
         },
     );
 
-    // 客户端在同一 session 下切换模型为 Claude 发起后续对话
+    // The client switches models in the same session to initiate subsequent conversations for Claude.
     let mut contents = vec![
         json!({ "role": "user", "parts": [{ "text": "Hello" }] }),
         json!({
@@ -30,7 +30,7 @@ fn test_restore_and_finalize_gemini_contents_with_model_claude_target_rejects_ge
         json!({ "role": "user", "parts": [{ "text": "Next turn" }] }),
     ];
 
-    // 1. 执行 restore（针对目标模型 claude-opus-4-6-thinking）
+    // 1. Execute restore (for the target model claude-opus-4-6-thinking)
     let restored = store.restore_gemini_contents_with_model(
         key,
         &mut contents,
@@ -38,21 +38,21 @@ fn test_restore_and_finalize_gemini_contents_with_model_claude_target_rejects_ge
     );
     assert_eq!(restored, 1);
 
-    // 恢复出的 thinking 块绝不能挂载 Gemini 签名！
+    // The recovered thinking block must not be mounted with Gemini signatures!
     let parts_after_restore = contents[1]["parts"].as_array().unwrap();
     assert!(
         parts_after_restore[0].get("thoughtSignature").is_none(),
         "ThinkingStore must not assign foreign Gemini signature when target is Claude"
     );
 
-    // 2. 执行 finalize（终审节点）
+    // 2. Execute finalize (final review node)
     finalize_gemini_contents_thinking_with_model(
         &mut contents,
         true,
         Some("claude-opus-4-6-thinking"),
     );
 
-    // 终审把关：没有合法 Claude 签名的思考块安全降级为普通 text，绝不报 400 签名错误
+    // Final review: thinking blocks without a valid Claude signature are safely downgraded to ordinary text and will never report a 400 signature error.
     let final_parts = contents[1]["parts"].as_array().unwrap();
     let has_thought_block = final_parts
         .iter()
@@ -72,11 +72,11 @@ fn test_restore_and_finalize_gemini_contents_with_model_claude_target_rejects_ge
 #[test]
 fn test_finalize_thinking_disabled_preserves_historical_thinking_and_signatures() {
     let real_sig = "Ep4MCpsMARFNMg9NDlK9RXXz5Mzq9mniX9KSQBBzbUx3k85w/qDgtcE+28NH+1EvPeULAprqUquvYXGMzUXGy1xJoMnqdkC4vqebuhyd2Xhs0oz+OhqcOTwLhGYOG0KBKQ87Hfw4q/sMCSgf2gz4vFMa6V6kKMJepYlPXKFJJF4ok+W6lUt3PfYln8K9Dh7wB/40iHiZ2BnJd++6hfUwu9Bz1n795S50l0yCj84EaSCDDF334Erxq7Fo";
-    // 模拟多轮对话：
+    // Simulate multiple rounds of dialogue:
     // Turn 1: User
-    // Turn 2: Model (历史已发生，包含合法思考块与工具调用及签名)
-    // Turn 3: User (工具返回)
-    // Turn 4: User (最新一轮用户提问，并且在这一轮用户把思考开关关闭了)
+    // Turn 2: Model (history has occurred, including legal thinking blocks, tool calls and signatures)
+    // Turn 3: User (Tool Return)
+    // Turn 4: User (the latest round of user questions, and in this round the user turned off the thinking switch)
     let mut contents = vec![
         json!({
             "role": "user",
@@ -113,14 +113,14 @@ fn test_finalize_thinking_disabled_preserves_historical_thinking_and_signatures(
         }),
     ];
 
-    // 最新一轮关思考 (is_thinking_enabled = false)
+    // The latest round of thinking (is_thinking_enabled = false)
     finalize_gemini_contents_thinking_with_model(
         &mut contents,
         false,
         Some("gemini-3.8-flash-tiered"),
     );
 
-    // 验证历史 Turn 2 的思考块与工具调用签名是否被完好保留：
+    // Verify that the think blocks and tool call signatures of historical Turn 2 are intact:
     let history_model_parts = contents[1]["parts"].as_array().expect("parts array");
     assert_eq!(history_model_parts.len(), 2);
     assert_eq!(history_model_parts[0]["text"], "Planning to run ls...");
@@ -142,15 +142,15 @@ fn test_finalize_thinking_disabled_keeps_unsigned_function_call_unsigned_for_gem
         ]
     })];
 
-    // 关思考出站，发往 Gemini
+    // Guan Thinking Outbound, sent to Gemini
     finalize_gemini_contents_thinking_with_model(
         &mut contents,
         false,
         Some("gemini-3.8-flash-tiered"),
     );
 
-    // 官方报文里哨兵出现 0 次；缺失签名被上游容忍（在飞轮即缺席）。
-    // 因此无签名的 functionCall 保持「字段缺席」，绝不发明占位符。
+    // Sentinel appears 0 times in official messages; missing signatures are tolerated by upstream (absent in Flywheel).
+    // Therefore an unsigned functionCall keeps "fields absent" and never creates placeholders.
     let parts = contents[0]["parts"].as_array().unwrap();
     assert_eq!(parts.len(), 1);
     assert!(
@@ -171,12 +171,12 @@ fn test_finalize_does_not_invent_signature_for_unsigned_function_call() {
                     "id": tool_id,
                     "args": { "cmd": "cargo test" }
                 }
-                // 注意：未带 thoughtSignature（模拟未在进站流水线查到的工具调用）
+                // Note: ThoughtSignature is not included (simulating tool calls not found in the inbound pipeline)
             }
         ]
     })];
 
-    // 终审出站，发往 Gemini
+    // Final review outbound and sent to Gemini
     finalize_gemini_contents_thinking_with_model(
         &mut contents,
         true,
@@ -184,8 +184,8 @@ fn test_finalize_does_not_invent_signature_for_unsigned_function_call() {
     );
 
     let parts = contents[0]["parts"].as_array().unwrap();
-    // 终审门禁：不查库、不发明签名。官方 functionCall 轮是"纯净"的
-    // （33 个 model 轮里 thought × functionCall 共现 0 次），因此不得注入占位思考块。
+    // Final access control: no database checks, no signature creation. The official functionCall wheel is "pure"
+    // (thought × functionCall appears 0 times in 33 model rounds), so placeholder thinking blocks must not be injected.
     assert_eq!(
         parts.len(),
         1,
@@ -218,7 +218,7 @@ fn test_finalize_thinking_disabled_strips_tool_signature_for_claude() {
         ]
     })];
 
-    // 关思考出站，发往 Claude
+    // Guan thinking outbound, sent to Claude
     finalize_gemini_contents_thinking_with_model(&mut contents, false, Some("claude-3-7-sonnet"));
 
     let parts = contents[0]["parts"].as_array().unwrap();
@@ -238,7 +238,7 @@ fn test_restore_deduplicates_and_elevates_thought_from_plain_text() {
     let thought_text = "I am analyzing the repository carefully and formulating a search query.";
     let visible_answer = "Here is the exact file path you requested.";
 
-    // 1. 模拟旧轮次入库（开思考时发生的思维记录）
+    // 1. Simulate the storage of old rounds (thinking records that occur when thinking is started)
     // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
     crate::error::record_ignored(
         crate::modules::proxy_db::save_thinking_record(
@@ -253,7 +253,7 @@ fn test_restore_deduplicates_and_elevates_thought_from_plain_text() {
         "save_thinking_record",
     );
 
-    // 2. 模拟客户端发上来的历史：之前关思考时降级的思考文本变成了普通正文部件，残留或与正文拼接在一起
+    // 2. The history sent by the simulation client: the thinking text that was previously downgraded when thinking was turned into a normal text component, remaining or spliced together with the text.
     let mut contents = vec![
         json!({
             "role": "user",
@@ -262,7 +262,7 @@ fn test_restore_deduplicates_and_elevates_thought_from_plain_text() {
         json!({
             "role": "model",
             "parts": [
-                { "text": thought_text }, // 降级残留的普通文本部件
+                { "text": thought_text }, // Downgrade residual normal text widgets
                 { "text": visible_answer },
                 {
                     "functionCall": {
@@ -279,7 +279,7 @@ fn test_restore_deduplicates_and_elevates_thought_from_plain_text() {
         }),
     ];
 
-    // 3. 当前轮次重新开启思考，执行复活与重提升
+    // 3. Restart thinking, perform resurrection and re-promotion in the current round
     let restored = store.restore_gemini_contents_with_model(
         key,
         &mut contents,
@@ -288,16 +288,16 @@ fn test_restore_deduplicates_and_elevates_thought_from_plain_text() {
     assert_eq!(restored, 1, "Must restore exactly 1 turn");
 
     let model_parts = contents[1]["parts"].as_array().expect("parts array");
-    // 验证：
-    // 1. 首位成功提升恢复为真正的思考块 (thought: true)
+    // Verification:
+    // 1. The first successful promotion is restored to the real thought block (thought: true)
     assert_eq!(model_parts[0]["thought"], true);
     assert_eq!(model_parts[0]["text"], thought_text);
 
-    // 2. 正文部件中的降级残留部件被精准剔除，只保留真实的可见回答，消灭双份复读！
+    // 2. The downgraded residual parts in the text part are accurately removed, and only the real visible answers are retained, eliminating double re-reading!
     assert_eq!(model_parts[1]["text"], visible_answer);
     assert!(model_parts[1].get("thought").is_none());
 
-    // 3. 工具调用挂载真实签名
+    // 3. Tool call to mount the real signature
     assert_eq!(model_parts[2]["functionCall"]["id"], tool_id);
     assert_eq!(model_parts[2]["thoughtSignature"], real_sig);
 
@@ -336,25 +336,25 @@ fn test_gemini_to_claude_wraps_foreign_thought_in_think_tags_and_strips_tool_sig
         ]
     })];
 
-    // 目标模型切为 Claude
+    // The target model is cut to Claude
     finalize_gemini_contents_thinking_with_model(&mut contents, true, Some("claude-3-7-sonnet"));
 
     let parts = contents[0]["parts"].as_array().expect("parts array");
-    // 1. Gemini 的思考块不具备 Claude 签名，因此绝不可作为 thought: true 上送 Claude
+    // 1. Gemini’s thought block does not have Claude’s signature, so it must not be sent to Claude as thought: true
     assert!(parts
         .iter()
         .all(|p| p.get("thought").and_then(|v| v.as_bool()) != Some(true)));
 
-    // 2. 思考文本被包装为 <think> 标签前置于正文部件
+    // 2. Think text is packaged as <think> tag and placed in front of the text component
     let first_text = parts[0]["text"].as_str().expect("text");
     assert!(first_text.starts_with("<think>"));
     assert!(first_text.contains(thought_text));
     assert!(first_text.contains("</think>"));
 
-    // 3. 正文回答完好保留
+    // 3. Keep the text of the answer intact
     assert_eq!(parts[1]["text"], visible_answer);
 
-    // 4. 工具调用上的签名被彻底拔出
+    // 4. The signature on the tool call is completely pulled out
     assert_eq!(parts[2]["functionCall"]["id"], "call_db_1");
     assert!(parts[2].get("thoughtSignature").is_none());
     assert!(parts[2].get("thought_signature").is_none());
@@ -382,7 +382,7 @@ fn test_gemini_native_synthetic_id_bridges_cross_protocol_signature_recovery() {
     let thought_text = "Analyzing directory and listing files.";
     let _visible_answer = "Running bash tool.";
 
-    // 1. 模拟 OpenAI 协议下生成的工具调用（带有 client_tool_id）
+    // 1. Simulate tool calls generated under the OpenAI protocol (with client_tool_id)
     let mut acc = TurnAccumulator::with_anchor("user-root-anchor");
     acc.ingest_part(&json!({
         "thought": true,
@@ -399,8 +399,8 @@ fn test_gemini_native_synthetic_id_bridges_cross_protocol_signature_recovery() {
     }));
     acc.commit(key);
 
-    // 2. 模拟用户切换到了原生 Gemini 协议发起后续对话：
-    // 原生 Gemini 请求的 contents 中天生没有 id 字段（id: None）！
+    // 2. The simulated user switches to the native Gemini protocol and initiates a subsequent conversation:
+    // There is no id field (id: None) in the contents of the native Gemini request!
     let mut gemini_contents = vec![
         json!({
             "role": "user",
@@ -413,7 +413,7 @@ fn test_gemini_native_synthetic_id_bridges_cross_protocol_signature_recovery() {
                     "functionCall": {
                         "name": "bash",
                         "args": { "command": "ls -la" }
-                        // 注意：完全无 id 字段！
+                        // Note: No id field at all!
                     }
                 }
             ]
@@ -424,7 +424,7 @@ fn test_gemini_native_synthetic_id_bridges_cross_protocol_signature_recovery() {
         }),
     ];
 
-    // 3. 原生 Gemini 协议执行流水线复活与终审出站
+    // 3. Resurrection and final review of the native Gemini protocol execution pipeline
     let restored = store.restore_gemini_contents_with_model(
         key,
         &mut gemini_contents,
@@ -442,18 +442,18 @@ fn test_gemini_native_synthetic_id_bridges_cross_protocol_signature_recovery() {
     );
 
     let model_parts = gemini_contents[1]["parts"].as_array().expect("parts");
-    // 验证思考块被成功提升复活：
+    // Verify that the thinking block is successfully promoted and resurrected:
     assert_eq!(model_parts[0]["thought"], true);
     assert_eq!(model_parts[0]["text"], thought_text);
 
-    // 验证跨协议捕获到的真实签名被归位到锚点，而不是被替换成哨兵：
+    // Verify that real signatures captured across protocols are returned to anchors and not replaced by sentinels:
     let fc = &model_parts[1];
     assert_eq!(fc["functionCall"]["name"], "bash");
     assert_eq!(
         fc["thoughtSignature"], real_sig,
         "Captured real signature must be restored onto the anchor, not replaced by a sentinel"
     );
-    // 验证伪 ID 纯粹内部使用，绝不外泄给无 ID 协议：
+    // Verify pseudo-IDs are purely for internal use and will never be leaked to IDless protocols:
     assert!(
         fc["functionCall"].get("id").is_none(),
         "Synthetic ID must remain internal and not leak to client"

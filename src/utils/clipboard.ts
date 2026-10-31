@@ -1,11 +1,14 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useErrorStore } from '../stores/error-store';
 
-function reportClipboardStage(err: unknown, triggerAction: string): void {
-    useErrorStore.getState().trackWarning(err, {
-        source: 'clipboard.copyToClipboard',
-        triggerAction,
-    });
+export function ensureDocumentFocus(): void {
+    if (typeof window !== 'undefined' && typeof window.focus === 'function' && !document.hasFocus()) {
+        try {
+            window.focus();
+        } catch {
+            // best-effort window focus
+        }
+    }
 }
 
 function copyWithExecCommand(text: string): boolean {
@@ -32,34 +35,36 @@ async function copyWithNativeHelper(text: string): Promise<void> {
 }
 
 /**
- * Copy text to the clipboard.
- * The browser Clipboard API rejects with NotAllowedError when the webview
- * document is not focused. That failure is recorded, then execCommand and the
- * OS helper (`clip` / `pbcopy` / `wl-copy`) are tried. The promise does not
- * reject. A total failure is recorded with captureError and returns false.
+ * Copy text to the clipboard with resilient multi-stage fallback:
+ * 1. Ensures document focus and tries modern Clipboard API.
+ * 2. If Clipboard API rejects (e.g. document not focused), falls back to document.execCommand('copy') which forces textarea focus.
+ * 3. If DOM execCommand fails, invokes native OS helper (`clip` / `pbcopy` / `wl-copy`) which never requires focus.
+ * Only captures an error if all 3 fallback stages fail.
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
-    if (navigator.clipboard && window.isSecureContext) {
+    ensureDocumentFocus();
+
+    // Stage 1: Modern Async Clipboard API (strictly require focused document)
+    const hasFocus = typeof document !== 'undefined' && typeof document.hasFocus === 'function' ? document.hasFocus() : false;
+    if (navigator.clipboard && window.isSecureContext && hasFocus) {
         try {
             await navigator.clipboard.writeText(text);
             return true;
-        } catch (err) {
-            reportClipboardStage(err, 'navigator.clipboard.writeText');
+        } catch {
+            // Document focus may have been lost during async tick, fall through to execCommand
         }
     }
 
+    // Stage 2: document.execCommand (forces element focus)
     try {
         if (copyWithExecCommand(text)) {
             return true;
         }
-        reportClipboardStage(
-            new Error('document.execCommand("copy") returned false'),
-            'document.execCommand',
-        );
-    } catch (err) {
-        reportClipboardStage(err, 'document.execCommand');
+    } catch {
+        // Fall through to native OS helper
     }
 
+    // Stage 3: Native desktop helper (clip / pbcopy / wl-copy)
     try {
         await copyWithNativeHelper(text);
         return true;
@@ -70,4 +75,29 @@ export async function copyToClipboard(text: string): Promise<boolean> {
         });
         return false;
     }
+}
+
+/**
+ * Imp-88: Copy both HTML and plain text dual-MIME payload to clipboard.
+ * Allows pasting rich formatted markdown or rendered HTML into office / email / chat apps,
+ * while pasting clean plain text into code editors / terminals.
+ */
+export async function copyHtmlAndTextToClipboard(html: string, plainText: string): Promise<boolean> {
+    ensureDocumentFocus();
+    if (typeof navigator !== 'undefined' && navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+        try {
+            const blobHtml = new Blob([html], { type: 'text/html' });
+            const blobText = new Blob([plainText], { type: 'text/plain' });
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    'text/html': blobHtml,
+                    'text/plain': blobText,
+                }),
+            ]);
+            return true;
+        } catch {
+            // Fall back to plain text
+        }
+    }
+    return copyToClipboard(plainText);
 }

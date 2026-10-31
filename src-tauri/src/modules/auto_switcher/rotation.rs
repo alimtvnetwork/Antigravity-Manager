@@ -33,7 +33,13 @@ pub async fn execute_profile_rotation_with_context(
         });
     let inst_id = &target.instance_id;
 
-    // Step 0: Ensure all running and queued prompts are snapshotted and backed up before profile switch
+    // Step 0: Ensure all running, queued, and pending prompts are swept, snapshotted and backed up before profile switch
+    crate::error::record_ignored(
+        crate::modules::repo_db::backup::sweep_incomplete_prompts_for_instance(
+            &current_instance_id,
+        ),
+        "sweep_incomplete_prompts_for_instance",
+    );
     let backup_res = crate::modules::repo_db::backup_running_prompts(&current_instance_id);
     let backed_up_count = backup_res.as_ref().copied().unwrap_or(0);
     // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
@@ -67,35 +73,12 @@ pub async fn execute_profile_rotation_with_context(
         );
     }
 
-    logger::log_info(&format!(
-        "[AutoSwitcher] Rotating instance '{}' to account '{}' (email: {}, quota: {:.1}%). Reason: {}",
-        inst_id,
-        target.account_id,
-        crate::modules::logger::mask_email(&target.email),
-        target.quota_percent,
-        reason
-    ));
+    // Step 2: Extract identity, quotas, predictions, and project context (Email Parity)
+    let (node_alias, _) = crate::modules::email_sender::get_local_node_identity();
+    let m_name = crate::modules::email_watcher::detect_machine_name();
+    let m_ip = crate::modules::email_watcher::detect_local_ip();
+    let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
 
-    crate::modules::audit::record_if_active(
-        "system",
-        "programmatic",
-        "auto_switcher::execute_rotation",
-        "instances | auto_switcher | rotation_executor",
-        serde_json::json!({
-            "instance_id": inst_id,
-            "from_account": ctx.as_ref().and_then(|c| c.previous_email.as_deref()).map(crate::modules::logger::mask_email),
-            "to_account": crate::modules::logger::mask_email(&target.email),
-            "previous_quota_4h": ctx.as_ref().and_then(|c| c.previous_quota_4h),
-            "target_quota_4h": target.quota_percent,
-            "backed_up_prompts": backed_up_count,
-            "auto_resume": has_auto_resume,
-            "reason": reason
-        }),
-        "ok",
-        "",
-    );
-
-    // Step 2: Trigger unified Email and Telegram notifications before switch
     let prev_email = ctx
         .as_ref()
         .and_then(|c| c.previous_email.clone())
@@ -172,6 +155,67 @@ pub async fn execute_profile_rotation_with_context(
         .collect();
     let backup_count_opt = backup_res.as_ref().ok().copied();
 
+    let condition = if reason.to_lowercase().contains("critical") {
+        "critical_quota"
+    } else if reason.to_lowercase().contains("depleted") {
+        "depleted_before_finish"
+    } else if reason.to_lowercase().contains("force") {
+        "forced_rotation"
+    } else if reason.to_lowercase().contains("manual") {
+        "manual_rotation"
+    } else {
+        "low_quota_threshold"
+    };
+
+    logger::log_info(&format!(
+        "[AutoSwitcher] [{} | {} | {}] Rotating instance '{}' (mode: auto, condition: {}, reason: {}) from '{}' ({:.1}%) -> '{}' ({:.1}%). Backed up: {} prompts, auto-resume: {}",
+        pkg_ver,
+        m_name,
+        node_alias,
+        inst_id,
+        condition,
+        reason,
+        prev_email.as_deref().map(crate::modules::logger::mask_email).unwrap_or_else(|| "(none)".to_string()),
+        prev_q_4h.unwrap_or(0.0),
+        crate::modules::logger::mask_email(&target.email),
+        target.quota_percent,
+        backed_up_count,
+        has_auto_resume,
+    ));
+
+    crate::modules::audit::record_if_active(
+        "system",
+        "programmatic",
+        "auto_switcher::execute_rotation",
+        "instances | auto_switcher | rotation_executor",
+        serde_json::json!({
+            "agm_version": pkg_ver,
+            "machine_name": m_name,
+            "node_alias": node_alias,
+            "local_ip": m_ip,
+            "instance_id": inst_id,
+            "instance_name": inst_id,
+            "switch_mode": "auto",
+            "condition": condition,
+            "from_account": prev_email.as_deref().map(crate::modules::logger::mask_email),
+            "to_account": crate::modules::logger::mask_email(&target.email),
+            "predicted_next_account": predicted_opt.as_deref().map(crate::modules::logger::mask_email),
+            "previous_quota_4h": prev_q_4h,
+            "previous_quota_weekly": prev_q_weekly,
+            "target_quota_4h": target_q_4h,
+            "target_quota_weekly": target_q_weekly,
+            "credit_before_switch": credit_before,
+            "threshold_activated": thresh,
+            "backed_up_prompts": backed_up_count,
+            "backed_up_projects": proj_names,
+            "auto_resume": has_auto_resume,
+            "reason": reason,
+            "timestamp": chrono::Utc::now().timestamp_millis(),
+        }),
+        "ok",
+        "",
+    );
+
     let notify_details = crate::modules::notification_hub::SwitchNotificationDetails {
         previous_email: prev_email,
         previous_quota_4h: prev_q_4h,
@@ -242,23 +286,54 @@ pub async fn execute_profile_rotation_with_context(
             ),
             "copy_instance_projects",
         );
-        // Re-attribute backed-up prompts from depleted instance to target instance so post-switch restore finds them
-        if let Ok(conn) = crate::modules::repo_db::connect_db() {
-            let reattributed = conn
-                .execute(
-                    "UPDATE active_prompts SET instance_id = ?1 WHERE instance_id = ?2 AND status = 'backed_up'",
-                    rusqlite::params![&target.instance_id, &current_instance_id],
-                )
+        // Re-attribute incomplete prompts from depleted instance to target instance so post-switch restore finds them
+        match crate::modules::repo_db::connect_db() {
+            Ok(conn) => {
+                let is_source_default =
+                    current_instance_id == "default" || current_instance_id == "__default__";
+                let reattributed = if is_source_default {
+                    conn.execute(
+                        "UPDATE active_prompts SET instance_id = ?1, status = 'backed_up' WHERE (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL) AND status NOT IN ('completed', 'succeeded')",
+                        rusqlite::params![&target.instance_id],
+                    )
+                } else {
+                    conn.execute(
+                        "UPDATE active_prompts SET instance_id = ?1, status = 'backed_up' WHERE instance_id = ?2 AND status NOT IN ('completed', 'succeeded')",
+                        rusqlite::params![&target.instance_id, &current_instance_id],
+                    )
+                }
                 .unwrap_or(0);
-            logger::log_info(&format!(
-                "[AutoSwitcher] Re-attributed {} backed-up prompts from '{}' to target '{}'",
-                reattributed, current_instance_id, target.instance_id
-            ));
+                logger::log_info(&format!(
+                    "[AutoSwitcher] Re-attributed {} incomplete prompts from '{}' to target '{}'",
+                    reattributed, current_instance_id, target.instance_id
+                ));
+            }
+            Err(e) => {
+                // Justification: best-effort DB statement during switch; failure logged
+                crate::error::record_ignored(
+                    Err::<(), _>(e),
+                    "connect repo_db to re-attribute active prompts",
+                );
+            }
         }
-        if let Ok(conn) = crate::modules::backup_prompts_db::connect_db() {
-            let _ = conn.execute(
-                "UPDATE prompt_backups SET instance_id = ?1 WHERE instance_id = ?2 AND is_restored = 0",
-                rusqlite::params![&target.instance_id, &current_instance_id],
+        // Justification: prompt re-attribution to target instance during switch; failure logged
+        crate::error::record_ignored(
+            crate::modules::backup_prompts_db::reattribute_unrestored_prompt_backups(
+                Some(&current_instance_id),
+                &target.instance_id,
+                None,
+            ),
+            "reattribute_unrestored_prompt_backups in auto-switcher",
+        );
+        if let Ok(conn) = crate::modules::backup_prompts_db::connect_backup_db(None) {
+            // Justification: sweep and reattribute orphaned backups during cross-instance switch; failure logged
+            crate::error::record_ignored(
+                crate::modules::backup_prompts_db::sweep_and_reattribute_orphaned_backups(
+                    &conn,
+                    &target.instance_id,
+                )
+                .map_err(|e| e.to_string()),
+                "sweep_and_reattribute_orphaned_backups in cross-instance rotation",
             );
         }
         for ws in &active_workspaces {
@@ -395,35 +470,81 @@ pub async fn execute_profile_rotation_with_context(
     });
 
     // Step 3: Post-switch prompt verification and status notification
-    // Note: switch_account_to_instance already synchronously restores and dispatches backed-up prompts.
+    // RC-3: report the real restored count — backed-up prompts re-attributed
+    // to the target that have already left `backed_up` status — instead of
+    // passing backed_up_count as both the backed-up and restored numbers.
+    // The deferred post-switch restore may still be pending at this point,
+    // in which case the honest restored count is 0.
     let target_inst_id_clone = inst_id.clone();
     let proj_names_clone = proj_names.clone();
     let backed_up_count_val = backed_up_count;
+    let still_backed_up = crate::modules::repo_db::count_backed_up_prompts(&target_inst_id_clone);
+    let restored_count_val = backed_up_count_val.saturating_sub(still_backed_up);
     let verified_running = crate::modules::repo_db::verify_prompts_running();
     logger::log_info(&format!(
-        "[AutoSwitcher] Post-switch prompt verification: {} backed-up, {} verified active running for instance '{}'",
-        backed_up_count_val, verified_running, target_inst_id_clone
+        "[AutoSwitcher] Post-switch prompt verification: {} backed-up, {} restored, {} verified active running for instance '{}'",
+        backed_up_count_val, restored_count_val, verified_running, target_inst_id_clone
     ));
     crate::modules::notification_hub::notify_post_switch_prompt_status(
         &target_inst_id_clone,
         backed_up_count_val,
-        backed_up_count_val,
+        restored_count_val,
         verified_running,
         proj_names_clone,
     );
 
-    // Auto-resume recent active prompts (<1h) if configured
+    // Restore handover: sweep and reattribute any orphaned backups to target instance
+    if let Ok(conn) = crate::modules::backup_prompts_db::connect_backup_db(None) {
+        match crate::modules::backup_prompts_db::sweep_and_reattribute_orphaned_backups(
+            &conn,
+            &target_inst_id_clone,
+        ) {
+            Ok(swept) => {
+                if swept > 0 {
+                    logger::log_info(&format!(
+                        "[AutoSwitcher] Restore handover swept and reattributed {} orphaned prompt backup(s) to target instance '{}'",
+                        swept, target_inst_id_clone
+                    ));
+                }
+            }
+            Err(e) => {
+                // Justification: best-effort sweep during rotation handover; failure logged
+                crate::error::record_ignored(
+                    Err::<(), _>(e.to_string()),
+                    "sweep_and_reattribute_orphaned_backups in auto-switcher handover",
+                );
+            }
+        }
+    }
+
+    // Schedule post-switch prompt restore on target instance if auto_reopen_on_switch is enabled
+    // or if backed-up prompts exist for the target instance
     let app_config = config::load_app_config().unwrap_or_default();
-    if app_config.auto_profile_switcher.auto_resume_recent_prompts {
-        let threshold = app_config
-            .auto_profile_switcher
-            .prompt_recency_threshold_seconds as i64;
-        // Justification: best-effort call; failure logged without changing control flow
-        crate::error::record_ignored(
-            crate::modules::repo_db::auto_resume_recent_prompts(inst_id, threshold),
-            "auto_resume_recent_prompts",
+    let has_pending_backups = backed_up_count_val > 0
+        || crate::modules::repo_db::count_backed_up_prompts(&target_inst_id_clone) > 0
+        || crate::modules::backup_prompts_db::count_unrestored_prompts_for_instance(Some(
+            &target_inst_id_clone,
+        ))
+        .unwrap_or(0)
+            > 0
+        || crate::modules::backup_prompts_db::count_unrestored_prompts_for_other_instances(
+            &target_inst_id_clone,
+            None,
+        )
+        .unwrap_or(0)
+            > 0;
+    if app_config.auto_profile_switcher.auto_reopen_on_switch || has_pending_backups {
+        crate::modules::instance::schedule_prompt_restore_after_launch(
+            target_inst_id_clone.clone(),
         );
     }
+
+    // Post-switch prompt resume is intentionally NOT done inline here: the
+    // scheduled STAGE_5_RESTORE unit re-dispatches exactly one prompt (the
+    // most recently active backed-up one) once the prompt channel is up —
+    // see instance::workspace::push_backed_up_prompts_after_channel.
+    // repo_db::auto_resume_recent_prompts remains available on its manual
+    // command path (commands::instance) only.
 
     let now = chrono::Utc::now().timestamp();
     let mut state = RUNTIME_STATE.lock().unwrap();

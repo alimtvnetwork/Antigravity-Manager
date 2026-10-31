@@ -19,18 +19,27 @@ export function FleetDisabledState() {
                             Multi-Machine Fleet Sync is Disabled
                         </h4>
                         <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                            Fleet monitoring and cross-machine instance leases are inactive. Enable Supabase Sync in configuration to coordinate instances and track remote fleet nodes across your network.
+                            Supabase Cloud Sync is inactive and no registered SSH fleet nodes were found. Configure SSH nodes under Settings &gt; SSH &amp; GitMap, or enable Supabase Sync to coordinate instances across your cluster.
                         </p>
                     </div>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => navigate('/supabase')}
-                    className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30 hover:text-blue-300 transition-colors flex items-center gap-1.5 cursor-pointer"
-                >
-                    <span>Supabase Settings</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => navigate('/ssh')}
+                        className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-600/20 text-purple-400 border border-purple-500/30 hover:bg-purple-600/30 hover:text-purple-300 transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                        <span>SSH &amp; GitMap</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => navigate('/supabase')}
+                        className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30 hover:text-blue-300 transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                        <span>Supabase Settings</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
+                </div>
             </div>
         </div>
     );
@@ -64,6 +73,7 @@ interface FleetEmptyStateProps {
 }
 
 export function FleetEmptyState({ isRefreshing, onRefresh }: FleetEmptyStateProps) {
+    const navigate = useNavigate();
     return (
         <div className={`${cardClass} p-8 text-center`}>
             <div className="w-12 h-12 rounded-xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-center mx-auto text-slate-400 mb-3 shadow-inner">
@@ -76,6 +86,13 @@ export function FleetEmptyState({ isRefreshing, onRefresh }: FleetEmptyStateProp
                 This list is the shared cluster. SSH nodes are configured under Settings, SSH and GitMap. Machines that join show their status, instances, and active prompts here.
             </p>
             <div className="mt-4 flex items-center justify-center gap-2">
+                <button
+                    type="button"
+                    onClick={() => navigate('/ssh')}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                    <span>Configure SSH Nodes</span>
+                </button>
                 <button
                     type="button"
                     onClick={onRefresh}

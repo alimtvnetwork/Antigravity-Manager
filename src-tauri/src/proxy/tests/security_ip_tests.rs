@@ -1,12 +1,12 @@
 //! IP Security Module Tests
-//! IP 安全监控功能的综合测试套件
+//! Comprehensive test suite for IP security monitoring capabilities
 //!
-//! 测试目标:
-//! 1. 验证 IP 黑/白名单功能的正确性
-//! 2. 验证 CIDR 匹配逻辑
-//! 3. 验证过期时间处理
-//! 4. 验证不影响主流程性能
-//! 5. 验证数据库操作的原子性和一致性
+//! Test objectives:
+//! 1. Verify the correctness of the IP black/white list function
+//! 2. Verify CIDR matching logic
+//! 3. Verify expiration time processing
+//! 4. Verification does not affect the performance of the main process
+//! 5. Verify the atomicity and consistency of database operations
 
 #[cfg(test)]
 mod ip_filter_middleware_tests;

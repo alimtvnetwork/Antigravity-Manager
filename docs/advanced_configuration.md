@@ -1,31 +1,31 @@
-# 高级配置与实验性功能 (Advanced Configuration)
+# Advanced Configuration and Experimental Features (Advanced Configuration)
 
-Antigravity v3.3.35 引入了 `ExperimentalConfig`，这是一组默认开启的实验性功能开关，旨在提升系统的鲁棒性与兼容性。这些配置位于 `src-tauri/src/proxy/config.rs` 中，目前暂未暴露到 UI 界面。
+Antigravity v3.3.35 introduces `ExperimentalConfig`, which is a set of experimental function switches that are turned on by default, aiming to improve the robustness and compatibility of the system. These configurations are located in `src-tauri/src/proxy/config.rs` and are not currently exposed to the UI interface.
 
-## 功能列表
+## Feature list
 
-### 1. 双层签名缓存 (Signature Cache)
-*   **配置项**: `enable_signature_cache`
-*   **默认值**: `true`
-*   **说明**: 启用后，系统会缓存 `ToolUse ID` 与 `Thought Signature` 的映射关系。
-*   **作用**: 解决部分客户端（如 Claude Desktop CLI, Cherry Studio）在多轮对话中可能丢失历史 Tool Call 签名的问题。当上游 API 报错 "Missing signature" 时，系统可从缓存中自动恢复，避免对话中断。
+### 1. Double-layer signature cache (Signature Cache)
+* **Configuration item**: `enable_signature_cache`
+* **Default value**: `true`
+* **Description**: When enabled, the system will cache the mapping relationship between `ToolUse ID` and `Thought Signature`.
+* **Function**: Solve the problem that some clients (such as Claude Desktop CLI, Cherry Studio) may lose historical Tool Call signatures in multiple rounds of conversations. When the upstream API reports an error "Missing signature", the system can automatically restore it from the cache to avoid interruption of the conversation.
 
-### 2. 工具循环自动恢复 (Tool Loop Recovery)
-*   **配置项**: `enable_tool_loop_recovery`
-*   **默认值**: `true`
-*   **说明**: 启用后，系统会实时监控对话状态，检测“死循环”模式。
-*   **触发条件**: 检测到连续的 `ToolUse` -> `ToolResult` 循环，且 `Assistant` 消息中缺少 `Thinking` 块（通常因签名校验失败被 stripping）。
-*   **行为**: 自动注入合成消息（`Assistant: Tool execution completed.` -> `User: Proceed.`）来打破死循环，强制模型进入下一轮思考。
+### 2. Tool Loop Recovery
+* **Configuration item**: `enable_tool_loop_recovery`
+* **Default value**: `true`
+* **Note**: When enabled, the system will monitor the conversation status in real time and detect the "infinite loop" mode.
+* **Trigger condition**: Continuous `ToolUse` -> `ToolResult` loop is detected, and the `Thinking` block is missing from the `Assistant` message (usually stripping due to signature verification failure).
+* **Behavior**: Automatically inject synthetic messages (`Assistant: Tool execution completed.` -> `User: Proceed.`) to break the infinite loop and force the model to enter the next round of thinking.
 
-### 3. 跨模型兼容性检查 (Cross-Model Checks)
-*   **配置项**: `enable_cross_model_checks`
-*   **默认值**: `true`
-*   **说明**: 防止在同一会话中切换不同系列模型（如 Claude -> Gemini）时引发的签名错误。
-*   **作用**: 当检测到历史消息中的签名属于不兼容的模型家族（如 `claude-3-5` vs `gemini-2.0`）时，系统会自动丢弃旧签名，防止 API 拒绝请求。
+### 3. Cross-Model Checks
+* **Configuration item**: `enable_cross_model_checks`
+* **Default value**: `true`
+* **Description**: Prevent signature errors caused when switching different series of models (such as Claude -> Gemini) in the same session.
+* **Function**: When it is detected that the signature in the historical message belongs to an incompatible model family (such as `claude-3-5` vs `gemini-2.0`), the system will automatically discard the old signature to prevent the API from rejecting the request.
 
-## 自定义配置
+## Custom configuration
 
-目前这些配置项可通过修改 `src-tauri/src/proxy/config.rs` 中的 `default_true` 默认值来调整，或者等待未来版本集成到 "Settings -> Advanced" 界面。
+Currently these configuration items can be adjusted by modifying the `default_true` default value in `src-tauri/src/proxy/config.rs`, or waiting for future versions to be integrated into the "Settings -> Advanced" interface.
 
 ```rust
 // src-tauri/src/proxy/config.rs

@@ -5,7 +5,7 @@ async fn exchange_code_once(
     redirect_uri: &str,
     client_cfg: &OAuthClientConfig,
 ) -> Result<TokenResponse, (Option<reqwest::StatusCode>, String)> {
-    // [PHASE 2] 对于登录行为，尚未有 account_id，使用全局池阶梯逻辑
+    // [PHASE 2] For login behavior, there is no account_id yet, use global pool ladder logic
     let client = if let Some(pool) = crate::proxy::proxy_pool::get_global_proxy_pool() {
         pool.get_effective_standard_client(None, 60).await
     } else {
@@ -36,7 +36,7 @@ async fn exchange_code_once(
                 (
                     None,
                     format!(
-                        "Token exchange request failed: {}. 请检查你的网络代理设置，确保可以稳定连接 Google 服务。",
+                        "Token exchange request failed: {} . Please check your network proxy settings to ensure that you can connect to Google services stably.",
                         e
                     ),
                 )

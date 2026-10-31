@@ -39,7 +39,7 @@ pub async fn handle_completions(
     upstream_recorder: Option<
         axum::extract::Extension<crate::proxy::monitor::UpstreamRequestBodyHolder>,
     >,
-    Json(mut body): Json<Value>,
+    Json(body): Json<Value>,
 ) -> Response {
     let clean_start = std::time::Instant::now();
     debug!(

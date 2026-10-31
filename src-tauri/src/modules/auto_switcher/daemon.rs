@@ -84,6 +84,16 @@ pub async fn check_and_rotate_with_options(
             continue;
         };
 
+        // Suppress spurious low-quota warnings during the 10-second post-switch settling window
+        let is_settling = inst.last_used > 0 && (now - inst.last_used) < 10;
+        if is_settling && !force {
+            logger::log_info(&format!(
+                "[AutoSwitcher] Instance '{}' is in 10s post-switch settling window. Skipping threshold evaluation.",
+                inst.id
+            ));
+            continue;
+        }
+
         let mut bound_acc = match account::load_account(&bound_acc_id) {
             Ok(acc) => acc,
             Err(_) => continue,
@@ -118,12 +128,22 @@ pub async fn check_and_rotate_with_options(
             .or_else(|| calculate_account_quota(&bound_acc, &switcher_cfg.target_model))
             .unwrap_or(100.0);
 
+        let is_claude_limited = is_account_claude_limited(&bound_acc, effective_low_threshold, now);
+
         let below_threshold = period_status
             .as_ref()
             .map(|s| s.below_threshold)
             .unwrap_or(false)
             || quota_percent <= effective_low_threshold
-            || quota_percent <= switcher_cfg.critical_threshold_percent;
+            || quota_percent <= switcher_cfg.critical_threshold_percent
+            || is_claude_limited;
+
+        if is_claude_limited {
+            logger::log_info(&format!(
+                "[AutoSwitcher] Bound account '{}' reached Claude quota or rate limits. Triggering rotation...",
+                bound_acc.email
+            ));
+        }
         if below_threshold || force {
             // Justification: non-Result return value intentionally discarded — no error channel to track
             let _ = instance::resolve_instance_pid_for_switch(

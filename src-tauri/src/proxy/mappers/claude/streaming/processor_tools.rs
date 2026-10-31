@@ -246,12 +246,12 @@ impl<'a> PartProcessor<'a> {
         // Record real tool_id into TurnAccumulator for precise session/fingerprint recovery
         self.state.thinking_acc.record_tool_id(&tool_name, &tool_id);
 
-        // 1. 发送 content_block_start (input 为空对象)
+        // 1. Send content_block_start (input is an empty object)
         let mut tool_use = json!({
             "type": "tool_use",
             "id": tool_id,
             "name": tool_name,
-            "input": {} // 必须为空，参数通过 delta 发送
+            "input": {} // Must be empty, parameters are sent via delta
         });
 
         if let Some(ref sig) = signature {
@@ -277,7 +277,7 @@ impl<'a> PartProcessor<'a> {
 
         chunks.extend(self.state.start_block(BlockType::Function, tool_use));
 
-        // 2. 发送 input_json_delta (完整的参数 JSON 字符串)
+        // 2. Send input_json_delta (complete parameter JSON string)
         // [FIX #Bug2/#Bug4] ALWAYS emit input_json_delta, even for empty/null args.
         // Claude protocol requires this delta before content_block_stop.
         // Skipping it causes clients (Claude Code) to misinterpret tool calls as text.
@@ -301,7 +301,7 @@ impl<'a> PartProcessor<'a> {
             );
         }
 
-        // 3. 结束块
+        // 3. End block
         chunks.extend(self.state.end_block());
 
         chunks

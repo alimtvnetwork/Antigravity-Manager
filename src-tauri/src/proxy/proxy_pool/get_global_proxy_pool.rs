@@ -24,6 +24,26 @@ pub struct PoolProxyConfig {
     pub entry_id: String,
 }
 
+/// Helper to determine if a proxy entry is eligible for shared pool selection.
+pub fn is_proxy_eligible_for_shared_pool(
+    proxy: &ProxyEntry,
+    auto_failover: bool,
+    bound_ids: &std::collections::HashSet<String>,
+) -> bool {
+    if !proxy.enabled {
+        return false;
+    }
+    if auto_failover && !proxy.is_healthy {
+        return false;
+    }
+    !bound_ids.contains(&proxy.id)
+}
+
+/// Helper to determine if a bound proxy is healthy and eligible for routing.
+pub fn is_bound_proxy_eligible(proxy: &ProxyEntry, auto_failover: bool) -> bool {
+    proxy.enabled && (!auto_failover || proxy.is_healthy)
+}
+
 /// Proxy pool manager
 pub struct ProxyPoolManager {
     pub(crate) config: Arc<RwLock<ProxyPoolConfig>>,
@@ -234,11 +254,7 @@ impl ProxyPoolManager {
     ) -> Result<Option<PoolProxyConfig>, String> {
         if let Some(proxy_id) = self.account_bindings.get(account_id) {
             if let Some(entry) = config.proxies.iter().find(|p| p.id == *proxy_id.value()) {
-                if entry.enabled {
-                    // If auto failover enabled and proxy is unhealthy, return None
-                    if config.auto_failover && !entry.is_healthy {
-                        return Ok(None);
-                    }
+                if is_bound_proxy_eligible(entry, config.auto_failover) {
                     return Ok(Some(self.build_proxy_config(entry)?));
                 }
             }
@@ -261,19 +277,7 @@ impl ProxyPoolManager {
         let healthy_proxies: Vec<_> = config
             .proxies
             .iter()
-            .filter(|p| {
-                if !p.enabled {
-                    return false;
-                }
-                if config.auto_failover && !p.is_healthy {
-                    return false;
-                }
-                // If proxy is dedicated-bound, exclude from shared round-robin
-                if bound_ids.contains(&p.id) {
-                    return false;
-                }
-                true
-            })
+            .filter(|p| is_proxy_eligible_for_shared_pool(p, config.auto_failover, &bound_ids))
             .collect();
 
         if healthy_proxies.is_empty() {

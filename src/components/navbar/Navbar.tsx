@@ -1,5 +1,5 @@
 import { startTransition, useRef } from 'react';
-import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings, Lock, KeyRound, Laptop, Mail, Bug, ScrollText, Database, Wrench } from 'lucide-react';
+import { LayoutDashboard, Users, Network, Activity, BarChart3, Settings, Lock, KeyRound, Laptop, Mail, Bug, ScrollText, Database, Wrench, MessageSquare } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
@@ -39,6 +39,7 @@ function Navbar() {
         { path: '/security', label: t('nav.security'), icon: Lock, priority: 'low' },
         { path: '/email', label: t('nav.email', 'Email & Alerts'), icon: Mail, priority: 'high' },
         { path: '/supabase', label: t('nav.supabase', 'Supabase'), icon: Database, priority: 'high' },
+        { path: '/telegram', label: t('nav.telegram', 'Telegram Remote'), icon: MessageSquare, priority: 'high' },
         { path: '/audit', label: t('nav.audit', 'Audit'), icon: ScrollText, priority: 'high' },
         { path: '/toolchain', label: t('nav.toolchain', 'Toolchain'), icon: Wrench, priority: 'low' },
         { path: '/settings', label: t('nav.settings'), icon: Settings, priority: 'high' },
@@ -205,33 +206,35 @@ function Navbar() {
             <div className="w-full px-2 sm:px-3 md:px-4 lg:px-6 relative" style={{ zIndex: 10 }}>
                 {/* Flexbox layout */}
                 <div className="flex items-center justify-between h-14 gap-1 sm:gap-1.5 md:gap-2 lg:gap-3 min-w-0">
-                    {/* Logo, Debug Button & Error Manager Badge */}
+                    {/* Logo, Debug & Error Manager Segmented Capsule */}
                     <div
-                        className="no-drag shrink-0 flex items-center gap-1 sm:gap-1.5 min-w-0"
+                        className="no-drag shrink-0 flex items-center gap-1.5 sm:gap-2 min-w-0"
                         onMouseDown={(e) => e.stopPropagation()}
                         onDoubleClick={(e) => e.stopPropagation()}
                     >
                         <NavLogo />
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (isDebugEnabled) {
-                                    disableDebug();
-                                } else {
-                                    enableDebug();
-                                }
-                            }}
-                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-150 ease-out shadow-xs cursor-pointer ${
-                                isDebugEnabled
-                                    ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30'
-                                    : 'bg-gray-100 dark:bg-slate-800 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-500 text-gray-700 dark:text-gray-300'
-                            }`}
-                            title={isDebugEnabled ? 'Disable Debug Overlay' : 'Enable Debug Overlay & Console'}
-                            aria-label="Debug Console"
-                        >
-                            <Bug className="w-4 h-4" />
-                        </button>
-                        <ErrorQueueBadge />
+                        <div className="flex items-center rounded-full bg-gray-100 dark:bg-[#171025]/90 border border-gray-200/60 dark:border-[#40285e] p-0.5 divide-x divide-gray-200/50 dark:divide-slate-700/60 shadow-xs">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (isDebugEnabled) {
+                                        disableDebug();
+                                    } else {
+                                        enableDebug();
+                                    }
+                                }}
+                                className={`w-7 h-7 rounded-l-full flex items-center justify-center transition-all duration-150 ease-out cursor-pointer ${
+                                    isDebugEnabled
+                                        ? 'bg-amber-500/20 text-amber-500 font-bold'
+                                        : 'hover:bg-gray-200 dark:hover:bg-[#40285e] text-gray-700 dark:text-gray-300'
+                                }`}
+                                title={isDebugEnabled ? 'Disable Debug Overlay' : 'Enable Debug Overlay & Console'}
+                                aria-label="Debug Console"
+                            >
+                                <Bug className="w-3.5 h-3.5" />
+                            </button>
+                            <ErrorQueueBadge />
+                        </div>
                     </div>
 
                     {/* Center draggable spacer */}

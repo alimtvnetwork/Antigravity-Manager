@@ -622,6 +622,8 @@ mod win32_console {
     use std::os::raw::c_void;
 
     const STD_OUTPUT_HANDLE: u32 = 0xFFFFFFF5;
+    const ENABLE_PROCESSED_OUTPUT: u32 = 0x0001;
+    const ENABLE_WRAP_AT_EOL_OUTPUT: u32 = 0x0002;
     const ENABLE_VIRTUAL_TERMINAL_PROCESSING: u32 = 0x0004;
     const DISABLE_NEWLINE_AUTO_RETURN: u32 = 0x0008;
 
@@ -660,10 +662,14 @@ mod win32_console {
 
             let handle = GetStdHandle(STD_OUTPUT_HANDLE);
             if !handle.is_null() {
-                // Enable ANSI virtual terminal processing
+                // Enable ANSI virtual terminal processing and disable DISABLE_NEWLINE_AUTO_RETURN
                 let mut mode: u32 = 0;
                 if GetConsoleMode(handle, &mut mode) != 0 {
-                    let new_mode = mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN;
+                    let new_mode = (mode
+                        | ENABLE_PROCESSED_OUTPUT
+                        | ENABLE_WRAP_AT_EOL_OUTPUT
+                        | ENABLE_VIRTUAL_TERMINAL_PROCESSING)
+                        & !DISABLE_NEWLINE_AUTO_RETURN;
                     SetConsoleMode(handle, new_mode);
                 }
 

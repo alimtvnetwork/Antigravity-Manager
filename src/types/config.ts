@@ -25,8 +25,8 @@ export interface ProxyConfig {
     saved_user_agent?: string;
     thinking_budget?: ThinkingBudgetConfig;
     global_system_prompt?: GlobalSystemPromptConfig;
-    image_thinking_mode?: 'enabled' | 'disabled'; // [NEW] 图像思维模式开关
-    only_raw_quota_models?: boolean; // [NEW] 是否只暴露真实配额模型
+    image_thinking_mode?: 'enabled' | 'disabled'; // [NEW] Image thinking mode switch
+    only_raw_quota_models?: boolean; // [NEW] Whether to expose only real quota models
     proxy_pool?: ProxyPoolConfig;
     default_path_rewrite?: boolean;
     enable_all_urls?: boolean;
@@ -42,43 +42,43 @@ export interface LogRetentionConfig {
 }
 
 // ============================================================================
-// Thinking Budget 配置 (控制 AI 深度思考时的 Token 预算)
+// Thinking Budget configuration (controlling the Token budget when AI is thinking deeply)
 // ============================================================================
 
-/** 思考预算控制权归属 */
+/** Thinking budget authority ownership */
 export type ThinkingControlSource = 'gateway' | 'client';
 
-/** Thinking Budget 处理模式 */
+/** Thinking budget processing mode */
 export type ThinkingBudgetMode = 'default' | 'custom' | 'auto' | 'passthrough' | 'adaptive';
 
-/** Thinking Effort 等级 (仅 adaptive 模式) */
+/** Thinking effort tier (adaptive mode only) */
 export type ThinkingEffort = 'low' | 'medium' | 'high';
 
-/** Thinking Budget 配置 */
+/** Thinking budget configuration */
 export interface ThinkingBudgetConfig {
-    /** 控制权大选择：网关权威控制 (gateway) vs 客户端直接控制 (client) */
+    /** Master control choice: gateway authoritative (gateway) vs client passthrough (client) */
     control_source?: ThinkingControlSource;
 
-    // --- Gemini Flash 系列配置 ---
+    // --- Gemini Flash Series Configuration ---
     flash_mode?: ThinkingBudgetMode;
-    flash_low?: number;       // 默认 1000
-    flash_medium?: number;    // 默认 4000
-    flash_high?: number;      // 默认 10000
-    flash_tiered?: number;    // 默认 -1
+    flash_low?: number;       // Default 1000
+    flash_medium?: number;    // Default 4000
+    flash_high?: number;      // Default 10000
+    flash_tiered?: number;    // Default -1
 
-    // --- Gemini Pro 系列配置（官方仅 Low 与 High 两档） ---
+    // --- Gemini Pro series configuration (officially only Low and High) ---
     pro_mode?: ThinkingBudgetMode;
-    pro_low?: number;         // 默认 1001
-    pro_high?: number;        // 默认 10001
+    pro_low?: number;         // Default 1001
+    pro_high?: number;        // Default 10001
 
-    // --- Claude 系列配置 ---
+    // --- Claude series configuration ---
     claude_mode?: ThinkingBudgetMode;
-    claude_budget?: number;    // 统一思考预算 (默认 16000, 填 -1 自适应)
-    claude_low?: number;       // 默认 1024
-    claude_medium?: number;    // 默认 4096
-    claude_high?: number;      // 默认 16000
+    claude_budget?: number;    // Unified thinking budget (default 16000, fill in -1 to adapt)
+    claude_low?: number;       // Default 1024
+    claude_medium?: number;    // Default 4096
+    claude_high?: number;      // Default 16000
 
-    // --- 旧版兼容字段 ---
+    // --- Legacy compatible fields ---
     mode?: ThinkingBudgetMode;
     custom_value?: number;
     effort?: ThinkingEffort;
@@ -89,14 +89,14 @@ export interface ThinkingBudgetConfig {
 }
 
 // ============================================================================
-// 全局系统提示词配置
+// Global system prompt word configuration
 // ============================================================================
 
-/** 全局系统提示词配置 */
+/** Global system prompt configuration */
 export interface GlobalSystemPromptConfig {
-    /** 是否启用 */
+    /** Whether enabled */
     enabled: boolean;
-    /** 提示词内容 */
+    /** Prompt content */
     content: string;
 }
 
@@ -171,45 +171,59 @@ export interface CircuitBreakerConfig {
     lock_on_zero_quota?: boolean;
 }
 
+/** Date & Time format display mode enum */
+export enum DateFormatModeType {
+    TwentyFourHour = '24h',
+    TwelveHour = '12h',
+    Iso = 'iso',
+}
+
+export type DateFormatMode = DateFormatModeType;
+
 export interface AppConfig {
     language: string;
     theme: string;
+    date_format_mode?: DateFormatMode; // [NEW] Global date and time format preference (DateFormatModeType)
+    time_format_preference?: DateFormatMode; // [NEW] Aliases compatible
     auto_refresh: boolean;
     refresh_interval: number;
     auto_sync: boolean;
     auto_sync_migrated?: boolean;
     sync_interval: number;
     default_export_path?: string;
-    antigravity_executable?: string; // [NEW] 手动指定的反重力程序路径
-    antigravity_ide_executable?: string; // [NEW] 手动指定的 Antigravity IDE 程序路径
-    antigravity_cli_executable?: string; // [NEW] 手动指定的 Antigravity CLI (agy) 路径
-    antigravity_args?: string[]; // [NEW] Antigravity 启动参数
-    auto_launch?: boolean; // 开机自动启动
-    auto_check_update?: boolean; // 自动检查更新
-    update_check_interval?: number; // 更新检查间隔（小时）
-    notify_on_update?: boolean; // 是否发送系统更新通知 (默认开启)
-    notify_via_email?: boolean; // 是否通过邮件发送系统更新通知 (默认开启)
-    notify_via_telegram?: boolean; // 是否通过Telegram发送系统更新通知 (默认开启)
-    update_channel?: 'stable' | 'beta'; // 更新通道：正式版 vs 预览版
-    accounts_page_size?: number; // 账号列表每页显示数量,默认 0 表示自动计算
-    hidden_menu_items?: string[]; // 隐藏的菜单项路径列表
+    antigravity_executable?: string; // [NEW] Manually specified anti-gravity program path
+    antigravity_ide_executable?: string; // [NEW] Manually specified Antigravity IDE program path
+    antigravity_cli_executable?: string; // [NEW] Manually specified Antigravity CLI (agy) path
+    antigravity_args?: string[]; // [NEW] Antigravity startup parameters
+    auto_launch?: boolean; // Start automatically at boot
+    auto_check_update?: boolean; // Automatically check for updates
+    update_check_interval?: number; // Update check interval (hours)
+    notify_on_update?: boolean; // Whether to send system update notifications (enabled by default)
+    notify_via_email?: boolean; // Whether to send system update notifications via email (enabled by default)
+    notify_via_telegram?: boolean; // Whether to send system update notifications through Telegram (enabled by default)
+    update_channel?: 'stable' | 'beta'; // Update channel: official version vs preview version
+    accounts_page_size?: number; // The number displayed on each page of the account list, default 0 means automatic calculation
+    hidden_menu_items?: string[]; // Hidden menu item path list
     scheduled_warmup: ScheduledWarmupConfig;
-    quota_protection: QuotaProtectionConfig; // [NEW] 配额保护配置
-    pinned_quota_models: PinnedQuotaModelsConfig; // [NEW] 配额关注列表
-    circuit_breaker: CircuitBreakerConfig; // [NEW] 熔断器配置
+    quota_protection: QuotaProtectionConfig; // [NEW] Quota protection configuration
+    pinned_quota_models: PinnedQuotaModelsConfig; // [NEW] Quota Watchlist
+    circuit_breaker: CircuitBreakerConfig; // [NEW] Fuse configuration
     proxy: ProxyConfig;
-    cloudflared: CloudflaredConfig; // [NEW] Cloudflared 配置
+    cloudflared: CloudflaredConfig; // [NEW] Cloudflared configuration
     lightweight_mode?: boolean; // [NEW] Lightweight mode: release WebView when minimized to tray
     auto_profile_switcher?: AutoProfileSwitcherConfig; // [NEW] Auto profile switching and task recovery config
     instance_clone_mode?: 'full' | 'profile'; // [NEW] Instance clone mode: full directory copy or profile only
     conversation_cleanup?: ConversationCleanupConfig; // [NEW] Conversation history and cache auto-cleanup config
     training_api_enabled?: boolean; // [NEW] Enable /api/v1/training REST endpoints
     remote_control_api_enabled?: boolean; // [NEW] Enable /api/v1/remote/control REST endpoints
-    suggestion_delete_thinking_store?: boolean; // [NEW] 建议删除历史思考块缓存开关
-    thinking_cleanup_dismissed?: boolean; // [NEW] 用户是否已确认/忽略该建议
-    dismissed_thinking_cleanup_version?: string; // [NEW] 用户已确认或忽略建议的目标版本号
+    suggestion_delete_thinking_store?: boolean; // [NEW] It is recommended to delete the historical thinking block cache switch
+    thinking_cleanup_dismissed?: boolean; // [NEW] Whether the user has confirmed/ignored the suggestion
+    dismissed_thinking_cleanup_version?: string; // [NEW] User has confirmed or ignored the suggested target version number
     instance_card_max_projects?: number; // [NEW] Maximum recent projects displayed on instance card (1-3, default 3)
     max_backup_prompts?: number; // [NEW] Maximum prompt snapshots retained in SQLite backup database (default 100, range 10-1000)
+    prompt_preview_max_words?: number; // [NEW] Maximum words retained in prompt preview snippet (100-200, default 100)
+    /** Maximum words displayed in conversation preview cards and tree leaves before truncation (default: 200 words, range: 50–500) */
+    prompt_preview_words?: number;
 }
 
 export interface ConversationCleanupConfig {
@@ -234,16 +248,18 @@ export interface AutoProfileSwitcherConfig {
     auto_reopen_on_switch?: boolean; // [NEW] Auto reopen active workspace window on profile rotation
     watchdog_interval_seconds?: number;
     prompt_recency_threshold_seconds?: number;
+    pid_refresh_seconds?: number; // Full process-table rebuild interval (default 600, clamp 180..=1200)
     fast_forward_shortcut?: string;
     account_cooldown_minutes?: number;
     account_lockout_window_minutes?: number;
     ultra_tier_multiplier?: number; // Best-account scoring: Ultra tier weight (default 4.0)
     pro_tier_multiplier?: number; // Best-account scoring: Pro tier weight (default 2.0)
     free_tier_multiplier?: number; // Best-account scoring: Free tier weight (default 1.0)
+    min_weekly_quota_percent?: number;
 }
 
 // ============================================================================
-// Cloudflared (CF隧道) 类型定义
+// Cloudflared (CF tunnel) type definition
 // ============================================================================
 
 export type TunnelMode = 'quick' | 'auth';
@@ -265,7 +281,7 @@ export interface CloudflaredStatus {
 }
 
 // ============================================================================
-// 代理池类型定义
+// Agent pool type definition
 // ============================================================================
 
 export interface ProxyAuth {
@@ -285,7 +301,7 @@ export interface ProxyEntry {
     health_check_url?: string;
     last_check_time?: number;
     is_healthy: boolean;
-    latency?: number; // [NEW] 延迟 (毫秒)
+    latency?: number; // [NEW] Delay (milliseconds)
 }
 
 // export type ProxyPoolMode = 'global' | 'per_account' | 'hybrid'; // [REMOVED]

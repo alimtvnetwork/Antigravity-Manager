@@ -1,4 +1,4 @@
-//! 动态模型候选集构建与账号模型解析。
+//! Dynamic model candidate set construction and account model analysis.
 
 use super::TokenManager;
 use std::collections::HashSet;
@@ -115,7 +115,7 @@ impl TokenManager {
         mapped_model.to_string()
     }
 
-    /// 测试辅助函数：公开访问 get_model_quota_from_json
+    /// Test helper function: public access to get_model_quota_from_json
     #[cfg(test)]
     pub fn get_model_quota_from_json_for_test(
         account_path: &PathBuf,

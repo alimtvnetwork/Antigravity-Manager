@@ -2,7 +2,7 @@ use crate::models::Account;
 
 use super::*;
 
-/// 系统集成管理器：替代 Arc<dyn SystemIntegration> 以解决 async trait 的 dyn 兼容性问题
+/// System Integration Manager: Replacement for Arc<dyn SystemIntegration> to resolve dyn compatibility issues with async traits
 #[derive(Clone)]
 pub enum SystemManager {
     Desktop(tauri::AppHandle),

@@ -149,7 +149,7 @@ pub fn init_db() -> Result<(), String> {
     )
     .map_err(|e| e.to_string())?;
 
-    // 高效复合索引：状态与时间戳倒序（针对错误筛选与分页排序，极大提升大数据量下的响应速度）
+    // Efficient compound index: status and timestamp reverse order (for error filtering and paging sorting, greatly improving the response speed under large data volumes)
     // Justification: lookup index is a performance accelerator; queries work without it
     crate::error::record_ignored(
         conn.execute(
@@ -159,7 +159,7 @@ pub fn init_db() -> Result<(), String> {
         "create idx_status_timestamp index",
     );
 
-    // 复合索引：模型与时间戳倒序（针对模型级日志过滤与排序）
+    // Composite index: model and timestamp reverse order (for model-level log filtering and sorting)
     // Justification: lookup index is a performance accelerator; queries work without it
     crate::error::record_ignored(
         conn.execute(
@@ -169,7 +169,7 @@ pub fn init_db() -> Result<(), String> {
         "create idx_model_timestamp index",
     );
 
-    // 复合索引：账号邮箱与时间戳倒序（针对多用户/多账号过滤）
+    // Composite index: account email and timestamp reverse order (for multi-user/multi-account filtering)
     // Justification: lookup index is a performance accelerator; queries work without it
     crate::error::record_ignored(
         conn.execute(
@@ -179,7 +179,7 @@ pub fn init_db() -> Result<(), String> {
         "create idx_account_timestamp index",
     );
 
-    // 复合索引：客户端IP与时间戳倒序（针对安全审计与IP过滤）
+    // Composite index: client IP and timestamp in reverse order (for security auditing and IP filtering)
     // Justification: lookup index is a performance accelerator; queries work without it
     crate::error::record_ignored(
         conn.execute(
@@ -189,7 +189,7 @@ pub fn init_db() -> Result<(), String> {
         "create idx_client_ip_timestamp index",
     );
 
-    // 复合索引：用户名与时间戳倒序
+    // Composite index: username and timestamp in reverse order
     // Justification: lookup index is a performance accelerator; queries work without it
     crate::error::record_ignored(
         conn.execute(
@@ -199,7 +199,7 @@ pub fn init_db() -> Result<(), String> {
         "create idx_username_timestamp index",
     );
 
-    // 复合索引：会话与时间戳倒序（针对会话粒度运维分析）
+    // Composite index: session and timestamp reverse order (for session granular operation and maintenance analysis)
     // Justification: lookup index is a performance accelerator; queries work without it
     crate::error::record_ignored(
         conn.execute(
@@ -209,7 +209,7 @@ pub fn init_db() -> Result<(), String> {
         "create idx_session_timestamp index",
     );
 
-    // 单列索引：协议类型
+    // Single column index: protocol type
     // Justification: lookup index is a performance accelerator; queries work without it
     crate::error::record_ignored(
         conn.execute(
@@ -219,7 +219,7 @@ pub fn init_db() -> Result<(), String> {
         "create idx_protocol index",
     );
 
-    // 单列索引：请求方法
+    // Single column index: request method
     // Justification: lookup index is a performance accelerator; queries work without it
     crate::error::record_ignored(
         conn.execute(
@@ -229,7 +229,7 @@ pub fn init_db() -> Result<(), String> {
         "create idx_method index",
     );
 
-    // 持久化工具签名表 (支持代理重启后根据 tool_id 秒级恢复真实加密签名)
+    // Persistence tool signature table (supports recovery of real encrypted signatures in seconds based on tool_id after agent restart)
     conn.execute(
         "CREATE TABLE IF NOT EXISTS tool_signatures (
             tool_id TEXT PRIMARY KEY,

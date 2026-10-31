@@ -45,20 +45,20 @@ pub(crate) fn extract_boundary(content_type: &str) -> Option<String> {
     })
 }
 
-/// 噪音请求日志抑制判定。
+/// Noise request log suppression decision.
 ///
-/// 面板「捕获健康请求」胶囊开关（`capture_health_logs`）**默认关闭**。关闭时：
-/// **所有 GET 成功请求一律不记录、不落库**（含 `/v1/models`、`/v1beta/models`、`/v1/models/claude`
-/// 等模型列表轮询，以及 `/health` `/healthz` `/api/health` 探针）。
+/// Panel "Capture Health Request" capsule switch (`capture_health_logs`) is **off by default**. When closed:
+/// **All successful GET requests will not be recorded or dropped into the database** (including `/v1/models`, `/v1beta/models`, `/v1/models/claude`
+/// etc. Model list polling, and `/health` `/healthz` `/api/health` probes).
 ///
-/// 之所以从"仅过滤 `/health` 探针"放宽到"全部 GET 成功"：真实客户端的健康/能力探测会高频轮询
-/// **模型列表**接口（issue #3498 的探针刷屏 + 面板中 `/v1/models` 200 连片淹没业务日志），
-/// 这类请求没有对话语义、无业务价值，却会把真实业务日志挤出视图。
+/// The reason for relaxing from "only filtering `/health` probes" to "all GET successes": the real client's health/capability probes will be polled frequently
+/// **Model List** interface (the probe of issue #3498 refreshes the screen + `/v1/models` 200 in the panel floods the business log),
+/// This type of request has no conversational semantics and no business value, but will squeeze the real business logs out of view.
 ///
-/// 边界（刻意保守，绝不影响排障）：
-/// - 失败请求（非 2xx）**始终记录**，无论路径与方法；
-/// - 非 GET（POST 等真实业务请求）**始终记录**；
-/// - 开关开启（或环境变量 `ABV_LOG_HEALTH_CHECKS` 为真）时全部记录并落库。
+/// Boundaries (deliberately conservative, never affecting troubleshooting):
+/// - Failed requests (non-2xx) are **always logged**, regardless of path and method;
+/// - Non-GET (real business requests such as POST) **always logged**;
+/// - When the switch is turned on (or the environment variable `ABV_LOG_HEALTH_CHECKS` is true), all records are logged and dropped into the library.
 
 pub(crate) fn should_skip_request_log(
     method: &str,

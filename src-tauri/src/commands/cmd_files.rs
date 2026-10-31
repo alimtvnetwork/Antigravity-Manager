@@ -1,6 +1,24 @@
 use super::*;
 
+fn path_has_illegal_syntax(rendered: &str) -> bool {
+    rendered
+        .chars()
+        .any(|ch| matches!(ch, '<' | '>' | '|' | '"' | '*' | '?'))
+        || rendered.contains("://")
+}
+
 fn resolve_existing_or_parent(path: &Path) -> Result<PathBuf, String> {
+    let rendered = path.to_string_lossy();
+    if path_has_illegal_syntax(&rendered) {
+        return Err(
+            "invalid_path: path contains characters Windows rejects, so it cannot be opened as a file"
+                .to_string(),
+        );
+    }
+    if !path.is_absolute() {
+        return Err("invalid_path: absolute path is required".to_string());
+    }
+
     if path.exists() {
         return path
             .canonicalize()
@@ -10,9 +28,15 @@ fn resolve_existing_or_parent(path: &Path) -> Result<PathBuf, String> {
     let parent = path
         .parent()
         .ok_or_else(|| "invalid_path: missing parent directory".to_string())?;
+    if !parent.exists() {
+        return Err(format!(
+            "path_not_found: neither file nor parent directory exists ({})",
+            path.display()
+        ));
+    }
     let canonical_parent = parent
         .canonicalize()
-        .map_err(|e| format!("failed_to_resolve_parent: {}", e))?;
+        .map_err(|e| format!("invalid_path: parent directory cannot be opened ({e})"))?;
     let file_name = path
         .file_name()
         .ok_or_else(|| "invalid_path: missing file name".to_string())?;
@@ -31,7 +55,6 @@ fn is_sensitive_path(path: &Path) -> bool {
         "c:\\windows",
         "c:\\program files",
         "c:\\program files (x86)",
-        "c:\\users\\administrator",
         "c:\\pagefile.sys",
     ];
 
@@ -86,18 +109,326 @@ pub fn copy_text_to_clipboard(text: String) -> Result<(), String> {
     crate::modules::repo_db::copy_text_to_clipboard_sync(&text)
 }
 
-/// 保存文本文件 (绕过前端 Scope 限制)
+/// Copy multiple image files or base64 image data directly to system clipboard as native OS image formats
+/// (CF_BITMAP, CF_DIB, PNG, and CF_HDROP on Windows).
+/// - For a single image: sets CF_BITMAP, CF_DIB, PNG, and CF_HDROP (file drop list).
+/// - For multiple images: stitches them vertically into a composite bitmap (with 16px gap and high-quality smoothing)
+///   and puts the composite into CF_BITMAP, CF_DIB, PNG (for OneNote, Word, Paint), and puts all individual file paths
+///   into CF_HDROP (so Antigravity IDE and chat inputs attach all image files directly).
+#[tauri::command]
+pub fn copy_images_to_clipboard(paths: Vec<String>) -> Result<(), String> {
+    if paths.is_empty() {
+        return Err("No image paths provided to copy".to_string());
+    }
+
+    let mut resolved_paths: Vec<PathBuf> = Vec::new();
+    for raw in paths {
+        let raw = raw.trim();
+        if raw.is_empty() {
+            continue;
+        }
+
+        let target_file_path: PathBuf = if raw.starts_with("data:image/") {
+            // Decode base64 and write to temp file
+            let comma_pos = raw
+                .find(',')
+                .ok_or_else(|| "invalid data URI: missing comma".to_string())?;
+            let b64_str = &raw[comma_pos + 1..];
+            use base64::Engine;
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(b64_str.trim())
+                .map_err(|e| format!("failed to decode base64 image: {e}"))?;
+            let temp_path = std::env::temp_dir().join(format!(
+                "agm_clipboard_{}.png",
+                &uuid::Uuid::new_v4().to_string()[..8]
+            ));
+            std::fs::write(&temp_path, &bytes)
+                .map_err(|e| format!("failed to write temp clipboard image: {e}"))?;
+            temp_path
+        } else {
+            let clean_path = crate::modules::repo_db::failed_commands::decode_uri_to_path(raw);
+            let trimmed = clean_path.trim().replace(r"\\?\", "").replace(r"\?\", "");
+            let p = PathBuf::from(&trimmed);
+            if !p.exists() {
+                return Err(format!("Image file does not exist: {trimmed}"));
+            }
+            p
+        };
+        resolved_paths.push(target_file_path);
+    }
+
+    if resolved_paths.is_empty() {
+        return Err("No valid image files found to copy".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let paths_formatted = resolved_paths
+            .iter()
+            .map(|p| format!("'{}'", p.to_string_lossy().replace('\'', "''")))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let script = format!(
+            "Add-Type -AssemblyName System.Drawing; Add-Type -AssemblyName System.Windows.Forms; \
+            $paths = @({paths_formatted}); \
+            $files = New-Object System.Collections.Specialized.StringCollection; \
+            $images = New-Object System.Collections.Generic.List[System.Drawing.Image]; \
+            foreach ($p in $paths) {{ \
+                if (Test-Path $p) {{ \
+                    [void]$files.Add($p); \
+                    $images.Add([System.Drawing.Image]::FromFile($p)); \
+                }} \
+            }} \
+            if ($images.Count -eq 0) {{ exit 1 }} \
+            if ($images.Count -eq 1) {{ \
+                $bmp = New-Object System.Drawing.Bitmap($images[0]); \
+            }} else {{ \
+                $maxW = 0; \
+                $totalH = 0; \
+                $gap = 16; \
+                for ($i = 0; $i -lt $images.Count; $i++) {{ \
+                    if ($images[$i].Width -gt $maxW) {{ $maxW = $images[$i].Width; }} \
+                    $totalH += $images[$i].Height; \
+                    if ($i -lt ($images.Count - 1)) {{ $totalH += $gap; }} \
+                }} \
+                $bmp = New-Object System.Drawing.Bitmap($maxW, $totalH); \
+                $g = [System.Drawing.Graphics]::FromImage($bmp); \
+                $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality; \
+                $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic; \
+                $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality; \
+                $g.Clear([System.Drawing.Color]::Transparent); \
+                $curY = 0; \
+                for ($i = 0; $i -lt $images.Count; $i++) {{ \
+                    $img = $images[$i]; \
+                    $x = [int][Math]::Max(0, ($maxW - $img.Width) / 2); \
+                    $g.DrawImage($img, $x, $curY, $img.Width, $img.Height); \
+                    $curY += $img.Height + $gap; \
+                }} \
+                $g.Dispose(); \
+            }} \
+            $msPng = New-Object System.IO.MemoryStream; \
+            $bmp.Save($msPng, [System.Drawing.Imaging.ImageFormat]::Png); \
+            $msBmp = New-Object System.IO.MemoryStream; \
+            $bmp.Save($msBmp, [System.Drawing.Imaging.ImageFormat]::Bmp); \
+            $bytes = $msBmp.ToArray(); \
+            $dibStream = New-Object System.IO.MemoryStream($bytes, 14, ($bytes.Length - 14)); \
+            $data = New-Object System.Windows.Forms.DataObject; \
+            $data.SetImage($bmp); \
+            $data.SetData([System.Windows.Forms.DataFormats]::Dib, $dibStream); \
+            $data.SetData('PNG', $msPng); \
+            if ($files.Count -gt 0) {{ \
+                $data.SetFileDropList($files); \
+            }} \
+            [System.Windows.Forms.Clipboard]::SetDataObject($data, $true, 10, 100); \
+            $bmp.Dispose(); \
+            foreach ($img in $images) {{ $img.Dispose(); }}"
+        );
+
+        let mut cmd = std::process::Command::new("powershell");
+        cmd.args(["-NoProfile", "-NonInteractive", "-Sta", "-Command", &script]);
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        let status = cmd
+            .status()
+            .map_err(|e| format!("Failed to run Windows image clipboard helper: {e}"))?;
+        if status.success() {
+            return Ok(());
+        } else {
+            return Err(format!(
+                "Windows image clipboard helper exited with {status}"
+            ));
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(first) = resolved_paths.first() {
+            let abs_str = first.to_string_lossy().to_string();
+            let script = format!(
+                "set the clipboard to (read (POSIX file \"{}\") as JPEG picture)",
+                abs_str.replace('"', "\\\"")
+            );
+            let mut cmd = std::process::Command::new("osascript");
+            cmd.args(["-e", &script]);
+            let status = cmd
+                .status()
+                .map_err(|e| format!("macOS osascript clipboard helper failed: {e}"))?;
+            if status.success() {
+                return Ok(());
+            } else {
+                return Err(format!("macOS clipboard helper exited with {status}"));
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(first) = resolved_paths.first() {
+            let abs_str = first.to_string_lossy().to_string();
+            if let Ok(file) = std::fs::File::open(first) {
+                let mut cmd = std::process::Command::new("wl-copy");
+                cmd.args(["-t", "image/png"]).stdin(file);
+                if let Ok(status) = cmd.status() {
+                    if status.success() {
+                        return Ok(());
+                    }
+                }
+            }
+            let mut cmd2 = std::process::Command::new("xclip");
+            cmd2.args(["-selection", "clipboard", "-t", "image/png", "-i", &abs_str]);
+            if let Ok(status) = cmd2.status() {
+                if status.success() {
+                    return Ok(());
+                }
+            }
+            return Err("Linux image clipboard helpers (wl-copy, xclip) failed".to_string());
+        }
+    }
+
+    #[allow(unreachable_code)]
+    Err("Image clipboard not supported on this operating system".to_string())
+}
+
+/// Copy an image file or base64 image data directly to system clipboard as native OS image format
+/// (CF_DIB / CF_BITMAP on Windows). This guarantees pasting into OneNote, Paint, Word, Antigravity, etc.
+#[tauri::command]
+pub fn copy_image_to_clipboard(path: String) -> Result<(), String> {
+    copy_images_to_clipboard(vec![path])
+}
+
+/// Save text file (bypassing front-end Scope restrictions)
 #[tauri::command]
 pub async fn save_text_file(path: String, content: String) -> Result<(), String> {
     let path = validate_user_json_path(&path, false)?;
-    std::fs::write(&path, content).map_err(|e| format!("写入文件失败: {}", e))
+    std::fs::write(&path, content).map_err(|e| format!("Failed to write file: {}", e))
 }
 
-/// 读取文本文件 (绕过前端 Scope 限制)
+/// Read text files (bypassing front-end Scope limitations)
 #[tauri::command]
 pub async fn read_text_file(path: String) -> Result<String, String> {
     let path = validate_user_json_path(&path, true)?;
-    std::fs::read_to_string(&path).map_err(|e| format!("读取文件失败: {}", e))
+    std::fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))
+}
+
+/// Read an image file directly from disk and return as a Base64 data URI (data:image/<ext>;base64,...)
+/// for safe, taint-free clipboard copy and embedding in WebView2 without CORS or canvas security errors.
+#[tauri::command]
+pub async fn read_image_as_base64(path: String) -> Result<String, String> {
+    let clean_path = crate::modules::repo_db::failed_commands::decode_uri_to_path(&path);
+    let raw_trimmed = clean_path.trim().replace(r"\\?\", "").replace(r"\?\", "");
+    #[cfg(target_os = "windows")]
+    let trimmed = {
+        if (raw_trimmed.starts_with('/') || raw_trimmed.starts_with('\\'))
+            && raw_trimmed.len() > 2
+            && raw_trimmed
+                .chars()
+                .nth(1)
+                .map_or(false, |c| c.is_ascii_alphabetic())
+            && raw_trimmed.chars().nth(2) == Some(':')
+        {
+            raw_trimmed[1..].to_string()
+        } else {
+            raw_trimmed
+        }
+    };
+    #[cfg(not(target_os = "windows"))]
+    let trimmed = raw_trimmed;
+    let requested = PathBuf::from(&trimmed);
+    if requested.as_os_str().is_empty() {
+        return Err("invalid_path: empty path".to_string());
+    }
+    if !requested.exists() {
+        return Err(format!(
+            "file_not_found: image file does not exist at {}",
+            requested.display()
+        ));
+    }
+    let resolved = requested
+        .canonicalize()
+        .map_err(|e| format!("failed_to_resolve_path: {}", e))?;
+    if is_sensitive_path(&resolved) || is_os_protected_path(&resolved) {
+        return Err("security_denied: sensitive path".to_string());
+    }
+    let metadata =
+        std::fs::metadata(&resolved).map_err(|e| format!("failed_to_read_metadata: {}", e))?;
+    if !metadata.is_file() {
+        return Err(format!(
+            "invalid_path: expected a regular file, found non-file at {}",
+            resolved.display()
+        ));
+    }
+    if metadata.len() > 100 * 1024 * 1024 {
+        return Err("file_too_large: image exceeds 100MB limit".to_string());
+    }
+    let bytes = std::fs::read(&resolved).map_err(|e| format!("failed_to_read_file: {}", e))?;
+    let ext = resolved
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    let mime: &str = match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" | "jfif" => "image/jpeg",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        "bmp" => "image/bmp",
+        "ico" => "image/x-icon",
+        "avif" => "image/avif",
+        "tiff" | "tif" => "image/tiff",
+        _ => {
+            // Sniff magic bytes if extension is missing, unknown, or generic
+            if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+                "image/png"
+            } else if bytes.len() >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF {
+                "image/jpeg"
+            } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+                "image/gif"
+            } else if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+                "image/webp"
+            } else if bytes.starts_with(b"BM") {
+                "image/bmp"
+            } else if bytes.len() >= 4
+                && bytes[0] == 0x00
+                && bytes[1] == 0x00
+                && bytes[2] == 0x01
+                && bytes[3] == 0x00
+            {
+                "image/x-icon"
+            } else if bytes.len() >= 12
+                && (&bytes[4..12] == b"ftypavif" || &bytes[4..12] == b"ftypavis")
+            {
+                "image/avif"
+            } else if bytes.starts_with(b"II*\0") || bytes.starts_with(b"MM\0*") {
+                "image/tiff"
+            } else if let Ok(s) = std::str::from_utf8(&bytes[..bytes.len().min(512)]) {
+                let trimmed = s.trim_start();
+                if trimmed.starts_with("<svg")
+                    || (trimmed.starts_with("<?xml") && trimmed.contains("<svg"))
+                {
+                    "image/svg+xml"
+                } else if ext.is_empty() {
+                    return Err(
+                        "unsupported_image_extension: no extension and unrecognized image format"
+                            .to_string(),
+                    );
+                } else {
+                    return Err(format!("unsupported_image_extension: .{}", ext));
+                }
+            } else if ext.is_empty() {
+                return Err(
+                    "unsupported_image_extension: no extension and unrecognized image format"
+                        .to_string(),
+                );
+            } else {
+                return Err(format!("unsupported_image_extension: .{}", ext));
+            }
+        }
+    };
+    use base64::Engine;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Ok(format!("data:{};base64,{}", mime, b64))
 }
 
 fn is_os_protected_path(path: &Path) -> bool {
@@ -257,5 +588,117 @@ mod prompt_backup_path_tests {
             .is_some_and(|ext| ext.eq_ignore_ascii_case("json")));
         let denied = validate_prompt_backup_path(r"C:\Windows\Temp\x.json", false);
         assert!(denied.is_err());
+    }
+
+    #[tokio::test]
+    async fn read_image_as_base64_rejects_empty_and_system_path() {
+        let empty_err = super::read_image_as_base64("".to_string()).await;
+        assert!(empty_err.is_err());
+
+        let win_err = super::read_image_as_base64(r"C:\Windows\System32\cmd.exe".to_string()).await;
+        assert!(win_err.is_err());
+    }
+
+    #[tokio::test]
+    async fn read_image_as_base64_encodes_png_file() {
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let target_dir = manifest_dir.join("target");
+        let _ = std::fs::create_dir_all(&target_dir); // Justification: best-effort test setup
+        let test_png = target_dir.join("test_clipboard_image.png");
+        let png_bytes = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]; // PNG magic header
+        std::fs::write(&test_png, &png_bytes).expect("write test png");
+        let res = super::read_image_as_base64(test_png.to_string_lossy().to_string()).await;
+        let _ = std::fs::remove_file(&test_png); // Justification: best-effort test cleanup
+        assert!(res.is_ok());
+        let uri = res.unwrap();
+        assert!(uri.starts_with("data:image/png;base64,"));
+    }
+
+    #[tokio::test]
+    async fn read_image_as_base64_resolves_file_protocol_uri() {
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let target_dir = manifest_dir.join("target");
+        let _ = std::fs::create_dir_all(&target_dir); // Justification: best-effort test setup
+        let test_png = target_dir.join("test_file_uri_image.png");
+        let png_bytes = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        std::fs::write(&test_png, &png_bytes).expect("write test png");
+        let file_uri = format!("file:///{}", test_png.to_string_lossy().replace('\\', "/"));
+        let res = super::read_image_as_base64(file_uri).await;
+        let _ = std::fs::remove_file(&test_png); // Justification: best-effort test cleanup
+        assert!(res.is_ok());
+        let uri = res.unwrap();
+        assert!(uri.starts_with("data:image/png;base64,"));
+    }
+
+    #[tokio::test]
+    async fn read_image_as_base64_rejects_directory_with_clear_error() {
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let res = super::read_image_as_base64(manifest_dir.to_string_lossy().to_string()).await;
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert!(
+            err.contains("expected a regular file"),
+            "Expected regular file error, got: {}",
+            err
+        );
+    }
+
+    #[tokio::test]
+    async fn read_image_as_base64_sniffs_extensionless_png() {
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let target_dir = manifest_dir.join("target");
+        let _ = std::fs::create_dir_all(&target_dir); // Justification: best-effort test setup
+        let test_no_ext = target_dir.join("test_magic_sniff_no_ext");
+        let png_bytes = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        std::fs::write(&test_no_ext, &png_bytes).expect("write test png no ext");
+        let res = super::read_image_as_base64(test_no_ext.to_string_lossy().to_string()).await;
+        let _ = std::fs::remove_file(&test_no_ext); // Justification: best-effort test cleanup
+        assert!(res.is_ok());
+        let uri = res.unwrap();
+        assert!(uri.starts_with("data:image/png;base64,"));
+    }
+
+    #[tokio::test]
+    async fn read_image_as_base64_rejects_extensionless_text_file() {
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let target_dir = manifest_dir.join("target");
+        let _ = std::fs::create_dir_all(&target_dir); // Justification: best-effort test setup
+        let test_no_ext = target_dir.join("test_plain_text_no_ext");
+        let txt_bytes = b"Hello plain text file without image header";
+        std::fs::write(&test_no_ext, txt_bytes).expect("write test txt no ext");
+        let res = super::read_image_as_base64(test_no_ext.to_string_lossy().to_string()).await;
+        let _ = std::fs::remove_file(&test_no_ext); // Justification: best-effort test cleanup
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert!(err.contains("unsupported_image_extension"));
+    }
+
+    #[test]
+    fn test_is_sensitive_path_permits_administrator_user_profile() {
+        use super::is_sensitive_path;
+        use std::path::Path;
+
+        // Administrator user home directory must NOT be blocked
+        assert!(!is_sensitive_path(Path::new(
+            r"C:\Users\Administrator\Pictures\screenshot.png"
+        )));
+        assert!(!is_sensitive_path(Path::new(
+            r"C:\Users\Administrator\.gemini\antigravity\test.json"
+        )));
+        assert!(!is_sensitive_path(Path::new(
+            r"c:\users\administrator\workspace\repo\image.webp"
+        )));
+
+        // Windows and OS critical system directories MUST still be blocked
+        assert!(is_sensitive_path(Path::new(r"C:\Windows\System32\cmd.exe")));
+        assert!(is_sensitive_path(Path::new(
+            r"C:\Program Files\Antigravity\app.exe"
+        )));
+        assert!(is_sensitive_path(Path::new(
+            r"C:\Program Files (x86)\App\binary.dll"
+        )));
+        assert!(is_sensitive_path(Path::new(r"/etc/shadow")));
+        assert!(is_sensitive_path(Path::new(r"/root/.ssh/id_rsa")));
+        assert!(is_sensitive_path(Path::new(r"C:\pagefile.sys")));
     }
 }

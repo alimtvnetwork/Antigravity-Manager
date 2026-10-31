@@ -118,9 +118,9 @@ pub(crate) fn convert_chat_response_to_responses(chat_response: &OpenAIResponse)
     })
 }
 
-/// 仅识别客户端本地私有展示项（如本地渲染的思考块），绝不误杀伴随工具调用的真实过程进度说明。
-/// 只有明确以 `msg_thought_` 为 ID 前缀或历史遗留以 `**Thinking**` 开头的消息才被视为 transcript-only。
-/// 真实的 `phase="commentary"` 消息包含正文说明，必须作为上下文历史保留以保证模型少样本进度输出范式。
+/// Only recognize local private display items of the client (such as locally rendered think blocks), and never accidentally kill the real process progress description accompanying the tool call.
+/// Only messages that explicitly begin with `msg_thought_` as the ID prefix or historically begin with `**Thinking**` are considered transcript-only.
+/// Real `phase="commentary"` messages contain textual descriptions that must be retained as contextual history to maintain the model's few-shot progress output paradigm.
 pub(crate) fn is_codex_transcript_only_assistant_message(item: &Value, text: &str) -> bool {
     if responses_input_item_type(item) != "message"
         || item.get("role").and_then(Value::as_str) != Some("assistant")

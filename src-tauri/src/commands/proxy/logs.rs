@@ -1,19 +1,19 @@
 use super::*;
 
-/// 获取反代服务状态
+/// Get anti-generation service status
 #[tauri::command]
 pub async fn get_proxy_status(state: State<'_, ProxyServiceState>) -> Result<ProxyStatus, String> {
-    // 优先检查启动标志，避免被写锁阻塞
+    // Prioritize checking the startup flag to avoid being blocked by write locks
     if state.starting.load(Ordering::SeqCst) {
         return Ok(ProxyStatus {
-            running: false, // 逻辑上还没运行
+            running: false, // Logically it has not been run yet
             port: 0,
-            base_url: "starting".to_string(), // 给前端标识
+            base_url: "starting".to_string(), // Identify the front-end
             active_accounts: 0,
         });
     }
 
-    // 使用 try_read 避免在该命令中产生产生排队延迟
+    // Use try_read to avoid queuing delays in this command
     let lock_res = state.instance.try_read();
 
     match lock_res {
@@ -32,7 +32,7 @@ pub async fn get_proxy_status(state: State<'_, ProxyServiceState>) -> Result<Pro
             }),
         },
         Err(_) => {
-            // 如果拿不到锁，说明正在进行写操作（可能是正在启动或停止中）
+            // If the lock cannot be obtained, it means that the write operation is in progress (it may be starting or stopping)
             Ok(ProxyStatus {
                 running: false,
                 port: 0,
@@ -43,7 +43,7 @@ pub async fn get_proxy_status(state: State<'_, ProxyServiceState>) -> Result<Pro
     }
 }
 
-/// 获取反代服务统计
+/// Get anti-generation service statistics
 #[tauri::command]
 pub async fn get_proxy_stats(state: State<'_, ProxyServiceState>) -> Result<ProxyStats, String> {
     let monitor_lock = state.monitor.read().await;
@@ -54,7 +54,7 @@ pub async fn get_proxy_stats(state: State<'_, ProxyServiceState>) -> Result<Prox
     }
 }
 
-/// 获取反代请求日志
+/// Get reverse generation request logs
 #[tauri::command]
 pub async fn get_proxy_logs(
     state: State<'_, ProxyServiceState>,
@@ -68,7 +68,7 @@ pub async fn get_proxy_logs(
     }
 }
 
-/// 设置监控开启状态
+/// Set monitoring on state
 #[tauri::command]
 pub async fn set_proxy_monitor_enabled(
     state: State<'_, ProxyServiceState>,
@@ -81,7 +81,7 @@ pub async fn set_proxy_monitor_enabled(
     Ok(())
 }
 
-/// 设置捕获健康检查日志状态
+/// Set capture health check log status
 #[tauri::command]
 pub async fn set_proxy_capture_health_logs(
     state: State<'_, ProxyServiceState>,
@@ -94,7 +94,7 @@ pub async fn set_proxy_capture_health_logs(
     Ok(())
 }
 
-/// 清除反代请求日志
+/// Clear reverse generation request log
 #[tauri::command]
 pub async fn clear_proxy_logs(state: State<'_, ProxyServiceState>) -> Result<(), String> {
     let monitor_lock = state.monitor.read().await;
@@ -104,20 +104,20 @@ pub async fn clear_proxy_logs(state: State<'_, ProxyServiceState>) -> Result<(),
     Ok(())
 }
 
-/// 清空所有思考块缓存与持久化数据 (包含 RAM 内存滑动窗口与 SQLite 数据库，但不删除任何请求日志)
+/// Clear all think block cache and persistent data (including RAM memory sliding window and SQLite database, but do not delete any request logs)
 #[tauri::command]
 pub async fn clear_thinking_store() -> Result<usize, String> {
-    // 1. 清空内存中 ThinkingStore 实例与 SignatureCache
+    // 1. Clear the ThinkingStore instance and SignatureCache in memory
     crate::proxy::thinking_store::ThinkingStore::global().clear();
     crate::proxy::SignatureCache::global().clear();
 
-    // 2. 清空 SQLite 数据库中所有的 thinking_records 与 thinking_sessions
+    // 2. Clear all thinking_records and thinking_sessions in the SQLite database
     tokio::task::spawn_blocking(crate::modules::proxy_db::clear_all_thinking_data)
         .await
         .map_err(|e| format!("Spawn blocking failed: {}", e))?
 }
 
-/// 获取当前思考块存储的记录总数
+/// Get the total number of records stored in the current thinking block
 #[tauri::command]
 pub async fn get_thinking_store_count() -> Result<usize, String> {
     tokio::task::spawn_blocking(crate::modules::proxy_db::get_thinking_records_count)
@@ -125,7 +125,7 @@ pub async fn get_thinking_store_count() -> Result<usize, String> {
         .map_err(|e| format!("Spawn blocking failed: {}", e))?
 }
 
-/// 获取代理数据库磁盘占用字节数
+/// Get the number of bytes occupied by the proxy database disk
 #[tauri::command]
 pub async fn get_proxy_db_disk_size() -> Result<u64, String> {
     tokio::task::spawn_blocking(crate::modules::proxy_db::get_proxy_db_disk_bytes)
@@ -133,7 +133,7 @@ pub async fn get_proxy_db_disk_size() -> Result<u64, String> {
         .map_err(|e| format!("Spawn blocking failed: {}", e))?
 }
 
-/// 获取反代请求日志 (分页)
+/// Get reverse generation request log (paginated)
 #[tauri::command]
 pub async fn get_proxy_logs_paginated(
     limit: Option<usize>,
@@ -142,7 +142,7 @@ pub async fn get_proxy_logs_paginated(
     crate::modules::proxy_db::get_logs_summary(limit.unwrap_or(20), offset.unwrap_or(0))
 }
 
-/// 获取单条日志的完整详情
+/// Get complete details of a single log
 #[tauri::command]
 pub async fn get_proxy_log_detail(
     log_id: Option<String>,
@@ -154,13 +154,13 @@ pub async fn get_proxy_log_detail(
     crate::modules::proxy_db::get_log_detail(&id)
 }
 
-/// 获取日志总数
+/// Get the total number of logs
 #[tauri::command]
 pub async fn get_proxy_logs_count() -> Result<u64, String> {
     crate::modules::proxy_db::get_logs_count()
 }
 
-/// 导出所有日志到指定文件
+/// Export all logs to the specified file
 #[tauri::command]
 pub async fn export_proxy_logs(file_path: String) -> Result<usize, String> {
     let logs = crate::modules::proxy_db::get_all_logs_for_export()?;
@@ -174,7 +174,7 @@ pub async fn export_proxy_logs(file_path: String) -> Result<usize, String> {
     Ok(count)
 }
 
-/// 导出指定的日志JSON到文件
+/// Export the specified log JSON to a file
 #[tauri::command]
 pub async fn export_proxy_logs_json(file_path: String, json_data: String) -> Result<usize, String> {
     // Parse to count items
@@ -191,7 +191,7 @@ pub async fn export_proxy_logs_json(file_path: String, json_data: String) -> Res
     Ok(count)
 }
 
-/// 获取带搜索条件的日志数量
+/// Get the number of logs with search conditions
 #[tauri::command]
 pub async fn get_proxy_logs_count_filtered(
     filter: String,
@@ -200,7 +200,7 @@ pub async fn get_proxy_logs_count_filtered(
     crate::modules::proxy_db::get_logs_count_filtered(&filter, errors_only)
 }
 
-/// 获取带搜索条件的分页日志
+/// Get paginated logs with search conditions
 #[tauri::command]
 pub async fn get_proxy_logs_filtered(
     filter: String,

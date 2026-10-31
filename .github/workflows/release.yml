@@ -16,14 +16,17 @@ env:
 jobs:
   verify-release-target:
     name: Verify Branch & Release Type Compatibility
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
     outputs:
       release_tag: ${{ steps.gate.outputs.release_tag }}
       is_prerelease: ${{ steps.gate.outputs.is_prerelease }}
       release_type: ${{ steps.gate.outputs.release_type }}
     steps:
       - name: Checkout repository with full history
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -93,6 +96,49 @@ jobs:
           echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
           echo "release_type=$RELEASE_TYPE" >> "$GITHUB_OUTPUT"
 
+      # Plan 91 step 03: a release is impossible on a commit whose CI is not green.
+      # A cancelled, failed, or timed-out CI run for github.sha fails the gate.
+      # Bounded polling loop waits for in-progress or queued CI runs to complete.
+      - name: Release gate - CI must be green for this commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          echo "Verifying CI status for commit ${{ github.sha }}..."
+          MAX_WAIT_SECONDS=3600
+          POLL_INTERVAL=20
+          ELAPSED=0
+
+          while [ "$ELAPSED" -lt "$MAX_WAIT_SECONDS" ]; do
+            RUN_INFO=$(gh api "repos/${{ github.repository }}/actions/workflows/ci.yml/runs?head_sha=${{ github.sha }}&per_page=1" --jq '[.workflow_runs[0].status // "none", .workflow_runs[0].conclusion // "none"] | @tsv' 2>/dev/null || echo "none none")
+            read -r STATUS CONCLUSION <<< "$RUN_INFO"
+
+            if [ "$STATUS" = "none" ]; then
+              echo "Waiting for CI run to register for ${{ github.sha }} (elapsed: ${ELAPSED}s)..."
+              sleep 10
+              ELAPSED=$((ELAPSED + 10))
+              continue
+            fi
+
+            if [ "$STATUS" = "completed" ]; then
+              echo "Latest CI run for ${{ github.sha }} completed with conclusion: $CONCLUSION"
+              if [ "$CONCLUSION" != "success" ]; then
+                echo "::error::❌ [Release Gate Intercept] CI for commit ${{ github.sha }} concluded '$CONCLUSION', not 'success'. Release refused."
+                exit 1
+              fi
+              echo "✅ CI gate passed: CI is green for ${{ github.sha }}."
+              exit 0
+            fi
+
+            echo "CI run is currently '$STATUS' (conclusion: '$CONCLUSION'). Waiting ${POLL_INTERVAL}s (elapsed: ${ELAPSED}s / ${MAX_WAIT_SECONDS}s)..."
+            sleep "$POLL_INTERVAL"
+            ELAPSED=$((ELAPSED + POLL_INTERVAL))
+          done
+
+          echo "::error::❌ [Release Gate Intercept] Timed out waiting for CI for commit ${{ github.sha }} after ${MAX_WAIT_SECONDS}s."
+          exit 1
+
       - name: Rust setup (rustfmt only)
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -131,7 +177,7 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Optimize Windows Runner I/O
         if: startsWith(matrix.platform, 'windows')
@@ -169,7 +215,7 @@ jobs:
           cache-targets: "true"
 
       - name: Node.js setup
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: "npm"
@@ -331,14 +377,14 @@ jobs:
 
   publish-release:
     needs: [verify-release-target, build-tauri]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: always() && !cancelled() && needs.verify-release-target.result == 'success' && needs.build-tauri.result != 'cancelled'
     permissions:
       contents: write
       actions: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # 下载所有构建产物 (仅限 release 相关的 assets 和 updater)
       - name: Download all artifacts
@@ -456,12 +502,17 @@ jobs:
           LINUX_AMD64_SIG=$(read_sig "*_amd64.AppImage.sig")
           LINUX_AARCH64_SIG=$(read_sig "*_aarch64.AppImage.sig")
 
+          # Sanitize asset filename: GitHub Release replaces spaces and parentheses with dots
+          sanitize_asset() {
+            echo "$1" | sed 's/[ ()]/./g' | sed 's/\.\././g'
+          }
+
           # Read matching asset filenames for each platform
-          MACOS_AARCH64_ASSET=$(get_asset_name "*_aarch64.app.tar.gz" "agm-alim_aarch64.app.tar.gz")
-          MACOS_X64_ASSET=$(get_asset_name "*_x64.app.tar.gz" "agm-alim_x64.app.tar.gz")
-          WINDOWS_NSIS_ASSET=$(get_asset_name "*_x64-setup.exe" "agm-alim_${VER}_x64-setup.exe")
-          LINUX_AMD64_ASSET=$(get_asset_name "*_amd64.AppImage" "agm-alim_${VER}_amd64.AppImage")
-          LINUX_AARCH64_ASSET=$(get_asset_name "*_aarch64.AppImage" "agm-alim_${VER}_aarch64.AppImage")
+          MACOS_AARCH64_ASSET=$(sanitize_asset "$(get_asset_name "*_aarch64.app.tar.gz" "agm-alim_aarch64.app.tar.gz")")
+          MACOS_X64_ASSET=$(sanitize_asset "$(get_asset_name "*_x64.app.tar.gz" "agm-alim_x64.app.tar.gz")")
+          WINDOWS_NSIS_ASSET="agm-alim-setup.exe"
+          LINUX_AMD64_ASSET=$(sanitize_asset "$(get_asset_name "*_amd64.AppImage" "agm-alim_${VER}_amd64.AppImage")")
+          LINUX_AARCH64_ASSET=$(sanitize_asset "$(get_asset_name "*_aarch64.AppImage" "agm-alim_${VER}_aarch64.AppImage")")
 
           echo "Signatures found:"
           [ -n "$MACOS_AARCH64_SIG" ] && echo "  macOS aarch64: YES ($MACOS_AARCH64_ASSET)" || echo "  macOS aarch64: NO"
@@ -620,11 +671,11 @@ jobs:
 
   docker-build-amd64:
     needs: verify-release-target
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.event_name != 'pull_request' && vars.ENABLE_DOCKER_PUSH == 'true'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -654,7 +705,7 @@ jobs:
     if: github.event_name != 'pull_request' && vars.ENABLE_DOCKER_PUSH == 'true'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -680,7 +731,7 @@ jobs:
 
   docker-manifest:
     needs: [verify-release-target, docker-build-amd64, docker-build-arm64]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.event_name != 'pull_request' && vars.ENABLE_DOCKER_PUSH == 'true'
     steps:
       - name: Login to Docker Hub

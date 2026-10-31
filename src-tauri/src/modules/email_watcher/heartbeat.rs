@@ -59,6 +59,7 @@ async fn execute_heartbeat_tick(
     last_telemetry: &mut i64,
     last_quota: &mut i64,
     last_idle: &mut i64,
+    last_keepalive: &mut i64,
 ) {
     let m_name = detect_machine_name();
     let m_ip = detect_local_ip();
@@ -79,6 +80,13 @@ async fn execute_heartbeat_tick(
         update_status_telemetry(m_name.clone(), m_ip.clone(), now).await;
         check_telemetry_sensors(settings, &m_name, &m_ip, last_quota, last_idle, now).await;
     }
+
+    // Imp-71: IMAP Idle Keepalive Heartbeat (every 15 min / 900s)
+    let is_keepalive_due = now - *last_keepalive >= 900;
+    if is_keepalive_due {
+        *last_keepalive = now;
+        crate::modules::email_inbound::imap::send_imap_keepalive().await;
+    }
 }
 
 pub(crate) async fn run_watcher_heartbeat_loop() {
@@ -90,6 +98,7 @@ pub(crate) async fn run_watcher_heartbeat_loop() {
     let mut last_telemetry: i64 = init_now;
     let mut last_quota: i64 = init_now;
     let mut last_idle: i64 = init_now;
+    let mut last_keepalive: i64 = init_now;
 
     while WATCHER_RUNNING.load(Ordering::SeqCst) {
         tokio::time::sleep(Duration::from_secs(30)).await;
@@ -107,6 +116,7 @@ pub(crate) async fn run_watcher_heartbeat_loop() {
             &mut last_telemetry,
             &mut last_quota,
             &mut last_idle,
+            &mut last_keepalive,
         )
         .await;
     }

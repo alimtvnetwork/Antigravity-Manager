@@ -48,6 +48,13 @@ for arg in "$@"; do
     esac
 done
 
+# Delegate --build directly to dedicated build runner (build.sh)
+if [ "${MODE}" = "build" ]; then
+    if [ -f "${SCRIPT_DIR}/build.sh" ]; then
+        exec "${SCRIPT_DIR}/build.sh" "$@"
+    fi
+fi
+
 echo ""
 echo -e "${CYAN}============================================================${NC}"
 echo -e "${CYAN}                Antigravity-Manager Runner                 ${NC}"
@@ -94,6 +101,9 @@ fi
 # 4. Dispatch Run Mode
 case "${MODE}" in
     build)
+        if [ -f "${SCRIPT_DIR}/build.sh" ]; then
+            exec "${SCRIPT_DIR}/build.sh" "$@"
+        fi
         write_step "Executing production build (npm run tauri build)..."
         npm run tauri build;;
     debug)

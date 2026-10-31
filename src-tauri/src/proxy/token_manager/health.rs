@@ -1,17 +1,17 @@
-//! 健康度：成功/失败记录、熔断器同步。
+//! Health: success/failure recording, circuit breaker synchronization.
 
 use super::TokenManager;
 
 impl TokenManager {
-    /// 标记账号请求成功，重置连续失败计数
+    /// Mark the account request as successful and reset the consecutive failure count
     ///
-    /// 在请求成功完成后调用，将该账号的失败计数归零，
-    /// 下次失败时从最短的锁定时间开始（智能限流）。
+    /// Called after the request is successfully completed to reset the account's failure count to zero.
+    /// The next time it fails, it will start from the shortest lock time (intelligent current limiting).
     pub fn mark_account_success(&self, account_id: &str) {
         self.rate_limit_tracker.mark_success(account_id);
     }
 
-    /// 记录请求成功，增加健康分
+    /// Record request success and increase health points
     pub fn record_success(&self, account_id: &str) {
         self.health_scores
             .entry(account_id.to_string())
@@ -20,7 +20,7 @@ impl TokenManager {
         tracing::debug!("📈 Health score increased for account {}", account_id);
     }
 
-    /// 记录请求失败，降低健康分
+    /// Record request failure, reduce health points
     pub fn record_failure(&self, account_id: &str) {
         self.health_scores
             .entry(account_id.to_string())
@@ -29,10 +29,10 @@ impl TokenManager {
         tracing::warn!("📉 Health score decreased for account {}", account_id);
     }
 
-    /// [NEW] 从账号配额信息中提取最近的刷新时间戳
+    /// [NEW] Extract the latest refresh timestamp from account quota information
     ///
-    /// Claude 模型（sonnet/opus）共用同一个刷新时间，只需取 claude 系列的 reset_time
-    /// 返回 Unix 时间戳（秒），用于排序时比较
+    /// Claude models (sonnet/opus) share the same refresh time, just take the reset_time of the claude series
+    /// Returns a Unix timestamp in seconds for comparison when sorting
     pub(crate) fn extract_earliest_reset_time(&self, account: &serde_json::Value) -> Option<i64> {
         let models = account
             .get("quota")
@@ -42,7 +42,7 @@ impl TokenManager {
         let mut earliest_ts: Option<i64> = None;
 
         for model in models {
-            // 优先取 claude 系列的 reset_time（sonnet/opus 共用）
+            // Prioritize the reset_time of the claude series (shared by sonnet/opus)
             let model_name = model.get("name").and_then(|n| n.as_str()).unwrap_or("");
             if !model_name.contains("claude") {
                 continue;
@@ -52,7 +52,7 @@ impl TokenManager {
                 if reset_time_str.is_empty() {
                     continue;
                 }
-                // 解析 ISO 8601 时间字符串为时间戳
+                // Parse ISO 8601 time string into timestamp
                 if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(reset_time_str) {
                     let ts = dt.timestamp();
                     if earliest_ts.is_none() || ts < earliest_ts.unwrap() {
@@ -62,7 +62,7 @@ impl TokenManager {
             }
         }
 
-        // 如果没有 claude 模型的时间，尝试取任意模型的最近时间
+        // If there is no time for the claude model, try to get the latest time for any model
         if earliest_ts.is_none() {
             for model in models {
                 if let Some(reset_time_str) = model.get("reset_time").and_then(|r| r.as_str()) {
@@ -200,12 +200,12 @@ impl TokenManager {
             }
         }
 
-        // 2. 回退到 models 配额检查
+        // 2. Fall back to models quota check
         if !lock_on_zero {
             return;
         }
         if let Some(models) = quota.get("models").and_then(|m| m.as_array()) {
-            // 只要受监控核心模型或全部模型为 0%，且有有效 reset_time
+            // As long as the monitored core model or all models are at 0% and there is a valid reset_time
             let all_zero = models
                 .iter()
                 .all(|m| m.get("percentage").and_then(|p| p.as_i64()).unwrap_or(100) == 0);
@@ -218,7 +218,7 @@ impl TokenManager {
                         return;
                     }
                     tracing::warn!(
-                        "[CircuitBreaker] 账号 {} 的模型配额已全部为 0%, 持续锁定至 {}",
+                        "[CircuitBreaker] The model quota of account {} has all been 0%, and it will continue to be locked to {}",
                         account_id,
                         reset_time_str
                     );

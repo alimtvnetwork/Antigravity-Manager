@@ -2,8 +2,17 @@
 
 This directory contains active issue tracking and bug reports.
 
+## Fixed in v4.271.0
+- [64-switch-restore-gate-parameter-mismatch-and-status-disconnect-rca.md](./64-switch-restore-gate-parameter-mismatch-and-status-disconnect-rca.md) (solved in `c36538824`: `switch.rs:676` passed `target_inst_id` into `list_prompt_backups` expecting `batch_id`; `'in_progress'` status omitted in queue dispatch; FIFO `pick_first_queued_prompt` enforced; reactive `notify_prompt_queue()` signal wired; unit test suites added)
+
 ## Fixed in v4.209.0
 - [../rca/17-instance-pid-stop-switch-and-audit-trail.md](../rca/17-instance-pid-stop-switch-and-audit-trail.md) (solved in `52aaf4cb`: the bare number is the PID; stop returned success after dropping that PID; the audit dialog read `recent_switches` while the query returned `records`)
+
+## Fixed in v4.279.0
+- [67-prompt-tree-enqueue-zero-after-click.md](./67-prompt-tree-enqueue-zero-after-click.md) (Enqueue 0 / IDLE after a successful click while Cursor already had queued messages; force tree reset, selected-turn overlay, and 600s recency gate; tagged `v4.279.0`)
+
+## Fixed in v4.278.0
+- [66-instances-switch-json-fake-success.md](./66-instances-switch-json-fake-success.md) (`agm instances switch --json` no longer prints `"switched"` before `switch_account_to_instance`; `bound_email` must match or `success: false`)
 
 ## Open (planned, spec 85)
 - [47-pro-badge-missing-when-tier-not-fetched-rca.md](./47-pro-badge-missing-when-tier-not-fetched-rca.md) (cache skip still open; raw-id half is issue 58)
@@ -28,6 +37,7 @@ This directory contains active issue tracking and bug reports.
 - [58-pro-badge-raw-tier-id-rca.md](./58-pro-badge-raw-tier-id-rca.md) (fetch-time normalization only; `standard-tier` stays raw; issue 47 still open)
 
 ## Resolved & Historical Application Issues
+- [65-anti-gravity-rerun-and-ui-fixes.md](./65-anti-gravity-rerun-and-ui-fixes.md) (resolved 2026-10-27; rerun target ID UUID, sequential enqueue retention, and filter compaction)
 - [56-release-fmt-gate-blocked-by-token-workflow-scope.md](./56-release-fmt-gate-blocked-by-token-workflow-scope.md) (resolved 2026-10-01, `6b18ddc4`)
 - [55-update-settings-missing-auto-check-rca.md](./55-update-settings-missing-auto-check-rca.md) (fixed 2026-09-30, `c4983761`)
 - [01-instance-launch-and-user-isolation-rca.md](./01-instance-launch-and-user-isolation-rca.md)

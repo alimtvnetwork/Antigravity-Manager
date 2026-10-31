@@ -2,15 +2,15 @@
 use bytes::Bytes;
 use serde_json::{json, Value};
 
-/// 解包响应（提取 response 字段）
+/// Unpack the response (extract the response field)
 pub fn unwrap_response(response: &Value) -> Value {
     response.get("response").unwrap_or(response).clone()
 }
 
-/// [NEW v3.3.18] 为 Claude 模型的 Gemini 响应自动注入 Tool ID
+/// [NEW v3.3.18] Automatically inject Tool ID for Gemini response of Claude model
 ///
-/// 目点是为了让客户端（如 OpenCode/Vercel AI SDK）能感知到 ID，
-/// 并在下一轮对话中原样带回，从而满足 Google v1internal 对 Claude 模型的校验。
+/// The purpose is to allow clients (such as OpenCode/Vercel AI SDK) to perceive the ID.
+/// And bring it back as it is in the next round of dialogue, thereby satisfying Google v1internal’s verification of Claude’s model.
 pub fn inject_ids_to_response(response: &mut Value, model_name: &str) {
     if !model_name.to_lowercase().contains("claude") {
         return;

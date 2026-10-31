@@ -1,5 +1,5 @@
 /**
- * 模型分类工具函数（无 React / icons 依赖，可在 Node 环境直接导入）
+ * Model classification tool function (no React / icons dependency, can be imported directly in the Node environment)
  */
 
 export type ModelCategory = 'gemini-pro' | 'gemini-flash' | 'gemini-pro-image' | 'gemini-flash-image' | 'claude' | 'other';
@@ -20,13 +20,20 @@ export interface ModelDisplayNameInput {
     display_name?: string;
 }
 
+export const DEFAULT_LATEST_MODEL_LABEL = 'Gemini 3.8 Flash';
+export const DEFAULT_LATEST_MODEL_ID = 'gemini-3.8-flash';
+
 const DEFAULT_MODEL_LABELS: Record<string, string> = {
     'gemini-pro-agent': 'gemini-3.1-pro-high',
     'gemini-3.1-pro-high': 'gemini-3.1-pro-high',
     'gemini-3.1-pro': 'gemini-3.1-pro',
     'gemini-3.1-pro-low': 'gemini-3.1-pro-low',
     'gemini-2.5-pro': 'gemini-2.5-pro',
-    'gemini-3.8-flash': 'gemini-3.8-flash',
+    'gemini-3.8-flash': 'Gemini 3.8 Flash',
+    'gemini-3.8-flash-tiered': 'Gemini 3.8 Flash',
+    'gemini-3.8-flash-high': 'Gemini 3.8 Flash (High)',
+    'gemini-3.8-flash-medium': 'Gemini 3.8 Flash (Medium)',
+    'gemini-3.8-flash-low': 'Gemini 3.8 Flash (Low)',
     'gemini-3.7-flash': 'gemini-3.7-flash',
     'gemini-3.5-flash': 'gemini-3.5-flash',
     'gemini-3-flash': 'gemini-3-flash',
@@ -53,7 +60,7 @@ export function getModelDisplayName(
 }
 
 /**
- * 按优先级查找配额模型：先精确匹配首选名，再按类别 fallback。
+ * Find quota models by priority: exact match on preferred name first, then fallback by category.
  */
 export function findQuotaModel<T extends { name: string }>(
     models: T[] | undefined,
@@ -62,7 +69,14 @@ export function findQuotaModel<T extends { name: string }>(
     if (!models || models.length === 0) return undefined;
     const preferred: Partial<Record<ModelCategory, string[]>> = {
         'gemini-pro': ['gemini-pro-agent', 'gemini-3.1-pro-high', 'gemini-3.1-pro', 'gemini-3.1-pro-low', 'gemini-2.5-pro'],
-        'gemini-flash': ['gemini-3-flash-agent', 'gemini-3-flash', 'gemini-3.5-flash'],
+        'gemini-flash': [
+            'gemini-3.8-flash',
+            'gemini-3.8-flash-high',
+            'gemini-3.8-flash-tiered',
+            'gemini-3-flash-agent',
+            'gemini-3-flash',
+            'gemini-3.5-flash',
+        ],
         'claude': ['claude-sonnet-4-6', 'claude-opus-4-6-thinking'],
     };
     const names = preferred[category];
@@ -87,8 +101,8 @@ export function getModelProtectionKey(name: string): string | null {
 }
 
 /**
- * 在任意图片类别中查找第一个实际模型。
- * 用于让新旧 image selector 共享同一配额槽位。
+ * Find the first actual model in any image category.
+ * Used to allow old and new image selectors to share the same quota slot.
  */
 export function findImageQuotaModel<T extends { name: string }>(
     models: T[] | undefined,
@@ -100,7 +114,7 @@ export function findImageQuotaModel<T extends { name: string }>(
     });
 }
 
-/** 账号管理 pin 列表缺省图像选择器时补入代表 Image，与仪表盘对齐。 */
+/** Account management pinned list defaults image selector to represent Image, aligning with dashboard. */
 export const DEFAULT_IMAGE_PIN_SELECTOR = 'gemini-3.1-flash-image';
 
 export function ensurePinnedImageSelector(selectorIds: string[] | undefined): string[] {

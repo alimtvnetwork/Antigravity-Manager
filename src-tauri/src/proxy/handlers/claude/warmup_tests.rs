@@ -4,7 +4,7 @@ use crate::proxy::mappers::claude::ClaudeRequest;
 
 #[test]
 fn test_is_warmup_request_strictly_exact() {
-    // 1. 严格全等为 Warmup 的请求
+    // 1. Requests that are strictly congruent to Warmup
     let exact_req = ClaudeRequest {
         model: "claude-3-7-sonnet".to_string(),
         messages: vec![Message {
@@ -26,12 +26,12 @@ fn test_is_warmup_request_strictly_exact() {
     };
     assert!(is_warmup_request(&exact_req));
 
-    // 2. 带后续句子的真实用户问题，绝不误杀！
+    // 2. Real user questions with follow-up sentences, never accidentally kill!
     let real_question_req = ClaudeRequest {
         model: "claude-3-7-sonnet".to_string(),
         messages: vec![Message {
             role: "user".to_string(),
-            content: MessageContent::String("Warmup function in PyTorch 怎么写？".to_string()),
+            content: MessageContent::String("How to write Warmup function in PyTorch?".to_string()),
         }],
         system: None,
         max_tokens: Some(100),
@@ -48,7 +48,7 @@ fn test_is_warmup_request_strictly_exact() {
     };
     assert!(!is_warmup_request(&real_question_req));
 
-    // 3. 包含 ToolResult 的消息，绝不误杀！
+    // 3. Messages containing ToolResult will never be accidentally killed!
     let tool_error_req = ClaudeRequest {
         model: "claude-3-7-sonnet".to_string(),
         messages: vec![Message {

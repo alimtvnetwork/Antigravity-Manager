@@ -1,20 +1,25 @@
-import { useEffect, useMemo, useRef, Component, type ErrorInfo, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, Component, type ErrorInfo, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { createPortal } from 'react-dom';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, PanelLeftOpen } from 'lucide-react';
+import { cn } from '../../../utils/cn';
 import { useErrorStore } from '../../../stores/error-store';
 import { useInstanceStore } from '../../../stores/useInstanceStore';
+import { useConfigStore } from '../../../stores/useConfigStore';
 import { copyToClipboard } from '../../../utils/clipboard';
 import { getTruncatedText, countWords, stripImagesFromPrompt } from './formatters';
 import type { PromptTreeViewModalProps } from './types';
 import { usePromptTreeState } from './usePromptTreeState';
-import { usePromptTreeData } from './usePromptTreeData';
+import { usePromptTreeData, invalidatePromptTreeCache } from './usePromptTreeData';
 import { usePromptTreeCoreActions } from './usePromptTreeCoreActions';
-import { usePromptTreePromptActions } from './usePromptTreePromptActions';
-import { isGhostConversation, isStaleOrEmptyConversation } from './conversationGuards';
+import { usePromptTreePromptActions, dispatchRerunMessages, extractUsedNudgesFromConversation, loadPersistedRerunCount, loadPersistedRerunMessageOption, type RerunMessageOption } from './usePromptTreePromptActions';
+import { isGhostConversation, isStaleOrEmptyConversation, getConversationStatus } from './conversationGuards';
 import { classifyPromptTier } from './tierClassification';
 import { ModalHeader } from './ModalHeader';
 import { TreePanel } from './TreePanel';
+import { NowRunningUpNext } from './NowRunningUpNext';
+import { useRunningAndUpNext } from './useRunningAndUpNext';
+import { sendPromptNow } from '../../../services/instanceService';
 import { DetailHeader } from './DetailHeader';
 import { DetailTabs } from './DetailTabs';
 import { PromptInstructionView } from './PromptInstructionView';
@@ -22,6 +27,10 @@ import { ResultsView } from './ResultsView';
 import { DetailEmptyState } from './DetailEmptyState';
 import { InspectorModal } from './InspectorModal';
 import { DetailsModal } from './DetailsModal';
+import { PromptTreeExportModal } from './PromptTreeExportModal';
+import { PromptTreeImportModal } from './PromptTreeImportModal';
+import { ProjectContextMenu } from './ProjectContextMenu';
+import type { AgmConversationNode, AgmProjectTreeNode } from './types';
 
 function formatDuration(secs: number): string {
     if (!Number.isFinite(secs) || isNaN(secs) || secs < 0) return '0s';
@@ -64,14 +73,14 @@ class PromptTreeErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundar
     public override render(): ReactNode {
         if (this.state.hasError) {
             return (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-3 bg-white dark:bg-[#171025]">
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-3 bg-white dark:bg-slate-900">
                     <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center">
                         <AlertTriangle className="w-6 h-6" />
                     </div>
                     <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">
                         Conversation Transcript Error
                     </h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md font-mono bg-slate-50 dark:bg-[#211631] p-3 rounded-lg border border-slate-200 dark:border-[#40285e] overflow-x-auto text-left">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md font-mono bg-slate-50 dark:bg-slate-800/60 p-3 rounded-lg border border-slate-200 dark:border-slate-800 overflow-x-auto text-left">
                         {this.state.error?.message || 'An unexpected error occurred while parsing this conversation transcript.'}
                     </p>
                     <button
@@ -103,9 +112,42 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
     } = props;
 
     const { instances } = useInstanceStore();
+    const { config } = useConfigStore();
     const state = usePromptTreeState(instanceId);
+    const [appVersion, setAppVersion] = useState<string>('');
+    const [isResetting, setIsResetting] = useState<boolean>(false);
+
+    useEffect(() => {
+        let isMounted = true;
+        import('@tauri-apps/api/app')
+            .then(({ getVersion }) => {
+                getVersion().then((v) => {
+                    if (isMounted) {
+                        setAppVersion(v);
+                        const lastSeen = localStorage.getItem('agm_prompt_tree_version');
+                        if (lastSeen && lastSeen !== v) {
+                            localStorage.setItem('agm_prompt_tree_version', v);
+                            invalidatePromptTreeCache(instanceId);
+                            void invoke('reset_prompt_tree_cache', { instanceId: instanceId || null });
+                        } else if (!lastSeen) {
+                            localStorage.setItem('agm_prompt_tree_version', v);
+                        }
+                    }
+                });
+            })
+            .catch((err: unknown) => {
+                useErrorStore.getState().trackWarning(err, {
+                    source: 'PromptTreeViewModal.getVersion',
+                    triggerAction: 'getVersion',
+                });
+            });
+        return () => {
+            isMounted = false;
+        };
+    }, [instanceId]);
     const {
         treeData,
+        setTreeData,
         isLoading,
         isAutoSyncing,
         syncInterval, setSyncInterval,
@@ -121,6 +163,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         refreshingProjectId,
         confirmationSuffix, setConfirmationSuffix,
         conversationTargetMode, setConversationTargetMode,
+        newConversationTitle, setNewConversationTitle,
         selectedProjectScope, setSelectedProjectScope,
         isDetailsModalOpen, setIsDetailsModalOpen,
         copiedField, setCopiedField,
@@ -145,6 +188,8 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         actionMsg, setActionMsg,
         elapsedSeconds, setElapsedSeconds,
         inspectorPrompt, setInspectorPrompt,
+        isTreeCollapsed, setIsTreeCollapsed,
+        isAutomatedHidden, setIsAutomatedHidden,
     } = state;
 
     const { selectConversation, loadTree } = usePromptTreeData({
@@ -165,7 +210,306 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         state,
         instanceId,
         selectConversation,
+        loadTree,
     });
+
+    const [projectContextMenu, setProjectContextMenu] = useState<{
+        x: number;
+        y: number;
+        project: AgmProjectTreeNode;
+    } | null>(null);
+
+    const DEFAULT_TREE_WIDTH = 340;
+    const MIN_TREE_WIDTH = 280;
+    const MAX_TREE_WIDTH = 760;
+
+    const [treeWidth, setTreeWidth] = useState<number>(() => {
+        try {
+            const saved = localStorage.getItem('agm_prompt_tree_panel_width');
+            const parsed = saved ? parseInt(saved, 10) : DEFAULT_TREE_WIDTH;
+            return isNaN(parsed) ? DEFAULT_TREE_WIDTH : Math.max(MIN_TREE_WIDTH, Math.min(MAX_TREE_WIDTH, parsed));
+        } catch {
+            return DEFAULT_TREE_WIDTH;
+        }
+    });
+    const [rerunHistory, setRerunHistory] = useState<string[]>([]);
+    const [isResizingTree, setIsResizingTree] = useState(false);
+    const treeSplitterRef = useRef<HTMLDivElement>(null);
+    const dragStartXRef = useRef<number>(0);
+    const startWidthRef = useRef<number>(DEFAULT_TREE_WIDTH);
+
+    const handleSplitterMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsResizingTree(true);
+        dragStartXRef.current = e.clientX;
+        startWidthRef.current = treeWidth;
+    }, [treeWidth]);
+
+    const handleSplitterDoubleClick = useCallback(() => {
+        setTreeWidth(DEFAULT_TREE_WIDTH);
+        try {
+            localStorage.setItem('agm_prompt_tree_panel_width', String(DEFAULT_TREE_WIDTH));
+        } catch {
+            // best-effort
+        }
+    }, [DEFAULT_TREE_WIDTH]);
+
+    useEffect(() => {
+        if (!isResizingTree) return;
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const delta = e.clientX - dragStartXRef.current;
+            const clampedWidth = Math.max(MIN_TREE_WIDTH, Math.min(MAX_TREE_WIDTH, startWidthRef.current + delta));
+            setTreeWidth(clampedWidth);
+        };
+
+        const handleMouseUp = () => {
+            setIsResizingTree(false);
+            try {
+                localStorage.setItem('agm_prompt_tree_panel_width', String(treeWidth));
+            } catch {
+                // best-effort
+            }
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+    }, [isResizingTree, treeWidth, MIN_TREE_WIDTH, MAX_TREE_WIDTH]);
+
+    // Imp-59: Trap Escape key to close modal cleanly without losing draft state
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (projectContextMenu || isDetailsModalOpen) {
+                    return;
+                }
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [projectContextMenu, isDetailsModalOpen, onClose]);
+
+    const handleProjectContextMenu = (e: React.MouseEvent, repoName: string, project?: AgmProjectTreeNode) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const proj = project || treeData.find((p) => p.repo_name === repoName);
+        if (proj) {
+            setProjectContextMenu({
+                x: e.clientX,
+                y: e.clientY,
+                project: proj,
+            });
+        }
+    };
+
+    const handleRenameConversation = async (conversationId: string, newTitle: string, instId?: string) => {
+        const targetInst = instId || selectedConversation?.instance_id || selectedProject?.instance_id || instanceId || 'default';
+        await invoke('rename_conversation', {
+            instanceId: targetInst,
+            conversationId,
+            newTitle,
+        });
+        setTreeData((prev) =>
+            prev.map((p) => ({
+                ...p,
+                conversations: p.conversations.map((c) =>
+                    c.conversation_id === conversationId ? { ...c, title: newTitle } : c
+                ),
+            }))
+        );
+        setSelectedConversation((prev) =>
+            prev?.conversation_id === conversationId ? { ...prev, title: newTitle } : prev
+        );
+        setSelectedProject((prev) => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                conversations: prev.conversations.map((c) =>
+                    c.conversation_id === conversationId ? { ...c, title: newTitle } : c
+                ),
+            };
+        });
+        setActionMsg('Conversation title updated & synced with IDE!');
+        setTimeout(() => setActionMsg(null), 3000);
+    };
+
+    const handleResendPrompts = () => {
+        void promptActions.handleResendPrompt();
+    };
+
+    const handleEnqueue = () => {
+        void promptActions.handleEnqueuePrompt();
+    };
+
+    // "Now Running + Up Next" strip (spec 154 §1): data hook + row-action handlers.
+    const runningUpNext = useRunningAndUpNext(instanceId, isOpen);
+
+    const findStripConversation = (promptId: string): { conv: AgmConversationNode; proj: AgmProjectTreeNode } | null => {
+        const bareId = promptId.startsWith('prompt-') ? promptId.slice('prompt-'.length) : promptId;
+        const keys = new Set([promptId, bareId].filter((value) => value.length > 0));
+        const running: { conv: AgmConversationNode; proj: AgmProjectTreeNode }[] = [];
+        for (const proj of treeData) {
+            for (const conv of proj.conversations || []) {
+                const convBare = conv.conversation_id.startsWith('prompt-')
+                    ? conv.conversation_id.slice('prompt-'.length)
+                    : conv.conversation_id;
+                const idMatch = keys.has(conv.conversation_id)
+                    || keys.has(convBare)
+                    || keys.has(conv.short_id);
+                if (idMatch) return { conv, proj };
+                if (conv.is_running) running.push({ conv, proj });
+            }
+        }
+        if (running.length === 1) return running[0];
+        return null;
+    };
+
+    const handleRerunConversation = (convoId: string, nudgeType?: string) => {
+        const found = findStripConversation(convoId);
+        const conv = (selectedConversation?.conversation_id === convoId ? selectedConversation : null) || found?.conv;
+        const proj = found?.proj || selectedProject;
+        const targetInstId = conv?.instance_id || proj?.instance_id || instanceId || 'default';
+        const targetRepoPath = proj?.repo_path || (conv as { repo_path?: string })?.repo_path || '.';
+        const count = loadPersistedRerunCount();
+
+        // Extract prompt text losslessly
+        let originalPrompt = '';
+        if (selectedConversation?.conversation_id === convoId && (editedPromptText?.trim() || activePromptText?.trim())) {
+            originalPrompt = (editedPromptText?.trim() || activePromptText?.trim()) ?? '';
+        }
+        if (!originalPrompt && conv) {
+            if (conv.selected_turn_number != null && conv.prompts && conv.prompts.length > 0) {
+                const matchedTurn = conv.prompts.find((p) => p.turn_number === conv.selected_turn_number);
+                if (matchedTurn?.prompt_text?.trim()) {
+                    originalPrompt = matchedTurn.prompt_text.trim();
+                }
+            }
+            if (!originalPrompt && conv.prompts && conv.prompts.length > 0) {
+                const runningTurn = conv.prompts.find((p) => Boolean(p.is_running) && Boolean(p.prompt_text?.trim()));
+                if (runningTurn?.prompt_text?.trim()) {
+                    originalPrompt = runningTurn.prompt_text.trim();
+                } else {
+                    const lastTurnWithText = [...conv.prompts].reverse().find((p) => Boolean(p.prompt_text?.trim()));
+                    if (lastTurnWithText?.prompt_text?.trim()) {
+                        originalPrompt = lastTurnWithText.prompt_text.trim();
+                    }
+                }
+            }
+            if (!originalPrompt) {
+                originalPrompt = (conv.full_prompt_text || conv.prompt_preview_200w || conv.title || '').trim();
+            }
+        }
+
+        const convMedia: string[] = Array.from(new Set([
+            ...(conv?.media_paths || []),
+            ...(conv?.media_thumbnails || []),
+            ...(conv?.prompts?.flatMap((p) => p.media_paths || []) || []),
+            ...(conv?.sub_runs?.flatMap((s) => s.media_paths || []) || []),
+        ])).filter((p): p is string => Boolean(p && typeof p === 'string' && p.trim().length > 0));
+
+        const effectiveNudgeType: RerunMessageOption = (nudgeType as RerunMessageOption) || loadPersistedRerunMessageOption();
+        setActionMsg(`Dispatching rerun nudge (×${count})...`);
+        void dispatchRerunMessages({
+            targetInstId,
+            repoPath: targetRepoPath,
+            convId: conv?.conversation_id || convoId,
+            count,
+            messageOption: effectiveNudgeType,
+            originalPrompt,
+            source: 'PromptTreeViewModal.onRerunConversation',
+            mediaPaths: convMedia.length > 0 ? convMedia : undefined,
+            history: extractUsedNudgesFromConversation(conv, rerunHistory),
+        }).then((res) => {
+            if (res.dispatched > 0) {
+                setRerunHistory((prev) => [...prev, ...(res.messages || [])].slice(-10));
+                const previewMsg = res.messages?.[0] ? ` ("${res.messages[0]}")` : '';
+                setActionMsg(`Rerun ×${res.dispatched} dispatched successfully!${previewMsg}`);
+                setTimeout(() => setActionMsg(null), 3500);
+                void invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId }).catch((cacheErr: unknown) => {
+                    useErrorStore.getState().trackWarning(cacheErr, {
+                        source: 'PromptTreeViewModal.onRerunConversation',
+                        triggerAction: 'invalidate_prompt_tree_cache',
+                    });
+                });
+                void loadTree(false, true);
+            } else if (res.failed > 0) {
+                setActionMsg(`Rerun failed: ${res.failed} of ${res.requested} dispatch(es) failed`);
+                useErrorStore.getState().captureError(
+                    new Error(`Rerun failed: ${res.failed} of ${res.requested} dispatch(es) failed`),
+                    {
+                        source: 'PromptTreeViewModal.handleRerunConversation',
+                        triggerAction: 'rerun_dispatch',
+                    }
+                );
+            }
+        }).catch((err: unknown) => {
+            const errorObj = err instanceof Error ? err : new Error(String(err) || 'rerun failed');
+            useErrorStore.getState().captureException(errorObj, {
+                source: 'PromptTreeViewModal.handleRerunConversation',
+                triggerAction: 'rerun_conversation',
+            });
+            setActionMsg(`Rerun failed: ${errorObj.message}`);
+        });
+    };
+
+    const handleStripSelectPrompt = (promptId: string) => {
+        const found = findStripConversation(promptId);
+        if (!found) {
+            useErrorStore.getState().trackWarning(`NowRunningUpNext: prompt ${promptId} not found in tree`, {
+                source: 'PromptTreeViewModal.stripSelectPrompt',
+                triggerAction: 'select_prompt',
+            });
+            return;
+        }
+        selectConversation(found.conv, found.proj);
+    };
+
+    const handleStripRerun = (promptId: string) => {
+        handleRerunConversation(promptId, loadPersistedRerunMessageOption());
+    };
+
+    const handleStripResendWithImage = (promptId: string) => {
+        const found = findStripConversation(promptId);
+        if (!found) {
+            useErrorStore.getState().trackWarning(`NowRunningUpNext: prompt ${promptId} not found in tree`, {
+                source: 'PromptTreeViewModal.stripResendWithImage',
+                triggerAction: 'resend_with_image',
+            });
+            setActionMsg('Resend failed: prompt not found in tree.');
+            return;
+        }
+        const { conv, proj } = found;
+        const text = (conv.full_prompt_text || conv.prompt_preview_200w || '').trim();
+        if (!text) {
+            setActionMsg('Resend failed: prompt has no text content.');
+            return;
+        }
+        const targetInstId = conv.instance_id || proj.instance_id || instanceId || 'default';
+        const repoPath = proj.repo_path || '';
+        // Send raw text (no base64→attachment rewrite): embedded data URIs /
+        // image refs travel verbatim so the backend captures them into the
+        // side-channel image_payload at dispatch time.
+        setActionMsg('Resending prompt with images...');
+        void sendPromptNow(targetInstId, repoPath, text, conv.conversation_id)
+            .then(() => {
+                setActionMsg('Prompt resent with images!');
+                setTimeout(() => setActionMsg(null), 3000);
+            })
+            .catch((err: unknown) => {
+                // sendPromptNow already routed this into the error store; surface user text.
+                const msg = err instanceof Error ? err.message : String(err) || 'dispatch rejected';
+                setActionMsg(`Resend failed: ${msg}`);
+            });
+    };
 
     const currentInstance = useMemo(() => {
         const targetId = selectedProject?.instance_id || instanceId || 'default';
@@ -274,6 +618,40 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         setExpandedStaleGroups,
     ]);
 
+    // Synchronize selected project and first conversation when project scope dropdown changes
+    useEffect(() => {
+        if (!isOpen || selectedProjectScope === 'all' || treeData.length === 0) return;
+        const target = treeData.find((p) => p.project_id === selectedProjectScope);
+        if (!target) return;
+        setSelectedProject(target);
+        setExpandedProjects((prev) => ({ ...prev, [target.project_id]: true }));
+
+        // If currently selected conversation already belongs to this target project, keep it
+        const hasCurrentInProject = selectedConversation && target.conversations.some((c) => c.conversation_id === selectedConversation.conversation_id);
+        if (hasCurrentInProject) return;
+
+        if (target.conversations && target.conversations.length > 0) {
+            const validConvs = target.conversations.filter(
+                (c) => !isGhostConversation(c) && !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+            );
+            const pool = validConvs.length > 0 ? validConvs : target.conversations;
+            const sorted = [...pool].sort((a, b) => {
+                const aRunning = Boolean(a.is_running);
+                const bRunning = Boolean(b.is_running);
+                if (aRunning !== bRunning) return aRunning ? -1 : 1;
+                const aTime = new Date(a.last_modified).getTime() || 0;
+                const bTime = new Date(b.last_modified).getTime() || 0;
+                return bTime - aTime;
+            });
+            if (sorted[0]) {
+                selectConversation(sorted[0], target);
+                if (isStaleOrEmptyConversation(sorted[0])) {
+                    setExpandedStaleGroups((prev) => ({ ...prev, [target.project_id]: true }));
+                }
+            }
+        }
+    }, [isOpen, selectedProjectScope, treeData, selectedConversation, selectConversation, setSelectedProject, setExpandedProjects, setExpandedStaleGroups]);
+
     // Hotkey: 'N' triggers Send Now
     useEffect(() => {
         if (!isOpen) return;
@@ -298,16 +676,37 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             if (e.key === 'n' || e.key === 'N') {
                 e.preventDefault();
                 promptActions.handleResendPrompt();
+            } else if (e.key === 'r' || e.key === 'R') {
+                if (selectedConversation) {
+                    e.preventDefault();
+                    handleRerunConversation(selectedConversation.conversation_id, loadPersistedRerunMessageOption());
+                }
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, promptActions]);
+    }, [isOpen, promptActions, selectedConversation]);
 
     const archivedCount = useMemo(() => {
         return treeData.filter((p) => archivedProjectIds.includes(p.project_id)).length;
     }, [treeData, archivedProjectIds]);
+
+    const isAllExpanded = useMemo(() => {
+        return treeData.length > 0 && treeData.every((p) => expandedProjects[p.project_id]);
+    }, [treeData, expandedProjects]);
+
+    const handleToggleExpandAll = useCallback(() => {
+        if (isAllExpanded) {
+            setExpandedProjects({});
+        } else {
+            const next: Record<string, boolean> = {};
+            for (const p of treeData) {
+                next[p.project_id] = true;
+            }
+            setExpandedProjects(next);
+        }
+    }, [isAllExpanded, treeData, setExpandedProjects]);
 
     // Search filter & multi-tier sorting across projects, partitioned into active & archived
     const { activeProjects, archivedProjects } = useMemo(() => {
@@ -343,8 +742,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                         p.conversations.some(
                             (c) =>
                                 Boolean(c.is_running) &&
-                                !isGhostConversation(c) &&
-                                !(c.prompt_word_count === 0 && (!c.prompt_preview_200w || !c.prompt_preview_200w.trim()))
+                                !isGhostConversation(c)
                         )
                 )
                 .map((p) => {
@@ -421,9 +819,17 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
             const bPinned = pinnedProjectIds.includes(b.project_id);
             if (aPinned !== bPinned) return aPinned ? -1 : 1;
 
-            const aRunning = Boolean(a.is_running) || a.conversations.some((c) => Boolean(c.is_running));
-            const bRunning = Boolean(b.is_running) || b.conversations.some((c) => Boolean(c.is_running));
+            const aRunning =
+                Boolean(a.is_running) ||
+                a.conversations.some((c) => getConversationStatus(c).isRunning);
+            const bRunning =
+                Boolean(b.is_running) ||
+                b.conversations.some((c) => getConversationStatus(c).isRunning);
             if (aRunning !== bRunning) return aRunning ? -1 : 1;
+
+            const aQueued = a.conversations.some((c) => getConversationStatus(c).isQueued);
+            const bQueued = b.conversations.some((c) => getConversationStatus(c).isQueued);
+            if (aQueued !== bQueued) return aQueued ? -1 : 1;
 
             const aLatest = Math.max(0, ...a.conversations.map((c) => new Date(c.last_modified).getTime() || 0));
             const bLatest = Math.max(0, ...b.conversations.map((c) => new Date(c.last_modified).getTime() || 0));
@@ -435,10 +841,11 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         return { activeProjects: active, archivedProjects: archived };
     }, [treeData, searchQuery, selectedProjectScope, activeFilter, archivedProjectIds, pinnedProjectIds]);
 
-    // Active prompt truncation for Preview mode (default preview word threshold: 120 words)
+    // Active prompt truncation for Preview mode (configured preview word threshold: default 200 words)
+    const promptPreviewWords = config?.prompt_preview_words ?? 200;
     const { displayText: previewDisplayText, isTruncated, totalWords } = useMemo(() => {
-        return getTruncatedText(activePromptText, 120);
-    }, [activePromptText]);
+        return getTruncatedText(activePromptText, promptPreviewWords);
+    }, [activePromptText, promptPreviewWords]);
 
     const displayedMarkdown = showAllWords || !isTruncated ? activePromptText : previewDisplayText;
     const activeWordCount = totalWords || countWords(activePromptText);
@@ -447,8 +854,19 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
     }, [activePromptText]);
 
     const hasImages = useMemo(() => {
+        if (selectedConversation?.media_paths && selectedConversation.media_paths.length > 0) {
+            return true;
+        }
+        if (selectedConversation?.prompts && selectedConversation.prompts.some((p) => p.media_paths && p.media_paths.length > 0)) {
+            return true;
+        }
+        if (selectedConversation?.sub_runs && selectedConversation.sub_runs.some((s) => s.media_paths && s.media_paths.length > 0)) {
+            return true;
+        }
         const text = activePromptText || selectedConversation?.prompt_preview_200w || '';
-        return /!\[.*?\]\((?:https?:\/\/.*?|data:image\/.*?;base64,.*?|[^\s)]+)\)/.test(text);
+        return /!\[.*?\]\((?:https?:\/\/.*?|data:image\/.*?;base64,.*?|[^\s)]+)\)/.test(text) ||
+            /<img\s+[^>]*?src=["'].*?["']/i.test(text) ||
+            /data:image\/[a-zA-Z0-9.+_-]+;base64,/.test(text);
     }, [activePromptText, selectedConversation]);
 
     const instanceSeqNum = selectedConversation?.instance_seq_num
@@ -464,120 +882,243 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
         ?? instanceName
         ?? 'Default';
 
+    const lastManualRefreshRef = useRef<number>(0);
+    const handleDebouncedRefreshAll = useCallback(async () => {
+        const now = Date.now();
+        // Guard against colliding with active 30s auto-sync, active loading, or rapid clicks
+        if (isAutoSyncing || isLoading || isResetting || (now - lastManualRefreshRef.current < 2000)) {
+            return;
+        }
+        lastManualRefreshRef.current = now;
+        setActionMsg('Refreshing prompt tree...');
+        try {
+            await loadTree(false, true);
+            setActionMsg('Prompt tree refreshed');
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'PromptTreeViewModal.onRefreshAll',
+                triggerAction: 'refresh_prompt_tree',
+            });
+            setActionMsg('Prompt tree refresh failed');
+        } finally {
+            setTimeout(() => {
+                setActionMsg(null);
+            }, 2500);
+        }
+    }, [isAutoSyncing, isLoading, isResetting, loadTree, setActionMsg]);
+
     if (!isOpen) return null;
 
     const modalContent = (
         <div
-            className={`fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-200 ${isFullscreen ? "p-0" : "p-4 sm:p-6"}`}
+            onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                    onClose();
+                }
+            }}
+            onDoubleClick={(e) => {
+                if (e.target === e.currentTarget) {
+                    onClose();
+                }
+            }}
+            className={`fixed inset-0 z-[99999] flex items-center justify-center bg-black/75 backdrop-blur-md animate-in fade-in duration-200 ${isFullscreen ? "p-0" : "p-4 sm:p-6"}`}
         >
             {/* Draggable Top Region */}
             <div data-tauri-drag-region className="fixed top-0 left-0 right-0 h-8 z-[100000] pointer-events-none" />
 
             <div
-                className={`flex flex-col overflow-hidden bg-white dark:bg-[#171025] shadow-2xl transition-all relative z-10 ${isFullscreen
+                onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => e.stopPropagation()}
+                className={`flex flex-col overflow-hidden bg-white dark:bg-[#0c0817] shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-slate-200 dark:border-purple-900/40 transition-all relative z-10 ${isFullscreen
                     ? "h-full w-full rounded-none border-0"
-                    : "h-[88vh] w-full max-w-6xl rounded-2xl border border-slate-200 dark:border-[#40285e]"
+                    : "h-[90vh] w-full max-w-7xl rounded-2xl"
                     }`}
             >
                 <ModalHeader
                     instanceName={instanceName}
+                    appVersion={appVersion}
                     sequenceNumber={sequenceNumber}
                     executablePath={executablePath}
                     isFullscreen={isFullscreen}
                     setIsFullscreen={setIsFullscreen}
                     isLoading={isLoading}
+                    isTreeCollapsed={isTreeCollapsed}
+                    onToggleTree={() => setIsTreeCollapsed((prev) => !prev)}
                     syncInterval={syncInterval}
                     setSyncInterval={setSyncInterval}
                     restoreFileInputRef={restoreFileInputRef}
                     onClose={onClose}
                     onBackup={coreActions.handleBackup}
                     onRestore={coreActions.handleRestore}
-                    onExportSqlite={coreActions.handleExportSqlite}
-                    onImportSqlite={coreActions.handleImportSqlite}
+                    onExportSqlite={() => coreActions.handleOpenExportModal({ target_type: 'full_tree' }, 'sqlite')}
+                    onExportMarkdown={() => coreActions.handleOpenExportModal({ target_type: 'full_tree' }, 'markdown')}
+                    onImportSqlite={coreActions.handleOpenImportModal}
                     onCopyAllTreePrompts={coreActions.handleCopyAllTreePrompts}
                     onFileRestore={coreActions.handleFileRestore}
-                    onRefreshAll={() => loadTree(true, true)}
-                    onResetTree={() => {
-                        void invoke('reset_prompt_tree_cache', { instanceId: instanceId || null })
-                            .catch((err) => {
-                                useErrorStore.getState().captureException(
-                                    err instanceof Error ? err : new Error(String(err)),
-                                    { source: 'PromptTreeViewModal.onResetTree', triggerAction: 'reset_prompt_tree_cache' }
-                                );
-                            })
-                            .finally(() => {
-                                loadTree(true, true);
-                            });
+                    isAutoSyncing={isAutoSyncing}
+                    onRefreshAll={handleDebouncedRefreshAll}
+                    isResetting={isResetting}
+                    onResetTree={async () => {
+                        setIsResetting(true);
+                        setActionMsg('Wiping database & regenerating prompt tree from disk transcripts...');
+                        try {
+                            invalidatePromptTreeCache();
+                            setSearchQuery('');
+                            setActiveFilter('all');
+                            setCategoryFilter('all');
+                            await invoke('wipe_and_rescan_repo_db', { instanceId: instanceId || null });
+                            await loadTree(true, true);
+                            setActionMsg('Prompt tree wiped & regenerated successfully');
+                        } catch (err) {
+                            useErrorStore.getState().captureException(
+                                err instanceof Error ? err : new Error(String(err)),
+                                { source: 'PromptTreeViewModal.onResetTree', triggerAction: 'wipe_and_rescan_repo_db' }
+                            );
+                            setActionMsg('Failed to reset & regenerate prompt tree');
+                        } finally {
+                            setIsResetting(false);
+                            setTimeout(() => {
+                                setActionMsg(null);
+                            }, 3000);
+                        }
                     }}
                 />
 
                 {/* Top Indeterminate Progress Bar */}
-                {(isLoading || isAutoSyncing) && (
+                {(isLoading || isResetting) && (
                     <div className="w-full h-0.5 bg-purple-950/40 dark:bg-[#40285e]/40 overflow-hidden shrink-0">
-                        <div className="h-full bg-[#1af18d] shadow-[0_0_8px_#1af18d] animate-pulse w-full" />
-                    </div>
-                )}
-
-                {/* Notification Banner */}
-                {actionMsg && (
-                    <div className="bg-emerald-500/10 border-b border-emerald-500/20 px-6 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-300 flex items-center gap-2 shrink-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        {actionMsg}
-                    </div>
-                )}
-                {error && (
-                    <div className="bg-rose-500/10 border-b border-rose-500/20 px-6 py-2 text-xs font-medium text-rose-700 dark:text-rose-300 shrink-0">
-                        {error}
+                        <div className="h-full bg-sky-500 w-full" />
                     </div>
                 )}
 
                 {/* Main Split View */}
-                <div className="flex flex-1 overflow-hidden">
-                    <TreePanel
-                        treeData={treeData}
-                        activeProjects={activeProjects}
-                        archivedProjects={archivedProjects}
-                        archivedCount={archivedCount}
-                        searchQuery={searchQuery}
-                        setSearchQuery={setSearchQuery}
-                        activeFilter={activeFilter}
-                        setActiveFilter={setActiveFilter}
-                        categoryFilter={categoryFilter}
-                        setCategoryFilter={setCategoryFilter}
-                        selectedProjectScope={selectedProjectScope}
-                        setSelectedProjectScope={setSelectedProjectScope}
-                        isArchivedProjectsExpanded={isArchivedProjectsExpanded}
-                        setIsArchivedProjectsExpanded={setIsArchivedProjectsExpanded}
-                        instanceName={instanceName}
-                        instanceId={instanceId}
-                        expandedProjects={expandedProjects}
-                        expandedStaleGroups={expandedStaleGroups}
-                        pinnedProjectIds={pinnedProjectIds}
-                        archivedProjectIds={archivedProjectIds}
-                        refreshingProjectId={refreshingProjectId}
-                        selectedProjectId={selectedProject?.project_id}
-                        selectedConversationId={selectedConversation?.conversation_id}
-                        onSelectProject={(p) => {
-                            setSelectedProject(p);
-                            setShowAllWords(false);
-                        }}
-                        onToggleProjectExpand={(pid) => setExpandedProjects((prev) => ({ ...prev, [pid]: !prev[pid] }))}
-                        onToggleStaleGroup={(pid) => setExpandedStaleGroups((prev) => ({ ...prev, [pid]: !prev[pid] }))}
-                        onSelectConversation={selectConversation}
-                        onOpenInspector={promptActions.openInspector}
-                        onRefreshProject={coreActions.handleRefreshSingleProject}
-                        onTogglePin={coreActions.togglePinProject}
-                        onToggleArchive={coreActions.toggleArchiveProject}
-                        onResendQueued={coreActions.handleResendQueued}
-                        isResendingQueued={coreActions.isResendingQueued}
-                    />
+                <div className="flex flex-1 overflow-hidden relative">
+                    {!isTreeCollapsed ? (
+                        <>
+                            <div
+                                style={{ width: `${treeWidth}px` }}
+                                className="shrink-0 flex flex-col border-r border-slate-200 dark:border-[#40285e] bg-slate-50/50 dark:bg-[#090611]/80 overflow-hidden select-none"
+                            >
+                                <NowRunningUpNext
+                                    items={runningUpNext.items}
+                                    isLoading={runningUpNext.isLoading}
+                                    lastSyncAt={runningUpNext.lastSyncAt}
+                                    hasError={runningUpNext.hasError}
+                                    upNextTotal={runningUpNext.upNextTotal}
+                                    onSelectPrompt={handleStripSelectPrompt}
+                                    onRerun={handleStripRerun}
+                                    onResendWithImage={handleStripResendWithImage}
+                                    onRefresh={runningUpNext.onRefresh}
+                                />
+                                <div className="flex-1 min-h-0 flex flex-col [&>div]:h-full [&>div]:border-r-0">
+                                    <TreePanel
+                                        treeData={treeData}
+                                        activeProjects={activeProjects}
+                                        archivedProjects={archivedProjects}
+                                        archivedCount={archivedCount}
+                                        searchQuery={searchQuery}
+                                        setSearchQuery={setSearchQuery}
+                                        activeFilter={activeFilter}
+                                        setActiveFilter={setActiveFilter}
+                                        categoryFilter={categoryFilter}
+                                        setCategoryFilter={setCategoryFilter}
+                                        selectedProjectScope={selectedProjectScope}
+                                        setSelectedProjectScope={setSelectedProjectScope}
+                                        isArchivedProjectsExpanded={isArchivedProjectsExpanded}
+                                        setIsArchivedProjectsExpanded={setIsArchivedProjectsExpanded}
+                                        isAutomatedHidden={isAutomatedHidden}
+                                        setIsAutomatedHidden={setIsAutomatedHidden}
+                                        isCollapsed={isTreeCollapsed}
+                                        onToggleCollapse={() => setIsTreeCollapsed(true)}
+                                        onToggleExpandAll={handleToggleExpandAll}
+                                        isAllExpanded={isAllExpanded}
+                                        instanceName={instanceName}
+                                        instanceId={instanceId}
+                                        expandedProjects={expandedProjects}
+                                        expandedStaleGroups={expandedStaleGroups}
+                                        pinnedProjectIds={pinnedProjectIds}
+                                        archivedProjectIds={archivedProjectIds}
+                                        refreshingProjectId={refreshingProjectId}
+                                        selectedProjectId={selectedProject?.project_id}
+                                        selectedConversationId={selectedConversation?.conversation_id}
+                                        onSelectProject={(p) => {
+                                            setSelectedProject(p);
+                                            setShowAllWords(false);
+                                        }}
+                                        onToggleProjectExpand={(pid) => setExpandedProjects((prev) => ({ ...prev, [pid]: !prev[pid] }))}
+                                        onToggleStaleGroup={(pid) => setExpandedStaleGroups((prev) => ({ ...prev, [pid]: !prev[pid] }))}
+                                        onSelectConversation={selectConversation}
+                                        onOpenInspector={promptActions.openInspector}
+                                        onRefreshProject={coreActions.handleRefreshSingleProject}
+                                        onTogglePin={coreActions.togglePinProject}
+                                        onToggleArchive={coreActions.toggleArchiveProject}
+                                        onResendQueued={coreActions.handleResendQueued}
+                                        isResendingQueued={coreActions.isResendingQueued}
+                                        onProjectContextMenu={handleProjectContextMenu}
+                                        onRenameConversation={handleRenameConversation}
+                                        onResendPrompts={handleResendPrompts}
+                                        onEnqueue={handleEnqueue}
+                                        onRerunConversation={handleRerunConversation}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Vertical Draggable Splitter Divider */}
+                            <div
+                                ref={treeSplitterRef}
+                                role="separator"
+                                aria-orientation="vertical"
+                                aria-valuenow={treeWidth}
+                                aria-valuemin={MIN_TREE_WIDTH}
+                                aria-valuemax={MAX_TREE_WIDTH}
+                                tabIndex={0}
+                                onMouseDown={handleSplitterMouseDown}
+                                onDoubleClick={handleSplitterDoubleClick}
+                                className={cn(
+                                    "w-1.5 hover:w-2 -ml-0.5 cursor-col-resize flex items-center justify-center transition-all group z-30 select-none shrink-0",
+                                    isResizingTree
+                                        ? "bg-blue-500 w-2 cursor-col-resize"
+                                        : "hover:bg-blue-500/50 bg-slate-200 dark:bg-slate-800"
+                                )}
+                                title="Drag to resize tree panel (280px - 760px) · Double-click to reset (450px)"
+                            >
+                                <div className={cn(
+                                    "w-0.5 h-6 rounded-full transition-colors",
+                                    isResizingTree ? "bg-white" : "bg-slate-400/60 dark:bg-slate-500/60 group-hover:bg-blue-400"
+                                )} />
+                            </div>
+                        </>
+                    ) : (
+                        <div className="w-10 shrink-0 border-r border-slate-200 dark:border-[#40285e] bg-slate-50/70 dark:bg-[#090611]/80 flex flex-col items-center py-3 gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setIsTreeCollapsed(false)}
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
+                                title="Expand Tree Panel"
+                            >
+                                <PanelLeftOpen className="w-4 h-4" />
+                            </button>
+                            <span
+                                className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase cursor-pointer select-none [writing-mode:vertical-rl] rotate-180 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                                onClick={() => setIsTreeCollapsed(false)}
+                            >
+                                Show Tree
+                            </span>
+                        </div>
+                    )}
 
                     {/* Right Panel: Prompt Details */}
                     <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-[#171025]">
                         <PromptTreeErrorBoundary onReset={() => setSelectedConversation(null)}>
                             {selectedConversation ? (
-                                <div className="flex-1 flex flex-col px-5 py-3.5 overflow-y-auto space-y-3">
+                                <div className="flex-1 flex flex-col px-5 py-3.5 overflow-y-auto space-y-1.5">
                                     <DetailHeader
+                                        previewTab={previewTab}
+                                        setPreviewTab={setPreviewTab}
+                                        showAllWords={showAllWords}
+                                        setShowAllWords={setShowAllWords}
+                                        isTruncated={isTruncated}
+                                        setIsDetailsModalOpen={setIsDetailsModalOpen}
                                         selectedConversation={selectedConversation}
                                         activePromptText={activePromptText}
                                         confirmationSuffix={confirmationSuffix}
@@ -603,6 +1144,7 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                         isExportMenuOpen={isExportMenuOpen}
                                         setIsExportMenuOpen={setIsExportMenuOpen}
                                         hasImages={hasImages}
+                                        instanceId={instanceId || selectedConversation?.instance_id || selectedProject?.instance_id}
                                         instancePid={instancePid}
                                         instanceSeqNum={instanceSeqNum}
                                         instanceExeName={instanceExeName}
@@ -621,7 +1163,10 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                         onResend={promptActions.handleResendPrompt}
                                         onEnqueue={promptActions.handleEnqueuePrompt}
                                         rerunRepoPath={selectedProject?.repo_path || ''}
+                                        onRenameConversation={handleRenameConversation}
+                                        setActionMsg={setActionMsg}
                                         onOpenInspector={(conv) => promptActions.openInspector(conv, selectedProject?.repo_path || '')}
+                                        loadTree={loadTree}
                                     />
 
                                     <DetailTabs
@@ -664,6 +1209,21 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                             activeByteCount={activeByteCount}
                                             setActivePromptText={setActivePromptText}
                                             setActionMsg={setActionMsg}
+                                            promptPreviewWords={promptPreviewWords}
+                                            onRerun={promptActions.handleRerunConversation}
+                                            onEnqueue={promptActions.handleEnqueuePrompt}
+                                            onResend={promptActions.handleResendPrompt}
+                                            isResending={promptActions.isResending}
+                                            isEnqueueing={promptActions.isEnqueueing}
+                                            isRerunning={promptActions.isRerunning}
+                                            loadTree={loadTree}
+                                            repoPath={selectedProject?.repo_path || ''}
+                                            conversationTargetMode={conversationTargetMode}
+                                            setConversationTargetMode={setConversationTargetMode}
+                                            newConversationTitle={newConversationTitle}
+                                            setNewConversationTitle={setNewConversationTitle}
+                                            confirmationSuffix={confirmationSuffix}
+                                            setConfirmationSuffix={setConfirmationSuffix}
                                         />
                                     ) : (
                                         <ResultsView
@@ -675,20 +1235,21 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                                             formatDuration={formatDuration}
                                             onFocusIde={promptActions.handleFocusIde}
                                             elapsedSeconds={elapsedSeconds}
+                                            showAllWords={showAllWords}
                                         />
                                     )}
                                 </div>
-                            ) : isLoading ? (
+                            ) : selectedConversation === null && treeData.length === 0 ? (
                                 <div className="flex-1 flex flex-col px-6 py-5 space-y-4 animate-pulse overflow-hidden bg-white dark:bg-[#171025]">
                                     {/* Skeleton Header */}
                                     <div className="space-y-3 pb-3 border-b border-slate-200/70 dark:border-[#40285e]/60">
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="flex items-center gap-2 flex-1">
                                                 <div className="h-5 w-16 bg-blue-500/15 rounded-[5px]" />
-                                                <div className="h-5 w-24 bg-slate-200 dark:bg-[#211631] rounded-full" />
+                                                <div className="h-5 w-24 bg-slate-200 dark:bg-[#211631] rounded-md" />
                                                 <div className="h-5 w-44 bg-slate-200 dark:bg-[#211631] rounded-md" />
                                             </div>
-                                            <div className="h-7 w-28 bg-slate-200 dark:bg-[#211631] rounded-full" />
+                                            <div className="h-7 w-28 bg-slate-200 dark:bg-[#211631] rounded-md" />
                                         </div>
                                     </div>
                                     {/* Skeleton Tabs */}
@@ -748,12 +1309,107 @@ export default function PromptTreeViewModal(props: PromptTreeViewModalProps) {
                 copiedField={copiedField}
                 setCopiedField={setCopiedField}
                 instanceId={instanceId}
+                instanceExeName={instanceExeName}
+                instancePid={instancePid}
+                instanceSeqNum={instanceSeqNum}
+                instanceNameDisplay={instanceNameDisplay}
+                executablePath={executablePath}
+            />
+
+            {/* Project Right-Click Context Menu */}
+            {projectContextMenu && (
+                <ProjectContextMenu
+                    x={projectContextMenu.x}
+                    y={projectContextMenu.y}
+                    projectId={projectContextMenu.project.project_id}
+                    projectName={projectContextMenu.project.repo_name}
+                    isPinned={pinnedProjectIds.includes(projectContextMenu.project.project_id)}
+                    isArchived={archivedProjectIds.includes(projectContextMenu.project.project_id)}
+                    onClose={() => setProjectContextMenu(null)}
+                    onRefresh={() => {
+                        const fakeEvent = { stopPropagation: () => {} } as React.MouseEvent;
+                        void coreActions.handleRefreshSingleProject(projectContextMenu.project.project_id, fakeEvent);
+                    }}
+                    onTogglePin={() => {
+                        const fakeEvent = { stopPropagation: () => {} } as React.MouseEvent;
+                        coreActions.togglePinProject(projectContextMenu.project.project_id, fakeEvent);
+                    }}
+                    onToggleArchive={() => {
+                        const fakeEvent = { stopPropagation: () => {} } as React.MouseEvent;
+                        coreActions.toggleArchiveProject(projectContextMenu.project.project_id, fakeEvent);
+                    }}
+                    onExportJson={() => {
+                        coreActions.handleOpenExportModal({
+                            target_type: 'project',
+                            project_id: projectContextMenu.project.project_id,
+                            project_name: projectContextMenu.project.repo_name,
+                        }, 'json');
+                    }}
+                    onExportSqlite={() => {
+                        coreActions.handleOpenExportModal({
+                            target_type: 'project',
+                            project_id: projectContextMenu.project.project_id,
+                            project_name: projectContextMenu.project.repo_name,
+                        }, 'sqlite');
+                    }}
+                    onExportYaml={() => {
+                        coreActions.handleOpenExportModal({
+                            target_type: 'project',
+                            project_id: projectContextMenu.project.project_id,
+                            project_name: projectContextMenu.project.repo_name,
+                        }, 'yaml');
+                    }}
+                    onImportProject={() => coreActions.handleOpenImportModal()}
+                    onRerunProject={() => void coreActions.handleResendQueued()}
+                />
+            )}
+
+            {/* Scoped Section Export Modal */}
+            <PromptTreeExportModal
+                isOpen={coreActions.isExportModalOpen}
+                onClose={coreActions.handleCloseExportModal}
+                preselectedScope={coreActions.exportScopeTarget}
+                initialFormat={coreActions.exportInitialFormat}
+                treeData={treeData}
+                selectedProject={selectedProject || undefined}
+                selectedConversation={selectedConversation || undefined}
+                onExecuteExport={coreActions.executeSectionExport}
+            />
+
+            {/* Scoped Section Import Modal */}
+            <PromptTreeImportModal
+                isOpen={coreActions.isImportModalOpen}
+                onClose={coreActions.handleCloseImportModal}
+                instanceId={instanceId || 'default'}
+                instanceName={instanceName || 'Default Instance'}
+                onExecuteImport={coreActions.executeSectionImport}
+                onImportComplete={() => {
+                    if (!isAutoSyncing) {
+                        void loadTree(false, true);
+                    }
+                }}
             />
 
             {isAutoSyncing && (
-                <div className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs text-blue-600 dark:text-cyan-400">
+                <div className="absolute bottom-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs text-blue-600 dark:text-cyan-400 shadow-lg pointer-events-none z-50">
                     <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                     Syncing...
+                </div>
+            )}
+
+            {/* Non-Displacing Absolute Floating Action Toast */}
+            {actionMsg && (
+                <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/95 dark:bg-[#171025] border border-slate-700/60 dark:border-purple-500/40 text-xs font-medium text-slate-200 dark:text-purple-200 shadow-2xl pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-150">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                    <span>{actionMsg}</span>
+                </div>
+            )}
+
+            {/* Non-Displacing Absolute Floating Error Toast */}
+            {error && (
+                <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-950/95 border border-rose-500/50 text-xs font-medium text-rose-200 shadow-2xl pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-150">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+                    <span>{error}</span>
                 </div>
             )}
         </div>

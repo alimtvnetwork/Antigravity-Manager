@@ -5,7 +5,7 @@ use crate::modules::security_db::{
 use std::thread;
 use std::time::{Duration, Instant};
 
-/// 辅助函数：初始化测试并加锁隔离
+/// Auxiliary function: initialize test and lock isolation
 fn setup_test() -> (
     std::sync::MutexGuard<'static, ()>,
     std::sync::MutexGuard<'static, ()>,
@@ -22,7 +22,7 @@ fn setup_test() -> (
     (env_lock, lock)
 }
 
-/// 辅助函数：清理测试环境
+/// Auxiliary function: clean up the test environment
 fn cleanup_test_data() {
     if let Ok(entries) = get_blacklist() {
         for entry in entries {
@@ -34,14 +34,14 @@ fn cleanup_test_data() {
     crate::error::record_ignored(clear_ip_access_logs(), "clear_ip_access_logs");
 }
 
-/// 压力测试：大量黑名单条目
+/// Stress test: large number of blacklist entries
 #[test]
 fn stress_test_large_blacklist() {
     let _lock = setup_test();
 
     let count = 25;
 
-    // 批量添加
+    // Add in batches
     let start = Instant::now();
     for i in 0..count {
         // Justification: best-effort call; failure logged without changing control flow
@@ -58,7 +58,7 @@ fn stress_test_large_blacklist() {
     let add_duration = start.elapsed();
     println!("Added {} entries in {:?}", count, add_duration);
 
-    // 随机查找测试
+    // random search test
     let start = Instant::now();
     for i in 0..25 {
         // Justification: best-effort call; failure logged without changing control flow
@@ -76,7 +76,7 @@ fn stress_test_large_blacklist() {
     let lookup_duration = start.elapsed();
     println!("25 lookups in large blacklist took {:?}", lookup_duration);
 
-    // 验证性能合理
+    // Verify that performance is reasonable
     assert!(
         lookup_duration < Duration::from_secs(30),
         "Lookups should be reasonably fast even with large blacklist"
@@ -85,7 +85,7 @@ fn stress_test_large_blacklist() {
     cleanup_test_data();
 }
 
-/// 压力测试：大量访问日志
+/// Stress test: large number of access logs
 #[test]
 fn stress_test_access_logging() {
     let _lock = setup_test();
@@ -96,7 +96,7 @@ fn stress_test_access_logging() {
         .unwrap()
         .as_secs() as i64;
 
-    // 批量写入日志
+    // Write logs in batches
     let start = Instant::now();
     for i in 0..count {
         let log = IpAccessLog {
@@ -119,7 +119,7 @@ fn stress_test_access_logging() {
     let write_duration = start.elapsed();
     println!("Wrote {} access logs in {:?}", count, write_duration);
 
-    // 验证写入性能合理
+    // Verify write performance is reasonable
     assert!(
         write_duration < Duration::from_secs(60),
         "Access log writing should be reasonably fast"
@@ -129,7 +129,7 @@ fn stress_test_access_logging() {
     crate::error::record_ignored(clear_ip_access_logs(), "clear_ip_access_logs");
 }
 
-/// 压力测试：并发操作
+/// Stress Test: Concurrent Operations
 #[test]
 fn stress_test_concurrent_operations() {
     let _lock = setup_test();
@@ -141,7 +141,7 @@ fn stress_test_concurrent_operations() {
         .map(|t| {
             thread::spawn(move || {
                 for i in 0..ops_per_thread {
-                    // 每个线程添加-查询-删除
+                    // Add-query-delete per thread
                     let ip = format!("concurrent.{}.{}", t, i);
                     if let Ok(entry) = add_to_blacklist(&ip, None, None, "concurrent") {
                         // Justification: best-effort call; failure logged without changing control flow
@@ -157,12 +157,12 @@ fn stress_test_concurrent_operations() {
         })
         .collect();
 
-    // 等待所有线程完成
+    // Wait for all threads to complete
     for handle in handles {
         handle.join().expect("Thread should not panic");
     }
 
-    // 验证没有遗留数据
+    // Verify there is no legacy data
     let remaining = get_blacklist().unwrap();
     let concurrent_remaining: Vec<_> = remaining
         .iter()

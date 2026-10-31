@@ -4,15 +4,15 @@ use std::fs;
 
 use super::*;
 
-/// 桌面版实现：包含完整的进程控制 and UI 同步
+/// Desktop version implementation: includes complete process control and UI synchronization
 pub struct DesktopIntegration {
     pub app_handle: Option<tauri::AppHandle>,
 }
 
-/// 写入账号凭据：>= 2.0.0 的原生应用走系统 Keyring，旧架构与定制 IDE 走 SQLite 注入。
+/// Write account credentials: Native applications >= 2.0.0 use system Keyring, old architecture and customized IDE use SQLite injection.
 ///
-/// 抽成独立函数是为了让「热切号」能在终止 language_server 子进程**之前**完成凭据写入
-/// （见 `on_account_switch` 的顺序说明），同时让完整重启路径保持原有的「先杀后写」顺序。
+/// The purpose of extracting a separate function is to allow the "eager number" to complete writing the credentials before terminating the language_server child process.
+/// (See the order description of `on_account_switch`), while keeping the complete restart path in the original "kill first, write later" order.
 pub(crate) fn apply_account_credentials(
     account: &Account,
     effective_target: Option<&str>,
@@ -22,13 +22,13 @@ pub(crate) fn apply_account_credentials(
     let mut use_keyring = false;
 
     if !is_ide {
-        // 经典原生版：自动探测版本号（优先使用预快照路径）
+        // Classic native version: automatically detects the version number (preferring to use the pre-snapshot path)
         match version::get_antigravity_version_with_path(
             effective_target,
             active_exe_path.as_deref(),
         ) {
             Ok(ver) => {
-                // 如果版本号 >= 2.0.0
+                // If version number >= 2.0.0
                 if version::compare_version(&ver.short_version, "2.0.0") != std::cmp::Ordering::Less
                 {
                     use_keyring = true;
@@ -44,8 +44,8 @@ pub(crate) fn apply_account_credentials(
                 }
             }
             Err(e) => {
-                // 如果探测失败，优先检查本地是否存在可用的 SQLite 数据库 (state.vscdb)
-                // 若存在数据库，说明是经典的 VS Code/IDE 架构，优先使用 SQLite 注入，防止无 secret-tool 时报错
+                // If the detection fails, first check whether there is an available local SQLite database (state.vscdb)
+                // If a database exists, it means it is a classic VS Code/IDE architecture. SQLite injection is preferred to prevent errors without secret-tool.
                 let has_sqlite_db = db::get_db_path(effective_target)
                     .map(|p| p.exists())
                     .unwrap_or(false);
@@ -68,8 +68,8 @@ pub(crate) fn apply_account_credentials(
     }
 
     if use_keyring {
-        // ================== 最新版 Antigravity 原生应用逻辑 (>= 2.0.0) ==================
-        // 2.1 写入系统 Keychain/Keyring
+        // ================== Latest version of Antigravity native application logic (>= 2.0.0) ==================
+        // 2.1 Write to system Keychain/Keyring
         if let Err(keyring_err) = write_to_system_keyring(account) {
             let db_fallback = if let Ok(db_path) = db::get_db_path(effective_target) {
                 if db_path.exists() {
@@ -120,7 +120,7 @@ pub(crate) fn apply_account_credentials(
             }
         }
 
-        // 2.2 同步写入 storage.json 与 state.vscdb（若存在），确保新版客户端与本地扩展状态完全一致
+        // 2.2 Synchronously write storage.json and state.vscdb (if it exists) to ensure that the new version of the client is completely consistent with the local extension state
         if let Ok(storage_path) = device::get_storage_path(effective_target) {
             if let Some(ref profile) = account.device_profile {
                 // Justification: device profile sync keeps local state consistent; the account is already in the system keyring
@@ -164,22 +164,22 @@ pub(crate) fn apply_account_credentials(
             }
         }
     } else {
-        // ================== 原有 Antigravity 旧版或定制 IDE 逻辑 (< 2.0.0) ==================
+        // ================== Legacy Antigravity legacy or custom IDE logic (< 2.0.0) ==================
         // Justification: opportunistic keyring write for old IDEs; the SQLite injection below is the authoritative path
         crate::error::record_ignored(
             write_to_system_keyring(account),
             "write account to system keyring",
         );
 
-        // 2.1 获取存储路径
+        // 2.1 Get the storage path
         let storage_path = device::get_storage_path(effective_target)?;
 
-        // 2.2 写入设备 Profile
+        // 2.2 Write device Profile
         if let Some(ref profile) = account.device_profile {
             device::write_profile(&storage_path, profile)?;
         }
 
-        // 2.3 数据库处理与 Token 注入
+        // 2.3 Database processing and Token injection
         let db_path = db::get_db_path(effective_target)?;
         if db_path.exists() {
             let backup_path = db_path.with_extension("vscdb.backup");
@@ -203,7 +203,7 @@ pub(crate) fn apply_account_credentials(
             effective_target,
         )?;
 
-        // 2.4 同步 Service Machine ID 到数据库
+        // 2.4 Synchronize Service Machine ID to database
         if let Some(ref profile) = account.device_profile {
             // Justification: service machine ID sync is auxiliary; the token injection already succeeded
             crate::error::record_ignored(

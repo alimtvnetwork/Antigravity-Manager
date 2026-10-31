@@ -76,7 +76,7 @@ pub(crate) async fn chat_completions_send(
     think_fill_ms: &mut f64,
 ) -> Result<ChatSendOutcome, (StatusCode, String)> {
     let norm_start = std::time::Instant::now();
-    // 将 OpenAI 工具转为 Value 数组以便探测联网
+    // Convert OpenAI tool to Value array for detecting networking
     let tools_val: Option<Vec<Value>> = openai_req
         .tools
         .as_ref()
@@ -91,11 +91,11 @@ pub(crate) async fn chat_completions_send(
         None, // body
     );
 
-    // 3. 提取 SessionId (粘性指纹)
+    // 3. Extract SessionId (sticky fingerprint)
     let session_id = session_scope.store_key.clone();
 
-    // 4. 获取 Token (使用准确的 request_type)
-    // 关键：在重试尝试时根据 force_rotate 决定是否轮换账号
+    // 4. Get Token (use accurate request_type)
+    // Key: Determine whether to rotate accounts based on force_rotate during retry attempts
     let (access_token, project_id, email, account_id, _wait_ms) =
         if let Some(credentials) = retry_credentials.take() {
             credentials
@@ -152,7 +152,7 @@ pub(crate) async fn chat_completions_send(
             }
         };
 
-    // [NEW v4.1.29] 获取完整 Token 对象用于动态规格查询
+    // [NEW v4.1.29] Obtain the complete Token object for dynamic specification query
     let proxy_token = token_manager.get_token_by_id(&account_id);
     let mapped_model = token_manager
         .resolve_dynamic_model_for_account(&account_id, &mapped_model)
@@ -161,7 +161,7 @@ pub(crate) async fn chat_completions_send(
     *last_email = Some(email.clone());
     info!("✓ Using account: {} (type: {})", email, config.request_type);
 
-    // 4. 转换请求 (返回内容包含 session_id, message_count, prefix_hash)
+    // 4. Conversion request (return content includes session_id, message_count, prefix_hash)
     let tf_start = std::time::Instant::now();
     let (mut gemini_body, session_id, message_count, _prefix_hash) =
         transform_openai_request(openai_req, &project_id, &mapped_model, proxy_token.as_ref());
@@ -217,7 +217,7 @@ pub(crate) async fn chat_completions_send(
         serialized_json_len(&gemini_body)
     );
 
-    // 5. 发送请求
+    // 5. Send a request
     let client_wants_stream = openai_req.stream;
     let force_stream_internally = !client_wants_stream;
     let actual_stream = client_wants_stream || force_stream_internally;
@@ -287,7 +287,7 @@ pub(crate) async fn chat_completions_send(
         }
     };
 
-    // [NEW] 记录端点降级日志到 debug 文件
+    // [NEW] Record endpoint downgrade log to debug file
     if !call_result.fallback_attempts.is_empty() && debug_logger::is_enabled(&debug_cfg) {
         let fallback_entries: Vec<Value> = call_result
             .fallback_attempts
@@ -320,7 +320,7 @@ pub(crate) async fn chat_completions_send(
     }
 
     let response = call_result.response;
-    // [NEW] 提取实际请求的上游端点 URL，用于日志记录和排查
+    // [NEW] Extract the actual requested upstream endpoint URL for logging and troubleshooting purposes
     let upstream_url = response.url().to_string();
     let status = response.status();
     Ok(ChatSendOutcome::Sent(ChatSendOutput {

@@ -1,6 +1,3 @@
-use crate::modules::auto_switcher;
-use crate::modules::backup_prompts_db;
-use crate::modules::email_watcher;
 use crate::modules::repo_db;
 use crate::modules::supabase_client::SupabaseClient;
 use crate::modules::supabase_sync;
@@ -9,6 +6,51 @@ use serde_json::{json, Value};
 use std::process::Command;
 
 use super::*;
+
+/// Helper to determine if a string prefix represents a valid cluster node identifier.
+pub fn is_valid_node_identifier(prefix_candidate: &str, cmd_candidate: &str) -> bool {
+    if prefix_candidate.is_empty() || cmd_candidate.is_empty() {
+        return false;
+    }
+    if prefix_candidate.contains(char::is_whitespace) {
+        return false;
+    }
+    let p_lower = prefix_candidate.to_lowercase();
+    p_lower.starts_with('w')
+        || p_lower.starts_with("node")
+        || p_lower.starts_with("vm")
+        || prefix_candidate
+            .chars()
+            .all(|c| c.is_ascii_digit() || c == '.')
+        || prefix_candidate.eq_ignore_ascii_case("local")
+}
+
+/// Helper to check if the target node refers to the local machine instance.
+pub fn is_command_target_local(target_node: &str) -> bool {
+    super::node_label::is_current_machine(target_node)
+}
+
+/// Helper to extract (target_node, cmd_content) from an inbound Telegram command string.
+pub fn extract_node_targeted_command<'a>(
+    trimmed: &'a str,
+    lower_full: &str,
+) -> Option<(&'a str, &'a str)> {
+    if lower_full.starts_with("cmd:") || lower_full.starts_with("exec:") {
+        let parts: Vec<&str> = trimmed.splitn(3, ':').collect();
+        if parts.len() >= 3 {
+            return Some((parts[1].trim(), parts[2].trim()));
+        }
+        return None;
+    }
+    if let Some(colon_pos) = trimmed.find(':') {
+        let prefix_candidate = trimmed[..colon_pos].trim();
+        let cmd_candidate = trimmed[colon_pos + 1..].trim();
+        if is_valid_node_identifier(prefix_candidate, cmd_candidate) {
+            return Some((prefix_candidate, cmd_candidate));
+        }
+    }
+    None
+}
 
 /// Unified inbound Telegram command processor
 pub async fn process_telegram_command_text(text: &str) -> Option<String> {
@@ -37,6 +79,11 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
         "open" => Some(commands::execute_open_command(rest).await),
         "screenshot" => Some(commands::execute_screenshot_command(rest).await),
         "send" => Some(super::send_flow::start_send_flow(rest)),
+        "seek" | "conversations" | "convs" | "turns" => Some(
+            super::reports_b::format_seek_conversations_report(rest)
+                .await
+                .0,
+        ),
         "fleet" | "whoami" => Some(format_fleet_identity_report()),
         "instances" | "inst" => Some(format_instances_report()),
         "accounts" | "acc" => Some(format_accounts_report()),
@@ -67,11 +114,16 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
             }
         }
         "status" | "observe" => Some(format_observe_report()),
+        "improvements" | "improve" | "next10" | "next-10" => {
+            Some(format_improvements_command_reply(&cmd_base, rest))
+        }
         "tree" => {
             let only_running = !rest.eq_ignore_ascii_case("all");
             Some(repo_db::format_tree_view_telegram_html(200, only_running))
         }
-        "expand" | "exp" => Some(format_expand_prompt_report(rest)),
+        "expand" | "exp" | "inspect" | "ins" | "show" | "view" => {
+            Some(format_expand_prompt_report(rest))
+        }
         "history" | "hist" => Some(super::prompt_history::format_prompt_history(8).0),
         "rerun" | "rr" => Some(super::prompt_history::rerun_prompt_by_id(rest).await.0),
         "active" | "running" => Some(format_active_prompts_report().await),
@@ -225,6 +277,19 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                     .unwrap_or("")
                     .trim();
                 Some(format_prompts_query_report(term))
+            } else if sub.starts_with("seek") {
+                let term = sub["seek".len()..].trim();
+                Some(
+                    super::reports_b::format_seek_conversations_report(term)
+                        .await
+                        .0,
+                )
+            } else if sub == "conversations" || sub == "convs" || sub == "turns" {
+                Some(
+                    super::reports_b::format_seek_conversations_report("")
+                        .await
+                        .0,
+                )
             } else if sub == "all" || sub == "db" {
                 Some(format_prompts_list())
             } else if sub.starts_with("expand") {
@@ -246,27 +311,39 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
         "gitmap" | "gm" => Some(execute_gitmap_subcommand(rest)),
         "agm" => Some(execute_agm_subcommand(rest)),
         "api" | "proxy" => Some(execute_api_status_command().await),
-        "backup" | "backpack" => Some(execute_backup_command(rest)),
-        "restore" => Some(execute_backup_command("restore")),
+        "backup" | "backpack" | "backup_prompt" | "backup_prompts" | "backup_running" | "brp" => {
+            Some(execute_backup_command(rest))
+        }
+        "restore" | "rrp" | "resend" => {
+            let sub = if rest.is_empty() {
+                "restore".to_string()
+            } else {
+                format!("restore {}", rest)
+            };
+            Some(execute_backup_command(&sub))
+        }
         "email" | "mail" => Some(execute_email_command(rest)),
         "snapshot" | "cluster" => Some(format_cluster_nodes_report().await),
         "ff" | "rotate" => {
-            let backup_count = repo_db::backup_running_prompts("default").unwrap_or(0);
-            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-            crate::error::record_ignored(
-                backup_prompts_db::backup_active_running_prompts(Some("default"), None),
-                "backup_active_running_prompts",
-            );
-            let _rotate_res = auto_switcher::check_and_rotate_if_needed().await;
-            let resent = repo_db::resend_all_running_commands(20).unwrap_or_default();
-            let disp = repo_db::dispatch_running_prompts("default").unwrap_or(0);
-
-            Some(format!(
-                "⏩ Switched to the highest-quota account. {} prompts backed up before the switch; {} re-sent ({} sent). Everything continues without interruption.",
-                backup_count,
-                resent.len(),
-                disp
-            ))
+            let inst = if rest.trim().is_empty() {
+                "default"
+            } else {
+                rest.trim()
+            };
+            match crate::modules::auto_switcher::trigger_manual_rotation_for_instance(Some(inst))
+                .await
+            {
+                Ok(msg) => Some(format!(
+                    "⏩ <b>Fast-forward</b> <code>{}</code>\n{}",
+                    clean_for_telegram_html(inst, 40),
+                    clean_for_telegram_html(&msg, 800)
+                )),
+                Err(e) => Some(format!(
+                    "❌ Fast-forward failed on <code>{}</code>: <code>{}</code>",
+                    clean_for_telegram_html(inst, 40),
+                    clean_for_telegram_html(&e, 200)
+                )),
+            }
         }
         _ => {
             let is_direct_seq_code = !rest.is_empty()
@@ -293,69 +370,44 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                 }
                 return Some(format_active_prompts_report().await);
             }
-            if lower_full.starts_with("ff:") {
-                let backup_count = repo_db::backup_running_prompts("default").unwrap_or(0);
-                // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-                crate::error::record_ignored(
-                    backup_prompts_db::backup_active_running_prompts(Some("default"), None),
-                    "backup_active_running_prompts",
-                );
-                let _rotate_res = auto_switcher::check_and_rotate_if_needed().await;
-                let resent = repo_db::resend_all_running_commands(20).unwrap_or_default();
-                let disp = repo_db::dispatch_running_prompts("default").unwrap_or(0);
-
-                return Some(format!(
-                    "⏩ Switched to the highest-quota account. {} prompts backed up before the switch; {} re-sent ({} sent). Everything continues without interruption.",
-                    backup_count,
-                    resent.len(),
-                    disp
-                ));
+            if lower_full.starts_with("backup prompt")
+                || lower_full.starts_with("backup prompts")
+                || lower_full.starts_with("backup running")
+                || lower_full.starts_with("brp ")
+            {
+                let sub = lower_full.trim();
+                return Some(execute_backup_command(sub));
             }
-            let node_selector: Option<(&str, &str)> =
-                if lower_full.starts_with("cmd:") || lower_full.starts_with("exec:") {
-                    let parts: Vec<&str> = trimmed.splitn(3, ':').collect();
-                    if parts.len() >= 3 {
-                        Some((parts[1].trim(), parts[2].trim()))
-                    } else {
-                        None
-                    }
-                } else if let Some(colon_pos) = trimmed.find(':') {
-                    let prefix_candidate = trimmed[..colon_pos].trim();
-                    let cmd_candidate = trimmed[colon_pos + 1..].trim();
-                    let is_node_ident = !prefix_candidate.is_empty()
-                        && !cmd_candidate.is_empty()
-                        && !prefix_candidate.contains(char::is_whitespace)
-                        && (prefix_candidate.starts_with('W')
-                            || prefix_candidate.starts_with('w')
-                            || prefix_candidate.to_lowercase().starts_with("node")
-                            || prefix_candidate.to_lowercase().starts_with("vm")
-                            || prefix_candidate
-                                .chars()
-                                .all(|c| c.is_ascii_digit() || c == '.')
-                            || prefix_candidate.eq_ignore_ascii_case("local"));
-                    if is_node_ident {
-                        Some((prefix_candidate, cmd_candidate))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
+            if lower_full.starts_with("ff:") {
+                let inst = trimmed
+                    .split_once(':')
+                    .map(|(_, r)| r.trim())
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or("default");
+                return match crate::modules::auto_switcher::trigger_manual_rotation_for_instance(
+                    Some(inst),
+                )
+                .await
+                {
+                    Ok(msg) => Some(format!(
+                        "⏩ <b>Fast-forward</b> <code>{}</code>\n{}",
+                        clean_for_telegram_html(inst, 40),
+                        clean_for_telegram_html(&msg, 800)
+                    )),
+                    Err(e) => Some(format!(
+                        "❌ Fast-forward failed on <code>{}</code>: <code>{}</code>",
+                        clean_for_telegram_html(inst, 40),
+                        clean_for_telegram_html(&e, 200)
+                    )),
                 };
+            }
+            let node_selector = extract_node_targeted_command(trimmed, &lower_full);
 
             if let Some((target_node, cmd_content)) = node_selector {
                 let s_config = supabase_sync::load_config().unwrap_or_default();
-                let local_alias = if s_config.node_alias.trim().is_empty() {
-                    email_watcher::detect_machine_name()
-                } else {
-                    s_config.node_alias.clone()
-                };
-                let local_ip = email_watcher::detect_local_ip();
 
                 // If targeting current local node, execute directly!
-                if target_node.eq_ignore_ascii_case("local")
-                    || target_node.eq_ignore_ascii_case(&local_alias)
-                    || target_node.eq_ignore_ascii_case(&local_ip)
-                {
+                if is_command_target_local(target_node) {
                     return Box::pin(process_telegram_command_text(cmd_content)).await;
                 }
 
@@ -393,7 +445,10 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
                             let cmd_payload = json!({
                                 "id": cmd_id,
                                 "target_node": target_node,
+                                "target_node_id": target_node,
+                                "source": "telegram",
                                 "command": cmd_content,
+                                "command_text": cmd_content,
                                 "status": "pending",
                                 "created_at": Utc::now().timestamp()
                             });
@@ -422,5 +477,22 @@ pub async fn process_telegram_command_text(text: &str) -> Option<String> {
             }
             None
         }
+    }
+}
+
+pub fn format_improvements_command_reply(cmd_base: &str, rest: &str) -> String {
+    let effective = if matches!(cmd_base, "next10" | "next-10") && rest.trim().is_empty() {
+        "next".to_string()
+    } else if rest.trim().is_empty() {
+        "status".to_string()
+    } else {
+        rest.trim().to_string()
+    };
+    match crate::modules::improvements::handle_rest(&effective) {
+        Ok(state) => crate::modules::improvements::format_telegram_html(&state),
+        Err(e) => format!(
+            "❌ <b>Improvements:</b> <code>{}</code>",
+            clean_for_telegram_html(&e.to_string(), 200)
+        ),
     }
 }

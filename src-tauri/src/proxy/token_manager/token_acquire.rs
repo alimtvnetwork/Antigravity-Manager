@@ -1,4 +1,4 @@
-//! Token 获取主入口：get_token / get_image_token 及核心调度逻辑。
+//! Token acquisition main entrance: get_token / get_image_token and core scheduling logic.
 
 use super::helpers::wait_for_image_account_change;
 use super::helpers::wait_for_image_token_selection;
@@ -13,11 +13,11 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 impl TokenManager {
-    /// 获取当前可用的 Token（支持粘性会话与智能调度）
-    /// 参数 `quota_group` 用于区分 "claude" vs "gemini" 组
-    /// 参数 `force_rotate` 为 true 时将忽略锁定，强制切换账号
-    /// 参数 `session_id` 用于跨请求维持会话粘性
-    /// 参数 `target_model` 用于检查配额保护 (Issue #621)
+    /// Get currently available Tokens (supports sticky sessions and intelligent scheduling)
+    /// Parameter `quota_group` is used to distinguish "claude" vs "gemini" groups
+    /// When the parameter `force_rotate` is true, the lock will be ignored and the account will be forced to switch.
+    /// Parameter `session_id` is used to maintain session stickiness across requests
+    /// Parameter `target_model` is used to check quota protection (Issue #621)
     pub async fn get_token(
         &self,
         quota_group: &str,
@@ -68,7 +68,7 @@ impl TokenManager {
                     None => {
                         return Err((
                             StatusCode::TOO_MANY_REQUESTS,
-                            "图片队列等待超时".to_string(),
+                            "Image queue wait timeout".to_string(),
                         ));
                     }
                     Some(Ok((access_token, project_id, email, account_id, wait_ms))) => {
@@ -100,7 +100,7 @@ impl TokenManager {
             if !wait_for_image_account_change(&mut scheduler_changes, remaining).await {
                 return Err((
                     StatusCode::TOO_MANY_REQUESTS,
-                    "图片队列等待超时".to_string(),
+                    "Image queue wait timeout".to_string(),
                 ));
             }
         }
@@ -114,7 +114,7 @@ impl TokenManager {
         target_model: &str,
         excluded_accounts: &HashSet<String>,
     ) -> Result<(String, String, String, String, u64), String> {
-        // [FIX] 检查并处理待重新加载的账号（配额保护同步）
+        // [FIX] Check and process accounts to be reloaded (quota protection synchronization)
         let pending_reload = crate::proxy::server::take_pending_reload_accounts();
         for account_id in pending_reload {
             if let Err(e) = self.reload_account(&account_id).await {
@@ -127,7 +127,7 @@ impl TokenManager {
             }
         }
 
-        // [FIX #1477] 检查并处理待删除的账号（彻底清理缓存）
+        // [FIX #1477] Check and process accounts to be deleted (clean cache completely)
         let pending_delete = crate::proxy::server::take_pending_delete_accounts();
         for account_id in pending_delete {
             self.remove_account(&account_id);
@@ -137,7 +137,7 @@ impl TokenManager {
             );
         }
 
-        // 【优化 Issue #284】添加 5 秒超时，防止死锁
+        // [Optimization Issue #284] Add 5 seconds timeout to prevent deadlock
         let timeout_duration = std::time::Duration::from_secs(5);
         match tokio::time::timeout(
             timeout_duration,
@@ -158,7 +158,7 @@ impl TokenManager {
         }
     }
 
-    /// 内部实现：获取 Token 的核心逻辑
+    /// Internal implementation: core logic of obtaining Token
     async fn get_token_internal(
         &self,
         quota_group: &str,
@@ -178,16 +178,16 @@ impl TokenManager {
         tokens_snapshot = Self::sort_candidates_by_capability(tokens_snapshot, target_model)?;
         total = tokens_snapshot.len();
 
-        // 0. 读取当前调度配置
+        // 0. Read the current scheduling configuration
         let scheduling = self.sticky_config.read().await.clone();
         use crate::proxy::sticky_config::SchedulingMode;
 
-        // 【新增】检查配额保护是否启用（如果关闭，则忽略 protected_models 检查）
+        // [New] Check whether quota protection is enabled (if it is off, the protected_models check is ignored)
         let quota_protection_enabled = crate::modules::config::load_app_config()
             .map(|cfg| cfg.quota_protection.enabled)
             .unwrap_or(false);
 
-        // ===== [FIX #820] 固定账号模式：优先使用指定账号 =====
+        // ===== [FIX #820] Fixed account mode: Prioritize the use of designated accounts =====
         let preferred_id = self.preferred_account_id.read().await.clone();
         if let Some(ref pref_id) = preferred_id {
             if let Some(result) = self
@@ -205,8 +205,8 @@ impl TokenManager {
         }
         // ===== [END FIX #820] =====
 
-        // 【优化 Issue #284】将锁操作移到循环外，避免重复获取锁
-        // 预先获取 last_used_account 的快照，避免在循环中多次加锁
+        // [Optimization Issue #284] Move the lock operation outside the loop to avoid repeated lock acquisition
+        // Get a snapshot of last_used_account in advance to avoid multiple locks in the loop
         let last_used_account_id = if quota_group != "image_gen" {
             let last_used = self.last_used_account.lock().await;
             last_used.clone()
@@ -220,7 +220,7 @@ impl TokenManager {
 
         for attempt in 0..total {
             let rotate = force_rotate || attempt > 0;
-            // 归一化目标模型名为标准 ID，用于配额保护检查
+            // Normalized target model named Standard ID, used for quota protection checks
             let normalized_target =
                 crate::proxy::common::model_mapping::normalize_to_standard_id(target_model)
                     .unwrap_or_else(|| target_model.to_string());
@@ -290,12 +290,12 @@ impl TokenManager {
 
             let project_id = self.resolve_project_id(&token).await;
 
-            // 【优化】在成功返回前，统一更新 last_used_account（如果需要）
+            // [Optimization] Update last_used_account uniformly before returning successfully (if necessary)
             if let Some((new_account_id, new_time)) = need_update_last_used {
                 if quota_group != "image_gen" {
                     let mut last_used = self.last_used_account.lock().await;
                     if new_account_id.is_empty() {
-                        // 空字符串表示需要清除锁定
+                        // An empty string indicates that the lock needs to be cleared
                         *last_used = None;
                     } else {
                         *last_used = Some((new_account_id, new_time));

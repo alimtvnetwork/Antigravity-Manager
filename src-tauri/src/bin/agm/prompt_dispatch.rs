@@ -80,6 +80,7 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
     let mut explicit_instance: Option<String> = None;
     let mut explicit_node: Option<String> = None;
     let mut explicit_seq_or_target: Option<String> = None;
+    let mut base64_payload: Option<String> = None;
     let mut text_parts: Vec<String> = Vec::new();
 
     let mut i = 0;
@@ -87,6 +88,16 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
         let arg = &args[i];
         if arg == "--queue" || arg == "-q" || arg == "--enqueue" {
             is_queue_mode = true;
+            i += 1;
+            continue;
+        } else if arg == "--base64" || arg == "-b64" || arg == "--b64" {
+            if i + 1 < args.len() {
+                base64_payload = Some(args[i + 1].clone());
+                i += 2;
+                continue;
+            }
+        } else if let Some(b64) = arg.strip_prefix("--base64=") {
+            base64_payload = Some(b64.to_string());
             i += 1;
             continue;
         } else if arg == "--prefix" || arg == "-prefix" {
@@ -149,10 +160,21 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
                 resolved_seq = Some(res);
                 text_parts.remove(0);
             }
+        } else if base64_payload.is_some() {
+            explicit_seq_or_target = Some(text_parts.remove(0));
         }
     }
 
-    let raw_text = text_parts.join(" ");
+    let raw_text = if let Some(ref b64_str) = base64_payload {
+        use base64::Engine;
+        let clean_b64 = b64_str.trim().trim_matches('"').trim_matches('\'');
+        match base64::engine::general_purpose::STANDARD.decode(clean_b64.as_bytes()) {
+            Ok(bytes) => String::from_utf8(bytes).unwrap_or_else(|_| text_parts.join(" ")),
+            Err(_) => text_parts.join(" "),
+        }
+    } else {
+        text_parts.join(" ")
+    };
     let final_prompt =
         wrap_prompt_with_templates(&raw_text, prefix_cat.as_deref(), suffix_cat.as_deref());
 
@@ -166,17 +188,17 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
         let target_arg = resolved_seq
             .as_ref()
             .map(|s| s.seq_code.clone())
-            .or(explicit_seq_or_target)
+            .or(explicit_seq_or_target.clone())
             .unwrap_or_else(|| "default".to_string());
         let inst_arg = explicit_instance
             .as_deref()
             .map(|ins| format!(" --instance {}", ins))
             .unwrap_or_default();
+        use base64::Engine;
+        let b64_prompt = base64::engine::general_purpose::STANDARD.encode(final_prompt.as_bytes());
         let remote_cmd = format!(
-            "agm prompt {}{} \"{}\"",
-            target_arg,
-            inst_arg,
-            final_prompt.replace('"', "\\\"")
+            "agm prompt {}{} --base64 \"{}\"",
+            target_arg, inst_arg, b64_prompt
         );
         println!(
             "[*] Dispatching prompt to remote node '{}' via GitMap cluster SSH...",
@@ -231,10 +253,23 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
             Some(seq.seq_code),
         )
     } else {
-        let s = crate::common::derive_current_repo_slug();
-        let c = env::current_dir()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|_| ".".to_string());
+        let target_str = explicit_seq_or_target.as_deref().unwrap_or("default");
+        let projects = repo_db::get_live_project_execution_info();
+        let matched = projects.iter().find(|p| {
+            p.project_id.eq_ignore_ascii_case(target_str)
+                || p.repo_name.eq_ignore_ascii_case(target_str)
+        });
+        let (s, c) = if let Some(p) = matched {
+            (p.project_id.clone(), p.repo_path.clone())
+        } else if Path::new(target_str).is_dir() {
+            (target_str.to_string(), target_str.to_string())
+        } else {
+            let s = crate::common::derive_current_repo_slug();
+            let c = env::current_dir()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|_| ".".to_string());
+            (s, c)
+        };
         let i = resolved_explicit_inst.unwrap_or_else(|| {
             instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string())
         });
@@ -340,7 +375,8 @@ pub(crate) fn cmd_prompt_dispatch(args: &[String]) {
             antigravity_tools_lib::modules::instance::cdp_onboarding::submit_prompt_via_cdp_for_instance(
                 &inst_id,
                 &clean_prompt,
-            );
+                true,
+            ).is_ok();
         if cdp_ok {
             antigravity_tools_lib::modules::audit::record_if_active(
                 "cli",

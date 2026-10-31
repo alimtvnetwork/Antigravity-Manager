@@ -22,12 +22,12 @@ pub(crate) fn phase_contents(
                 std::collections::HashMap::new();
 
             if let Some(parts) = content.get_mut("parts").and_then(|p| p.as_array_mut()) {
-                // 1. 如果是 assistant/model 轮次，预先扫描提取 turn_signature (对齐 Anthropic)
+                // 1. If it is the assistant/model round, pre-scan to extract turn_signature (aligned Anthropic)
                 let mut turn_signature: Option<String> = None;
                 if is_assistant {
                     for part in parts.iter() {
                         if let Some(obj) = part.as_object() {
-                            // 铁律：只认 thought: true（详见 thinking_store::is_thought_part）
+                            // Iron rule: only recognize thought: true (see thinking_store::is_thought_part for details)
                             let is_thought = crate::proxy::thinking_store::is_thought_part(part);
                             if is_thought {
                                 if let Some(s) = obj
@@ -51,7 +51,7 @@ pub(crate) fn phase_contents(
                 let mut saw_non_thinking = false;
 
                 for mut part in parts.drain(..) {
-                    // 铁律：只认 thought: true（详见 thinking_store::is_thought_part）
+                    // Iron rule: only recognize thought: true (see thinking_store::is_thought_part for details)
                     let is_thought = crate::proxy::thinking_store::is_thought_part(&part);
 
                     if is_assistant && is_thought {
@@ -62,9 +62,9 @@ pub(crate) fn phase_contents(
                             .and_then(|s| s.as_str())
                             .map(str::to_string);
 
-                        // [2026-09-27] 占位思考块直接丢弃（不写思考块）。
-                        // 官方样本（baogao.txt）9/24 轮是「无思考块 + 锚点带签名」，
-                        // 空 / "." / "..." / 空格 / "·" 等占位思考无信息量，不出站。
+                        // [2026-09-27] Placeholder thinking blocks are discarded directly (no thinking blocks are written).
+                        // The official sample (baogao.txt) on round 9/24 is "no thinking block + anchor with signature",
+                        // Empty / "." / "..." / Space / "·" and other placeholder thinking have no information and do not leave the site.
                         let is_placeholder =
                             crate::proxy::thinking_store::is_placeholder_thought(text);
                         if is_placeholder || text.trim().is_empty() {
@@ -76,7 +76,7 @@ pub(crate) fn phase_contents(
                         }
                         let final_thought_text = text.trim();
 
-                        // 位置检查：思考块必须是首位部件，若之前已有非思考内容则降级为文本
+                        // Position check: The thinking block must be the first component. If there is non-thinking content before, it will be downgraded to text.
                         if saw_non_thinking || !new_parts.is_empty() {
                             tracing::warn!("[Gemini-Wrap] Thinking part found at non-zero index. Downgrading to text.");
                             if !final_thought_text.is_empty() {
@@ -86,7 +86,7 @@ pub(crate) fn phase_contents(
                             continue;
                         }
 
-                        // 思考关闭检查 (对齐 Anthropic 降级为普通文本)
+                        // Thinking about turning off checks (downgrading Anthropic alignment to normal text)
                         if !is_thinking_active {
                             tracing::warn!("[Gemini-Wrap] Thinking disabled. Downgrading thinking part to text.");
                             if !final_thought_text.is_empty() {
@@ -96,7 +96,7 @@ pub(crate) fn phase_contents(
                             continue;
                         }
 
-                        // 签名有效性与模型兼容性校验 (对齐 Anthropic)
+                        // Signature validity and model compatibility verification (Alignment Anthropic)
                         let mut effective_sig = None;
                         if let Some(ref sig) = incoming_sig {
                             if !sig.is_empty() {
@@ -127,9 +127,9 @@ pub(crate) fn phase_contents(
                             effective_sig = turn_signature.clone();
                         }
 
-                        // 无签名时**绝不发明哨兵**：官方流量里哨兵出现 0/23 次，
-                        // 它不属于 Antigravity 协议。Gemini 目标的思考块本就不应携带签名
-                        // （铁律 I4），故保留 `thought: true` 结构、仅省略签名字段。
+                        // **Sentinels are never invented** when there is no signature: Sentinels appear 0/23 times in official traffic,
+                        // It is not part of the Antigravity protocol. Gemini target think blocks should not carry signatures
+                        // (Iron Law I4), so the `thought: true` structure is retained and only the signature field is omitted.
                         if let Some(sig) = effective_sig {
                             new_parts.push(json!({
                                 "text": final_thought_text,
@@ -143,9 +143,9 @@ pub(crate) fn phase_contents(
                             }));
                         }
                     } else {
-                        // 处理普通部件及 functionCall / functionResponse
+                        // Handling common components and functionCall / functionResponse
                         if let Some(obj) = part.as_object_mut() {
-                            // 1. 处理 functionCall (Assistant 请求调用工具)
+                            // 1. Process functionCall (Assistant request calling tool)
                             if let Some(fc) = obj.get_mut("functionCall") {
                                 if fc.get("id").is_none() && is_target_claude {
                                     let name = fc
@@ -162,7 +162,7 @@ pub(crate) fn phase_contents(
                                     tracing::debug!("[Gemini-Wrap] Request stage: Injected missing call_id '{}' for Claude model", call_id);
                                 }
 
-                                // 处理签名校验与兼容性 (对齐 Anthropic)
+                                // Handling signature verification and compatibility (Alignment Anthropic)
                                 let _call_id =
                                     fc.get("id").and_then(|v| v.as_str()).map(str::to_string);
                                 let incoming_fc_sig = obj
@@ -171,14 +171,14 @@ pub(crate) fn phase_contents(
                                     .and_then(|s| s.as_str())
                                     .map(str::to_string);
 
-                                // 纯净线缆透传：客户端若自带签名则保持原样，缺失签名全权委托进站流水线统一对齐与回填
+                                // Pure cable transparent transmission: If the client comes with its own signature, it will remain intact. If the signature is missing, the inbound pipeline will be entrusted with unified alignment and backfilling.
                                 if let Some(ref sig) = incoming_fc_sig {
                                     obj.insert("thoughtSignature".to_string(), json!(sig));
                                 }
                                 obj.remove("thought_signature");
                             }
 
-                            // 2. 处理 functionResponse (User 回复工具结果)
+                            // 2. Process functionResponse (User reply tool result)
                             if obj.contains_key("functionResponse") {
                                 obj.remove("thoughtSignature");
                                 obj.remove("thought_signature");

@@ -283,6 +283,9 @@ pub(crate) fn email_from_postgrest(value: &serde_json::Value) -> Option<String> 
 
 /// Force an immediate heartbeat and instance registry sync to all root endpoints
 pub async fn sync_local_node_now() -> Result<(), AppError> {
+    if is_supabase_circuit_open() {
+        return Ok(());
+    }
     let config = load_config()?;
     for ep in &config.endpoints {
         if ep.is_enabled && ep.role == "root" {
@@ -299,4 +302,16 @@ pub async fn sync_local_node_now() -> Result<(), AppError> {
 /// Trigger manual synchronization of local node and profiles to Supabase
 pub async fn trigger_manual_sync() -> Result<(), AppError> {
     sync_local_node_now().await
+}
+
+/// Spawn a non-blocking background task to push local node telemetry to Supabase,
+/// logging any network errors safely without blocking caller execution.
+pub fn spawn_background_telemetry_push() {
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = sync_local_node_now().await {
+            tracing::warn!(
+                "Background telemetry push to Supabase encountered non-fatal error: {e}"
+            );
+        }
+    });
 }

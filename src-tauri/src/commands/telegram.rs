@@ -22,6 +22,8 @@ pub async fn save_telegram_config(config: TelegramConfig) -> AppResult<()> {
     } else {
         telegram_inbound::stop_telegram_daemon();
     }
+    // Wake up daemon loop immediately so config changes take effect without waiting
+    crate::modules::telegram_inbound::notify_telegram_daemon();
     Ok(())
 }
 

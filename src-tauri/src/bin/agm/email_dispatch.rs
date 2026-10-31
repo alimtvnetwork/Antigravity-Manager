@@ -37,6 +37,9 @@ pub(crate) fn cmd_email(args: &[String]) {
         "import" => {
             crate::email_arms_b::email_arm_import(args, is_json);
         }
+        "dedupe" => {
+            crate::email_arms_b::email_arm_dedupe(args, is_json);
+        }
         _ => {
             eprintln!("Unknown email subcommand: '{}'. Run 'agm email help'.", sub);
             std::process::exit(1);

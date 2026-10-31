@@ -7,7 +7,7 @@ use std::time::Duration;
 
 #[test]
 fn test_p2c_selects_higher_quota() {
-    // P2C 应选择配额更高的账号
+    // P2C should choose an account with a higher quota
     let manager = TokenManager::new(PathBuf::from("/tmp/test"));
 
     let low_quota = create_test_token("low@test.com", Some("PRO"), 1.0, None, Some(20));
@@ -16,12 +16,12 @@ fn test_p2c_selects_higher_quota() {
     let candidates = vec![low_quota, high_quota];
     let attempted: HashSet<String> = HashSet::new();
 
-    // 运行多次确保选择高配额账号
+    // Run multiple times to ensure you select a high quota account
     for _ in 0..10 {
         let result = manager.select_with_p2c(&candidates, &attempted, "claude-sonnet", false);
         assert!(result.is_some());
-        // P2C 从两个候选中选择配额更高的
-        // 由于只有两个候选，应该总是选择 high_quota
+        // P2C selects the one with the higher quota from the two candidates
+        // Since there are only two candidates, high_quota should always be chosen
         assert_eq!(result.unwrap().email, "high@test.com");
     }
 }
@@ -111,7 +111,7 @@ async fn account_priority_save_reselects_preserving_sessions_and_limits() {
 
 #[test]
 fn test_p2c_skips_attempted() {
-    // P2C 应跳过已尝试的账号
+    // P2C should skip attempted accounts
     let manager = TokenManager::new(PathBuf::from("/tmp/test"));
 
     let token_a = create_test_token("a@test.com", Some("PRO"), 1.0, None, Some(80));
@@ -128,7 +128,7 @@ fn test_p2c_skips_attempted() {
 
 #[test]
 fn test_p2c_skips_protected_models() {
-    // P2C 应跳过对目标模型有保护的账号 (quota_protection_enabled = true)
+    // P2C should skip accounts with protection for the target model (quota_protection_enabled = true)
     let manager = TokenManager::new(PathBuf::from("/tmp/test"));
 
     let mut protected = HashSet::new();
@@ -149,7 +149,7 @@ fn test_p2c_skips_protected_models() {
 
 #[test]
 fn test_p2c_single_candidate() {
-    // 单候选时直接返回
+    // Return directly when there is a single candidate
     let manager = TokenManager::new(PathBuf::from("/tmp/test"));
 
     let token = create_test_token("single@test.com", Some("PRO"), 1.0, None, Some(50));
@@ -163,7 +163,7 @@ fn test_p2c_single_candidate() {
 
 #[test]
 fn test_p2c_empty_candidates() {
-    // 空候选返回 None
+    // Empty candidates return None
     let manager = TokenManager::new(PathBuf::from("/tmp/test"));
 
     let candidates: Vec<ProxyToken> = vec![];
@@ -175,7 +175,7 @@ fn test_p2c_empty_candidates() {
 
 #[test]
 fn test_p2c_all_attempted() {
-    // 所有账号都已尝试时返回 None
+    // Returns None if all accounts have been tried
     let manager = TokenManager::new(PathBuf::from("/tmp/test"));
 
     let token_a = create_test_token("a@test.com", Some("PRO"), 1.0, None, Some(80));
@@ -190,4 +190,4 @@ fn test_p2c_all_attempted() {
     assert!(result.is_none());
 }
 
-// ===== Ultra 优先逻辑测试 =====
+// ===== Ultra priority logic test =====

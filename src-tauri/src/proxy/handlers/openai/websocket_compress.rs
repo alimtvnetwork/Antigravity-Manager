@@ -92,14 +92,14 @@ async fn call_openai_gemini_sync(
         trace_id, model
     );
 
-    // 走共享的辅助调用通道。
+    // Take the shared auxiliary call channel.
     //
-    // 历史实现把 `transform_openai_request` 产出的**已包装 cloudcode 信封**
-    // （内含 project / request / model / userAgent / requestId / requestType）
-    // POST 到 `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`
-    // —— host 与形状双双不符。实测该 host 对 Antigravity 账号恒返回
-    // 403 `ACCESS_TOKEN_SCOPE_INSUFFICIENT`（token 不具备公共 Generative Language API 权限），
-    // 因此该后台摘要从未成功过。
+    // Historical implementations put the output of `transform_openai_request` into a **wrapped cloudcode envelope**
+    // (Contains project/request/model/userAgent/requestId/requestType)
+    // POST to `https://generativelanguage.googleapis.com/v1beta/models/ {model} :generateContent`
+    // ——The host does not match the shape. It is actually measured that this host always returns the Antigravity account.
+    // 403 `ACCESS_TOKEN_SCOPE_INSUFFICIENT` (token does not have public Generative Language API permissions),
+    // So this background digest never succeeds.
     let gemini_response = upstream
         .call_v1_internal_auxiliary(
             "generateContent",
@@ -110,11 +110,11 @@ async fn call_openai_gemini_sync(
         )
         .await?;
 
-    // 上游返回 `{"response": {...}}` 包装体，必须先解包。
+    // The upstream returns the `{"response": {...} }` package body, which must be unpacked first.
     let unwrapped = crate::proxy::mappers::gemini::unwrap_response(&gemini_response);
 
-    // 只拼接「非思考 part」的文本：前面可能存在 `{"thought": true, "text": ""}` 的空块，
-    // 直接取 `parts[0].text` 会拿到空串并把空摘要当成功。
+    // Only the text of "non-thinking part" is spliced: there may be an empty block of ` {"thought": true, "text": ""} ` in front,
+    // Directly fetching `parts[0].text` will get an empty string and treat the empty summary as success.
     unwrapped
         .get("candidates")
         .and_then(|c| c.get(0))

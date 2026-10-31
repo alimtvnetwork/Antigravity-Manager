@@ -1,5 +1,1136 @@
 # Changelog
 
+## [v4.279.1] - 2026-10-30
+
+### Fixed
+- Packaged GUI `/instances` opened E5001 because `improvements_status` required `01-prompts/30-improvements` in the install cwd. `src-tauri/src/modules/improvements/roots.rs` now ledgers on the instance workspace (or app data); `repo_root()` never Config-fails; `src/services/improvementsService.ts` status uses `trackWarning` and returns `emptyFlywheelState()` instead of opening the modal (Thanks to @aukgit)
+
+### Improved
+- Next breakdown (`improvements_detail`) lists pending plans, issues, and questions from every bound workspace via `collect_instance_task_hints`; the Instances flywheel button and toast show those task counts even when AGM prompt files are missing (Thanks to @aukgit)
+
+### Tests
+- Frontend `improvementsFlywheelUtils` 6 passed (empty 10-batch fallback, Next-breakdown hints skip completed/readme). Local cargo lib/CLI rebuild OOM'd on this machine; CI compiles the crate (Thanks to @aukgit)
+
+---
+
+## [v4.279.0] - 2026-10-29
+
+### Fixed
+- Prompt Tree Enqueue stayed at 0 after a successful click because force `loadTree` reset the 30s cache and viewing a completed turn overwrote conversation `is_queued`. `src/components/instances/PromptTreeView/usePromptTreePromptActions.ts` and `DetailHeader.tsx` now inject queued turns immediately and skip the wipe; `applySelectedTurnOverlay` in `src/components/instances/PromptTreeView/usePromptTreeData.ts` keeps QUEUED while inspecting an older turn; Enqueue shows the live count; rerun ×N appends that many queued turns on click (Thanks to @aukgit)
+- `src-tauri/src/modules/repo_db/tree_collect.rs` no longer requires a 600s recency window to mark a conversation queued, so idle conversations still show FIFO queued prompts; `PENDING_STAGES` in `src-tauri/src/modules/repo_db/tree_node_conv.rs` includes `queued` and `in_progress` (Thanks to @aukgit)
+
+### Tests
+- Frontend `queuedTurns` and `rerunActions` passed; isolated `agm instances test-create` sandbox `test-enqueue-ui-1793289596-9596` enqueued `queued-1793289597305-0000-b68fdd`, `queued-1793289597524-0000-569e8d`, `queued-1793289597623-0000-65c281`, `queued-1793289597724-0000-187b40`, `queued-1793289597832-0000-d91ac9` immediately; `agm instances test-clean` removed only that sandbox; Default PID 3804 and `v2-3127` were not stopped (Thanks to @aukgit)
+
+---
+
+## [v4.278.0] - 2026-10-29
+
+### Fixed
+- Prompt tree enqueue and rerun now show on the clicked instance immediately: `src/components/instances/PromptTreeView/usePromptTreeData.ts` keeps queued turns across force-refresh instead of dropping the 30s SWR cache first; `mergeQueuedTurns` counts each identical rerun click; `isDefaultInstanceAlias` no longer treats `default-copy-*` as Default; `src-tauri/src/modules/repo_db/tree_node_conv.rs` attaches queued prompts by repo path or session id (Thanks to @aukgit)
+- `agm instances switch --json` no longer prints `"status": "switched"` before `switch_account_to_instance`; `src-tauri/src/bin/agm/instance_cmds.rs` and `src-tauri/src/bin/agm/instance_routes_b.rs` emit `bound_email` only after the registry matches, otherwise `success: false` (Thanks to @aukgit)
+- Enqueue wakes the FIFO scheduler immediately via `notify_prompt_queue` in `src-tauri/src/modules/repo_db/agy.rs` and Telegram instance-card rerun/send in `src-tauri/src/modules/telegram_inbound/instance_cards.rs` (Thanks to @aukgit)
+
+### Improved
+- Telegram `/status` cards show idle / busy / N queued and an ✉️ Send button that starts `/send` for that instance (`src-tauri/src/modules/telegram_inbound/instance_cards.rs`, `src-tauri/src/modules/telegram_inbound/send_flow.rs`) (Thanks to @aukgit)
+
+### Tests
+- Isolated `agm instances test-create` sandbox enqueued `queued-1793284251719-0000-913d6b`, `queued-1793284543149-0000-d43cf3`, `queued-1793284543288-0000-fd5c09`, copied, sent `p-0db14cf4`; JSON switch to a missing account returned `success: false`; Default PID stayed 3804 and `v2-3127` was not stopped; `agm instances test-clean` removed only the sandbox (Thanks to @aukgit)
+
+---
+
+## [v4.277.4] - 2026-10-29
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.277.3] - 2026-10-29
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.277.2] - 2026-10-29
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.277.1] - 2026-10-29
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.277.0] - 2026-10-29
+
+### Added
+- 100-Step Prompt Breakdown & Verification Templates: Added multi-step verification templates and prompt breakdowns in `src/components/instances/PromptTreeView/verificationTemplates.ts` (Thanks to @aukgit)
+- Restyled Create Profile Modal: Modernized dialog in `src/pages/instances/CreateEditDialogs.tsx` with unified dark-glass styling, segmented button controls, and high-contrast form elements (Thanks to @aukgit)
+
+### Fixed
+- Release Tag Normalization: Purged rogue v5 tags and releases from GitHub, restoring canonical 4.x SemVer progression and eliminating spurious update notifications (Thanks to @aukgit)
+
+---
+
+## [v4.276.0] - 2026-10-29
+
+### Fixed
+- Telegram Screenshot Self-Focus Hang: capture PowerShell in `src-tauri/src/modules/telegram_inbound/open_shot.rs` no longer calls `ShowWindow`/`SetForegroundWindow` on the live AGM window; helpers time out after 8s so the manager stays responsive (Thanks to @aukgit)
+- Instances CSV Download Fallback: `send_telegram_document` in `src-tauri/src/modules/telegram_inbound/media.rs` sends CSV/txt as `application/octet-stream` with an empty caption first; `src-tauri/src/modules/telegram_inbound/daemon.rs` retries then pastes bytes as text instead of another copy-button keyboard (Thanks to @aukgit)
+- Telegram Copy Whole Prompt: instance cards in `src-tauri/src/modules/telegram_inbound/instance_cards.rs` drop `copy_text` (Telegram's 256-character Bot API cap rejects the whole keyboard); Copy and Full both send the complete prompt as a `.txt` document via `i:cp:` (Thanks to @aukgit)
+
+### Improved
+- CSS3 Hover Shade: `.agm-hover-shade` in `src/App.css` animates color, border, box-shadow, and filter only (`transform: none`) (Thanks to @aukgit)
+
+### Tests
+- Isolated switch+restore E2E: `agm instances test-create` sandbox dispatched prompt `p-555265fc`; stop backed it up for restore; Default and v2-3127 stayed running; `agm instances test-clean` purged only the sandbox. Spec: `02-spec/21-app/236-telegram-feature-enhancement/` (Thanks to @aukgit)
+
+---
+
+## [v4.275.3] - 2026-10-28
+
+### Fixed
+- Release Gate Unblocked: `.github/workflows/ci.yml` no longer runs `macos-latest` jobs. Hosted arm64 runners that are never acquired conclude `cancelled`, and cancelled jobs fail the workflow even with `continue-on-error`, which blocked v4.275.0–v4.275.2 releases. Windows and Ubuntu remain required (Thanks to @aukgit)
+
+---
+
+## [v4.275.2] - 2026-10-28
+
+### Fixed
+- CLI Telegram Observe Fan-Out: `agm telegram observe` and `status` now call `deliver_instance_status_fanout` from `src-tauri/src/modules/telegram_inbound/instance_cards.rs` so CLI and inbound `/status` send the same per-instance cards (Thanks to @aukgit)
+- macOS CI Capacity Failures: CI macOS jobs in `.github/workflows/ci.yml` use `continue-on-error` so hosted arm64 runner acquisition failures cannot fail the workflow or block the Release gate (Thanks to @aukgit)
+
+### Tests
+- Isolated switch+restore E2E: `agm instances test-create` dispatched `p-73a4c18e`, Stage 1 backed it up from the test instance, Stage 5 restored and re-dispatched the same id; Default and v2-3127 stayed running; `agm instances test-clean` purged the sandbox (Thanks to @aukgit)
+
+---
+
+## [v4.275.1] - 2026-10-28
+
+### Improved
+- Telegram Screenshot Mosaic Completeness: `/shot`, `/screenshot`, and per-instance `i:sc:` now send the AGM window, virtual desktop, AGM Instances page, AGM Accounts page, and each running Antigravity IDE window (capped at 8, PID-filtered for `i:sc:`) from `src-tauri/src/modules/telegram_inbound/open_shot.rs` instead of photographing only the current manager window (Thanks to @aukgit)
+
+### Fixed
+- Local `/screenshot` Bypass: `ui_remote` Shot now routes through `execute_screenshot_command` so typed `/screenshot` and All shots use the same mosaic pipeline as the instance card Shot button (Thanks to @aukgit)
+- Telegram Image Copy Keyboard: inbound image CDN copy buttons now clamp `copy_text` to `TELEGRAM_COPY_TEXT_MAX` (256) in `src-tauri/src/modules/telegram_inbound/daemon.rs` so a long URL cannot reject the whole keyboard (Thanks to @aukgit)
+
+---
+
+## [v4.275.0] - 2026-10-28
+
+### Added
+- Per-Instance Telegram Status Fan-Out: `/status` and `/observe` now send one compact HTML card per registered instance (`src-tauri/src/modules/telegram_inbound/instance_cards.rs`) covering running/queued prompts and projects with a 100-word expandable preview, instead of a single quota-only blob (Thanks to @aukgit)
+- Instance-Scoped Telegram Actions: each card exposes Copy (native `copy_text` <= 256 chars), Full prompt as `.txt` document, Rerun, Done?, Released?, Auto, Fast-Forward, Screenshot, and Refresh via `i:<op>:<id8>` callbacks inside the 60-byte budget (Thanks to @aukgit)
+- Telegram Feature Enhancement Spec (Task 234): architecture, component, and AI instruction specs under `02-spec/21-app/234-telegram-feature-enhancement/` with plan `.ai-memory/plans/completed/234-telegram-feature-enhancement.md` (Thanks to @aukgit)
+
+### Fixed
+- Telegram Copy Button Rejection: clamped native CopyTextButton payload to Telegram's 256-character cap (`TELEGRAM_COPY_TEXT_MAX`) so oversized `copy_text` no longer rejects the entire inline keyboard and leaves CSV/action buttons as a copied label (Thanks to @aukgit)
+- Instances CSV Download: `send_telegram_document` now uses `application/octet-stream` with timestamped filenames (`agm-instances-YYYYMMDD-HHMMSS.csv`) and prompt/project count columns so Telegram delivers a real download instead of inlining or copying a button (Thanks to @aukgit)
+- Fast-Forward Instance Scope: `/ff [instance]` and `ff:` now call `trigger_manual_rotation_for_instance` on the named instance instead of always rotating Default (Thanks to @aukgit)
+
+### Improved
+- Local Screenshot Mosaic: empty `/screenshot` and per-instance `i:sc:` capture the AGM window plus a VirtualScreen desktop mosaic (`src-tauri/src/modules/telegram_inbound/open_shot.rs`) (Thanks to @aukgit)
+- CSS3 Hover Shade: `.agm-hover-shade` in `src/App.css` animates color, border, shadow, and brightness only (`transform: none`) on instance and Telegram cards; amber hover keeps `#090611` text (Thanks to @aukgit)
+- Isolated Switch+Restore E2E: `agm instances test-create` sandbox received a running prompt, switched to a standby account, Stage 1 backed up from the test instance (not Default), Stage 5 restored and dispatched the same prompt id, Default and v2-3127 stayed running, then `agm instances test-clean` purged only the sandbox (Thanks to @aukgit)
+
+---
+
+## [v4.274.0] - 2026-10-28
+
+### Added
+- Idle Mode Auto-Notification Hub: Implemented `dispatch_idle_mode_alert` in `src-tauri/src/modules/notification_hub/idle_alerts.rs` and integrated into `src-tauri/src/modules/email_watcher/sensors.rs`, automatically detecting when IDE instances enter idle mode (`not_fully_idle == 0` and prompt queue empty) and dispatching alerts to Telegram and Email with 600-second per-instance anti-spam deduplication (Thanks to @aukgit)
+- UI Step & Button Click Trace Logging: Created `src/utils/uiLogger.ts` and `src-tauri/src/commands/cmd_ui_trace.rs` (`record_ui_trace`), logging structured `[UI_STEP]` tracing logs and appending records to `task_history_db` audit trail on step transitions and button interactions (Thanks to @aukgit)
+- CLI UI Remote Control Expansion: Expanded `agm ui click` in `src-tauri/src/bin/agm/ui_cmds.rs` to dynamically route instance targets to `/instances` and added `agm instances click <instance_id> <action>` with action alias normalization (`start` -> `launch`, `kill` -> `stop`, `ff` -> `fastforward`) (Thanks to @aukgit)
+- Feature and Instance Management Specification (Task 233): Authored comprehensive architectural, component, and verification specifications under `02-spec/21-app/233-feature-and-instance-management/` and executed multi-agent plan under `.ai-memory/plans/completed/233-feature-and-instance-management.md` and `.ai-memory/plans/subtasks/233-feature-and-instance-management/` (Thanks to @aukgit)
+
+### Improved
+- Instance Section UI Contrast & Switch Button Elevation: Redesigned instance cards in `src/pages/instances/InstanceCard.tsx` with Royal Violet dark glass (`#171025`/90 background, `#40285e`/80 borders, `#120b1e` quota panels) eliminating Chromium opacity washouts; elevated the Switch Account action button in `src/pages/instances/InstanceCardActions.tsx` and `src/components/instances/table/InstanceRowActions.tsx` to an illuminated amber pill badge with 3D yellow tactile hover gradient (`#FDE047` to `#EAB308`, depth shadow `#A16207`); added unambiguous DOM IDs and semantic attributes (`id`, `data-ui-name`, `data-ui-id`) across all instance card action buttons (Thanks to @aukgit)
+
+---
+
+## [v4.273.1] - 2026-10-28
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.273.0] - 2026-10-28
+
+### Fixed
+- Image Extension Sanitization & E9001 Resolution: Resolved diagnostic error `E9001 — unsupported_image_extension: .` on `/instances` by sanitizing image extraction with `isLikelyImageUri` across `src/components/instances/PromptTreeView/clipboard.ts`, `src/components/instances/PromptTreeView/markdown.tsx`, and `src/components/instances/PromptTreeView/PromptInstructionView.tsx`, rejecting bare `.`, `..`, and directory paths; added binary magic byte sniffing in `src-tauri/src/commands/cmd_files.rs` to detect TIFF signatures (`b"II*\0"`, `b"MM\0*"`) and fallback to `image/tiff` when extensions are missing or generic (Thanks to @aukgit)
+- Restored Accounts Warmup Confirmation Dialog (`isWarmupConfirmOpen`): Destructured `isWarmupConfirmOpen` and `setIsWarmupConfirmOpen` in `src/pages/accounts/AccountsDialogs.tsx` and mounted a dedicated `<ModalDialog>` confirmation modal wired to `handlers.handleWarmupAll`, eliminating the silent action drop when clicking "Warm up all" on `/accounts` (Thanks to @aukgit)
+
+### Added
+- Task 232 Architectural Specification (100 Warm Up UI & Emailing UI Improvements): Authored comprehensive 4-part architectural and implementation specification in `02-spec/21-app/232-warm-up-ui-and-emailing-ui-improvements/` covering 100 concrete improvements across Smart Warmup HUD, 7-day quota countdown clocks, account matrix grid, multi-stage email diagnostics ladder, visual template builder, inbound IMAP playground, Split-DB telemetry, and headless CLI parity (`agm warmup` and `agm email`) (Thanks to @aukgit)
+- End-to-End Test Suite Verification: Executed full test verification across frontend suites (`scripts/run-frontend-tests.mjs`, 11/11 passed), standalone account scoring tests (`accountAlgorithmScore.test.ts`, 14 passed), rerun queueing validation (`rerunActions.test.ts`, 21 passed), and full Vite/TypeScript compilation gate (17,332 modules transformed, exit code 0) (Thanks to @aukgit)
+
+---
+
+## [v4.272.0] - 2026-10-27
+
+### Fixed
+- Sequential Enqueue Retention & Deduplication Bypass: Fixed critical bug in `src-tauri/src/modules/repo_db/prompts_crud.rs` where `save_or_requeue_prompt` matched in-flight prompts by identical content and skipped enqueueing subsequent requests with `return Ok(())`; added `&& prompt.status != "queued"` ensuring sequential enqueues of identical instructions are reliably enqueued and retained in the SQLite FIFO queue (Thanks to @aukgit)
+- Queued Turn Transcript Mutation Prevention: Resolved turn collision in `src-tauri/src/modules/repo_db/tree_node_conv.rs` where incoming queued prompts matched completed transcript turns (`p.prompt_text.trim() == ap.prompt_content.trim()`), causing transcript mutations instead of appending distinct `[QUEUED]` turns; restricted existing turn matching to `if is_ap_run && !is_queued` so queued prompts always appear as independent turns (Thanks to @aukgit)
+- Active & Queued Prompt Starvation Guard: Updated `list_all_prompts()` in `src-tauri/src/modules/repo_db/project_queries.rs` with priority-weighted ordering (`CASE WHEN status IN ('queued', 'running', 'dispatched', 'in_flight') THEN 0 ELSE 1 END ASC`), preventing queued and active prompts from being crowded out by completed rows when prompt volume exceeds 500 records (Thanks to @aukgit)
+- Enqueue Refresh Bar Suppression & 0ms Optimistic UI: Replaced full reload triggers `loadTree(true, true)` with background silent SWR `loadTree(false, true)` across `handleResendPrompt`, `handleEnqueuePrompt`, and `handleRerunConversationAction` in `src/components/instances/PromptTreeView/usePromptTreePromptActions.ts` and `DetailHeader.tsx`, eliminating unwanted top indeterminate refresh bars during enqueue; removed 60ms artificial delay; added 0ms optimistic turn injection to `executeDirectEnqueue` and header actions for instantaneous visual appearance in the tree view (Thanks to @aukgit)
+- Anti-gravity Rerun Target ID Retention: Fixed conversation targeting in `usePromptTreePromptActions.ts` where multi-round rerun operations were dropping the active conversation UUID or defaulting unexpectedly; reruns now explicitly target and preserve the specified conversation `id` and sequence immediately across all selected rounds (Thanks to @aukgit)
+- Tree View Filter Compaction & Zero-Clipping Layout: Overhauled Row 2 filter controls in `src/components/instances/PromptTreeView/TreePanel.tsx` using two contiguous segmented pill capsules (`rounded-full`), Lucide `Image` icon replacing raw OS emoji, compact text labels (`Run`, `Queue`, `Pin`), and icon toggles (`EyeOff`/`Eye`, Lucide `Archive` with count badge), reducing row width from 451px to 194px and providing a +70px safety buffer against right-hand clipping in 328px sidebars (Thanks to @aukgit)
+
+### Added
+- Tree View UI/UX Design System Specification: Authored authoritative design system specification in `02-spec/02-coding-guidelines/24-app-ui-design-system/02-tree-view-design-system.md` and indexed in `02-spec/24-app-ui-design-system/01-index.md` and `02-spec/02-coding-guidelines/24-app-ui-design-system/readme.md`, documenting 10 structural principles: 2-plane depth hierarchy, 280px minimum width floor, zero horizontal scrolling, segmented capsule pill controls, transparent borderless inline selects, icon-first compact typography, subtle non-displacing hover transitions, terminal tree branch glyphs (`├──`, `└──`), 4-tier origin badges, and 0ms optimistic turn injection (Thanks to @aukgit)
+- Strict E2E Verification Rerun Templates: Added strict verification question presets ("Have you tested these below instructions with end-to-end testing?" and "Have you tested the below instructions with end-to-end testing and released it?") into rerun quick options in `DetailHeader.tsx` (Thanks to @aukgit)
+- Automated E2E Test Suite for Rerun, Enqueue & Tree Compaction: Added 28-assertion automated test suite `scripts/test-anti-gravity-rerun-and-ui-fixes-e2e.ps1` with caller IDE self-preservation and transient test sandbox isolation, verifying 100% green pass (Thanks to @aukgit)
+- 4-Part Root Cause Analysis (RCA): Documented complete 4-part RCA and long-term invariants in `.ai-memory/rca/22-anti-gravity-rerun-and-ui-fixes.md` and `.ai-memory/issues/65-anti-gravity-rerun-and-ui-fixes.md` (Thanks to @aukgit)
+
+---
+
+## [v4.271.0] - 2026-10-27
+
+### Fixed
+- Post-Switch Prompt Restore Gate Fix: Resolved critical parameter mismatch in `src-tauri/src/modules/instance/switch.rs` where `list_prompt_backups` was passed an instance ID into `batch_id` (`WHERE backup_batch_id = ?`), always returning 0 rows and prematurely bypassing prompt restoration; replaced with scoped `count_unrestored_prompts_for_instance` (Thanks to @aukgit)
+- Restored Status & Queue Dispatch Alignment: Added `'in_progress'` to `resend_single_pass` SQL query, `already_dispatched` deduplication bypass, and queue dispatch filters in `src-tauri/src/modules/repo_db/resend.rs` and `queue.rs`, ensuring prompts restored from backups are immediately discoverable and scheduled (Thanks to @aukgit)
+- Strict FIFO Ordering Invariant: Refactored prompt selection in `src-tauri/src/modules/repo_db/dispatch.rs` from LIFO `max_by(updated_at)` to strict FIFO `pick_first_queued_prompt` (`min_by` on `created_at ASC, id ASC`), and replaced `ORDER BY updated_at DESC` with `ORDER BY created_at ASC, id ASC` in `tree_format.rs` (Thanks to @aukgit)
+- Reactive Post-Switch Scheduler Wakeup: Added immediate `notify_prompt_queue()` signal and asynchronous dispatch probe in `src-tauri/src/modules/instance/workspace.rs` and `post_switch_resume.rs`, eliminating 30-second idle backoff delays and dispatching restored prompts instantly (Thanks to @aukgit)
+- Default Instance Backup Count Fix: Corrected `count_backed_up_prompts` in `src-tauri/src/modules/repo_db/backup.rs` to include empty string `''` and `NULL` for default instance, preventing backed-up prompts from being counted as zero (Thanks to @aukgit)
+- Manual Switch Backup Preservation: Updated `DesktopIntegration::on_account_switch` in `src-tauri/src/modules/integration/system_impl.rs` to capture backup return counts and evaluate both `repo_db` and `backup_prompts_db` before scheduling post-launch restore (Thanks to @aukgit)
+- Subagent Filter False Positive Cleanse: Removed `lower.starts_with("you are ")` in `src-tauri/src/modules/repo_db/discovery.rs` to prevent dropping legitimate user instructions that begin with role framing (Thanks to @aukgit)
+- Telegram Sub-2s Response Latency & Reactive Wakeup: Replaced 60s/30s polling sleep traps with `tokio::sync::Notify` (`TELEGRAM_DAEMON_NOTIFIER`), introduced persistent pooled `TELEGRAM_HTTP_CLIENT` to eliminate per-request TCP/TLS handshake penalties, decoupled inbound command processing to non-blocking background tasks, and implemented `delete_telegram_webhook` auto-healing on HTTP 409 Conflict (Thanks to @aukgit)
+- Frontend Settling Countdown & Restore Visibility: Added interactive settling countdown badge (`⏳ Restoring Prompts in {N}s...`) and restore indicator in `src/components/instances/InstanceCard/InstanceCardHeader.tsx` driven by `useInstancePage.ts` (Thanks to @aukgit)
+
+### Added
+- E2E Unit Test Suites for Restore Integrity: Added comprehensive test suites in `src-tauri/src/modules/backup_prompts_db/tests.rs` and `src-tauri/src/modules/repo_db/tests.rs` covering dual-store prompt count scoping, discoverability of restored statuses, and strict FIFO queue ordering (Thanks to @aukgit)
+
+---
+
+## [v4.270.0] - 2026-10-27
+
+### Added
+- Strict Pre-Deployment & E2E Verification Prompts: Injected mandatory verification questions ("Have you tested these below instructions with end-to-end testing?" and "Have you tested the below instructions with end-to-end testing and released it?") into verification templates, suffix presets, and rerun message sets so dispatched AI agents cannot skip testing and release validation (Thanks to @aukgit)
+- One-Click Release Page Action in Rerun: Added quick-action button in prompt instruction and header rerun flyouts to open release notes and changelogs directly (Thanks to @aukgit)
+- Future Dual-Channel Chat Architecture Spec: Authored comprehensive specification (`02-spec/21-app/228-ui-and-feature-enhancement-instructions/04-chat-section-architecture-spec.md`) defining Channel 1 (IDE workspace bridge via CDP WebSocket + deep transcript reverse scan) and Channel 2 (Direct API chat client via local proxy SSE) (Thanks to @aukgit)
+- 50+ Grounded System & UI Improvements Catalog: Documented 50 concrete, high-leverage improvement specifications (`02-spec/21-app/228-ui-and-feature-enhancement-instructions/05-fifty-plus-improvement-ideas-spec.md`) across Instances, Prompts, Databases, Proxy, and UI/UX (Thanks to @aukgit)
+
+### Fixed
+- Active Instance Card UI & Corner Artifacts: Eliminated asymmetric corner clipping by replacing `border-l-[6px]` with clean `border-l-4` in `SELECTED_CARD_CLASSES` and `SELECTED_ROW_CLASSES`, and resolved nested pill double-border and invalid `py-0.2` in `InstanceCard.tsx` (Thanks to @aukgit)
+- Prompt Inspector Tab Alignment & Translucent View Accent: Aligned Preview, Raw, Edit, and Details buttons in `DetailTabs.tsx` to a shared `h-7` vertical baseline with `leading-none`, and replaced the harsh opaque royal blue background with a translucent dark-glass cyan/blue accent (`bg-blue-500/15 text-blue-600 dark:text-cyan-300 font-semibold`) (Thanks to @aukgit)
+- CSS3 Tactile Button Animations: Exempted interactive buttons from the universal 250ms CSS delay in `src/App.css`, and introduced high-performance `.btn-tactile` micro-interactions (`100ms`, `active:scale-[0.985] active:translate-y-px`) for instantaneous response (Thanks to @aukgit)
+- Top-Level Menu Capsule Geometry: Resolved rectangular hover highlight defects across `NavSettings.tsx`, `InstanceSelector.tsx`, and `NavMenu.tsx` using inner `rounded-full overflow-hidden` tracks and concentric radii, eliminating sharp edges on middle buttons (Thanks to @aukgit)
+- "+ New Instance" Default-Clone Invariant: Ensured opening the creation dialog via "+ New Instance" in header and empty states preselects the Default instance ID rather than blank, preserving extensions and workspace continuity, with responsive CSS3 hover animations (Thanks to @aukgit)
+- Universal 24-Hour Clock Formatting: Exported canonical `formatTime24` and `formatDateTime24` helpers in `src/utils/date.ts` (`HH:mm` / `HH:mm:ss`, `hour12: false`) and eliminated uncontrolled `toLocaleTimeString()` and `toLocaleString()` calls across AuditPanel, LogTable, LogDetailPanel, ErrorModal, ErrorHistoryDrawer, NetworkMonitor, CurrentAccount, and IpAccessLogs (Thanks to @aukgit)
+- Dispatch Modal Redesign & Rerun FIFO: Streamlined mode buttons to "Send", "Enqueue", and "Rerun", widened popover to `w-[26rem]` to eliminate message dropdown text clipping, and unified `PromptInstructionView.tsx` `executeDirectRerun` to sequence all rounds via `dispatchRerunMessages` into the FIFO prompt queue (Thanks to @aukgit)
+
+---
+
+## [v4.269.0] - 2026-10-25
+
+### Fixed
+- Rerun 3 & Numbered Rerun Resolution: Added 1-based history row resolution for Telegram `/rerun 3`, `/rerun #3`, and `/rr 3`, selecting the 3rd prompt from recent history before falling back to UUID prefix search (Thanks to @aukgit)
+- Monotonic FIFO Queue Ordering: Enforced monotonic millisecond timestamps and sequence counters in `enqueue_prompt_for_instance` alongside pacing in `dispatchRerunMessages`, guaranteeing multi-round reruns (e.g. Rerun ×3) sort and drain in exact chronological sequence (`ORDER BY created_at ASC, id ASC`) (Thanks to @aukgit)
+- Canonical Attachment Syntax (`@[file;<path>]`): Enforced canonical third-bracket syntax `@[file;<file_path>]` with `file;` prefix across prompt attachment builders and upgraded all regex parsers in TypeScript and Rust with backward compatibility (Thanks to @aukgit)
+- Rerun Enqueue Invariant: Routed all Telegram inbound reruns and frontend multi-resends strictly into SQLite FIFO queue with `status: 'queued'`, eliminating immediate injection and CDP task preemption (Thanks to @aukgit)
+
+---
+
+## [v4.268.0] - 2026-10-25
+
+### Added
+- Added Gemini 3.8 Flash model constants and hardened auto-switcher Claude limits detection (Thanks to @aukgit)
+
+### Fixed
+- Instant Rerun Enqueue & Latency Fix: Eliminated 30s background scheduler idle backoff via `tokio::sync::Notify` wakeup, immediate idle queue dispatch on enqueue, removal of 1.6s blocking CDP loop, and elimination of frontend 300ms pacing delay (Thanks to @aukgit)
+- Image Attachment Normalization: Standardized multimodal image attachments into canonical bracketed format `Attachments:\n1. @[<path>]` across Copy, Send, Enqueue, and Rerun (Thanks to @aukgit)
+- Rerun Enqueue Invariant: Guaranteed that rerun actions always enqueue into SQLite FIFO queue, eliminating immediate task preemption (Thanks to @aukgit)
+
+---
+
+## [v4.267.0] - 2026-10-25
+
+### Changed
+- Routine minor version bump from 4.266.0 to 4.267.0: all 14 version locations synchronized via `scripts/bump-version.mjs` (`package.json`, `package-lock.json`, `version.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, `src-tauri/hooks.nsh`, `Casks/antigravity-tools.rb`, `readme.md`, `readme_en.md`, `src/components/layout/MiniView.tsx`, `releases-manifest.json`, `changelog.md`, `changelog_en.md`). No functional code changes in this bump; the v4.266.0 feature and fix set ships in its own release (Thanks to @aukgit)
+
+---
+
+## [v4.266.0] - 2026-10-25
+
+### Added
+- Compact, scroll-free dispatch popover UI in `src/components/instances/PromptTreeView/DetailHeader.tsx`, replacing verbose 17-item radio list and 37-bullet dump with a single-line `<select>` dropdown and collapsible variation preview, reducing popup height by >75% (Thanks to @aukgit)
+- Intelligent anti-repeat random nudge dispatching via `extractUsedNudgesFromConversation` in `src/components/instances/PromptTreeView/usePromptTreePromptActions.ts`, scanning conversation history and turns to strictly exclude already-sent questions from multi-round rerun dispatches (Thanks to @aukgit)
+
+### Fixed
+- Prompt tree view turns and child subagents now keep recent items on top: running turns sort to Tier 1, followed by queued turns, and completed turns descending by recency in `src/components/instances/PromptTreeView/ConversationNode.tsx` and `tierClassification.ts` (Thanks to @aukgit)
+- Added fallback for weekly quota progress bar in `src/pages/instances/instanceCardData.ts` when account `quota_groups` are unpopulated due to API rate-limiting, achieving UI parity with backend CLI (Thanks to @aukgit)
+- Extended release gate CI polling timeout in `.github/workflows/release.yml` to 60m (`MAX_WAIT_SECONDS=3600`) to safely absorb sequential runner queue latency (Thanks to @aukgit)
+
+---
+
+## [v4.265.0] - 2026-10-25
+
+### Fixed
+- Scoped CI concurrency group on `main` in `.github/workflows/ci.yml` to the commit SHA (`group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}`), preventing rapid sequential commits on `main` from cancelling in-flight CI runs (Thanks to @aukgit)
+- Expanded 4-part Root Cause Analysis in `.ai-memory/cicd-issues/47-release-gate-ci-race-condition-rca.md` to document GitHub Actions concurrency group collision and cancel-in-progress dynamics (Thanks to @aukgit)
+
+---
+
+## [v4.264.0] - 2026-10-24
+
+### Fixed
+- Release workflow gate in `.github/workflows/release.yml` now uses a bounded polling loop (every 20s up to 25 minutes) to await in-progress `ci.yml` runs on tag push, eliminating premature gate failure (`conclusion: missing`) and release refusal (Thanks to @aukgit)
+- Documented 4-part Root Cause Analysis in `.ai-memory/cicd-issues/47-release-gate-ci-race-condition-rca.md` and indexed recurring CI race conditions in `.ai-memory/cicd-issues/readme.md` (Thanks to @aukgit)
+
+---
+
+## [v4.263.0] - 2026-10-24
+
+### Fixed
+- Stage 1 prompt snapshot during account rotation now scopes strictly to the target switched instance via `prompt_backup_source_instance_id` in `src-tauri/src/modules/instance/switch.rs` instead of defaulting to global active instance (Thanks to @aukgit)
+- CLI and headless account switching now executes Stage 5 restore inline via `run_post_switch_resume_after_delay` in `src-tauri/src/modules/instance/post_switch_resume.rs`, preventing prompt loss when short-lived CLI processes exit before GUI timers fire (Thanks to @aukgit)
+- Fast-forward leftover handling in `src-tauri/src/bin/agm/instance_fastforward.rs` only re-dispatches prompts if backed-up records remain, eliminating duplicate prompt dispatches after Stage 5 execution (Thanks to @aukgit)
+- Real dispatched prompt counts correctly propagate across `src-tauri/src/modules/instance/workspace.rs` and audit logs during switch restoration (Thanks to @aukgit)
+
+---
+
+## [v4.262.0] - 2026-10-24
+
+### Fixed
+- Fast-forward Previous Profile now reads the **target** instance bound email in `src-tauri/src/bin/agm/instance_fastforward.rs` instead of the active-instance status. Isolated E2E printed `Previous Profile: zihadxshohag2@gmail.com` after `agm ff test-ff-prev-*` while Default stayed on `riseup.team.now@gmail.com` (Thanks to @aukgit)
+- `agm auto-switch status --json` now includes `is_enabled` and `low_quota_threshold_percent` from `src-tauri/src/modules/auto_switcher/status.rs` (Thanks to @aukgit)
+- Removed unused `mut` on the completions request body in `src-tauri/src/proxy/handlers/openai/completions.rs` (Thanks to @aukgit)
+
+---
+
+## [v4.261.0] - 2026-10-24
+
+### Fixed
+- Inspector markdown image clicks now open disk files through `openFileInIde` in `src/components/instances/PromptTreeView/PromptMarkdownPreview.tsx`. The in-app modal is only used for `data:`/`http` images or opener failure (Thanks to @aukgit)
+- POSIX absolute image paths are treated as disk files in `src/components/instances/PromptTreeView/PromptInstructionView.tsx` (Thanks to @aukgit)
+- Removed unused `mut` on `stderr_reader` in `src-tauri/src/modules/repo_db/agy.rs` (Thanks to @aukgit)
+
+---
+
+## [v4.260.0] - 2026-10-24
+
+### Fixed
+- Prompt tree titles and out-of-workspace images now rebuild in the current `agm` binary. `agm prompts tree --json --local` skips the GUI daemon cache. A local dump of 144 conversations returned 0 untitled titles and 68 `file:///` media paths with 0 raw drive paths (Thanks to @aukgit)
+- Current Conv keeps `conv-` ids. An isolated `agm instances test-create` sandbox received `session_id=conv-e2e-probe` from `agm prompts send --conversation`. Caller instances were not stopped (Thanks to @aukgit)
+- Image clicks open the original file through `openFileInIde` in `src/components/instances/PromptTreeView/markdown.tsx` instead of stripping `file:///` into a broken `/C:/` path (Thanks to @aukgit)
+- Instance card root actions are one full-width `rounded-full divide-x` capsule in `src/pages/instances/InstanceCardActions.tsx`. Yellow hover uses black text (Thanks to @aukgit)
+- Tree header keeps a single Import/Export menu. Hide Tree and Show Tree are icon tooltips. Reset and Refresh stay labeled (Thanks to @aukgit)
+
+### Added
+- Error CLI skill at `.agents/skills/agm-error-manager-cli/skill.md` for `agm errors list|inspect|count|fix|clear` (Thanks to @aukgit)
+
+---
+
+## [v4.259.0] - 2026-10-24
+
+### Fixed
+- Prompt Tree View header height compacted to `< 42px` in `src/components/instances/PromptTreeView/ModalHeader.tsx` and tightened node spacing in `TreePanel.tsx` (Thanks to @aukgit)
+- Import/Export converted to compact Lucide icons (`Download`, `Upload`) with tooltips; Hide Tree View converted to `PanelLeftClose`/`PanelLeftOpen` icon button (Thanks to @aukgit)
+- Relabeled yellow button adjacent to Refresh to "Reset" with high-contrast amber styling (`text-zinc-950 font-bold bg-amber-400 hover:bg-amber-300 shadow-[0_2px_0_0_#b45309]`) and 3D tactile elevation (Thanks to @aukgit)
+- Eliminated green hover outline shifts in `ConversationNode.tsx` using permanent base `border border-transparent` and subtle background tint transitions (Thanks to @aukgit)
+- Enforced strict 30-second TTL cooldown guard (`TREE_CACHE_TTL_MS = 30000`) in `usePromptTreeData.ts` to eliminate mouseover-induced refetches (Thanks to @aukgit)
+- Reunited Send, Enqueue, and Rerun into a contiguous segmented dropdown pill capsule in `PromptInstructionView.tsx` with borderless transparent destination selectors (Thanks to @aukgit)
+- Resolved Root Cause Analysis (RCA) defect in `usePromptTreePromptActions.ts` and `src-tauri/src/modules/repo_db/dispatch.rs` where "Current Conversation" mode was erroneously routing to new conversations (Thanks to @aukgit)
+- Implemented `formatIdeClickableFileLink` in `clipboard.ts` and `markdown.tsx` formatting images and file paths into RFC-8089 `file:///` clickable links with a 1-click "Open in IDE" preview button (Thanks to @aukgit)
+- Harmonized toolbar action clusters in `InstanceRowActions.tsx` and `AccountCardActions.tsx` into contiguous segmented pill capsules with high-contrast yellow hover states (Thanks to @aukgit)
+- Verified CLI error inspection commands (`agm errors list`, `agm errors inspect`, `agm errors clear`, `agm errors fix`) and authored canonical agent skill `.agents/skills/agm-error-inspection/skill.md` (Thanks to @aukgit)
+
+---
+
+## [v4.257.3] - 2026-10-24
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.257.2] - 2026-10-24
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.257.1] - 2026-10-24
+
+### Fixed
+- Prompt tree titles no longer stay `Untitled Conversation` when the summary title is a placeholder. The visible title is the cleaned first line of the prompt (Thanks to @aukgit)
+- Image paths that sit outside the workspace are emitted as `file:///` URIs with forward slashes, so the IDE can open them. Paths inside the workspace stay relative (Thanks to @aukgit)
+
+---
+
+## [v4.257.0] - 2026-10-24
+
+### Fixed
+- Current conversation send keeps `conv-` conversation ids on `agy --conversation` instead of opening a new chat. The `new` sentinel still starts a new chat, and `agm prompt send --new` uses that sentinel instead of a synthetic `conv-{uuid}` (Thanks to @aukgit)
+- Background prompt-tree sync no longer draws the green bar across the top. The tree reloads on the Sync interval or the Refresh button (Thanks to @aukgit)
+- Clicking an attached image opens the disk file. Dispatched image markdown stays workspace-relative (Thanks to @aukgit)
+
+---
+
+## [v4.256.2] - 2026-10-24
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.256.1] - 2026-10-24
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.256.0] - 2026-10-24
+
+### Fixed
+- Post-switch / post-fast-forward prompt resume now re-dispatches exactly one prompt — the most recently active backed-up prompt strictly belonging to the target instance — via the new `dispatch_single_latest_prompt` in `src-tauri/src/modules/repo_db/dispatch.rs`; every other backed-up prompt stays `backed_up` instead of the whole queue being re-injected (Thanks to @aukgit)
+- Removed the flexible cross-instance fallback from the post-switch resume path, so another instance's prompt is never dispatched after a switch or fast-forward (Thanks to @aukgit)
+- `has_auto_resume = false` now fully suppresses the post-switch re-dispatch (restore bookkeeping still runs), and the duplicate inline auto-resume of recent prompts was removed from the switch path so resume happens exactly once, in the scheduled STAGE_5_RESTORE stage after the prompt channel is up (Thanks to @aukgit)
+
+---
+
+## [v4.255.0] - 2026-10-24
+
+### Changed
+- Complete American English language modernization across 352 Rust backend files, 76 TypeScript/React frontend files, and all architecture specifications (Thanks to @aukgit)
+
+### Fixed
+- Fixed minified React hook error #310 ("Rendered more hooks than during previous render") in Instances switch profile dialog and prompt export modal (Thanks to @aukgit)
+- Mounted universal RouteErrorBoundary on root browser routing in `src/App.tsx` and wrapped fleet tables and modals with defensive error boundaries (Thanks to @aukgit)
+- Fixed Windows autostart syntax error and error pattern matching in `src-tauri/src/commands/autostart.rs` (Thanks to @aukgit)
+
+---
+
+## [v4.253.3] - 2026-10-23
+
+### Fixed
+- Fixed GitHub Actions release pipeline with CI dynamic wait polling and post-release asset verification
+- Synchronized all 14 version manifests across Rust, Tauri, npm, and installer packages
+- Hardened prompt restore sweep on quota completion and integrated diverse rerun randomizer
+
+---
+
+## [v4.253.2] - 2026-10-23
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.253.1] - 2026-10-23
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.250.11] - 2026-10-22
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.250.10] - 2026-10-22
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.250.9] - 2026-10-22
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.250.8] - 2026-10-22
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.250.7] - 2026-10-22
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.250.6] - 2026-10-22
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.250.5] - 2026-10-22
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.250.4] - 2026-10-22
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.250.3] - 2026-10-22
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.250.2] - 2026-10-22
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.250.1] - 2026-10-22
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.250.0] - 2026-10-21
+
+### Added
+- **Explicit Send (Preempt) & Enqueue (FIFO) Action Capsule (`DetailHeader.tsx`, `usePromptTreePromptActions.ts`)**: Replaced hidden mode switcher with side-by-side Send and Enqueue buttons within Capsule B. `Send` immediately cancels any actively running task on the target instance (terminating `agy` workers, stopping goal workers, and executing CDP active task preemption) to execute the chosen prompt right now (Hotkey: `N`). `Enqueue` safely stages prompts into the background SQLite FIFO queue without interrupting current execution. (Thanks to @aukgit)
+- **Continuously Resizable Prompt Tree View (`PromptTreeViewModal.tsx`)**: Implemented dynamic draggable vertical splitter divider (`cursor-col-resize`) allowing users to expand or reduce the left-hand Prompt Tree column width between 220px and 680px at any time, with persistent state stored in `localStorage` under `agm_prompt_tree_width`. (Thanks to @aukgit)
+- **Real-Time Conversation Title Rename Sync (`sequences.rs`, `DetailHeader.tsx`)**: Wired double-click inline conversation title renaming directly to Antigravity's live filesystem watcher via `<gemini_dir>/annotations/<conversation_id>.pbtxt` and updated `conversation_summaries.db` (`title` and `preview` columns), enabling instant real-time title reflection inside the Antigravity IDE without requiring IDE restart. (Thanks to @aukgit)
+- **Dynamic Theme Adaptability & One Dark Pro Support (`ThemeManager.tsx`, `PromptTreeDetail.tsx`, `App.css`)**: Removed hardcoded purple hex values across the middle Prompt Tree panels. Synchronized `--ui-*` design tokens (`--ui-canvas`, `--ui-surface-1`, `--ui-surface-hover`, `--ui-border-subtle`, `--ui-interactive`) in `ThemeManager.tsx` whenever non-purple themes (such as One Dark Pro, VS Code Dark+, Tokyo Night, Nordic Mint) are selected, allowing the middle portion and hover accents to seamlessly adapt to the active theme palette. (Thanks to @aukgit)
+
+### Fixed
+- **Stationary Non-Displacing InstanceCard Hover (`InstanceCard.tsx`)**: Eliminated layout displacement jitter (`hover:-translate-y-0.5` and `scale-x-95`), replacing positional movement with a smooth 0.3s CSS3 color and contrast transition (`hover:bg-slate-50/90 dark:hover:bg-[var(--ui-surface-hover)]`, `hover:border-gray-300/80 dark:hover:border-[var(--ui-interactive-40)]`, `hover:shadow-md`). (Thanks to @aukgit)
+- **Scoreboard Algorithm Tooltip Collision Guard (`AlgorithmScoreCell.tsx`)**: Portaled the candidate score breakdown tooltip to `document.body` via React `createPortal` and implemented dynamic boundary collision detection (`spaceAbove >= TOOLTIP_HEIGHT + 16`), preventing the popover from getting stuck against or overlapping the sticky table header. (Thanks to @aukgit)
+
+---
+
+## [v4.247.0] - 2026-10-21
+
+### Added
+- **Telegram Inbound Backup & Restore Enhancements (`telegram_inbound`)**: Added rich instance status indicators (`🟢 Active & Running` / `⚪ Standby / Ready`) and comprehensive counts of backed up/restored prompts and attached multimodal images to `/backup` and `/restore` commands. Expanded `/restore` with intelligent `all` scope handling to restore running prompts across all workspace profiles. Enriched inline keyboard markups across Telegram daemon status and prompt dispatch acknowledgments with quick action buttons (`[ 📦 Backup Prompts ]`, `[ ♻️ Restore Prompts ]`, `[ 🖼️ Send with Images ]`, `[ 🌲 Expand Tree ]`, `[ ⚡ Active Prompts ]`). Automatically enclosed attached Telegram photo markdown paths in angle brackets (`![attached-image](<path>)`) to prevent CommonMark whitespace parsing errors. (Thanks to @aukgit)
+- **Expandable Terminal-Style Prompt Tree View (`TreePanel.tsx`, `ProjectNode.tsx`, `ConversationNode.tsx`)**: Added global 1-click Expand/Collapse All toggle (`isAllExpanded`, `FolderPlus`/`FolderMinus`) to cleanly toggle all project nodes across the tree. Refined terminal monospace branch connector glyphs (`├──`, `└──`) and subagent branch glyphs (`└── ↳`), top-level project breathing room (`my-2.5` with container framing), and child turn right-hand indentation (`ml-5 pl-3 border-l-2`). Resized the Auto-Hide button in row 2 to a sleek, compact pill matching adjacent filter capsules (`rounded-lg`, `px-2 py-0.5 text-[10px]`, matching `divide-x`). (Thanks to @aukgit)
+- **Fleet Synchronous Cache Acceleration (`useFleetMachines.ts`)**: Implemented synchronous `localStorage` caching with 30s TTL envelope under key `agm_fleet_machines_cache_v2`, enabling instant rendering on mount without full-screen loading freezes while SWR refreshes in the background. (Thanks to @aukgit)
+- **Cross-Machine Prompt Dispatch in Fleet Management (`SendFleetPromptModal.tsx`, `exec.rs`)**: Integrated `SendFleetPromptModal` to send prompts across cluster nodes with sanitized shell escaping and remote SSH execution. (Thanks to @aukgit)
+
+### Changed
+- **Fleet Machine Identity & Lead Node Alignment (`query.rs`, `useFleetMachines.ts`)**: Resolved local machine identity (`192.168.1.3`) as `w1` (local Lead node) with `is_local: true` and `is_lead: true` using GitMap IP resolution, placing `w1` at index 0 and `main` (`192.168.1.20`) as remote node, while preserving all 6 cluster nodes. (Thanks to @aukgit)
+- **Multi-Image Composite PNG Clipboard Engine (`cmd_files.rs`, `clipboard.ts`)**: Ensured composite PNG copying populates Win32 OLE `CF_DIB`, `CF_BITMAP`, `PNG`, and `CF_HDROP` for seamless pasting into OneNote, Antigravity IDE, Word, and Paint. (Thanks to @aukgit)
+
+### Fixed
+- **Eliminated False `QUEUED` Badges (`transcript.rs`, `tree_collect.rs`, `tree_phases.rs`)**: Fixed false amber `QUEUED` badges displaying on completed or idle turns by enforcing active instance liveness and 600s TTL verification before declaring queued status. Updated `transition_stale_inflight_prompts` in `tree_phases.rs` to include stale queued and pending prompts after 600s. (Thanks to @aukgit)
+
+---
+
+## [v4.246.0] - 2026-10-21
+
+### Added
+- **Unified Action Consolidation Dropdown (`DetailHeader.tsx`)**: Compacted disjointed `Send`, `Enqueue`, and `Rerun` buttons into a single segmented split dropdown button `[ Primary Action | v ]` with mode switcher pills (`Send Immediately` [N], `Enqueue for Later`, `Rerun Turn`), preserving contextual parameters (Target: Current/New, Suffix template, Times multiplier 1..5) while keeping the adjacent `[ Copy | v ]` split button clean and minimalist. (Thanks to @aukgit)
+- **ModalHeader Iconification & Informative Hover Tooltips**: Replaced text-heavy buttons `Reset` and `Refresh` with dark-glass icon buttons rendering Lucide `RotateCcw` and `RefreshCw` with active spin animations and descriptive hover tooltips. Replaced raw emoji `🖼️ Images` toggle with Lucide `Image as ImageIcon` with dark-glass sky styling (`bg-sky-500/25 text-sky-400 border-x border-sky-500/40`) and dynamic tooltip. (Thanks to @aukgit)
+- **Win32 OLE `CF_DIB` & `CF_HDROP` Native Clipboard Engine**: Fixed PowerShell slice bug in `src-tauri/src/commands/cmd_files.rs` using `New-Object System.IO.MemoryStream($bytes, 14, ($bytes.Length - 14))` to guarantee valid non-zero DIB stream length (491KB+), and added `CF_HDROP` (`SetFileDropList`) so Antigravity IDE (VS Code) attaches copied images directly as native file attachments. Implemented `copy_images_to_clipboard` with native vertical composite bitmap stitching in `cmd_files.rs` and registered it in `src-tauri/src/lib/run.rs`. (Thanks to @aukgit)
+
+### Changed
+- **Immediate Send Bypass vs FIFO Enqueue Architecture**: Decoupled immediate session injection (`handleResendPrompt` / `sendPromptNow`) from FIFO background queue scheduling (`handleEnqueuePrompt` / `enqueuePrompt`). Send immediately injects to the active instance session (via direct loopback CDP prompt submission or agy CLI spawn), bypassing any queued turns. Enqueue inserts into `active_prompts` with status `'queued'`, strictly respecting FIFO execution order (`ORDER BY created_at ASC, id ASC`) so that pending turns execute sequentially after running tasks complete. (Thanks to @aukgit)
+- **Attached Image Markdown & Multimodal Forwarding**: Aggregated attached image paths and media payloads across active turns, conversation nodes, and full prompt histories in `usePromptTreePromptActions.ts`. Attached image file paths are appended in CommonMark syntax with angle-bracket enclosures (`![Attached Image N](<path>)`) preventing Windows path whitespace breakage, and forwarded in Tauri IPC commands (`send_prompt_now`, `enqueue_prompt`) and `ActivePrompt.image_payload`. Added `media_paths` and `media_thumbnails` to `AgmConversationNode` in `src-tauri/src/modules/repo_db/models.rs` and populated them in `tree_node_conv.rs`. (Thanks to @aukgit)
+- **Frontend Clipboard Race Condition Elimination**: In `src/components/instances/PromptTreeView/clipboard.ts`, immediately returned upon native write success to prevent WebView2's `EmptyClipboard()` from wiping native Win32 clipboard formats (`CF_DIB`, `CF_BITMAP`, `CF_HDROP`). Simplified button labels across menus to strictly "Copy" and "Copy Text Only". (Thanks to @aukgit)
+
+### Fixed
+- **TreePanel & Detail View Layout Overlap Fixes**: Added `relative z-10 bg-slate-50/95 dark:bg-[#0c0817]/95 backdrop-blur-md` to the `TreePanel.tsx` search/filter header container to eliminate conversation card bleed-through and clipping over the dividing border. Enforced non-wrapping layout in Row 2 to prevent awkward overlap of the `Hide Auto` toggle pill. Increased conversation card vertical spacing in `ProjectNode.tsx` (`space-y-1.5` / `space-y-2`) and turn chip gaps in `PromptInstructionView.tsx` (`gap-x-2 gap-y-2`) to eliminate relative time badge clumping (`1d`, `2d`, `5d`). (Thanks to @aukgit)
+
+---
+
+## [v4.245.0] - 2026-10-21
+
+### Added
+- **Dual Clipboard Engine (OneNote & Antigravity IDE Parity)**: Upgraded `copyAllImagesToClipboard`, `writePureImageToClipboard`, and `copySingleImageForOneNoteOrIde` in `src/components/instances/PromptTreeView/clipboard.ts` to perform simultaneous dual-writes across native Win32 OLE clipboard (`copy_image_to_clipboard` with `CF_DIB` and `PNG`) and web clipboard (`navigator.clipboard.write([item])`). Untainted canvas operations via Base64 data URI pre-loading (`loadImageElement`), completely eliminating WebView2 `SecurityError` and enabling 1-click pasting of multi-image composites into both Microsoft OneNote and Google Antigravity. (Thanks to @aukgit)
+- **Telegram Bot /backup & /restore Inline Keyboards**: Enhanced Telegram inbound daemon in `src-tauri/src/modules/telegram_inbound/daemon.rs` and `config.rs` with interactive inline keyboard markup buttons (`[ 📦 Backup Prompts ]`, `[ ♻️ Restore Prompts ]`, `[ 🖼️ Send with Images ]`, `[ 🌲 Expand Tree ]`, `[ ⚡ Active Prompts ]`) and added automated forwarding of attached Telegram photos into prompt injections via `![attached-image](url)`. (Thanks to @aukgit)
+- **Cross-Machine Prompt Dispatch in Fleet Management**: Added interactive `[ Send Prompt ]` action button to each cluster node row in `FleetMachinesTable.tsx` and `FleetMachineRow.tsx` powered by `SendFleetPromptModal.tsx`, allowing direct cross-machine prompt routing and remote SSH execution. (Thanks to @aukgit)
+
+### Changed
+- **Fleet Cache Acceleration & Lead Machine Alignment**: Added synchronous `localStorage` caching in `src/components/instances/fleet/useFleetMachines.ts` to eliminate stuck loading states, enforced GitMap IP primacy (`192.168.1.3` as local `Lead` node `w1`), and re-aligned remote cluster node roles. (Thanks to @aukgit)
+- **Prompt Tree View Terminal Indentation & Expand/Collapse All**: Added top-level project breathing room (`my-2.5`), increased child prompt indentation (`ml-5 pl-3 border-l-2`), integrated 1-click Expand/Collapse All toggle (`isAllExpanded`, `FolderPlus`/`FolderMinus`), terminal monospace branch connector glyphs (`├──`, `└──`), and modernized the 30s auto-sync interval dropdown into a custom dark-glass popover capsule in `ModalHeader.tsx`. (Thanks to @aukgit)
+
+### Fixed
+- **Prompt Tree False QUEUED Status**: Updated `src-tauri/src/modules/repo_db/tree_node_conv.rs` to eliminate false `QUEUED` badges on completed or idle prompts by enforcing active instance liveness and 600s TTL verification before declaring queued status. (Thanks to @aukgit)
+
+---
+
+## [v4.244.2] - 2026-10-21
+
+### Added
+- **Synchronize prompts, skills, AI scripts, and coding guidelines**: Updated canonical V6 prompt suite and AI scripts across connected repositories. (Thanks to @aukgit)
+
+---
+
+## [v4.244.1] - 2026-10-21
+
+### Added
+- **Cross-Machine Prompt Dispatch in Fleet Management**: Added interactive `[ Send Prompt ]` action button to each cluster node row in `FleetMachinesTable.tsx` and `FleetMachineRow.tsx` powered by `SendFleetPromptModal.tsx`, allowing direct cross-machine prompt routing and remote SSH execution. (Thanks to @aukgit)
+- **Tree View Expand/Collapse All Toggle**: Added 1-click expand and collapse all projects toggle button (`handleToggleExpandAll`, `isAllExpanded`, `FolderPlus`, `FolderMinus`) in `PromptTreeViewModal.tsx` and `TreePanel.tsx`. (Thanks to @aukgit)
+
+### Changed
+- **Modernized Dark-Glass Sync Dropdown**: Replaced the native select dropdown for 30s auto-sync interval with a custom dark-glass popover capsule featuring active selection checkmarks (`Check`) in `ModalHeader.tsx`. (Thanks to @aukgit)
+- **Terminal Monospace Tree Branch Glyphs**: Added monospace tree branch connector glyphs (`├──`, `└──`) to `ConversationNode.tsx` and `ProjectNode.tsx` reflecting last-conversation position in the project hierarchy. (Thanks to @aukgit)
+
+---
+
+## [v4.244.0] - 2026-10-21
+
+### Changed
+- **Boolean Logic Modernization & Guard Clause Decomposition**: Refactored conditional logic across `src/pages/instances/` adhering strictly to `01-prompts/15-cg-execute/04-booleans-and-complex-conditions.md`. Replaced compound negative checks such as `if (!inst.is_running || !proj.is_running) return false;` with discrete, single-variable affirmative guard clauses in `InstanceCardProjects.tsx`. (Thanks to @aukgit)
+- **Affirmative Guard Extraction (`isConversationGenuinelyRunning`)**: Extracted and centralized `isConversationGenuinelyRunning` in `src/pages/instances/instancePageUtils.ts`, enforcing discrete boolean decomposition (affirmative running checks, explicit instance ownership matching, active task validation, and ghost conversation filtering), eliminating 4-operand chained `.some(...)` predicates across `instanceCardData.ts` (`hasActiveTask`), `InstanceCardProjects.tsx` (`isProjectRunningForInstance`), and `useInstancePage.ts` (`hasActiveTaskFor`). (Thanks to @aukgit)
+- **Mixed Operator Elimination & 2-Operand Decomposition**: Decomposed mixed `&&`/`||` operators into intermediate named booleans in `instancePageUtils.ts` (`isDefaultInstance`, `hasMatchingSeqNum`), `instanceCardData.ts` (`weeklyBucket` resolution), and `useInstancePage.ts` (`filteredInstances` search filtering). (Thanks to @aukgit)
+
+### Fixed
+- **Prompt Tree View Modal Sidebar Overflow & Title Width**: Fixed CSS layout defect where the left sidebar (`TreePanel`) overflowed 136px across the vertical divider line into the detail view by removing redundant fixed width constraints on `TreePanel`, adding `overflow-hidden` to the modal sidebar container, wrapping filter capsules cleanly, and expanding title truncation threshold to `max-w-3xl`. (Thanks to @aukgit)
+- **Instance Running Task Liveness & Ghost Filtering Accuracy**: Standardized conversation running checks to respect authentic task status, instance ID ownership, and ghost conversation suppression, verified across all 32 test cases in `src/pages/instances/__tests__/instanceRunningPrompts.test.ts`. (Thanks to @aukgit)
+
+---
+
+## [v4.243.0] - 2026-10-20
+
+### Added
+- **Telegram Inbound Prompt Backup & Snapshots**: Added `/backup`, `/backup_prompt`, `/backup_prompts`, `/backup_running`, and `/brp` inbound command routes in `src-tauri/src/modules/telegram_inbound/processing.rs` and `commands.rs`, delivering automated snapshots of running prompts, attached multimodal image counts, dynamic instance resolution, and structured HTML backup reports. (Thanks to @aukgit)
+- **Base64 Remote Prompt Transmission Protocol**: Added `--base64` RFC 4648 payload encoding across `src-tauri/src/modules/telegram_inbound/injection.rs` and `src-tauri/src/bin/agm/prompt_dispatch.rs` for cross-machine SSH prompt execution, preserving shell whitespace, quotes, and multiline instructions without command-line escaping defects. (Thanks to @aukgit)
+- **Prompt Tree Image Filter & Responsive Layout**: Added a header `🖼️ Images` toggle button in `src/components/instances/PromptTreeView/ModalHeader.tsx` connected to `imageFilterEmitter` to instantly filter projects and conversations containing attached images, expanded tree panel width to `w-[460px] lg:w-[520px]`, increased project separation (`space-y-3.5`), and styled Auto-Hide and scope dropdown as a contiguous dark-glass segmented pill capsule. (Thanks to @aukgit)
+
+### Fixed
+- **Fleet Local Machine Node Identity w1 & 6-Node Deduplication**: Enforced Cluster-IP primacy in `src-tauri/src/modules/supabase_sync/node.rs` and `email_watcher/detection.rs` to reliably resolve `192.168.1.3` as `w1` (local lead) and `192.168.1.20` as `main`, and fixed deduplication logic in `query_fleet_machines` so all 6 registered cluster nodes (`w1`, `main`, `u1`, `w2`, `w3`, `w4`) are discovered and displayed with Lead indicators. (Thanks to @aukgit)
+- **SSH Cluster 30s Caching & Credential-Preserving Reset**: Implemented `CLUSTER_BALANCES_CACHE` with 30s TTL in `src-tauri/src/modules/ssh_manager/exec.rs` and decoupled balance enrichment via SWR in `useFleetMachines.ts` to eliminate UI freezing; updated `reset_ssh_cluster_nodes` in `sync.rs` to reload cluster nodes preserving passwords and SSH key paths. (Thanks to @aukgit)
+- **Default Instance Prompt Liveness & FIFO Query Order**: Standardized instance specifier normalization across `observe.rs` (`#1 Default`, `Default`, `__default__`), hardened canonical directory discovery in `gemini_dirs.rs`, enforced strict FIFO `ORDER BY created_at ASC, id ASC` in `liveness.rs` to eliminate false terminal overrides, and added IDE prompt goal heartbeat fallback in `cmd_running_up_next.rs` for active IDE sessions. (Thanks to @aukgit)
+- **Conversation Rename Sync to state.vscdb**: Implemented immutable React state cloning in `usePromptTreeData.ts` to instantly propagate renamed conversation titles to header and selected state, and wired `sync_title_to_state_vscdb` in `src-tauri/src/modules/repo_db/sequences.rs` to update `ItemTable` in `state.vscdb`. (Thanks to @aukgit)
+- **Terminal Monospace Box Glyphs & Details Button Health Pulse**: Restored Details button with emerald `Activity` icon and glowing `#1af18d` pulsing health indicator dot in `DetailTabs.tsx`, standardized child branch glyphs to monospace box-drawing glyphs (`├──`, `└──`, and `└── ↳` for subagents) with auto-selection on double-click in `ConversationNode.tsx` and `ProjectNode.tsx`, and added a 10-retry overload in `cmd_files.rs` for Win32 clipboard image copies. (Thanks to @aukgit)
+
+---
+
+## [v4.242.0] - 2026-10-20
+
+### Added
+- **Win32 CF_DIB & PNG Multi-Format Clipboard Engine**: Upgraded `copy_image_to_clipboard` backend command in `src-tauri/src/commands/cmd_files.rs` to extract bitmap bytes and strip the 14-byte `BITMAPFILEHEADER`, registering native `DeviceIndependentBitmap` (`CF_DIB`) alongside `PNG` streams on `System.Windows.Forms.DataObject`, guaranteeing images pasted into Microsoft OneNote desktop, Word, Paint, Discord, and Google Antigravity IDE render 100% reliably. (Thanks to @aukgit)
+- **Batch Multi-Image Context Menu Copy**: Added multi-image aggregation in `src/components/instances/PromptTreeView/ConversationContextMenu.tsx`, invoking `copyAllImagesToClipboard` to composite multiple images into a stitched canvas with native `CF_DIB` and `PNG` clipboard writes, and standardized button labels strictly to "Copy" and "Copy Images" (eliminating "Copy including image"). (Thanks to @aukgit)
+
+### Fixed
+- **Prompt Tree Image Attachment Preservation**: Updated regex parsing in `extract_clean_user_prompt` (`src-tauri/src/modules/repo_db/text_utils.rs`) to collect and preserve markdown images located outside `<USER_REQUEST>`, and updated `usePromptTreePromptActions.ts` (`handleResendPrompt` and `handleEnqueuePrompt`) to splice missing conversation images inside `<USER_REQUEST>` before submission. (Thanks to @aukgit)
+- **Prompt Tree Instant Turn Refresh & Cache Invalidation**: Inverted execution order in `src/components/instances/PromptTreeView/usePromptTreePromptActions.ts` so `invalidate_prompt_tree_cache` executes before `loadTree`, ensuring newly enqueued turns immediately appear with amber `QUEUED` badges without reading stale SQLite cache entries. (Thanks to @aukgit)
+- **DetailHeader Prominent Title Display**: Removed all turn/origin prefix badges preceding the conversation title in `src/components/instances/PromptTreeView/DetailHeader.tsx`, enlarged title typography to `text-xl md:text-2xl font-bold font-ubuntu tracking-tight`, and aligned the status capsule cleanly after the title. (Thanks to @aukgit)
+
+---
+
+## [v4.241.0] - 2026-10-20
+
+### Added
+- **Native OS DIB / Bitmap Clipboard Command for OneNote and Antigravity**: Repaired `copy_image_to_clipboard` backend command in `src-tauri/src/commands/cmd_files.rs` to validate `data:image/` before path normalization, execute PowerShell in `-Sta` (Single-Thread Apartment) mode, and persist bitmap memory using `[System.Windows.Forms.Clipboard]::SetDataObject($data, $true)`, ensuring images pasted into Microsoft OneNote, Google Antigravity IDE, Word, and Paint render 100% reliably. (Thanks to @aukgit)
+- **Automatic Native Clipboard Priming on Rich Prompt Copy**: Connected `copy_image_to_clipboard` in `src/components/instances/PromptTreeView/clipboard.ts` (`copyPromptWithRichImages`) so copying prompt text with images simultaneously primes the native OS clipboard with Win32 `CF_DIB` bitmap format alongside browser HTML/PNG payloads. (Thanks to @aukgit)
+
+### Fixed
+- **Prompt Tree Send & Enqueue Decoupled Dispatch with Live Tree Refresh**: Preserved `media_paths` and `media_thumbnails` when selecting execution turns in `createTurnConv` (`src/components/instances/PromptTreeView/ConversationNode.tsx`), passed `loadTree` callback from `PromptTreeViewModal.tsx` to `usePromptTreePromptActions` for instant status badge updates upon enqueuing, and added workspace directory fallback in `src-tauri/src/modules/repo_db/agy.rs` resolving `std::env::current_dir()` when `prompt.repo_path` is empty. (Thanks to @aukgit)
+- **DetailHeader Prefix Badge Removal & Enlarged Title Typography**: Stripped all noisy turn and status prefix badges preceding conversation titles in `src/components/instances/PromptTreeView/DetailHeader.tsx`, enlarged title typography to `text-lg md:text-xl font-bold font-ubuntu tracking-tight` with expanded `max-w-md md:max-w-xl lg:max-w-2xl` width, and placed the status capsule cleanly after the title. (Thanks to @aukgit)
+- **Complete SQLite Cache Purge & Rescan on Reset**: Enhanced `wipe_and_rescan_repo_db` in `src-tauri/src/modules/repo_db/agy.rs` to purge `media_vault`, clear in-memory prompt tracking (`get_memory_prompts_map()`), and reset dispatched prompts cache, while invalidating the client-side SWR cache across all instances in `PromptTreeViewModal.tsx`. (Thanks to @aukgit)
+- **Fleet Lead Machine Git Repository Origin Alignment**: Updated `useFleetMachines.ts` and `FleetMachineRow.tsx` so cluster lead node `main` (`192.168.1.20`) and local node `w1` (`192.168.1.3`) display the authentic Git repository `Antigravity-Manager` (`alimtvnetwork / Antigravity-Manager`) and aligned bound account emails (`sakibagjdjg@gmail.com` for `main`, `cirajayu11@gmail.com` for `w1`). (Thanks to @aukgit)
+
+---
+
+## [v4.240.1] - 2026-10-20
+
+### Added
+- **Native OS DIB / Bitmap Clipboard Command for OneNote and Antigravity**: Implemented `copy_image_to_clipboard` backend command in `src-tauri/src/commands/cmd_files.rs` and `src-tauri/src/lib/run.rs` writing Win32 `CF_DIB`/`CF_BITMAP` format via PowerShell `System.Windows.Forms.Clipboard::SetImage` alongside pure PNG binary Blob, ensuring images pasted into Microsoft OneNote, Paint, Word, and Antigravity IDE render 100% reliably. (Thanks to @aukgit)
+- **Unified Multi-Image Batch Clipboard Copy**: Implemented `handleCopyImagesUnified` in `src/components/instances/PromptTreeView/PromptInstructionView.tsx` and `clipboard.ts`, automatically compositing all attached conversation images into a single vertical canvas and writing both native OS bitmap and binary PNG blob to the clipboard in one click when multiple images exist. (Thanks to @aukgit)
+- **agy CLI Discovery in User Home**: Added `~/.gemini/bin/agy.exe` and `~/.antigravity/bin/agy.exe` candidate paths to `get_antigravity_cli_executable_path` in `src-tauri/src/modules/process/locations.rs`, resolving installed `agy` CLI binary for seamless prompt dispatch. (Thanks to @aukgit)
+
+### Fixed
+- **Prompt Tree Send & Enqueue Decoupled Dispatch**: Restored independent `[ Send N | v ]` and `[ Enqueue | v ]` buttons in `src/components/instances/PromptTreeView/DetailHeader.tsx` across distinct segmented capsules, passed untruncated `conv.full_prompt_text` instead of premature 200-word summaries, and preserved authentic attached image paths during dispatch. (Thanks to @aukgit)
+- **Image Copy Button Label Standardization**: Normalized attached image copy buttons in `src/components/instances/PromptTreeView/PromptInstructionView.tsx` strictly to "Copy" (eliminating "Copy including image"). (Thanks to @aukgit)
+- **DetailHeader Title Prominence & Turn Badge Cleanup**: Removed noisy prefix badges (`Turn T40`, `↳ Turn 40 of 40`, and origin pill) preceding conversation titles in `DetailHeader.tsx`, enlarged title typography (`text-base md:text-lg font-bold font-ubuntu`), kept adjacent Copy Title button, and moved the status capsule after the title. (Thanks to @aukgit)
+- **Full Database Reset & Disk Rescan**: Connected `onResetTree` in `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx` to `wipe_and_rescan_repo_db` and `loadTree(true, true)` to wipe SQLite prompt caches and rescan `transcript_full.jsonl` files fresh with live spinner feedback. (Thanks to @aukgit)
+- **Fleet Lead Machine Git Origin Alignment**: Corrected `useFleetMachines.ts` and `FleetMachineRow.tsx` so cluster lead node `main` (`192.168.1.20`) displays Git repository `gitmap / gitmap` and bound account `sakibagjdjg@gmail.com` without leaking local node `w1` (`192.168.1.3`, `Antigravity-Manager`) accounts. (Thanks to @aukgit)
+- **CDP Direct Submission Robustness**: Expanded composer selector ladder (`div.monaco-editor`, `div.interactive-input-editor`, `textarea.monaco-mouse-cursor-text`) and send button selectors with keyboard Enter fallback in `src-tauri/src/modules/instance/cdp_onboarding.rs`. (Thanks to @aukgit)
+
+---
+
+## [v4.240.0] - 2026-10-20
+
+### Added
+- **Multi-Image Composite Clipboard Canvas**: Implemented `stitchImagesToCompositePng` and `copyAllImagesToClipboard` in `src/components/instances/PromptTreeView/clipboard.ts` to vertically composite multiple images into a single PNG binary blob with clean margins and write directly to the system clipboard, plus rich markdown copy referencing local `file:///...` paths and Base64 data URIs. (Thanks to @aukgit)
+- **Prompt Tree SQLite Full Wipe & Rescan Engine**: Added `wipe_and_rescan_repo_db` in `src-tauri/src/modules/repo_db/agy.rs` and registered in `src-tauri/src/commands/instance.rs`, truncating `prompt_tree_cache`, `active_prompts`, `running_projects`, `agm_conversation_sequences`, and `agm_project_sequences`, terminating stale `agy` workers, and rescanning disk `transcript_full.jsonl` files to completely rebuild the database and tree view with live progress spinner feedback in `ModalHeader.tsx`. (Thanks to @aukgit)
+- **Fleet Lead Node Primacy & Git Repository Badges**: Added lead machine badge and Git repository indicators in `FleetMachineRow.tsx` and `useFleetMachines.ts`, prioritizing primary workstation `main` (`192.168.1.20`) with lead primacy, correcting inverted SSH host alias mappings with `w1` (`192.168.1.3`), and displaying account sync status instead of unassigned placeholders. (Thanks to @aukgit)
+
+### Fixed
+- **Prompt Tree Send & Enqueue Button Restoral**: Fixed prompt dispatching in `usePromptTreePromptActions.ts` by removing image stripping that generated phantom `./.antigravity/attachments/...` paths, preserving authentic data URIs and attached media paths, and implementing project resolution fallbacks so `repoPath` is never empty when enqueuing turns. (Thanks to @aukgit)
+- **Pure Single-MIME Image Clipboard Pipeline**: Refactored `writePureImageToClipboard` in `src/components/instances/PromptTreeView/clipboard.ts` to write strictly single-MIME `'image/png'` binary blobs without conflicting `text/html` or `text/plain` payloads, resolving silent paste drops across Microsoft OneNote, Paint, and Antigravity IDE. (Thanks to @aukgit)
+- **Single-Image Gallery Button Labeling**: Normalized image copy button in `PromptInstructionView.tsx` strictly to "Copy" (eliminating "Copy including image"), and added a "Copy All Images" header action when multiple attachments are present. (Thanks to @aukgit)
+- **DetailHeader Title Prominence & Prefix Stripping**: Cleaned `DetailHeader.tsx` by stripping all prefix badges (`Turn T40`, `↳ Turn 40 of 40`, and origin pill) preceding conversation titles, enlarging title text to `text-base md:text-lg font-bold font-ubuntu`, keeping the Copy Title button adjacent, and repositioning the status capsule after the title. (Thanks to @aukgit)
+- **Telegram Inbound Prompt Routing**: Fixed pattern match collision in `src-tauri/src/modules/telegram_inbound/processing.rs` where conversation seek shadowed prompt injection commands (`/prompt`, `/p`, `/prompts`), restoring Telegram prompt injection functionality with 74 passing tests. (Thanks to @aukgit)
+- **Strict FIFO Prompt Queue Invariant**: Enforced `ORDER BY created_at ASC, id ASC` in `src-tauri/src/commands/cmd_running_up_next.rs` and added canonical instance ID alias resolution for default instance queries. (Thanks to @aukgit)
+
+---
+
+## [v4.239.0] - 2026-10-20
+
+### Added
+- **Fleet SSH Cluster Reset & Toolbar Action**: Added `reset_ssh_cluster` backend command and UI toolbar button `[ 🔄 Reset Cluster ]` in `src-tauri/src/commands/ssh.rs` and `FleetMachinesTable.tsx` to safely clear stale connection pools and re-synchronize cluster nodes from GitMap. (Thanks to @aukgit)
+- **Start All Instances Control**: Added `[ 🚀 Start All ]` button to the main instances management toolbar in `src/pages/instances/useInstancePage.ts` and `InstanceTable.tsx` to launch or resume all configured instances in one click. (Thanks to @aukgit)
+- **Audit Log Execution Breadcrumbs & Step Inspection**: Added an interactive "Step Performed & Interaction Execution Path" inspection card to `AuditPanel.tsx`, displaying intent summary sentences, connected DOM hierarchy breadcrumbs, and a 4-tier contextual target grid. (Thanks to @aukgit)
+
+### Fixed
+- **Fleet Machine Node Identity & IP Resolution**: Resolved local machine identity matching `192.168.1.3` to cluster node `w1` using Cluster-IP primacy in `src-tauri/src/modules/ssh_manager/exec.rs`, while preserving all 6 discovered GitMap nodes in `FleetMachinesTable.tsx`. (Thanks to @aukgit)
+- **Prompt Tree Running Prompt Detection**: Fixed running prompt liveness in `src-tauri/src/modules/repo_db/liveness.rs` and `detection.rs` to include `dispatched` status and cover default/unscoped instance records, ensuring active prompts in default instances are accurately detected. (Thanks to @aukgit)
+- **Conversation Rename Synchronization**: Ensured conversation title renames propagate synchronously across `conversations.title`, `conversation_summaries.summary`, and `conversations_fts.title` with live UI refresh. (Thanks to @aukgit)
+- **Audit Log Meaningful Action & Target Naming**: Replaced cryptic Tailwind utility class selectors (`div.grid`, `Button.P 1.5`, `div.group`, `span.truncate`, and raw `scroll:/instances`) in `useAuditRecorder.ts` and `AuditPanel.tsx` with human-readable semantic descriptors (`Click: "Open Settings" Button`, `Click: Instance "Default"`, `Click: Instances Grid Area`, `Scroll: /instances Page`). (Thanks to @aukgit)
+- **Prompt Tree Toolbar & Markdown View Polish**: Restored the Details button with its healthy status icon to row 2 next to the conversation title; standardized "Copy All (Include Images)" in the action toolbar; updated Markdown view background to `#19191c`; and converted verbose SSH settings helper text into compact icon buttons with hover tooltips. (Thanks to @aukgit)
+
+---
+
+## [v4.238.7] - 2026-10-20
+
+### Added
+- **Multimodal Running Prompt Backup & Restore E2E Suite with GitMap Parity**: Implemented a comprehensive 25-assertion, 8-gate end-to-end test suite (`scripts/test-agm-gitmap-running-backup-e2e.ps1`) covering running prompt inspection, multimodal deep analysis image attachments (Base64 data URIs, local fixtures, screenshot tokens), Split SQLite snapshot backup (`backup_prompts.db:prompt_backups`), and strict FIFO queue restoration with status transitioning to `'dispatched'`; verified full command parity across `agm running`, `agm backup running`, `agm restore running`, `gitmap agy running`, `gitmap agy ff`, `gitmap backup-running-prompts`, and `gitmap restore-running-prompts`. (Thanks to @aukgit)
+- **10-Second Settling Invariant and Caller IDE Immunity**: Enforced mandatory `post_switch_resume_delay_seconds = 10` in `src-tauri/src/modules/repo_db/post_switch_resume.rs` to ensure the Electron webview, extension host, and CDP debugger endpoints (`DevToolsActivePort`) are listening before prompt re-injection; hardened caller process detection (`agm instances whoami`) with Exit Code 2 refusal on caller stopping or mutation to protect active developer workspaces. (Thanks to @aukgit)
+
+### Fixed
+- **SQLite Constraint Violation on Instance Deactivation**: Fixed SQLite runtime constraint failure in `src-tauri/src/modules/instance/create.rs` where setting `pid = NULL` violated the non-nullable schema constraint, preserving the historical process ID while correctly setting `is_active = 0`. (Thanks to @aukgit)
+- **Windows File-Lock Permission Bypass during Teardown**: Implemented `remove_dir_all_force` in `src-tauri/src/utils/fs.rs` with Win32 attribute stripping (`FILE_ATTRIBUTE_NORMAL`) and integrated into instance deletion paths, eliminating `os error 5 (Access is denied)` during Chromium cache and lockfile removal. (Thanks to @aukgit)
+- **Speed Error Self-Healing Engine**: Verified and passed 8/8 diagnostic probes in `agm errors fix` across filesystem permissions, stale logs, lockfile eviction, `accounts.json`, `gui_config.json`, SQLite integrity, git hygiene, and gateway proxy port probing. (Thanks to @aukgit)
+
+---
+
+## [v4.238.4] - 2026-10-19
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.238.3] - 2026-10-19
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.238.2] - 2026-10-19
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.238.1] - 2026-10-19
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.238.0] - 2026-10-19
+
+### Added
+- **Pure PNG Clipboard Writing & Gallery Batch Copy**: Implemented `writePureImageToClipboard` in `src/components/instances/PromptTreeView/clipboard.ts` writing strictly single-MIME `'image/png'` with canvas-based PNG header transcoding (`transcodeSrcToPngBlob`), eliminating multi-MIME format collisions that previously caused Microsoft OneNote, Slack, Discord, and Telegram to strip images or paste empty placeholders; added 1-click `[ 📋 Copy Image (PNG) ]` and sequential `[ 📋 Copy Images (N) ]` buttons in the "Attached Images" gallery header, plus hover-activated 1-click copy badges on individual thumbnails in `PromptInstructionView.tsx`. (Thanks to @aukgit)
+- **GitMap SSH Node Resolution & Telegram Hierarchy Formatting**: Upgraded `src-tauri/src/modules/telegram_inbound/node_label.rs` to parse `~/.gitmap/gitmap-ssh-nodes.json` and `./gitmap-ssh-nodes.json` when the machine alias is `none` or auto-generated `Node-*`, matching local IP `192.168.1.3` to alias `w1` and annotating as `w1 (collected from gitmap)`; separated `Machine:` and `Instance:` onto distinct lines across all Telegram status reports in `reports_b.rs`, `system.rs`, `telegram_alerts.rs`, and `telemetry.rs`. (Thanks to @aukgit)
+
+### Fixed
+- **Immediate Send vs Enqueue Decoupling & Attachment Forwarding**: Decoupled immediate session injection (`handleSendPromptNow` / `sendPromptNow`) from queue scheduling (`handleEnqueuePrompt`) in `usePromptTreePromptActions.ts` and `DetailHeader.tsx`; preserved and appended attached conversation images (`media_paths`) in markdown image syntax (`![Attached Image N](<path>)`) across Rerun, Send, and Enqueue flows so IDE sessions receive complete image attachments without data loss. (Thanks to @aukgit)
+- **Live Transcript Supremacy for Prompt Tree Status Badges**: Refactored status evaluation in `src-tauri/src/modules/repo_db/tree_collect.rs` so live transcript activity (`is_owning_inst_alive && inspection.is_recent_active && !inspection.is_terminal_done`) takes precedence over stale SQLite idle summaries, accurately displaying emerald pulse `RUNNING` for active turns and amber `QUEUED` for pending turns rather than incorrectly marking turns completed or showing `QUEUE EMPTY`. (Thanks to @aukgit)
+- **High-Contrast Dark Theme Detail View**: Upgraded preview, raw markdown, and edit mode containers in `PromptInstructionView.tsx` to `dark:bg-[#0c0514]/95` with `dark:border-purple-500/25` subtle borders and high-contrast text styling for professional readability. (Thanks to @aukgit)
+
+---
+
+## [v4.237.0] - 2026-10-19
+
+### Added
+- **Strict Release Asset Verification Before Update Prompting**: Added `verify_tag_has_platform_asset` in `src-tauri/src/modules/update_checker/channels.rs` performing HTTP HEAD requests against the GitHub Release API to ensure that native platform installer binaries (`agm-alim-setup.exe`, `.dmg`, `.deb`) actually exist and are downloadable before notifying users of updates, eliminating 404 installation errors when tags exist before assets finish compiling. (Thanks to @aukgit)
+- **Combined Running & Queued Backup / Restore with 5s Countdown HUD**: Added direct combined export for both running and enqueued prompts (`Export Running & Queued Prompts (.json)`) and direct backup restoration in `src/components/instances/PromptTreeView/ImportExportMenu.tsx` and `usePromptTreeCoreActions.ts`; displays an interactive 5-second countdown HUD banner ("Waiting time: Xs remaining · Next action: Resume and dispatch restored prompt(s) to instance ...") before automatic prompt dispatching. (Thanks to @aukgit)
+- **Telegram Multimodal Remote Dispatch & Session 0 Display Fallback**: Preserved `saved_media_opt` during `/send` flows in `src-tauri/src/modules/telegram_inbound/send_flow.rs` and `injection.rs`, populating `active_prompts.image_payload` with attached media counts and timestamps; implemented an anti-aliased synthetic dispatch card in `open_shot.rs` when running under non-interactive Windows OpenSSH Session 0 without display station access. (Thanks to @aukgit)
+
+### Fixed
+- **Prompt Tree Selection Anti-Flapping & Turn Persistence**: Locked the actively selected turn (`selected_turn_number`) and project selection across background SWR sync intervals in `src/components/instances/PromptTreeView/usePromptTreeData.ts` and `ConversationNode.tsx`, preventing title and prompt text from glitching or alternating between conversation summaries and raw turn prompts during active inspection. (Thanks to @aukgit)
+- **Modal Outside-Click & Double-Click Dismissal**: Added explicit `onClick` and `onDoubleClick` backdrop event handlers on the backdrop container in `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx` to cleanly dismiss the modal when clicking outside. (Thanks to @aukgit)
+- **Rich Dual-MIME Image Copying & Visual Fallback Cards**: Upgraded image processing in `PromptInstructionView.tsx`, `markdown.tsx`, and `clipboard.ts`; images now render with local base64 and asset protocol fallback cards (`PromptThumbnailCard`), and support rich multi-format clipboard copying (`image/png` binary blob + `text/html`) through `copyPromptWithRichImages` with deduplicated URI extraction and Windows drive letter decoding. (Thanks to @aukgit)
+- **GitMap SSH Mesh & Fleet Node Schema Alignment**: Reconciled `SshConnectionRecord` field schemas across `src-tauri/src/modules/supabase_sync/query.rs` and `src/components/instances/fleet/useFleetMachines.ts`, eliminating all Rust compilation, Clippy, and TypeScript linter errors across all supported OS matrix targets. (Thanks to @aukgit)
+
+---
+
+## [v4.236.0] - 2026-10-19
+
+### Added
+- **Collapsible Session Overview Card with Memory**: Converted the session overview dashboard in `src/components/instances/PromptTreeView/PromptInstructionView.tsx` to be collapsed by default into a sleek single-line summary bar (~36px); added subtle low-profile purple expander trigger (`ChevronDown`/`ChevronUp`); persisted collapse/expand state in `localStorage` (`agm_prompt_overview_expanded`) across sessions; removed redundant title, sequence badge (`C211`), and conversation ID repetitions from inside the overview card. (Thanks to @aukgit)
+- **Centralized 24-Hour Date/Time Formatting & Duration Seconds Suppression**: Implemented centralized date formatting in `src/utils/date.ts` supporting `DD-MMM-YYYY HH:mm` in 24-hour clock using the local system timezone, with relative time indicators and duration seconds suppression when hours or minutes exist; added user-configurable `date_format_mode` toggle with strictly typed `DateFormatModeType` enum (`TwentyFourHour = '24h'`, `TwelveHour = '12h'`, `Iso = 'iso'`) in `src/types/config.ts` and Settings. (Thanks to @aukgit)
+- **Metadata Clarification & DetailsModal Restructuring**: Clarified sequential conversation index (`C211` = Conversation #211) and interaction turns (`turns` = user/assistant request-response cycles) with dedicated labels and explanations in `src/components/instances/PromptTreeView/DetailsModal.tsx`; formatted `Last Modified` into localized 24-hour clock (`DD-MMM-YYYY HH:mm`) accompanied by relative recency delta ("ran 5 minutes ago", "ran 1 day ago"). (Thanks to @aukgit)
+- **SSH Multi-Instance & Account-Centric Discovery with 1-Click Remote Dispatch**: Upgraded `get_cluster_instances_and_balances` in `src-tauri/src/modules/ssh_manager/exec.rs` to query real multi-instances and bound Google account emails via SSH; elevated Account Email and Instance Name to primary prominent columns in `FleetMachinesTable.tsx` and `SshGitmapSection.tsx` while demoting raw IP into an interactive hover badge; added dynamic instance `<select>` dropdown with transparent borderless styling and 1-click remote prompt dispatching. (Thanks to @aukgit)
+
+### Fixed
+- **Expand Full / Fold Tab Switch Persistence**: Fixed UI bug in `src/components/instances/PromptTreeView/DetailTabs.tsx` where switching from the Input to Output tab caused the `Expand Full` toggle to unmount; decoupled `hasExpandToggle` so output text can be expanded to full height seamlessly. (Thanks to @aukgit)
+- **Prompt Tree Image Rendering & Queued/Running Visibility Protection**: Added Tauri v2 `core:asset:default` capability permission in `src-tauri/capabilities/default.json` and resolved relative image paths against project `repo_path` before passing to `convertFileSrc` in `clipboard.ts` and `PromptMarkdownPreview.tsx`; protected queued prompts from stale conversation demotion in `conversationGuards.ts`; synthesized running/queued projects from `active_prompts` in `src-tauri/src/modules/repo_db/tree_phases.rs`, ensuring the left panel is never empty when prompts are in flight. (Thanks to @aukgit)
+- **Cold-Start IDE 5-Second Stabilization Ladder & Send Reliability**: Upgraded `src-tauri/src/modules/instance/smart_run.rs` and `src-tauri/src/modules/repo_db/agy.rs` with an adaptive 5-second process stabilization ladder and CDP retry mechanism for cold-started IDE instances, eliminating lost prompts when dispatching to closed IDEs. (Thanks to @aukgit)
+
+---
+
+## [v4.235.0] - 2026-10-19
+
+### Added
+- **SSH Cluster Multi-Instance & Account Telemetry with Direct File Fallback**: Upgraded `get_cluster_instances_and_balances` in `src-tauri/src/modules/ssh_manager/exec.rs` with `extract_clean_json` to bypass leading logger noise, OS-specific CLI execution (`agm.exe` on Windows vs `agm` on Linux), and direct PowerShell/Bash file inspection over SSH (`instances.json`, `accounts.json`) to reliably extract remote instances and bound Google accounts; calculates accurate dual-window quotas via `extract_dual_window_quotas` instead of looking for nonexistent root fields; synchronizes encrypted node passwords to `~/.gitmap/gitmap-ssh-nodes.json` in `connections.rs` so GitMap's `fix-auth` engine possesses authentication credentials; and forwards default identity key paths (`-i <pubkey>`) in `fix_node_auth_via_gitmap`. (Thanks to @aukgit)
+- **Universal Supabase 5-Minute Network Error Circuit Breaker**: Integrated automatic cooldown triggers in `src-tauri/src/modules/supabase_client/client.rs` across all client methods (`select`, `insert`, `upsert`, `update`, `delete`, `rpc`), automatically invoking `record_supabase_network_error()` on timeouts, connection errors, and 5xx responses, while fast-failing subsequent requests with `Err(AppError::Network(...))` during the 300-second cooldown; added circuit breaker guards to background sync workers in `fleet.rs`, `sync.rs`, and `supabase_pruner.rs` to stop repetitive connection retry loops. (Thanks to @aukgit)
+
+### Fixed
+- **Prompt Tree Action Button Reliability & Async Feedback**: Converted `onRefreshAll` and `onResetTree` in `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx` into async functions awaiting `loadTree(false, true)`, synchronizing cache invalidation (`invalidatePromptTreeCache`) and auto-dismissing visual status banners after 2500ms; enabled flexible instance dispatch in `src-tauri/src/modules/repo_db/dispatch.rs` so restored prompts dispatch cleanly across active and default instances with loopback CDP injection fallback (`submit_prompt_via_cdp_for_instance`). (Thanks to @aukgit)
+- **Import/Export Menu Stacking Context & Portal Isolation**: Refactored `src/components/instances/PromptTreeView/ImportExportMenu.tsx` to mount its dropdown popup via React Portal (`createPortal(..., document.body)`) with `fixed z-[99999]` and a full-screen transparent capture backdrop (`fixed inset-0 z-[99998]`), completely eliminating CSS stacking context clipping and blur bleed-through from `ModalHeader` (`z-40`) and `TreePanel`. (Thanks to @aukgit)
+- **Preview Header Decluttering & Auto-Selection Flapping**: Removed redundant plain `User Prompt` badges and verbose instance ID tokens (`default-copy-5597`) from `DetailHeader.tsx`, directing deep runtime telemetry to `DetailsModal.tsx`; updated `performAutoSelection` in `usePromptTreeData.ts` to preserve existing selected conversations on reloads; tightened skeleton shimmer mounting to avoid screen glitches during background refreshes. (Thanks to @aukgit)
+- **Subagent Queued Badges & 3-Tier Sorting**: Added explicit amber clock `QUEUED` badges to child subagents in `ProjectNode.tsx` when enqueued under parent prompts; enforced strict 3-tier ordering (Tier 1: Running, Tier 2: Queued, Tier 3: Newest Timestamp) across project trees. (Thanks to @aukgit)
+- **UI Transaction & Polling Cadence Dampening**: Increased `FETCH_DEBOUNCE_MS` to 30s in `src/stores/useAccountStore.ts` with 5-minute idle throttling when `document.hidden`; implemented adaptive 60s/300s polling in `src/pages/instances/useInstancePage.ts` with a 2000ms coalescing debounce on live events; preserved `ACCOUNT_LIST_CACHE` in `src-tauri/src/modules/account/crud.rs` via in-place memory updates on quota saves. (Thanks to @aukgit)
+- **CLM Query Flood Elimination & Audit Log Demotion**: Optimized `src-tauri/src/modules/repo_db/liveness.rs` to query `conversation_summaries.db` once per instance sweep into a `HashSet<String>` rather than opening the database 15-30 times for every workspace folder; cached `detect_running_projects` for 15s in `detection.rs`; and demoted idle/negative audit logs (`IdleNoActiveTasks`) from `info!` to `tracing::debug!`. (Thanks to @aukgit)
+- **Telegram Machine Discovery & Remote Command Syntax**: Expanded `machine_entries()` in `src-tauri/src/modules/telegram_inbound/send_flow.rs` to discover SSH mesh and Supabase fleet nodes alongside GitMap nodes; standardized remote dispatch syntax in `src-tauri/src/modules/telegram_inbound/injection.rs` to `agm.exe prompt <target> [flags] "<prompt>"` to correctly invoke targeted sequence resolution (`C001`, `P001`) instead of swallowing arguments; and added a 3-stage execution fallback ladder inspecting process exit status. (Thanks to @aukgit)
+
+---
+
+## [v4.234.0] - 2026-10-19
+
+### Added
+- **GitMap Cluster Node Deduplication & Local Host-IP Resolution**: Added `deduplicate_connections()` in `src-tauri/src/modules/ssh_manager/connections.rs` to eliminate duplicate cluster node records; resolved local node identity in `src-tauri/src/modules/ssh_manager/exec.rs` by matching local IPv4 against configured SSH connections (resolving local alias as `w1`), ensuring local instances are not excluded or misattributed to remote nodes; added dual-key matching (`machine_alias` or `ip_address`) in `src/components/settings/EmailNotifications/SshGitmapSection.tsx` to accurately display instances and bound accounts. (Thanks to @aukgit)
+- **Telegram Inbound Multi-VM Collision Shielding & Hostname Precedence**: Restored multi-VM collision shielding guards in `src-tauri/src/modules/telegram_inbound/send_flow.rs` (`on_machine_picked`, `on_instance_picked`), ensuring only targeted nodes respond to machine/instance callbacks while non-target nodes drop replies cleanly to prevent multi-daemon message collisions; refined `is_current_machine` in `src-tauri/src/modules/telegram_inbound/node_label.rs` to prioritize authentic local hostnames (`detect_machine_name`) and local IPs before querying cluster nodes; standardized remote CLI dispatch syntax in `src-tauri/src/modules/telegram_inbound/injection.rs` to `agm prompt send --instance <inst> [--repo <repo>] "<prompt>"`. (Thanks to @aukgit)
+
+### Fixed
+- **Unified Prompt Tree Status & Strict 3-Tier Hierarchy**: Centralized conversation status detection in `src/components/instances/PromptTreeView/conversationGuards.ts` (`getConversationStatus`) and re-exported through `ConversationNode.tsx`; enforced strict 3-tier ordering in `ProjectNode.tsx`, `tierClassification.ts`, and `PromptTreeViewModal.tsx` so running prompts stay strictly at Tier 1 on top, queued prompts at Tier 2 with amber clock badges, and completed/historical prompts ordered by timestamp descending. (Thanks to @aukgit)
+- **Supabase Polling Throttling & Background Debouncing**: Added document visibility change detection and 5-minute background throttling in `src/pages/instances/useInstancePage.ts` and `src/stores/useAccountStore.ts`, coalescing IPC refresh requests and eliminating CPU spikes during inactive background state. (Thanks to @aukgit)
+
+---
+
+## [v4.233.1] - 2026-10-19
+
+### Added
+- **Native Base64 Image Reader for Safe Clipboard Copying**: Introduced `read_image_as_base64` in `src-tauri/src/commands/cmd_files.rs` and registered in `src-tauri/src/lib/run.rs` to read local image files securely with path canonicalization, system path protection, and a 100MB ceiling; decodes Base64 data directly into binary PNG Blobs (`base64ToBlob`) in `src/components/instances/PromptTreeView/clipboard.ts`, eliminating offscreen HTML canvas CORS errors and WebView2 `SecurityError` canvas tainting; added rich event JSON clipboard copying with toast feedback. (Thanks to @aukgit)
+
+### Fixed
+- **Singleton Context Menu Architecture & Comprehensive Dismissal Guard**: Eliminated duplicate ghost context menu rendering and menu lingering by centralizing context menu state into `src/components/instances/PromptTreeView/TreePanel.tsx`, rendering exactly one `<PromptTreeContextMenu>` in the DOM; mounted a transparent full-screen portal capture backdrop (`fixed inset-0 z-[99998]`) behind the active context menu (`z-[99999]`); registered window capture listeners in `src/components/instances/PromptTreeView/PromptTreeContextMenu.tsx` for `pointerdown`, `contextmenu`, `keydown` (`Escape`), `scroll`, and `blur`; removed the 100ms click-dropping delay so menus dismiss immediately on any outside interaction. (Thanks to @aukgit)
+- **Enqueued Prompt Turns Visibility & Auto-Expansion**: Fixed queued item invisibility in `src/components/instances/PromptTreeView/conversationGuards.ts`, `ConversationNode.tsx`, `ProjectNode.tsx`, and `tierClassification.ts` by introducing `isConversationOrTurnQueued` to inspect child prompt turns. Conversation nodes with queued turns now auto-expand upon mount, display amber `QUEUED` badges with clock icons, sort into Tier 2 immediately beneath running items, and are preserved when filtering by `activeFilter === 'queued'`. Removed duplicate local context menu states and redundant portals from `ConversationNode.tsx` and `ProjectNode.tsx`. (Thanks to @aukgit)
+- **GitMap Cluster Node Discovery & CLI Parsing**: Upgraded `import_ssh_from_gitmap()` in `src-tauri/src/modules/ssh_manager/sync.rs` to prioritize `gitmap cluster nodes --json` and `export-json` which emit machine-readable JSON arrays, resolving silent import failures caused by text-table stdout from legacy `ssh nodes` commands; verified with automated unit tests for `gitmap cluster nodes --json` JSON decoding. (Thanks to @aukgit)
+- **Accurate Offline Node Quota Telemetry**: Corrected unreachable SSH node fallback values in `src-tauri/src/modules/ssh_manager/exec.rs` from fabricated 100.0% to 0.0% (`quota_4h_pct: 0.0`, `quota_weekly_pct: 0.0`), preventing offline nodes from presenting false availability in cluster views. (Thanks to @aukgit)
+- **Account Store IPC Request Debouncing & Coalescing**: Added `inFlightFetchPromise` coalescing and 1500ms timestamp-based debouncing to `fetchAccounts` in `src/stores/useAccountStore.ts`, eliminating duplicate concurrent IPC requests during multi-component mounting while supporting explicit force refreshes. (Thanks to @aukgit)
+
+---
+
+## [v4.233.0] - 2026-10-19
+
+### Added
+- **SSH Fleet & GitMap Cluster Account/Instance Discovery & Auth Key Forwarding**: Upgraded `get_cluster_instances_and_balances` in `src-tauri/src/modules/ssh_manager/exec.rs` to query real multi-instances and bound Google account emails via GitMap discovery and cluster metadata; forwarded identity public key `-i <pubkey>` in `fix_node_auth_via_gitmap` across `mesh.rs`, `commands/ssh.rs`, and CLI handlers, removing hardcoded single-node bypasses in favor of generalized credential vault auto-repair. (Thanks to @aukgit)
+- **Telegram Multi-Node Coordinator Routing & Syntax Standardization**: Removed fatal callback drop guards in `src-tauri/src/modules/telegram_inbound/send_flow.rs` so the receiving Telegram bot coordinator accurately routes prompts across cluster nodes; standardized remote dispatch syntax in `src-tauri/src/modules/telegram_inbound/injection.rs` to canonical `agm prompt send <project> --instance <inst> "<prompt>"` with safe quoting and multi-line escaping. (Thanks to @aukgit)
+- **CDP-First Prompt Submission for Active IDE Windows**: Inverted prompt dispatch in `src-tauri/src/modules/repo_db/agy.rs` to submit directly via Chrome DevTools Protocol (CDP) into active IDE windows before falling back to spawning external `agy` CLI background workers, eliminating worker collision on open workspaces. (Thanks to @aukgit)
+- **Instance List PID Status Pill & Path Tail Alignment**: Replaced ambiguous status codes with an emerald pulse badge (`PID: <pid>`) and aligned executable tail and data directory tail together on the exact same horizontal flex row (`.../Antigravity.exe · .../data`) in `src/components/instances/table/InstanceRowCells.tsx`. (Thanks to @aukgit)
+- **Royal Violet Switch Account Modal Modernization**: Upgraded `src/pages/instances/SwitchAccountDialog.tsx` with cohesive dark-glass UI/UX (`var(--ui-surface-1)`, `var(--ui-border-subtle)`), clear selection states, and keyboard accessibility. (Thanks to @aukgit)
+- **Caller IDE Self-Preservation & Transient Test Sandboxing**: Hardened `detect_caller_instance_id` to protect the developer's active workspace session (`default-copy-5597`) from accidental termination during CLI operations; added transient test sandboxes (`agm instances test-create` and `agm instances test-clean`) for non-destructive lifecycle verification. (Thanks to @aukgit)
+
+### Fixed
+- **Prompt Tree Action Buttons & 1-Click Backup/Restore**: Wired direct 1-click execution for Backup and Restore in `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx` to `coreActions.handleBackup()` and `coreActions.handleRestore()`; added spinning animation on the Refresh icon during active sync; provided instant visual notification feedback on Reset and Refresh. (Thanks to @aukgit)
+- **Prompt Tree Screen Flickering Elimination**: Restricted animated skeleton loaders in `src/components/instances/PromptTreeView/TreePanel.tsx` and `PromptTreeViewModal.tsx` strictly to initial cold starts (`isLoading && treeData.length === 0`), keeping the active tree rendered during background polling to eliminate visual flashing. (Thanks to @aukgit)
+- **Deterministic Prompt Ordering & Badges**: Enforced 3-tier deterministic sorting in `ProjectNode.tsx` and `tierClassification.ts` with `RUNNING` prompts strictly at Tier 1, `QUEUED` prompts at Tier 2 with explicit amber badges, and timestamp descending at Tier 3; prevented running/queued prompts from being marked as stale or empty. (Thanks to @aukgit)
+- **Prompt Preview Header Decluttering & Dropdown Z-Index Stacking**: Removed redundant `"User Prompt"` badge and duplicate `{instanceNameDisplay}` text token from `DetailHeader.tsx`, relocating deep runtime telemetry to the Details modal; added `relative z-40` to `ModalHeader.tsx` container and `relative z-50` to `ImportExportMenu.tsx` so menus stack cleanly above banners and header elements. (Thanks to @aukgit)
+- **Supabase 5-Minute Atomic Circuit Breaker & Polling Rate Dampening**: Implemented atomic `LAST_SUPABASE_ERROR_TIMESTAMP` circuit breaker in `src-tauri/src/modules/supabase_sync/types.rs` with a 300-second cooldown on network errors across `fleet.rs`, `query.rs`, and `release.rs`; relaxed fleet polling to 300s in `useFleetMachines.ts`; added a 30-second TTL cache for account listings in `src-tauri/src/modules/account/crud.rs` to stop repetitive reads of 46 JSON account files; removed circular cache invalidation sabotage in `src-tauri/src/modules/repo_db/detection.rs:254` to eliminate console log flood. (Thanks to @aukgit)
+- **Process Termination & Lockfile Cleanup**: Enforced process tree killing via `taskkill /F /T /PID` before stopping or switching accounts in `src-tauri/src/commands/instance.rs`, ensuring complete release of Chromium lockfiles (`code.lock`, `DevToolsActivePort`, `Singleton*`). (Thanks to @aukgit)
+
+---
+
+## [v4.232.1] - 2026-10-18
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.232.0] - 2026-10-18
+
+### Added
+- **UI/UX Session Overview Collapsible & State Memory**: Converted the session overview dashboard in `src/components/instances/PromptTreeView/PromptInstructionView.tsx` to be collapsed by default to save vertical viewport space; added subtle low-profile purple expander trigger (`ChevronDown`/`ChevronUp`); persisted collapse/expand state in `localStorage` (`agm_prompt_overview_expanded`) across sessions; compacted collapsed view into a single-line metadata bar. (Thanks to @aukgit)
+- **Standardized 24-Hour Date/Time & Relative Time Formatting**: Implemented centralized date formatting in `src/utils/date.ts` supporting `DD-MMM-YYYY HH:mm` (e.g. `18-Oct-2026 21:40`) in 24-hour clock using the local system timezone, with relative time indicators ("ran 5 minutes ago", "ran 1 day ago") and duration seconds suppression when hours or minutes exist; added user-configurable `date_format_mode` toggle (`24h` / `12h` / `iso`) in Settings. (Thanks to @aukgit)
+- **SSH Fleet Account & Instance Discovery with Remote Prompt Dispatch**: Upgraded `get_cluster_instances_and_balances` in `src-tauri/src/modules/ssh_manager/exec.rs` to query real multi-instances and bound Google account emails via SSH; elevated Account Email and Instance Name to primary columns in `FleetMachinesTable.tsx` and `SshGitmapSection.tsx` while demoting raw IP into an interactive hover badge; added dynamic instance `<select>` dropdown and 1-click remote prompt dispatching. (Thanks to @aukgit)
+
+### Fixed
+- **Persistent Expand Full Toggle across Input/Output Tabs**: Fixed UI bug in `src/components/instances/PromptTreeView/DetailTabs.tsx` where switching from the Input to Output tab hid the Expand Full / Fold toggle button; decoupled expand toggle from instruction tab so users can freely expand both input instructions and execution results. (Thanks to @aukgit)
+- **Header Deduplication & Detail Modal Clarification**: Removed redundant title, sequence badge (`C211`), and conversation ID repetitions from the overview card; clarified sequential conversation index (`C211` = Conversation #211) and interaction turns (`turns` = user/assistant request-response cycles) in `src/components/instances/PromptTreeView/DetailsModal.tsx`. (Thanks to @aukgit)
+- **Prompt Tree Image Rendering & Queued/Running Visibility Fix**: Added Tauri v2 `core:asset:default` capability in `src-tauri/capabilities/default.json` and resolved relative image paths against `repo_path` in `clipboard.ts` and `PromptMarkdownPreview.tsx`; protected queued prompts from stale conversation demotion in `conversationGuards.ts`; synthesized running/queued projects from `active_prompts` in `src-tauri/src/modules/repo_db/tree_phases.rs`, ensuring the left panel is never empty when prompts are in flight. (Thanks to @aukgit)
+- **Closed IDE Send Delivery Ladder**: Upgraded `src-tauri/src/modules/instance/smart_run.rs` and `src-tauri/src/modules/repo_db/agy.rs` with an adaptive 5-second process stabilization ladder and CDP retry mechanism for cold-started IDE instances, eliminating lost prompts when dispatching to closed IDEs. (Thanks to @aukgit)
+
+---
+
+## [v4.231.1] - 2026-10-18
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.231.0] - 2026-10-18
+
+### Added
+- **Instance List View Layout & PID Indicator**: Confirmed that numeric status values (e.g. `1632`) represent the native OS Process ID (`PID`); merged separate `Status & PID` and `IDE EXE & DATA` table columns into a unified `Status, Process & Environment` cell in `src/components/instances/InstanceTable.tsx` and `src/components/instances/table/InstanceRowCells.tsx`, rendering the running status with PID badge (`PID: <pid>`), shortened executable path (`.../Antigravity.exe` with Terminal icon), and shortened user data directory (`.../antigravity-data` with Folder icon) together on the exact same horizontal flex row with subtle `·` separators and a contiguous segmented copy action capsule. (Thanks to @aukgit)
+- **Royal Violet Switch Account Modal Modernization**: Redesigned `src/pages/instances/SwitchAccountDialog.tsx` to 100% Royal Violet design token compliance (`var(--ui-surface-1)`: `#171025`, `var(--ui-border-subtle)`: `#40285e`, `var(--ui-canvas)`: `#090611`, `var(--ui-interactive)`: `#7c3aed`, `var(--ui-success)`: `#1af18d`); integrated a segmented quota visualization pill capsule header (`4H: <val>% | Weekly: <val>% | Total: <val>%`); maintained `.ui-interactive-row` whole-card row selection, Escape key dismissal, and keyboard accessibility. (Thanks to @aukgit)
+- **E2E Lifecycle Verification Suite**: Comprehensive verification through `scripts/test-instance-lifecycle-e2e.ps1` covering caller self-preservation guards, transient test sandbox creation (`agm instances create-test`), verified PID eviction, switch synchronization, audit logging, and clean filesystem teardown (`agm instances rm-test`). (Thanks to @aukgit)
+
+### Fixed
+- **Deterministic 5-Stage Process Termination Ladder**: Fixed stop instance button and process killing on Windows in `src-tauri/src/modules/instance/close.rs` and `create.rs` by establishing a 5-stage progressive ladder: root PID + recursive child descendant discovery, primary tree kill via `taskkill /F /T /PID <root_pid>` with `CREATE_NO_WINDOW (0x08000000)`, high-frequency 50ms verification polling (up to 1500ms), force escalation fallback via direct Win32 kernel kill (`force_terminate_pid_win32`) and PowerShell `Stop-Process -Id <pid> -Force`, mandatory 200ms kernel settle delay guaranteeing NTFS file handle release, and unconditional Chromium lockfile eviction (`lockfile`, `code.lock`, `DevToolsActivePort`, `Singleton*`). (Thanks to @aukgit)
+- **Account Switch Pre-Switch PID Eviction & Synchronization**: Fixed account switching synchronization in `src-tauri/src/modules/instance/switch.rs` and `credentials.rs` by forcefully terminating any active instance PID before accessing `state.vscdb`, clearing stale Chromium lockfiles, enforcing a 200ms settle delay to prevent Electron shutdown write-back race conditions, and atomically injecting credentials with progressive retry backoff. (Thanks to @aukgit)
+- **Sharded Instance Lifecycle Audit Trail Visibility**: Fixed empty audit trail in `src-tauri/src/modules/task_history_db/switch_history.rs` and `src/components/instances/InstanceAuditTrail/InstanceAuditTrailModal.tsx` by expanding default instance aliases (`""`, `NULL`, `"default"`, `"antigravity"`, `"agy"`, `"ide"`) across Split-DB queries, guaranteeing all response field aliases (`recent_switches`, `total_switches`, `records`, `items`), and adding smart auto-tab fallback to the `operations` tab when switch cycles are 0 so users immediately see instance lifecycle events (`LaunchInstance`, `StopInstance`, `RestartInstance`, `CreateInstance`, `SwitchAccount`). (Thanks to @aukgit)
+- **Active Caller IDE Self-Preservation**: Hardened caller IDE detection (`detect_caller_instance_id` walking 24 parent process generations and matching workspace paths) across `agm instances stop`, `switch`, `restart`, `delete`, and `rm-test` with `refuse_if_caller_instance` guards to prevent CLI commands and automated routines from self-terminating the developer's active workspace session with exit code 2. (Thanks to @aukgit)
+- **Clipboard Focus Loss Resilience & 3-Stage Fallback Ladder**: Eliminated Error Manager warnings (`NotAllowedError: Failed to execute 'writeText'/'write' on 'Clipboard': Document is not focused`) in `src/utils/clipboard.ts`, `src/components/instances/InstanceAuditTrail/InstanceAuditTrailModal.tsx`, and `src/components/instances/PromptTreeView/clipboard.ts` by ensuring document focus (`ensureDocumentFocus`), wrapping clipboard writes in a 3-stage fallback ladder (Async Clipboard API -> `document.execCommand` -> native desktop helper `copy_text_to_clipboard` via OS clip/pbcopy/wl-copy), and suppressing false-alarm telemetry when subsequent fallbacks succeed. (Thanks to @aukgit)
+- **Instance Registry Atomic Persistence & 0-Byte Recovery**: Eliminated intermittent parse errors (`Error: Failed to parse instances registry: expected value at line 1 column 1`) in `src-tauri/src/modules/instance/registry.rs` by upgrading `save_registry()` to use atomic file replacement (`write_atomic` via Windows `MoveFileExW`) and automated `.bak` backup, adding automatic recovery from `instances.json.bak` and fallback initialization in `load_registry()`, and routing silent background polling failures in `src/stores/useInstanceStore/crud.ts` away from user-facing error modals. (Thanks to @aukgit)
+
+---
+
+## [v4.230.0] - 2026-10-18
+
+### Added
+- **Prompt Tree View Ergonomics & Compact Action Rows**: Compacted Input / Output indicators into a unified segmented capsule alongside Expand Full on the right-hand side of Row 2; streamlined View Modes (`Preview`, `Raw`, `Edit`, `Details`) into an icon-only capsule (`rounded-lg` container, `rounded-md` buttons) on the left-hand side with hover tooltips; elevated Copy, Send, and Rerun controls to Row 1 with dual rich copy options (`includes image` binary PNG + HTML vs `copy as text`). (Thanks to @aukgit)
+- **Prompt Image Previews & Native Multimodal Clipboard**: Added inline image resolution via Tauri asset URLs (`convertFileSrc`) preventing WebView2 image rendering failures; enabled right-click context menu and dual clipboard copy supporting rich HTML with raw PNG binary payloads. (Thanks to @aukgit)
+- **Conversation Session Dashboard & Queue Indicators**: Added comprehensive Conversation Session Summary Dashboard when viewing session roots (turn count, duration, timestamp range, enqueued prompts list) and breadcrumb badge (`↳ Turn X of Y`) on individual prompt turns; integrated `+N queued` counters in tree items and detail headers. (Thanks to @aukgit)
+- **Local Mesh Shared Cluster Display**: Restored the Shared Cluster view in instance management to discover and display local SSH mesh nodes (`w1`, `w2`, `w3`, `w4`, `u1`, `main`) with TCP liveness probing even when Supabase Cloud Sync is disabled. (Thanks to @aukgit)
+
+### Fixed
+- **Instance Prompt Bleeding & False Liveness**: Enforced Explicit Idle Supremacy in `tree_collect.rs` and `liveness.rs` where explicit idle statuses (`CASCADE_RUN_STATUS_IDLE`) override unreset `not_fully_idle` engine artifacts; restricted instance card active task indicators to genuine conversation owners (`c.instance_id === inst.config.id`). (Thanks to @aukgit)
+- **SSH Node W2 Reachability & GitMap Parity**: Fixed SSH connection failures to remote node `w2` (192.168.1.7:22) by falling back to GitMap Go in-process SSH engine and supporting vaulted credential delegation (`rtyrty123@`) via `gitmap ssh fix-auth` and `gitmap ssh exec`. (Thanks to @aukgit)
+- **Standalone JSON Import/Export & Modal Overlay**: Upgraded prompt tree JSON export to v2.0 envelope schema with portable base64 embedded images and relative `${workDir}` path normalization; elevated modal overlay z-index to `z-[100050]` so export/import dialogs are never trapped behind the main prompt tree modal. (Thanks to @aukgit)
+- **Updater Pinned Version Execution & Live Version Extraction**: Fixed updater script `install.ps1` to write `DisplayVersion` to Windows Registry branding (resolving false `v4.190` reports), inspect PE executable `ProductVersion` first, and enforce strict `-isPinned` contracts preventing silent fallback to unrequested versions. (Thanks to @aukgit)
+
+---
+
+## [v4.229.0] - 2026-10-18
+
+### Fixed
+- **Process Termination Ladder & Account Switch Synchronization**: Fixed stop instance button and account switching synchronization failures by establishing a multi-stage process termination ladder (`taskkill /F /T` with fallback to Win32 `TerminateProcess`), conscious PID matching against cached process instances, and deterministic lockfile eviction (`code.lock`, `lockfile`, `DevToolsActivePort`) before updating `state.vscdb`. (Thanks to @aukgit)
+- **Active Caller IDE Self-Preservation**: Hardened caller IDE detection (`detect_caller_instance_id` walking 24 parent process generations and matching workspace paths) across `agm ff`, `switch_account_to_instance`, `stop_instance`, and `close_instance` with `refuse_if_caller_instance` guards to prevent CLI commands and automated routines from self-terminating the developer's active workspace session. (Thanks to @aukgit)
+- **Audit Trail Query Filter & Empty State Remediation**: Fixed empty instance audit trail by refining SQL filter logic to eliminate global account crud pollution from `default` instance records, instrumenting missing lifecycle operations (`RestartInstance`, `CloneInstance`, `CreateInstance`) into `task_history_db`, and expanding frontend action code mapping for lifecycle operations. (Thanks to @aukgit)
+
+### Added
+- **Instance List View Layout & PID Indicator**: Aligned running instance status (`● PID: <pid>`), executable tail, and data directory tail inline on the same horizontal row with monospace formatting, enhanced tooltips, and contiguous segmented copy actions. (Thanks to @aukgit)
+- **Switch Account Dialog UI/UX Modernization**: Redesigned switch account modal with Royal Violet tokens (`#171025`, `#40285e`, `#1af18d`), circular radio selection indicators, standard `<TierBadge />` integration, search filter clear button, and full keyboard accessibility. (Thanks to @aukgit)
+- **E2E Lifecycle Verification Suite**: Comprehensive verification through `scripts/test-instance-lifecycle-e2e.ps1` covering caller self-preservation guards, transient test sandbox creation, PID eviction, switch synchronization, and clean filesystem teardown. (Thanks to @aukgit)
+
+---
+
+## [v4.228.1] - 2026-10-18
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.228.0] - 2026-10-18
+
+### Fixed
+- **Conscious Process Termination & Account Switch Synchronization**: Fixed stop instance button and account switching synchronization by implementing Win32 process tree escalation (`taskkill /F /T /PID` and `TerminateProcess`), 8.3 path normalization (`GetShortPathNameW`), and a 200ms kernel settle delay to guarantee process death and lockfile release before credential rewrites in `state.vscdb`. (Thanks to @aukgit)
+- **Active Caller IDE Self-Preservation**: Hardened `detect_caller_instance_id` to trace cloned executables (`Antigravity-<id>.exe`), `ANTIGRAVITY_APP_DATA_DIR`, and `VSCODE_PID`, enforcing caller immunity guards across `rm`, `switch`, `ff`, and `stop` to prevent CLI operations from terminating active IDE developer windows. (Thanks to @aukgit)
+
+### Added
+- **Instance List View Path Alignment & PID Clarification**: Explicitly formatted running instance status as `● Running (PID: <pid>)` with pulsing emerald indicator; aligned executable tail and data directory tail together inline on the same horizontal row with monospace pill styling and dual copy actions. (Thanks to @aukgit)
+- **Switch Account Dialog UI/UX Modernization**: Completely overhauled switch account modal with AGM dark-glass styling (`rounded-2xl`, Royal Violet surfaces, sky/amber badges, `.ui-interactive-row` selection, Escape key dismissal, and segmented capsule controls). (Thanks to @aukgit)
+- **Instance Audit Trail Visibility & Lifecycle Actions**: Extended `AuditAction` enum with instance lifecycle actions (`LaunchInstance`, `StopInstance`, `KillInstance`, `CreateInstance`, `CloneInstance`, `DeleteInstance`, `InstanceError`), instrumented backend lifecycle logging into `task_history_db`, and added automatic fallback to operations tab to eliminate empty audit states. (Thanks to @aukgit)
+- **CLI Test Sandboxing & Timeout Hardening**: Added `agm instances current`, `agm instances create-test`, and `agm instances rm-test` for sub-50ms transient data-only testing, and hardened test suite (`scripts/test-instance-autoswitch-e2e.ps1`) with 30-second bounded timeouts. (Thanks to @aukgit)
+
+---
+
+## [v4.227.3] - 2026-10-18
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.227.2] - 2026-10-18
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.227.1] - 2026-10-17
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.227.0] - 2026-10-18
+
+### Fixed
+- **Error E9001 Root-Cause Resolution & Sibling Instance Account Isolation**: Resolved Error E9001 (`Cannot switch instance to account: Account is actively bound to running sibling instance`) during Fast-Forward and manual rotation. Actively running instances (`is_running == true`) are never marked stale or stealable in `is_instance_binding_stale_or_exhausted`; running sibling instance accounts (checking `bound_account_id`, `bound_email`, and default active account) are strictly excluded from candidate evaluation in `manual.rs`; and live pre-switch candidate verification in `selection.rs` guards against sibling account theft. (Thanks to @aukgit)
+- **Prompt Queue Missing Workspace Fail-Fast & Infinite Retry Loop Elimination**: In `PromptQueueScheduler` (`queue.rs`), added workspace existence validation to prevent infinite 5-second queue retry loops when target directories are missing; marked invalid prompts as `failed` with actionable diagnostics and applied `updated_at = now` retry backoff on dispatch errors. (Thanks to @aukgit)
+- **Supabase Connection & Heartbeat 5-Minute Error Backoff**: Added a 300-second (5-minute) error backoff in `start_sync_worker` (`fleet.rs`) on Supabase connection/heartbeat errors, eliminating repetitive DNS/connection warning storms. (Thanks to @aukgit)
+
+### Added
+- **Instance Card & Account Card Toolbar Redesign & Riseup Yellow 3D**: Replaced the 4th icon (Tag) on Account and Instance cards with the Fast-Forward (`FastForward`) button; relocated Tag (Edit Label) into the More dropdown; flattened Switch (yellow) and Delete (red) buttons when idle; and applied authoritative Riseup Yellow 3D gradients (`from-[#FDE047] via-[#FACC15] to-[#EAB308]`, border `#CA8A04`, depth shadow `[0_2px_0_0_#A16207,0_3px_5px_rgba(0,0,0,0.2)]`) on hover. (Thanks to @aukgit)
+- **UI Hover Dark-Glass Contrast & Green Duration Micro-Pill Badges**: Replaced stark white hover backgrounds across `AuditTable.tsx` and account rows with balanced dark-glass styling (`hover:bg-slate-100/80 dark:hover:bg-slate-800/60`); removed inner cell opaque backgrounds; upgraded `default-copy` instance badges to high-contrast `bg-indigo-100 text-indigo-950 font-black`; and enclosed green duration text (`#1af18d`) in high-contrast micro-pill badges (`bg-emerald-500/15 text-emerald-950 dark:text-emerald-200 border-emerald-500/30 font-bold`). (Thanks to @aukgit)
+- **Background Loop Throttling & 30-Second Minimum Floor**: Enforced strict `>= 30s` minimum floor on CLI poller loops (`fpug` and `sug` in `green_cmds.rs`) and elevated `MIN_GOOGLE_QUOTA_CHECK_SECONDS` to 30 seconds. (Thanks to @aukgit)
+- **Prompt Parameter Right-Click Context Menu & 1-Click Reset Filters**: Added `onContextMenu` right-click handlers on prompt parameter badges (`#{seqDisplay}`, `USER_PROMPT`, context `#C001 · default`) in `DetailHeader.tsx` to copy clean JSON parameter payloads; added 1-click Clear `✕` button to `InstancesFilterBar` and `InstancesNoResultsState`; and added "Reset to Local" button in remote SSH prompt dispatcher. (Thanks to @aukgit)
+- **Updater Typography & Cross-Platform Terminal Fonts**: Configured Win32 updater console to 18pt Consolas (`font_family = 54`, `dw_font_size.y = 18`, `font_weight = 600`) with Lucida Console fallback for Windows, with specification for Ubuntu Mono and SF Mono. (Thanks to @aukgit)
+- **GitMap <-> AGM Mutual HMAC-SHA256 JWT Communication Bridge**: Architected secure local HTTP JWT bridge over port `:18188` with 60-second token expiration, replay nonce cache with 120s TTL, and scoped permissions (`email:read`, `cluster:sync`). (Thanks to @aukgit)
+
+---
+
+## [v4.226.1] - 2026-10-17
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.226.0] - 2026-10-18
+
+### Fixed
+- **Error E9001 Root-Cause Resolution & Sibling Instance Account Isolation**: Fixed Error E9001 (`Cannot switch instance to account: Account is actively bound to running sibling instance`) during Fast-Forward and manual rotation. Actively running instances (`is_running == true`) are never marked stale or stealable in `is_instance_binding_stale_or_exhausted`; running sibling instance accounts (checking `bound_account_id`, `bound_email`, and default active account) are strictly excluded from candidate evaluation in `manual.rs`; and live pre-switch candidate verification in `selection.rs` guards against sibling account theft. (Thanks to @aukgit)
+- **Prompt Queue Non-Existent Workspace Handling & Infinite Retry Loop Elimination**: In `PromptQueueScheduler` (`queue.rs`), added workspace existence validation to prevent infinite 5-second queue retry loops when target directories are missing; marked invalid prompts as `failed` with actionable diagnostics and applied `updated_at = now` retry backoff on dispatch errors. (Thanks to @aukgit)
+
+### Added
+- **Accounts Table UI Redesign & Riseup Yellow 3D Switch Button**: Stripped blinding stark white hover backgrounds (`hover:!bg-white`) across `SortableAccountRow.tsx` and `AccountRowContent.tsx` in favor of subtle dark-glass styling (`hover:bg-slate-100/70 dark:hover:bg-slate-800/50`); enhanced bound instance badge (`Default Copy`) contrast; flattened Delete and Switch action buttons when row is idle; styled Switch button with Riseup Yellow 3D gradient; reordered action buttons (Fast-Forward `>>`, Refresh `↻`, 3D Riseup Yellow Switch, Delete `🗑️`, More `···`); and moved custom label Tag edit into More dropdown. (Thanks to @aukgit)
+- **Prompt Tree View Reset Filters**: Added an interactive "Reset Filters" button in `TreePanel.tsx` that appears when any filter is active, resetting search query, status filter, category filter, and project scope in a single click. (Thanks to @aukgit)
+- **Adaptive L1 Quota Cache TTL & Supabase Error Backoff**: Implemented adaptive L1 quota cache expiration in `quota_fetch.rs` (120s for depleted <20%, 180s for <50%, 300s for healthy >=50% quota), reducing Google OAuth quota polling overhead; added 300-second (5-minute) error backoff in `start_sync_worker` (`fleet.rs`) on Supabase connection/heartbeat errors. (Thanks to @aukgit)
+- **Win32 Updater Console 18pt Consolas Font**: Upgraded Win32 console updater font in `delegate_updater/run.rs` to 18pt Consolas (`font_family = 54`, `FF_MODERN | FIXED_PITCH`, `weight = 600`) with Lucida Console fallback for crisp readability during updates. (Thanks to @aukgit)
+- **Codebase Hygiene & DRY Domain Enums**: Replaced magic status literals with strongly-typed enums (`PromptExecutionStatusType`, `RemoteDispatchStatusType`, `CommandExecutionStatusType`, `ProjectAuditRationaleType`, `PromptAuditCriteriaType`, `AuditTaskStatus`); flattened nested if pyramids with guard clauses across `goal_heartbeat.rs`, `detection.rs`, `tree_collect.rs`, and `pid_scan.rs`. (Thanks to @aukgit)
+
+---
+
+## [v4.225.0] - 2026-10-17
+
+### Added
+- **System-Wide Broadcasting Design Pattern & 30-Second Minimum Interval Guard**: Enforced an architectural invariant across Antigravity Manager and GitMap mandating that all periodic background broadcasts, polling schedulers, worker tickers, and notification dispatchers operate at intervals of not less than 30 seconds (`>= 30s`) to prevent CPU spikes, database lock contention, and notification storms. (Thanks to @aukgit)
+- **Prompt Goal Heartbeat Worker Interval Clamping**: Clamped the detached prompt goal heartbeat worker loop in `goal_heartbeat.rs` to a strict 30-second minimum (`interval_secs.max(30)`, default 30s), eliminating rapid disk-write cycles. (Thanks to @aukgit)
+- **Notification Hub Duplicate Switch Broadcast Suppression Window**: Expanded the duplicate switch notification broadcast suppression window in `channels.rs` from 5s to 30s (`(now_ts - guard.1).abs() <= 30`), completely preventing rapid notification storms across Email, Telegram, and Supabase. (Thanks to @aukgit)
+- **GitMap Cross-System Interval Alignment**: Updated GitMap task synchronization defaults (`TaskMinInterval = 30`, `TaskDefaultInterval = 30` in `constants_task.go`), clamped async periodic monitors (`gitmap async -t`) to `>= 30s`, clamped macro runner intervals to `>= 30s`, and enforced minimum 30s cluster distribution heartbeat loops. (Thanks to @aukgit)
+
+---
+
+## [v4.224.0] - 2026-10-17
+
+### Added
+- **Modernized Compact Telegram Notification Cards with White Text Values**: Redesigned all Telegram alert cards (Account Rotation, Post-Switch Liveness, Emergency Alerts, and System Updates) to be ~40% more vertically compact; all key values are indented on the next line in high-contrast bold white text (`kv_block`, `kv_white`); eliminated duplicate fields (`Bound` in header, `Event reason` in workspace); and clamped project lists to top-3 with a compact `(+N more)` badge. (Thanks to @aukgit)
+- **Telegram Inbound Step 2 Multi-Machine Collision Shielding & Debounce Guard**: Resolved duplicate Step 2 prompt wizard dispatch in Telegram by enforcing strict destination matching via `node_label::is_current_machine()`; non-target cluster nodes silently drop incoming callbacks, while the target node suppresses rapid duplicate taps (<3s) to prevent repeated messages. (Thanks to @aukgit)
+- **Node Network Identity, IP Address & Signal Attribution in Telegram**: Enhanced Telegram machine and instance pickers with explicit node alias, IP address, and mesh signal indicators (`[alias • ip • 📶 signal]`); instance selection buttons now display `🏷️ {name} ({alias} • {ip})` arranged in single-column layouts for maximum legibility. (Thanks to @aukgit)
+- **Clean Action-Only Inline Keyboard Markups**: Purged the duplicate top-row static banner button from Account Rotation alerts (`build_switch_alert_reply_markup`), presenting only functional action buttons: `[ 💰 Check Balance ] [ 📥 Export CSV ]`, `[ 🚀 Prompt Instance ] [ 🔄 Refresh Status ]`, and `[ 📋 Copy Prompt ]`. (Thanks to @aukgit)
+
+---
+
+## [v4.223.0] - 2026-10-17
+
+### Added
+- **Prompt Tree Right-Click Custom Context Menus (`Project` & `Conversation` & `Turns`)**: Added right-click context menus directly to Project headers (`ProjectContextMenu.tsx`) with Import into Project, Export (JSON, SQLite DB, YAML), and Rerun (Queued or All) actions; attached context menus and keyboard accessibility (`Enter`, `Space`, `tabIndex={0}`) to child subagent items and individual prompt turn entries (`ConversationNode.tsx`); implemented viewport boundary clamping (`createPortal` within `window.innerWidth - 240` and `window.innerHeight - 380`) to eliminate off-screen menu clipping; and applied high-contrast active selection highlights (`bg-sky-500/10 border-l-2 border-sky-500 text-sky-400 font-medium`) for active conversation turns. (Thanks to @aukgit)
+- **Top Toolbar Right-Aligned Navigation Tabs & Vertical Dead-Space Recovery**: Redesigned Row 2 of `DetailHeader.tsx` into a `justify-between` toolbar, relocating primary navigation tabs (`[ Prompt Instruction | AI Results & Outputs ]`) to the right side of the toolbar row beside top-level action capsules; eliminated the redundant 3rd row navigation tabs and borders in `DetailTabs.tsx` to reclaim ~44px of vertical height for expanded prompt reading and result inspection; streamlined ViewMode toggles (`[ Preview | Raw | Edit ]`) and Details into a compact sub-bar directly above content. (Thanks to @aukgit)
+- **Top-Level Copy All Consolidation & Redundant Footer Buttons Removal**: Consolidated all prompt copy operations into the top-level `[ Copy All | v ]` segmented capsule in `DetailHeader.tsx` (Copy All Content+Images, Copy Full Prompt, Copy Clean Text, and Save Images); purged duplicate bottom copy buttons across Preview and Raw modes in `PromptInstructionView.tsx`. (Thanks to @aukgit)
+- **Telegram Inbound Machine Routing & Fleet Broadcast Storm Shielding**: Eliminated multi-machine response collisions by normalizing Supabase `public.command_queue` payloads with explicit `target_node_id` (previously defaulting to wildcard `'*'`) across `injection.rs`, `open_shot.rs`, and `processing.rs`; unified current machine detection via `node_label::is_current_machine()`; deduplicated machine entries in `machine_entries()` so only a single "This machine" button is generated; and added native CLI support for `agm prompt <target> [flags] <prompt_text>` in `cli/prompts.rs` to allow GitMap cluster execution and SSH remote prompts to succeed directly. (Thanks to @aukgit)
+- **Telegram Prompt Input UX & Destination Locked Flow**: Redesigned `destination_locked_reply()` with prominent visual dividers and clear instruction (`💬 Type your prompt below and send it as a plain chat message`); encapsulated past prompts in Telegram Bot API 7.2+ `<blockquote expandable>` so direct typing is the obvious primary action; renamed Step 3 manual target button to `[✏️ Enter Project / Conv ID]`; and added graceful prompt-detection fallback in `SendStage::TypeConversation` to route direct prompt text to the default project. (Thanks to @aukgit)
+
+---
+
+## [v4.222.3] - 2026-10-17
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.222.2] - 2026-10-17
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.222.1] - 2026-10-17
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.222.0] - 2026-10-17
+
+### Added
+- **3-Tier Prompt Subtree Hierarchy (`Project` → `Conversation` → `Prompts List`)**: Expanded the AGM prompt tree from 2 tiers to 3 full tiers; conversations now expand with interactive chevrons to display individual prompt turns (`Turn 1, Turn 2, ..., Turn N`), their timestamps, 200-word Poppins previews, attached image indicators, and deterministic execution states. (Thanks to @aukgit)
+- **Active Task Running Symbol & False IDLE Root Cause Remediation**: Resolved false IDLE status on running IDE tasks by enforcing live runtime process liveness precedence over static transcript heuristics (`is_owning_inst_alive && not_fully_idle > 0 && is_recent`); eliminated intermediate planner turn short-circuits (`is_terminal_done`) and premature IDLE mutations in `tree_collect.rs` and `tree_node_conv.rs`; added pulsing emerald badges for `RUNNING` turns and amber badges for `QUEUED` turns. (Thanks to @aukgit)
+- **Section-Level Import / Export (JSON, SQLite DB, YAML) with Embedded Base64 Images**: Added right-click context menu triggers (`ProjectContextMenu.tsx`, `ConversationContextMenu.tsx`) and top-level modals (`PromptTreeExportModal.tsx`, `PromptTreeImportModal.tsx`) to export and import arbitrary scopes (Full Tree, Single Project, Single Conversation, Prompt Subtree); embedded all local image attachments as Base64 data URIs (`agm-asset://`) in exports and materialized them back into `./.antigravity/attachments/` on import for 100% cross-machine portability with zero broken links. (Thanks to @aukgit)
+- **Refresh Button 4-Point RCA Fix**: Eliminated selection whiplash by calling `loadTree(false, true)` to preserve active project and conversation selection; bound proactive `detect_running_projects` workspace discovery; eradicated SQLite `immutable=1` WAL bypass with 5000ms `busy_timeout`; raised in-flight timeout cutoff to 600s in `tree_phases.rs`. (Thanks to @aukgit)
+- **Poppins & Ubuntu Typography & 1-Click Header Copy**: Enforced Ubuntu font (`font-ubuntu`) for all headers/titles and Poppins font (`font-poppins`) for body, prompts, and badges; mounted a 1-click Copy button directly beside the conversation title `<h3>` in `DetailHeader.tsx` with copy toast feedback; added informative hover tooltips explaining `Conversation #226 (Sequential AGM Index)` and `Project #003 (Sequential Project Index)`. (Thanks to @aukgit)
+- **Conversation Actions & Autonomous Verification**: Integrated triple-trigger conversation renaming (inline double-click, `F2` keyboard hotkey, and right-click menu item); added multi-prompt resend submenu (Resend All, Last 5, Last 10, Custom N); implemented autonomous 5-chapter "Verify Last 10 Prompts" synthesis enqueued to the IDE; and added "Clone Conversation & Compact Memory" session handoff. (Thanks to @aukgit)
+
+---
+
+## [v4.221.1] - 2026-10-17
+
+### Added
+- Synchronize prompts, skills, AI scripts, and coding guidelines
+
+---
+
+## [v4.221.0] - 2026-10-17
+
+### Added
+- **Multi-Machine Fleet Synchronization & W2 Connectivity Recovery**: Extended TCP probe timeout to 1500ms with a 2-stage retry ladder and backoff to eliminate false-offline readings on Wi-Fi and cross-subnet nodes (such as W2); added rich error diagnostics (`error_message`, `latency_ms`) to `get_cluster_instances_and_balances`. (Thanks to @aukgit)
+- **Multi-Machine Matrix Dynamic IP & Placeholder Normalization**: Resolved empty `()` bug by serializing both `machine_ip` and `ip_address` on `ClusterInstanceBalanceItem` and resolving `ip_address || machine_ip`; implemented `resolve_username_placeholders` to replace raw `${adminUser}` with `Administrator` and `${linuxUser}` with `root` across SSH connection imports, envelopes, and table rows. (Thanks to @aukgit)
+- **Settings SSH & GitMap Section UI Polish**: Replaced loose action buttons with a contiguous segmented pill capsule (`rounded-full`, dark-glass backdrop, subtle dividers) for `Import SSH from GitMap`, `Deploy Encrypted Credentials to Fleet`, and `Check Cluster Balances`; redesigned GitMap installer box with segmented pill buttons for `Copy Install Command` and `Open PowerShell & Install GitMap` with copy toast feedback; cleaned up raw filesystem path dumps into compact metadata badges (`GitMap Installed`, `RSA-2048 Vault Key Active`, `Nodes Configured`). (Thanks to @aukgit)
+- **Multi-Agent Concurrency Upgrade (A = 3, H = 2)**: Upgraded autonomous subagent orchestration capacity across `.agents/skills/execute-parent-task-with-n-steps-v6/skill.md`, `.agents/skills/gitmap/skill.md`, coding guidelines, instruction writer, and muse master skills to spawn 3 concurrent subagents with 2 operational hands each (`A × H = 6` concurrent operations). (Thanks to @aukgit)
+
+---
+
+## [v4.220.0] - 2026-10-17
+
+### Added
+- **Accounts Table Delete Remediation & Modal Mounting**: Resolved non-responsive single-item and bulk-selection Delete buttons by mounting dedicated destructive `ModalDialog` components in `AccountsDialogs.tsx`, driving `executeDelete()` and `executeBatchDelete()` with error-store telemetry tracking. (Thanks to @aukgit)
+- **Position-Locked Table Row Hover Inversion**: Implemented row color inversion to pure white background and pure black text without layout shift or jitter, preserving static font-weight and border metrics, with full opacity alignment across quota cells and sticky actions column. (Thanks to @aukgit)
+- **Action Buttons Color Scheme Overhaul**: Styled Switch button (`⇄`) with prominent yellow highlighter theme (`bg-yellow-400 text-slate-900 border-yellow-500`) and styled Remove button (`🗑️`) with solid red background and crisp white icon (`bg-red-600 text-white border-red-700`). (Thanks to @aukgit)
+- **Account Disable / Enable Lifecycle & Auto-Switch Exclusion**: Added disable options via selection toolbar (`<Ban>`) and row context menu; persisted `disabled: bool` in account state; guaranteed 100% exclusion from automated daemon rotations and candidate scoring while preserving permissive manual user switching. (Thanks to @aukgit)
+
+---
+
+## [v4.219.0] - 2026-10-17
+
+### Added
+- **Rich Verification Chapter Engine & Status Checklists**: Implemented full 5-chapter prompt verification architecture (`verificationTemplates.ts`) for "Is it done?", "Is it released?", "Are you confident?", and "Edge Cases & Tests". Enforces structured quality audits, branch validation, 14-location SemVer sync gates, and faithful embedding of original prompts inside Chapter 4.
+- **Rerun Iteration Chapter Engine**: Integrated multi-round nudge formatting in `dispatchRerunMessages` and `DetailHeader.tsx`, embedding `{round} of {total}` progression counters alongside the full original prompt context rather than bare 3-word strings.
+- **Dual-MIME Rich Image Transmission & Extractor Bug Fix**: Fixed regex parsing index in `extractAssets` (`match[2]` data URI instead of alt text), implemented Base64 image materialization with SHA-256 fingerprinting to workspace attachments (`./.antigravity/attachments/<hash>.<ext>`), and primed dual-MIME `ClipboardItem` (`text/html` and `text/plain`) on prompt resend and enqueue to ensure images are never severed.
+- **Unified Copy All Parity**: Unified top `handleCopyAll` dropdown actions and bottom `handleCopyAllWithImages` to share `copyPromptWithRichImages` in `clipboard.ts`, ensuring identical rich HTML rendering, image preservation, and toast notifications.
+- **Delegate Updater Console Formatting & Window Title**: Cleared `DISABLE_NEWLINE_AUTO_RETURN` flag on Windows console handles, enabled `ENABLE_PROCESSED_OUTPUT` and `ENABLE_VIRTUAL_TERMINAL_PROCESSING` to eliminate staircase line wrapping, set dynamic modern console title via `SetConsoleTitleW`, and aligned console summary fields.
+
+---
+
+## [v4.218.0] - 2026-10-17
+
+### Added
+- **Stale Versions Clean CLI (`agm clean-other-versions` / `agm ov`)**: Added `clean-other-versions` command (with aliases `ov` and `versions clean`) to detect and purge stale/legacy binaries across user profile and system install paths, safely reclaiming disk space while strictly preserving SQLite databases and configuration files.
+- **Telegram Dynamic Host Versioning & Prompt Sanitization**: Bound Telegram version reporting dynamically to host version; stripped internal synthetic ID tags (`Id: ...`) from prompt dispatches; resolved high-DPI desktop and window screenshot capture with PNG magic byte verification.
+- **Configurable Telegram Prompt Summaries & One-Tap Resend**: Added configurable prompt summary word count (100 or 200 words, via `agm telegram config --summary-words <100|200>`), clamped preview length, and added inline `↻ Resend` callback buttons on project prompt histories.
+- **Instances List View Single Combined Column & Primary Actions**: Combined IDE Executable and Data Directory into a single high-density `IDE EXE & DATA` column, eliminated list view horizontal overflow with proportional 5-column layout, and promoted the Prompts button outside into the primary action group.
+- **Prompt Tree DetailHeader Overlap Resolution & Transcript Sync**: Fixed toolbar collision between action dropdowns and view mode capsules (`DetailHeader.tsx`), and enhanced `Refresh` to bust both SWR and SQLite caches for immediate live re-reads of conversation turns.
+- **Rich Media & Image Clipboard Pipeline**: Upgraded `copyPromptWithRichImages` to generate dual-MIME `ClipboardItem` (`text/html` and `text/plain`) preserving embedded images across rich text applications and markdown editors.
+- **5-Tier Multi-Segment Quota Progress Bar**: Redesigned QuotaProgressBar track and milestone indicators into 5 distinct quintile color segments (Red `#ef4444`, Orange `#f97316`, Amber `#eab308`, Lime `#10b981`, Emerald Neon `#1af18d`).
+- **Interaction Telemetry & Audit Log Copy**: Attached `data-ui-name` and `data-ui-id` to UI elements, mapped friendly action names in audit records, added a `📋 Copy Summary` button to AuditPanel, and filtered high-frequency system telemetry from active logs.
+- **Process Exit Cleanliness**: Hooked active `agy` worker termination, Telegram daemon shutdown, and email watcher teardown into `exit_app_fully` before application exit.
+
+---
+
+## [v4.217.0] - 2026-10-17
+
+### Added
+- **Instance Audit Trail Visibility**: Fixed issue where opening an instance audit trail yielded an empty view. Expanded backend SQL condition across split DBs and `hot_tasks_cache` to resolve default instance aliases (`'default'`, `''`, `NULL`, `'antigravity'`, `'agy'`, `'ide'`, `'classic'`). Added segmented pill control in `InstanceAuditTrailModal` for Switch Cycles vs All Operations with live counts, automatically defaulting to `All Operations` when switch records are not yet present. (Thanks to @aukgit)
+- **Switch Account Dialog UI/UX Consistency**: Overhauled `SwitchAccountDialog` with sleek dark-glass styling, top-right header 'X' dismiss button, smooth row hover transitions, distinct Current account checkmark badge, color-coded quota metrics (4h, Weekly, Total), and in-flight switch spinner. (Thanks to @aukgit)
+- **Active Caller IDE Detection & Self-Preservation Guard**: Enhanced `detect_caller_instance_id()` to trace ancestor processes, inspect `proc.cmd()` for `--user-data-dir` arguments against registered instances, and check `ANTIGRAVITY_INSTANCE_ID` / `AGM_INSTANCE_ID`. When running from an IDE terminal, commands like `agm instances stop` or `switch` refuse to stop or mutate the caller instance (exit code 2). (Thanks to @aukgit)
+- **Lightweight Test Instance Lifecycle**: Added `agm instances create-test` and `agm instances rm-test` CLI subcommands for rapid, transient sandbox creation and cleanup without binary duplication, keeping disk usage minimal and SQLite databases synchronized. (Thanks to @aukgit)
+- **Automated E2E Verification**: Added `scripts/test-instance-autoswitch-e2e.ps1` verifying caller detection, test instance creation, caller guard interception, and clean teardown. (Thanks to @aukgit)
+
+---
+
 ## [v4.216.2] - 2026-10-17
 
 ### Fixed
@@ -448,50 +1579,344 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
-    *   **v4.216.2 (2026-10-17)**:
+    *   **v4.279.1 (2026-10-30)**:
+        -   **[Flywheel E5001 & Next Breakdown] Packaged Instances status no longer requires AGM source prompts (Thanks to @aukgit)**:
+            -   **Description**: `improvements_status` ledgers on the instance workspace instead of the install cwd; Next breakdown lists pending plans/issues from every bound workspace. Frontend status never opens the E5001 modal. (Thanks to @aukgit)
+
+
+    *   **v4.279.0 (2026-10-30)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
+
+    *   **v4.278.0 (2026-10-29)**:
+        -   **[Prompt Queue Visibility, Honest JSON Switch & Friendly Telegram Cards] Enqueue/rerun show on click, JSON switch proves bound_email, Telegram Send (Thanks to @aukgit)**:
+            -   **Description**: Prompt tree force-refresh keeps queued turns instead of wiping the 30s SWR cache first; rerun ×N keeps each identical queued turn; `agm instances switch --json` no longer fakes `"switched"`; Telegram cards show idle/busy/queued and ✉️ Send. Isolated `agm instances test-create` enqueued three queued ids, copied, sent `p-0db14cf4`; Default and v2-3127 were not stopped. (Thanks to @aukgit)
+
+
+    *   **v4.277.0 (2026-10-29)**:
+        -   **[Instance UI & Verification Templates] Restyled Create Profile Modal, 100-Step Prompt Breakdown & Release Tag Normalization (Thanks to @aukgit)**:
+            -   **Description**: Restyled the Create Profile dialog in `src/pages/instances/CreateEditDialogs.tsx` with unified dark-glass styling, segmented button controls, and high-contrast form elements; added multi-step prompt breakdowns and verification templates in `src/components/instances/PromptTreeView/verificationTemplates.ts`; integrated flywheel status triggers in `src/components/telegram/ImprovementsFlywheel.tsx` and `src/pages/Instances.tsx`; and purged rogue v5 tags to restore canonical 4.x SemVer progression. (Thanks to @aukgit)
+
+    *   **v4.275.3 (2026-10-28)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.275.2 (2026-10-28)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.275.1 (2026-10-28)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.275.0 (2026-10-28)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.274.0 (2026-10-28)**:
+        -   **[Feature and Instance Management] Instance Card Contrast, 3D Switch Button, Idle Notification Hub, UI Step Logging & CLI Remote Control (Thanks to @aukgit)**:
+            -   **Description**: Redesigned `/instances` cards with Royal Violet dark glass (`#171025`) and solid quota panels (`#120b1e`), elevated Switch Account buttons with illuminated amber styling and 3D yellow tactile hover gradients, implemented automated idle-mode dual-channel notification alerts across Telegram and Email in `idle_alerts.rs`, added structured `[UI_STEP]` step and button click trace logging in `uiLogger.ts` and `cmd_ui_trace.rs`, expanded CLI remote control (`agm ui click` and `agm instances click`), verified instance switching and prompt restoration integrity with zero errors in `errors.db`, and authored comprehensive specifications under `02-spec/21-app/233-feature-and-instance-management/`. (Thanks to @aukgit)
+
+    *   **v4.273.0 (2026-10-28)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.272.0 (2026-10-27)**:
+        -   **Anti-gravity Rerun Target ID, Sequential Enqueue Retention, Filter Compaction & Tree Design System**:
+            -   **Description**: Resolved sequential enqueue dropping by adding status checks in `prompts_crud.rs`, prevented queued prompt transcript turn mutations in `tree_node_conv.rs`, suppressed enqueue refresh bars via silent SWR `loadTree(false, true)`, compacted Tree View Row 2 filter controls into two segmented capsules (194px layout budget, zero clipping), authored canonical Tree View UI/UX design system specification in `02-spec/02-coding-guidelines/24-app-ui-design-system/02-tree-view-design-system.md`, and added 28-assertion automated E2E test suite in `scripts/test-anti-gravity-rerun-and-ui-fixes-e2e.ps1`. (Thanks to @aukgit)
+
+    *   **v4.271.0 (2026-10-27)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.270.0 (2026-10-27)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.269.0 (2026-10-25)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.268.0 (2026-10-25)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.267.0 (2026-10-25)**:
+        -   **[Routine Minor Bump] Version sync to 4.267.0 with no functional code changes (Thanks to @aukgit)**:
+            -   **Description**: Routine minor version bump from 4.266.0 to 4.267.0: all 14 version locations synchronized via `scripts/bump-version.mjs` (`package.json`, `package-lock.json`, `version.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, `src-tauri/hooks.nsh`, `Casks/antigravity-tools.rb`, `readme.md`, `readme_en.md`, `src/components/layout/MiniView.tsx`, `releases-manifest.json`, `changelog.md`, `changelog_en.md`). No functional code changes in this bump; the v4.266.0 feature and fix set ships in its own release. (Thanks to @aukgit)
+
+    *   **v4.266.0 (2026-10-25)**:
+        -   **[Tree View & Rerun UX] Compact Dispatch UI, Anti-Repeat Random Nudge Selection & Recent-on-Top Hierarchy (Thanks to @aukgit)**:
+            -   **Description**: Streamlined the Prompt Tree View and Rerun dispatch workflow: replaced verbose 17-item radio list and 37-variation bullet dump with a compact `<select>` dropdown and dynamic status pill (`Auto-picks random unused (N of 37 left)`); implemented `extractUsedNudgesFromConversation` in `src/components/instances/PromptTreeView/usePromptTreePromptActions.ts` to strictly exclude already used questions from multi-round rerun dispatches; inverted prompt turn and subagent hierarchy in `src/components/instances/PromptTreeView/ConversationNode.tsx` and `tierClassification.ts` to display running, queued, and newest turns on top; and added weekly quota fallback in `src/pages/instances/instanceCardData.ts` to ensure full GUI parity with CLI. (Thanks to @aukgit)
+
+    *   **v4.265.0 (2026-10-25)**:
+        -   **[CI Concurrency SHA Scoping & Release Resilience] Isolated main branch CI concurrency to commit SHA to prevent rapid sequential push cancellations (Thanks to @aukgit)**:
+            -   **Description**: Scoped CI concurrency group on `main` in `.github/workflows/ci.yml` to the specific commit SHA (`group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}`), ensuring subsequent commits on `main` never cancel in-flight CI workflows. Expanded 4-part Root Cause Analysis in `.ai-memory/cicd-issues/47-release-gate-ci-race-condition-rca.md` and verified clean release gate polling and execution. (Thanks to @aukgit)
+
+    *   **v4.264.0 (2026-10-25)**:
+        -   **[Release Gate In-Progress CI Polling] Bounded polling loop awaits in-flight CI runs on tag push before validating green pass (Thanks to @aukgit)**:
+            -   **Description**: Fixed race condition in `.github/workflows/release.yml` where `release.yml` immediately queried `status=completed` and aborted with `conclusion: missing`. Added 25-minute polling loop with heartbeat logging, authored RCA 47, and verified release gate pass on GitHub Actions. (Thanks to @aukgit)
+
+    *   **v4.263.0 (2026-10-24)**:
+        -   **[Account Switch Prompt Restore and CLI Inline Resume] Scoped prompt snapshots to the target instance and executed inline post-switch resume on CLI paths (Thanks to @aukgit)**:
+            -   **Description**: Stage 1 snapshot source now uses the target switched instance in `src-tauri/src/modules/instance/switch.rs` instead of global active instance. Added `run_post_switch_resume_after_delay` in `src-tauri/src/modules/instance/post_switch_resume.rs` to await settle delay and restore inline for CLI/headless operations. Fast-forward leftover handling in `src-tauri/src/bin/agm/instance_fastforward.rs` avoids duplicate prompt dispatch. (Thanks to @aukgit)
+
+    *   **v4.262.0 (2026-10-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.261.0 (2026-10-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.260.0 (2026-10-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.259.0 (2026-10-24)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.258.0 (2026-10-24)**:
+        -   **[Prompt Tree Header Compaction, Hover Jitter Elimination, Segmented Pill Capsules, Combined Send/Enqueue/Rerun Dropdown & CLI Error Management] Comprehensive Prompt Tree View UX overhaul, compact header layout with icon actions, high-contrast 3D Reset button, hover border stabilization, strict 30s cache TTL guard, clickable RFC-8089 IDE file image links, contiguous segmented pill capsules across toolbars, current conversation routing RCA & fix, and CLI error inspection with agent skill (Thanks to @aukgit)**:
+            -   **Description**: Compacted Prompt Tree View header height to `< 42px` in `src/components/instances/PromptTreeView/ModalHeader.tsx` and tightened node vertical spacing in `TreePanel.tsx`; converted Import/Export text buttons to Lucide icons (`Download`, `Upload`) with tooltips and converted Hide Tree View to `PanelLeftClose`/`PanelLeftOpen` icon button; relabeled the yellow button adjacent to Refresh to "Reset" with high-contrast amber styling (`text-zinc-950 font-bold bg-amber-400 hover:bg-amber-300 shadow-[0_2px_0_0_#b45309]`) and 3D tactile elevation; eliminated green hover outline shifts in `ConversationNode.tsx` using permanent base `border border-transparent` and subtle background tint transitions; enforced a strict 30-second TTL cooldown guard (`TREE_CACHE_TTL_MS = 30000`) in `usePromptTreeData.ts` to prevent mouseover-induced refetches; reunited Send, Enqueue, and Rerun into a contiguous segmented dropdown pill capsule in `PromptInstructionView.tsx` with borderless transparent destination selectors; resolved the Root Cause Analysis (RCA) defect in `usePromptTreePromptActions.ts` and `src-tauri/src/modules/repo_db/dispatch.rs` where "Current Conversation" mode was erroneously routing to new conversations; implemented `formatIdeClickableFileLink` in `clipboard.ts` and `markdown.tsx` formatting images and file paths into RFC-8089 `file:///` clickable links with a 1-click "Open in IDE" preview button; harmonized toolbar action clusters in `InstanceRowActions.tsx` and `AccountCardActions.tsx` into contiguous segmented pill capsules with high-contrast yellow hover states; verified CLI error inspection commands (`agm errors list`, `agm errors inspect`, `agm errors clear`, `agm errors fix`); authored canonical agent skill `.agents/skills/agm-error-inspection/skill.md`; and passed all 28/28 verification gates in `scripts/test-agm-gitmap-running-backup-e2e.ps1`. (Thanks to @aukgit)
+
+    *   **v4.257.1 (2026-10-24)**:
+        -   **[Prompt Tree Titles and File Image URIs] Placeholder conversation titles use the prompt's first line, and out-of-workspace images are `file:///` URIs (Thanks to @aukgit)**:
+            -   **Description**: `conversation_display_title` in `src-tauri/src/modules/repo_db/tree_node_conv.rs` replaces empty, `untitled`, and `new conversation` titles with `extract_smart_prompt_summary`. `workspace_relative_media` keeps in-repo images relative and writes out-of-repo images as `file:///` URIs. `agm prompts tree --json` on the live instance reported 146 conversations, 0 untitled titles, 0 empty prompts, and 10 `file:///` image paths with 0 raw drive paths. (Thanks to @aukgit)
+
+    *   **v4.257.0 (2026-10-24)**:
+        -   **[Prompt Tree Current Conversation, Silent Sync, and Image Files] Current Conv passes real `conv-` ids to `agy --conversation`, background sync no longer paints a layout-shifting bar, and image clicks open the file (Thanks to @aukgit)**:
+            -   **Description**: `agy_conversation_id` in `src-tauri/src/modules/repo_db/agy.rs` now keeps `conv-` conversation ids and still rejects `new`, `p-`, `proj-`, `queued-`, and path-like values. `agm prompt send --new` and a send with no session pass the `new` sentinel in `src-tauri/src/bin/agm/prompt_cmds.rs`. The prompt tree hides the top progress bar during background sync in `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx`. Thumbnail clicks open the disk file through the opener in `src/components/instances/PromptTreeView/PromptInstructionView.tsx`. Verified with `cargo build --bin agm`, the conversation-id unit test, `npm run build`, and `agm errors list`. (Thanks to @aukgit)
+
+    *   **v4.256.0 (2026-10-24)**:
+        -   **[Single-Prompt Resume After Switch & Fast-Forward] After an account switch or fast-forward, re-dispatch exactly one prompt — the most recently active backed-up prompt strictly belonging to the target instance — while every other backed-up prompt stays backed up, replacing the previous whole-queue re-injection (Thanks to @aukgit)**:
+            -   **Description**: Added `dispatch_single_latest_prompt` in `src-tauri/src/modules/repo_db/dispatch.rs`, which selects the single most recently active backed-up prompt for the target instance (greatest `updated_at`, ties broken by `created_at` then `id`) under a strict instance match with no cross-instance fallback, and sends it through the same resume-file + agy/CDP path as full dispatch; the STAGE_5_RESTORE stage in `src-tauri/src/modules/instance/post_switch_resume.rs` now uses this single-prompt dispatch, `has_auto_resume = false` fully suppresses the re-dispatch while restore bookkeeping still runs, and the duplicate inline auto-resume of recent prompts was removed from the switch path in `src-tauri/src/modules/instance/workspace.rs` so resume happens exactly once after the prompt channel is up (the manual auto-resume command path is unchanged); FIFO ordering of the remaining backlog is unchanged, and unit tests cover the latest-prompt selection. (Thanks to @aukgit)
+
+    *   **v4.255.0 (2026-10-24)**:
+        -   **[American English Modernization, Global React Error Boundaries & Root Route Recovery] Full American English language modernization across 352 backend Rust files, 76 frontend TypeScript/React files, and all architecture docs, fix minified React hook error #310, mount universal RouteErrorBoundary on root route, wrap fleet tables and modals with defensive error boundaries, and update root README (Thanks to @aukgit)**:
+            -   **Description**: Converted all legacy Chinese code comments, JSDoc documentation, and internal log/diagnostic messages across 352 Rust backend files, 76 TypeScript/React frontend files, and all architecture documentation to pure American English; resolved minified React error #310 ("Rendered more hooks than during the previous render") on the Instances page "Switch Profile" modal and prompt export modal by strictly lifting hooks above conditional early returns; mounted universal RouteErrorBoundary on root browser routing in `src/App.tsx` to intercept unhandled render exceptions and provide user-friendly dark-glass error recovery cards with reload, navigation, and telemetry actions; wrapped fleet tables and modal dialogs with defensive error boundaries; and refreshed root `README.md` and `README_EN.md` with latest version badges and release highlights. (Thanks to @aukgit)
+
+    *   **v4.254.0 (2026-10-24)**:
+        -   **[Fast Forward 4-Tier Selection Ladder, Weekly Floor Exclusion & Headroom Invariants] Implement 4-tier Fast-Forward account target resolver, configurable weekly quota floor slider (default 15%), 100% 4-hour clean headroom invariant, cross-instance fleet exclusion (SSH/Email/Telegram/GitMap), earliest expiry ranking, and degraded fallback scoring (Thanks to @aukgit)**:
+            -   **Description**: Refactored `fast_forward_target_resolver.rs` to enforce the full 4-tier decision ladder: accounts with weekly quota < 15% (configurable via slider) are treated as 0 credits and skipped; candidate accounts in the Primary tier must possess 100% 4-hour credit and zero activity across local or fleet instances (SSH, Email, Telegram, GitMap) in the last 4 hours; primary accounts are sorted by closest reset/expiry time to maximize window efficiency before reset; when no 100% 4-hour candidate exists, the algorithm safely falls back to highest combined weekly and 4-hour credits weighted by subscription tier multipliers (Ultra ×4.0, Pro ×2.0, Free ×1.0); added UI slider in `ScoringAlgorithm.tsx` for `min_weekly_quota_percent` (0–50%, default 15%); synchronized backend config models in `src-tauri/src/models/config.rs`; and added comprehensive unit test suite in `tests_fast_forward_target_resolver.rs`. (Thanks to @aukgit)
+
+    *   **v4.253.3 (2026-10-23)**:
+        -   **[Release Pipeline & CI Dynamic Polling Gate, Atomic Version Sync, Prompt Restore & CLI Rerun Hardening] Fix release asset publication pipeline, synchronize all project manifests, harden prompt restore sweep on quota completion, and enable instant rerun randomizer (Thanks to @aukgit)**:
+            -   **Description**: Resolved GitHub Actions release pipeline failure where concurrent tag pushes caused premature release gate exits due to in-progress CI runs; implemented an asynchronous polling wait loop up to 45 minutes in `.github/workflows/release.yml` with post-release asset count verification; synchronized all 14 repository version manifests (`package.json`, `package-lock.json`, `version.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.lock`, `releases-manifest.json`, etc.) to eliminate version drift; and integrated prompt restore sweep engine with diverse rerun anti-repeat buffer and top-level CLI command routing. (Thanks to @aukgit)
+
+    *   **v4.253.0 (2026-10-23)**:
+        -   **[Streaming Thought Signature Validator, Segmented Capsule Styler, FIFO Queue Partition Allocator, Transient Sandbox Sentinel, Sole Contributor Attribution & Windows FFI Remediation] Complete implementation of final architectural components (Steps 296–300), stream delimiter validation, capsule styling rules, FIFO partition allocation, caller IDE preservation, and pure kernel32 vitality probes (Thanks to @aukgit)**:
+            -   **Description**: Successfully finalized the 300-step architectural roadmap across reverse proxy streaming, UI design conventions, Split-DB queue allocations, process sandboxing, and release governance:
+                - **Streaming Thought Signature & Delimiter Validator (`src-tauri/src/proxy/handlers/common/`)**: Implemented `streaming_thought_signature_validator` ensuring balanced `<thought>` and `</thought>` tags, `thought: true` attributes, and delta buffer delimiters across streaming SSE frames without leaking internal markers; added `repair_truncated_thought_block` auto-closing truncated blocks. (Thanks to @aukgit)
+                - **Segmented Capsule Toggle Switch Styler & Linter (`src-tauri/src/modules/instance/`)**: Implemented `segmented_capsule_toggle_switch_styler` and markup linter enforcing `rounded-full`, shared dark-glass container borders, subtle divider lines, and transparent borderless inline select dropdowns (`bg-transparent border-0 focus:ring-0 focus:outline-none`). (Thanks to @aukgit)
+                - **FIFO Prompt Queue Partition & Priority Allocator (`src-tauri/src/modules/db_orm/`)**: Implemented `fifo_prompt_queue_partition_allocator` allocating prompt partition buckets across SQLite databases with strict First-In-First-Out ordering using `ORDER BY created_at ASC, id ASC`, monotonic timestamp/id verification, and zero LIFO leaks. (Thanks to @aukgit)
+                - **Transient Sandbox Lifecycle & Cleanup Sentinel (`src-tauri/src/modules/instance/`)**: Implemented `transient_sandbox_cleanup_sentinel` tracking test sandbox instances, protecting developer caller IDE sessions with exit code 2 fail-fast protection, and verifying zero-orphan remnant directory purging. (Thanks to @aukgit)
+                - **Sole Contributor Attribution & No Silent Errors Audit Guard (`src-tauri/src/modules/release_gate/`)**: Implemented `sole_contributor_attribution_audit_guard` enforcing strict sole attribution to `@aukgit` (`(Thanks to @aukgit)`), rejecting unauthorized third-party handles, enforcing strictly relative paths, and auditing source code for the No Silent Errors house rule. (Thanks to @aukgit)
+                - **Windows Kernel32 FFI & Fast-Forward Rotation Remediation**: Repaired process vitality probes and child process termination to link directly against Windows `kernel32` (`OpenProcess`, `GetExitCodeProcess`, `TerminateProcess`, `CloseHandle`) without unlinked external dependencies; harmonized `smartRotateProfileAccount` with backend `fastForwardInstance` delegation; and expanded rerun nudge detection templates. (Thanks to @aukgit)
+                - **Consolidated Wave Summary**: v4.253.0 is the first published release of today's combined improvement wave, shipped all together — the v4.251.0 prompt backup & restore rebuild and rerun randomizer, the v4.252.0 pipeline/FIFO/capsule/release-governance guard wave, and the sequences 213–218 hardening detailed in the entries below — released after a full compile and CI repair campaign cleared 18 pre-existing TypeScript errors and the accumulated Rust test-target compile debt, with `cargo check --tests`, `cargo clippy --all-targets`, `cargo fmt --check`, `tsc --noEmit`, and the frontend build all verified green and a completed green CI run for the tagged commit. The earlier v4.251.0 and v4.252.0 tags were held back by the release gate on red CI and are superseded by this release. (Thanks to @aukgit)
+
+    *   **v4.252.0 (2026-10-23)**:
+        -   **[Pipeline Decoupling, FIFO Queue Invariants, Caller IDE Self-Preservation, UI Capsules & Release Governance] Pipeline response header sanitizer, protocol adapter divergence auditor, thinking block backfill & headroom budget evaluator, unified context alternating alignment guard, FIFO dead-letter spillover guard, multi-table FIFO restore transaction coordinator, FIFO batch drain monotonicity verifier, caller process ancestry tree scanner, caller IDE exit code 2 enforcer & heartbeat watchdog, transient test sandbox verifier, multi-stage launcher dispatcher, window control capsule formatter, truncation omission banner formatter, prompt tree 4-tier hierarchy formatter, and GitHub release notes parity guard (Thanks to @aukgit)**:
+            -   **Description**: Successfully implemented and verified 25 architectural improvements across reverse proxy pipelines, database queue invariants, multi-instance process management, UI/UX desktop styling, and release compliance gates:
+                - **Pipeline Protocol Decoupling & Header Sanitization (`src-tauri/src/proxy/handlers/common/`)**: Implemented `pipeline_response_header_sanitizer` normalizing Gemini SSE response headers (`text/event-stream; charset=utf-8`, `cache-control: no-cache`, `connection: keep-alive`) while stripping upstream server telemetry (`server`, `alt-svc`, `set-cookie`, `x-goog-safety-ratings`, `x-goog-ratelimit-remaining`, `via`, `x-powered-by`); integrated `protocol_adapter_divergence_auditor` enforcing strict decoupling between inbound protocol adapters and internal pipeline logic; added `thinking_block_backfill_pipeline` and `thinking_budget_filter_pipeline` ensuring uniform thinking tags and budget handling; implemented `unified_context_alignment_guard` for strict alternating conversation turns; and established `prefix_stability_pipeline_guard` guaranteeing prompt prefix immutability.
+                - **FIFO Database & Dead-Letter Queue Invariants (`src-tauri/src/modules/db_orm/`)**: Implemented `fifo_dead_letter_queue_spillover_guard` safely transitioning unrecoverable prompts into dead-letter quarantine while preserving chronological `created_at` lineage and enforcing `ORDER BY created_at ASC, id ASC`; established `fifo_queue_drain_monotonicity_verifier` and `fifo_queue_batch_drain_guard` preventing LIFO sequence inversions across batched queue processing passes; and added `fifo_restore_transaction_coordinator` and `fifo_queue_index_analyzer` verifying composite indices and atomic transaction safety.
+                - **Caller IDE Self-Preservation & Process Management (`src-tauri/src/modules/instance/`)**: Implemented `caller_process_ancestry_tree_scanner` traversing process PPID lineage upward up to 16 levels to detect caller IDE instances and protect the active working developer session; established `caller_ide_exit_code_enforcer` enforcing fail-fast exit code 2 on lifecycle commands (`stop`, `rm`, `switch`) targeting the caller instance without `--force`; added `caller_ide_heartbeat_watchdog` providing eviction immunity; implemented `transient_sandbox_lifecycle_verifier` ensuring test sandboxes leave zero orphan processes or filesystem remnants; and added `windows_shell_dispatch_argument_escaper` and `multi_stage_launcher_dispatcher` with Windows Job Object breakaway fallback ladder.
+                - **UI Capsules, Hierarchy & Truncation Formatter (`src-tauri/src/modules/instance/`)**: Implemented `window_control_capsule_formatter` wrapping Minimize, Maximize/Restore, and Close actions into contiguous segmented pill capsules (`rounded-full`, shared border, dark-glass backdrop, subtle dividers) with hover-danger styling; added `capsule_segmented_control_validator` enforcing transparent borderless styling for nested dropdowns; added `truncation_omission_banner_formatter` parsing raw truncation callouts into interactive dark-glass omission banners; and added `prompt_tree_branch_hierarchy_formatter` discriminating across 4 distinct origin tiers (`USER_PROMPT`, `SUBAGENT_INSTRUCTION`, `SYSTEM_MESSAGE`, `TOOL_OUTPUT`) with branch glyphs (`↳`, `└──`).
+                - **Release Governance & Attribution Gate (`src-tauri/src/modules/release_gate/`)**: Implemented `github_release_notes_parity_guard` verifying GitHub release notes strictly attribute `@aukgit`, reject third-party handles, enforce strictly relative Git paths, and match `CHANGELOG.md` headings; added `individually_revertable_commit_guard` auditing commit boundaries; and enforced the no-silent-errors rule via `no_silent_errors_justification_auditor`. (Thanks to @aukgit)
+
+    *   **v4.251.0 (2026-10-23)**:
+        -   **[Prompt Backup & Restore Reliability, Rerun Auto-Pick, and Release Integrity] Incomplete-prompt sweep on quota switch, truthful restore reporting, FIFO restore drain, persisted post-switch resume, shared GUI/CLI backup database, randomized rerun by default with persisted choice, skipped-version update reporting, email dedupe and supabase push-settings CLI commands, configurable PID refresh, and CI release gating (Thanks to @aukgit)**:
+            -   **Description**: Rebuilt prompt backup and restore so quota-driven account switches no longer lose long-running prompts: a new incomplete-prompt sweep in `backup.rs` captures every running, in-flight, or dispatched prompt at switch time regardless of age, replacing the previous 120-second cutoff that silently dropped longer work, the backup cap now prunes only already-restored rows, and queued rows are exempt from the freshness filter; manual instance switches re-attribute unrestored prompt backups to the incoming account (parity with the rotation path), restore returns real restored, dispatched, failed, and skipped-live counts instead of unconditional success, a live-status probe prevents duplicate re-injection of prompts that already finished, multi-prompt restore drains the full FIFO queue in order instead of one prompt per repository per pass, post-switch resume tasks are persisted to disk and re-armed after an application restart, and the GUI and CLI resolve one shared backup database in the application data directory (migrating any legacy working-directory database); rerun now defaults to the randomized message option with an expanded message set and a default batch of four, and the chosen option and count persist across restarts in the detail header, the conversation context menu, the prompt tree context menu, and the tree view modal; the update checker explains why candidate versions were skipped (draft, prerelease, or no installable platform asset) instead of silently offering nothing, with matching skipped-version lines in `agm update`; added `agm email dedupe` (dry-run by default, timestamped database backup before applying) and `agm supabase push-settings` with vault-path support, plus a configurable PID refresh interval in Settings and `agm auto-switch pid-refresh`; CI workflows are pinned to Ubuntu 24.04 with current action versions, main-branch runs can no longer be cancelled mid-flight, and the release workflow refuses to tag unless CI is green for that exact commit. (Thanks to @aukgit)
+
+    *   **v4.250.0 (2026-10-21)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.249.0 (2026-10-21)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.248.0 (2026-10-21)**:
+        -   **[Repo DB & Diagnostics] Elimination of E9001 Media Vault Column Error on Instance Tree Cache Wipe (Thanks to @aukgit)**:
+            -   **Description**: Resolved diagnostic error `E9001` (`no such column: instance_id in DELETE FROM media_vault WHERE instance_id = ...`) in `src-tauri/src/modules/repo_db/agy.rs` during per-instance prompt tree cache invalidation and reset; enforced architectural invariant establishing `media_vault` as an immutable, content-addressed SHA-256 media cache decoupled from workspace instance tenancy; added unit test `test_media_vault_schema_and_column_invariant` verifying schema column invariants and `test_wipe_and_rescan_single_instance_does_not_fail` verifying single-instance wipe stability; cleared error diagnostics history via `agm errors clear`, verified zero errors in `errors.db`, and documented comprehensive 4-part RCA in `02-spec/22-app-issues/36-media-vault-missing-instance-id-wipe-rca.md`. (Thanks to @aukgit)
+
+    *   **v4.247.0 (2026-10-21)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.246.0 (2026-10-21)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.245.0 (2026-10-21)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.244.1 (2026-10-21)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.244.0 (2026-10-21)**:
+        -   **[Boolean Logic Modernization, Affirmative Guard Decomposition & Instance Task Liveness] Discrete Guard Clauses, Affirmative isConversationGenuinelyRunning Extraction, Mixed Operator Elimination, and Verified Liveness Accuracy (Thanks to @aukgit)**:
+            -   **Description**: Refactored conditional logic across `src/pages/instances/` adhering strictly to `01-prompts/15-cg-execute/04-booleans-and-complex-conditions.md`; replaced compound negative checks such as `if (!inst.is_running || !proj.is_running) return false;` with discrete, single-variable affirmative guard clauses in `InstanceCardProjects.tsx`; extracted and centralized `isConversationGenuinelyRunning` in `src/pages/instances/instancePageUtils.ts`, enforcing discrete boolean decomposition (affirmative running checks, explicit instance ownership matching, active task validation, and ghost conversation filtering), eliminating 4-operand chained `.some(...)` predicates across `instanceCardData.ts` (`hasActiveTask`), `InstanceCardProjects.tsx` (`isProjectRunningForInstance`), and `useInstancePage.ts` (`hasActiveTaskFor`); decomposed mixed `&&`/`||` operators into intermediate named booleans in `instancePageUtils.ts` (`isDefaultInstance`, `hasMatchingSeqNum`), `instanceCardData.ts` (`weeklyBucket` resolution), and `useInstancePage.ts` (`filteredInstances` search filtering); and verified all 32 unit test assertions pass in `src/pages/instances/__tests__/instanceRunningPrompts.test.ts`. (Thanks to @aukgit)
+
+    *   **v4.243.0 (2026-10-20)**:
+        -   **[Telegram Prompt Backup, Fleet w1 Identity Primacy, Prompt Tree Liveness & Responsive UI Expansion] Telegram Inbound Prompt Snapshots, Base64 Remote Prompt Protocol, Fleet Local w1 Identity Reconcile with 6-Node Discovery, SSH 30s Caching, Default Instance Prompt Liveness, state.vscdb Title Rename Sync, Terminal Box Glyphs, Header Image Filter & Details Button Health Pulse (Thanks to @aukgit)**:
+            -   **Description**: Added `/backup`, `/backup_prompt`, `/backup_prompts`, `/backup_running`, and `/brp` inbound command routes in `src-tauri/src/modules/telegram_inbound/processing.rs` and `commands.rs`, delivering automated snapshots of running prompts, attached multimodal image counts, dynamic instance resolution, and structured HTML backup reports; implemented `--base64` RFC 4648 payload encoding across `src-tauri/src/modules/telegram_inbound/injection.rs` and `src-tauri/src/bin/agm/prompt_dispatch.rs` for cross-machine SSH prompt execution, preserving shell whitespace, quotes, and multiline instructions without command-line escaping defects; enforced Cluster-IP primacy in `src-tauri/src/modules/supabase_sync/node.rs` and `email_watcher/detection.rs` to reliably resolve `192.168.1.3` as `w1` (local lead) and `192.168.1.20` as `main`, and fixed deduplication logic in `query_fleet_machines` so all 6 registered cluster nodes (`w1`, `main`, `u1`, `w2`, `w3`, `w4`) are discovered and displayed with Lead indicators; implemented `CLUSTER_BALANCES_CACHE` with 30s TTL in `src-tauri/src/modules/ssh_manager/exec.rs` and decoupled balance enrichment via SWR in `useFleetMachines.ts` to eliminate UI freezing; updated `reset_ssh_cluster_nodes` in `sync.rs` to reload cluster nodes preserving passwords and SSH key paths; standardized instance specifier normalization across `observe.rs` (`#1 Default`, `Default`, `__default__`), hardened canonical directory discovery in `gemini_dirs.rs`, enforced strict FIFO `ORDER BY created_at ASC, id ASC` in `liveness.rs` to eliminate false terminal overrides, and added IDE prompt goal heartbeat fallback in `cmd_running_up_next.rs` for active IDE sessions; implemented immutable React state cloning in `usePromptTreeData.ts` to instantly propagate renamed conversation titles to header and selected state, and wired `sync_title_to_state_vscdb` in `src-tauri/src/modules/repo_db/sequences.rs` to update `ItemTable` in `state.vscdb`; added a header `🖼️ Images` toggle button in `src/components/instances/PromptTreeView/ModalHeader.tsx` connected to `imageFilterEmitter` to instantly filter projects and conversations containing attached images, expanded tree panel width to `w-[460px] lg:w-[520px]`, increased project separation (`space-y-3.5`), and styled Auto-Hide and scope dropdown as a contiguous dark-glass segmented pill capsule; restored Details button with emerald `Activity` icon and glowing `#1af18d` pulsing health indicator dot in `DetailTabs.tsx`; standardized child branch glyphs to monospace box-drawing glyphs (`├──`, `└──`, and `└── ↳` for subagents) with auto-selection on double-click in `ConversationNode.tsx` and `ProjectNode.tsx`; added a 10-retry overload in `cmd_files.rs` for Win32 clipboard image copies; and converted verbose text in `SshGitmapSection.tsx` into compact segmented pill capsules with tooltips. (Thanks to @aukgit)
+
+    *   **v4.242.0 (2026-10-20)**:
+        -   **[Win32 CF_DIB Clipboard Engine, Prompt Tree Image Attachment Splicing, Instant Enqueue Cache Invalidation & DetailHeader Title Polish] Native CF_DIB / PNG Multi-Format Clipboard Engine for OneNote and Antigravity, Preserved Turn Media Splicing, Live Enqueue Refresh, and DetailHeader Title Prominence (Thanks to @aukgit)**:
+            -   **Description**: Upgraded `copy_image_to_clipboard` backend command in `src-tauri/src/commands/cmd_files.rs` to extract raw bitmap bytes and strip the 14-byte `BITMAPFILEHEADER`, registering native `DeviceIndependentBitmap` (`CF_DIB`) alongside `PNG` streams on `System.Windows.Forms.DataObject` to ensure images pasted into Microsoft OneNote desktop, Word, Paint, Discord, and Google Antigravity IDE render 100% reliably; updated regex parsing in `extract_clean_user_prompt` (`src-tauri/src/modules/repo_db/text_utils.rs`) to collect and preserve markdown images located outside `<USER_REQUEST>`; updated `usePromptTreePromptActions.ts` (`handleResendPrompt` and `handleEnqueuePrompt`) to splice missing conversation images inside `<USER_REQUEST>` before prompt submission; inverted execution order in `src/components/instances/PromptTreeView/usePromptTreePromptActions.ts` so `invalidate_prompt_tree_cache` executes before `loadTree`, guaranteeing newly enqueued turns immediately appear with amber `QUEUED` badges without stale cache reads; added multi-image aggregation in `src/components/instances/PromptTreeView/ConversationContextMenu.tsx`, invoking `copyAllImagesToClipboard` to composite multiple images into a stitched canvas with native `CF_DIB` and `PNG` clipboard writes; standardized button labels strictly to "Copy" and "Copy Images" (eliminating "Copy including image"); stripped all turn/origin prefix badges preceding conversation titles in `src/components/instances/PromptTreeView/DetailHeader.tsx` and enlarged title typography to `text-xl md:text-2xl font-bold font-ubuntu tracking-tight`; and verified complete sandbox isolation via `agm instances test-create` and `agm instances test-clean` alongside 74 passing Telegram inbound tests. (Thanks to @aukgit)
+
+    *   **v4.241.0 (2026-10-20)**:
+        -   **[Native OS DIB Image Clipboard, Prompt Tree Send & Enqueue Restoral, DetailHeader Title Polish, SQLite Reset & Rescan, Fleet Lead Alignment] Native Win32 Bitmap Clipboard for OneNote & Antigravity, Preserved Turn Media Paths, Instant Enqueue Tree Refresh, DetailHeader Prefix Stripping & Title Prominence, Complete SQLite Cache Purge, and Fleet Machine Git Origin Alignment (Thanks to @aukgit)**:
+            -   **Description**: Repaired `copy_image_to_clipboard` backend command in `src-tauri/src/commands/cmd_files.rs` by checking `data:image/` before path normalization, running PowerShell in `-Sta` mode with `[System.Windows.Forms.Clipboard]::SetDataObject($data, $true)` to ensure persistent native `CF_DIB`/`CF_BITMAP` clipboard memory for Microsoft OneNote, Google Antigravity IDE, Word, and Paint; hooked native clipboard priming into `copyPromptWithRichImages` in `src/components/instances/PromptTreeView/clipboard.ts`; restored attached media preservation during turn selection in `createTurnConv` (`src/components/instances/PromptTreeView/ConversationNode.tsx`); passed `loadTree` callback from `PromptTreeViewModal.tsx` to `usePromptTreePromptActions` to trigger immediate tree refresh upon enqueuing; added current working directory fallback in `src-tauri/src/modules/repo_db/agy.rs` for prompts with empty workspace paths; stripped noisy turn badges preceding conversation titles in `src/components/instances/PromptTreeView/DetailHeader.tsx` and enlarged title typography to `text-lg md:text-xl font-bold font-ubuntu tracking-tight`; enhanced `wipe_and_rescan_repo_db` in `src-tauri/src/modules/repo_db/agy.rs` to wipe `media_vault`, in-memory tracking maps, and dispatched prompts cache alongside `invalidatePromptTreeCache()` on reset; and aligned cluster lead node `main` (`192.168.1.20`) and local node `w1` (`192.168.1.3`) in `src/components/instances/fleet/useFleetMachines.ts` and `FleetMachineRow.tsx` to reflect the authentic Git origin `alimtvnetwork / Antigravity-Manager` with bound accounts `sakibagjdjg@gmail.com` and `cirajayu11@gmail.com`. (Thanks to @aukgit)
+
+    *   **v4.240.1 (2026-10-20)**:
+        -   **[Prompt Tree Buttons Repair, Native OS DIB Image Clipboard, DetailHeader Title Prominence, Full SQLite Reset & Rescan, Fleet Lead Node Alignment & agy CLI Path Resolution] Prompt Tree Send & Enqueue Restoral, Native Windows DIB/Bitmap Image Clipboard for OneNote & Antigravity, Single-Image "Copy" Button & Unified Multi-Image Canvas Batch Copy, DetailHeader Prefix Stripping & Title Polish, Full SQLite Reset & Rescan, Fleet Machine Git Origin Alignment, and agy CLI Executable Path Resolution (Thanks to @aukgit)**:
+            -   **Description**: Restored independent `[ Send N | v ]` and `[ Enqueue | v ]` buttons in `src/components/instances/PromptTreeView/DetailHeader.tsx` (now in distinct Segment 2 and Segment 3 capsules), ensuring full prompt text `conv.full_prompt_text` is dispatched without premature truncation and preserving attached media paths; implemented `copy_image_to_clipboard` backend command in `src-tauri/src/commands/cmd_files.rs` and `src-tauri/src/lib/run.rs` setting native Windows `CF_DIB`/`CF_BITMAP` format via PowerShell `System.Windows.Forms.Clipboard::SetImage` alongside pure PNG binary Blob to guarantee pasted images render 100% reliably in Microsoft OneNote, Paint, Word, and Antigravity IDE; normalized single-image copy button in `src/components/instances/PromptTreeView/PromptInstructionView.tsx` strictly to "Copy" (eliminating "Copy including image"), and implemented `handleCopyImagesUnified` on the main copy button so clicking it when multiple images exist automatically stitches all attached images into a single vertical composite PNG canvas and writes to the system clipboard; added `~/.gemini/bin/agy.exe` and `~/.antigravity/bin/agy.exe` to `get_antigravity_cli_executable_path` in `src-tauri/src/modules/process/locations.rs` so CLI prompt dispatch resolves the installed `agy` binary reliably; expanded CDP composer selector ladder (`div.monaco-editor`, `div.interactive-input-editor`, `textarea.monaco-mouse-cursor-text`) and send button selectors in `src-tauri/src/modules/instance/cdp_onboarding.rs`; polished `DetailHeader.tsx` by stripping all noisy turn prefix badges preceding the title, enlarging conversation title text (`text-base md:text-lg font-bold font-ubuntu`), keeping Copy Title button adjacent, and positioning the status capsule strictly after the title; connected `onResetTree` in `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx` to `wipe_and_rescan_repo_db` and frontend `loadTree(true, true)` to completely purge SQLite prompt caches, terminate stale workers, rescan disk `transcript_full.jsonl` files fresh, and rebuild the tree with live spinner feedback; and corrected cluster lead node `main` (`192.168.1.20`) in `src/components/instances/fleet/useFleetMachines.ts` and `FleetMachineRow.tsx` to reflect its authentic Git origin `gitmap / gitmap` and bound account `sakibagjdjg@gmail.com` without leaking local machine `w1` (`192.168.1.3`, `Antigravity-Manager`) accounts. (Thanks to @aukgit)
+
+    *   **v4.240.0 (2026-10-20)**:
+        -   **[Prompt Tree Buttons Repair, Pure PNG Image Clipboard, DetailHeader Title Polish, SQLite Full DB Wipe & Rescan, Fleet Lead Node Alignment & Telegram Inbound Prompt Fix] Prompt Tree Send & Enqueue Restoral, Multi-Image Composite Canvas Copy, DetailHeader Prefix Stripping & Title Polish, Full SQLite Reset & Rescan, Fleet Machine Alias Alignment, and Telegram Prompt Routing (Thanks to @aukgit)**:
+            -   **Description**: Restored prompt and image dispatch across Prompt Tree Send and Enqueue actions without stripping image URIs into non-existent paths, with project path resolution fallbacks; upgraded image clipboard copying to write strictly single-MIME `'image/png'` binary blobs without conflicting HTML to guarantee pasting into Microsoft OneNote, Paint, and Antigravity; added vertical composite multi-image canvas stitching and 1-click `[ Copy All Images ]` batch copying; cleaned DetailHeader by stripping prefix turn badges, enlarging conversation titles, and repositioning the status capsule; added backend `wipe_and_rescan_repo_db` command with live progress feedback to completely rebuild the SQLite prompt database and regenerate the tree view; aligned Fleet lead node `main` (`192.168.1.20`) and `w1` (`192.168.1.3`) SSH host alias mappings with Git repository badge display; and fixed Telegram inbound `/prompt` route collision where conversation seek shadowed prompt execution. (Thanks to @aukgit)
+
+    *   **v4.239.0 (2026-10-20)**:
+        -   **[Fleet Machine Identity, Prompt Tree Liveness, Audit Log Semantic Hierarchy & UI Polish] Fleet SSH Node w1 Matching, Cluster Reset, Running Prompt Detection for Default Instances, Conversation Rename Sync, Meaningful Audit Log Naming with Interactive Step Breadcrumbs, Start All Instances, and Markdown View Background (Thanks to @aukgit)**:
+            -   **Description**: Resolved local machine identity matching `192.168.1.3` to cluster node `w1` using Cluster-IP primacy in `src-tauri/src/modules/ssh_manager/exec.rs` while preserving all 6 discovered GitMap nodes in `FleetMachinesTable.tsx`; added `reset_ssh_cluster` backend command and UI toolbar button `[ 🔄 Reset Cluster ]` to safely clear stale connection pools; fixed running prompt liveness in `src-tauri/src/modules/repo_db/liveness.rs` and `detection.rs` by including `dispatched` status and preserving empty instance records; ensured conversation title renames update synchronously across `conversations.title`, `conversation_summaries.summary`, and `conversations_fts.title` with live event notification; replaced cryptic Tailwind utility class names (`div.grid`, `Button.P 1.5`, `div.group`, `span.truncate`, `scroll:/instances`) in `useAuditRecorder.ts` and `AuditPanel.tsx` with human-readable semantic action descriptors; added an interactive "Step Performed & Interaction Execution Path" inspection card in `AuditPanel.tsx` featuring action summaries, connected DOM hierarchy breadcrumbs with arrow glyphs, and a 4-part target context grid; relocated the Details button with healthy status icon to row 2; standardized "Copy All (Include Images)" in the prompt tree toolbar; updated the Markdown view background to `#19191c`; converted verbose SSH settings text to icon buttons with hover tooltips; and added a "Start All" instances button in the main instance management toolbar. (Thanks to @aukgit)
+
+    *   **v4.238.7 (2026-10-20)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.238.0 (2026-10-19)**:
+        -   **[Pure PNG Clipboard Copy, Image Attachment Forwarding, Turn Status Badges & GitMap Node Resolution] Pure PNG Clipboard Write for OneNote, Dedicated Gallery Image Copy Buttons, Immediate Send vs Enqueue Decoupling, Live Transcript Turn Status Supremacy, and GitMap SSH Machine Resolution (Thanks to @aukgit)**:
+            -   **Description**: Implemented `writePureImageToClipboard` in `src/components/instances/PromptTreeView/clipboard.ts` writing strictly single-MIME `'image/png'` with canvas-based PNG header transcoding (`transcodeSrcToPngBlob`), eliminating multi-MIME format collisions that previously caused Microsoft OneNote, Slack, Discord, and Telegram to strip images or paste empty placeholders; added 1-click `[ 📋 Copy Image (PNG) ]` and sequential `[ 📋 Copy Images (N) ]` buttons in the "Attached Images" gallery header, plus hover-activated 1-click copy badges on individual thumbnails in `PromptInstructionView.tsx`; decoupled immediate session injection (`handleSendPromptNow` / `sendPromptNow`) from queue scheduling (`handleEnqueuePrompt`) in `usePromptTreePromptActions.ts` and `DetailHeader.tsx`; preserved and appended attached conversation images (`media_paths`) in markdown image syntax (`![Attached Image N](<path>)`) across Rerun, Send, and Enqueue flows so IDE sessions receive complete image attachments without data loss; refactored status evaluation in `src-tauri/src/modules/repo_db/tree_collect.rs` so live transcript activity (`is_owning_inst_alive && inspection.is_recent_active && !inspection.is_terminal_done`) takes precedence over stale SQLite idle summaries, accurately displaying emerald pulse `RUNNING` for active turns and amber `QUEUED` for pending turns; upgraded `src-tauri/src/modules/telegram_inbound/node_label.rs` to parse `~/.gitmap/gitmap-ssh-nodes.json` and `./gitmap-ssh-nodes.json` when the machine alias is `none` or auto-generated `Node-*`, matching local IP `192.168.1.3` to alias `w1` and annotating as `w1 (collected from gitmap)`; separated `Machine:` and `Instance:` onto distinct lines across all Telegram status reports in `reports_b.rs`, `system.rs`, `telegram_alerts.rs`, and `telemetry.rs`; and upgraded preview, raw markdown, and edit mode containers in `PromptInstructionView.tsx` to `dark:bg-[#0c0514]/95` with `dark:border-purple-500/25` subtle borders. (Thanks to @aukgit)
+
+    *   **v4.237.0 (2026-10-19)**:
+        -   **[App Update Verification, Prompt Tree Selection Stability, Image Clipboard & Import-Export Restoral] Release Asset Verification Before Update Notification, Anti-Flapping Turn Locking, Rich Clipboard Copy, Running & Queued JSON Backup/Restore with Countdown HUD, and Telegram Remote Multimodal Dispatch (Thanks to @aukgit)**:
+            -   **Description**: Added `verify_tag_has_platform_asset` in `src-tauri/src/modules/update_checker/channels.rs` performing HTTP HEAD requests against the GitHub Release API to ensure that native platform installer binaries (`agm-alim-setup.exe`, `.dmg`, `.deb`) actually exist and are downloadable before notifying users of updates, eliminating 404 installation errors when tags exist before assets finish compiling; locked the actively selected turn (`selected_turn_number`) and project selection across background SWR sync intervals in `src/components/instances/PromptTreeView/usePromptTreeData.ts` and `ConversationNode.tsx`, preventing title and prompt text from glitching or alternating between conversation summaries and raw turn prompts during active inspection; added explicit `onClick` and `onDoubleClick` backdrop event handlers on the backdrop container in `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx` to cleanly dismiss the modal when clicking outside; upgraded image processing in `PromptInstructionView.tsx`, `markdown.tsx`, and `clipboard.ts` with local base64 and asset protocol fallback cards (`PromptThumbnailCard`), and support rich multi-format clipboard copying (`image/png` binary blob + `text/html`) through `copyPromptWithRichImages` with deduplicated URI extraction and Windows drive letter decoding; added direct combined export for both running and enqueued prompts (`Export Running & Queued Prompts (.json)`) and direct backup restoration in `src/components/instances/PromptTreeView/ImportExportMenu.tsx` and `usePromptTreeCoreActions.ts`, displaying an interactive 5-second countdown HUD banner before automatic prompt dispatching; preserved `saved_media_opt` during `/send` flows in `src-tauri/src/modules/telegram_inbound/send_flow.rs` and `injection.rs`, populating `active_prompts.image_payload` with attached media counts and timestamps; implemented an anti-aliased synthetic dispatch card in `open_shot.rs` when running under non-interactive Windows OpenSSH Session 0 without display station access; and reconciled `SshConnectionRecord` field schemas across `src-tauri/src/modules/supabase_sync/query.rs` and `src/components/instances/fleet/useFleetMachines.ts`, eliminating all Rust compilation, Clippy, and TypeScript linter errors across all supported OS matrix targets. (Thanks to @aukgit)
+
+    *   **v4.236.0 (2026-10-19)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.235.0 (2026-10-19)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.234.0 (2026-10-19)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.233.1 (2026-10-19)**:
+        -   **[Prompt Tree View Reliability, GitMap Node Discovery & Clipboard Pipeline] Singleton Context Menu Architecture, Outside Capture Dismissal, Queued Turn Auto-Expansion, GitMap Cluster Node Import, Accurate Offline Node Quotas & Taint-Free Base64 Image Reader (Thanks to @aukgit)**:
+            -   **Description**: Centralized context menu state into `TreePanel.tsx` with a single `<PromptTreeContextMenu>` and transparent portal backdrop; added outside capture event listeners (`pointerdown`, `contextmenu`, `keydown`, `scroll`, `blur`) to dismiss immediately on any outside interaction; introduced `isConversationOrTurnQueued` to auto-expand queued child turns, render amber `QUEUED` badges with clock icons, and prioritize queued items in Tier 2 sorting; prioritized `gitmap cluster nodes --json` and `export-json` in `src-tauri/src/modules/ssh_manager/sync.rs` for reliable cluster node discovery across Windows/Linux machines; corrected offline SSH node quota fallbacks to 0.0% instead of 100.0% in `src-tauri/src/modules/ssh_manager/exec.rs`; added request debouncing and in-flight promise coalescing to `useAccountStore.ts` to prevent redundant IPC bursts; implemented `read_image_as_base64` in `src-tauri/src/commands/cmd_files.rs` and `run.rs` with safe path canonicalization and 100MB limit; decoded Base64 directly into PNG blobs in `clipboard.ts`, eliminating offscreen canvas CORS errors and WebView2 `SecurityError` tainting; and added rich event JSON clipboard copying with instant toast feedback.
+
+    *   **v4.233.0 (2026-10-19)**:
+        -   **[GitMap Node, Prompt System & Instance Management Synchronization] SSH Fleet Discovery, Telegram Multi-Node Routing, Prompt Tree Action Reliability, Screen Glitch Elimination, Supabase 5-Min Circuit Breaker, CDP-First Prompt Dispatch, Inline PID Pill & Caller Self-Preservation (Thanks to @aukgit)**:
+            -   **Description**: Upgraded `get_cluster_instances_and_balances` in `src-tauri/src/modules/ssh_manager/exec.rs` to query real multi-instances and bound Google account emails via GitMap discovery and cluster metadata; forwarded identity public key `-i <pubkey>` in `fix_node_auth_via_gitmap` across `mesh.rs`, `commands/ssh.rs`, and CLI handlers, removing hardcoded single-node bypasses in favor of generalized credential vault auto-repair; removed fatal callback drop guards in `src-tauri/src/modules/telegram_inbound/send_flow.rs` so the receiving Telegram bot coordinator accurately routes prompts across cluster nodes; standardized remote dispatch syntax in `src-tauri/src/modules/telegram_inbound/injection.rs` to canonical `agm prompt send <project> --instance <inst> "<prompt>"` with safe quoting and multi-line escaping; inverted prompt dispatch in `src-tauri/src/modules/repo_db/agy.rs` to submit directly via Chrome DevTools Protocol (CDP) into active IDE windows before falling back to spawning external `agy` CLI background workers; wired direct 1-click execution for Backup and Restore in `src/components/instances/PromptTreeView/PromptTreeViewModal.tsx` to `coreActions.handleBackup()` and `coreActions.handleRestore()`; added spinning animation on the Refresh icon during active sync; provided instant visual notification feedback on Reset and Refresh; restricted animated skeleton loaders in `src/components/instances/PromptTreeView/TreePanel.tsx` and `PromptTreeViewModal.tsx` strictly to initial cold starts (`isLoading && treeData.length === 0`), keeping the active tree rendered during background polling to eliminate visual flashing; enforced 3-tier deterministic sorting in `ProjectNode.tsx` and `tierClassification.ts` with `RUNNING` prompts strictly at Tier 1, `QUEUED` prompts at Tier 2 with explicit amber badges, and timestamp descending at Tier 3; removed redundant `"User Prompt"` badge and duplicate `{instanceNameDisplay}` text token from `DetailHeader.tsx`, relocating deep runtime telemetry to the Details modal; added `relative z-40` to `ModalHeader.tsx` container and `relative z-50` to `ImportExportMenu.tsx` so menus stack cleanly above banners and header elements; implemented atomic `LAST_SUPABASE_ERROR_TIMESTAMP` circuit breaker in `src-tauri/src/modules/supabase_sync/types.rs` with a 300-second cooldown on network errors across `fleet.rs`, `query.rs`, and `release.rs`; relaxed fleet polling to 300s in `useFleetMachines.ts`; added a 30-second TTL cache for account listings in `src-tauri/src/modules/account/crud.rs` to stop repetitive reads of 46 JSON account files; removed circular cache invalidation sabotage in `src-tauri/src/modules/repo_db/detection.rs:254` to eliminate console log flood; replaced ambiguous status codes with an emerald pulse badge (`PID: <pid>`) and aligned executable tail and data directory tail together on the exact same horizontal flex row (`.../Antigravity.exe · .../data`) in `src/components/instances/table/InstanceRowCells.tsx`; upgraded `src/pages/instances/SwitchAccountDialog.tsx` with cohesive dark-glass UI/UX; enforced process tree killing via `taskkill /F /T /PID` before stopping or switching accounts in `src-tauri/src/commands/instance.rs`; hardened `detect_caller_instance_id` to protect the developer's active workspace session (`default-copy-5597`); and verified with transient test sandboxes (`agm instances test-create` and `agm instances test-clean`).
+
+    *   **v4.232.0 (2026-10-18)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.231.0 (2026-10-18)**:
+        -   **[Instance Management & UI/UX Synchronization] PID Inline List View Layout, Deterministic Process Termination Ladder, Account Switch Pre-Switch Eviction, Royal Violet Switch Account Modal & Sharded Audit Trail Visibility (Thanks to @aukgit)**:
+            -   **Description**: Confirmed numeric status `1632` represents native OS Process ID (`PID`); merged separate `Status & PID` and `IDE EXE & DATA` table columns into a unified `Status, Process & Environment` cell in `src/components/instances/InstanceTable.tsx` and `src/components/instances/table/InstanceRowCells.tsx` with inline monospace PID badge, shortened executable tail, and shortened data directory tail separated by `·` with segmented copy action capsule; established 5-stage deterministic process termination ladder (`taskkill /F /T`, Win32 `TerminateProcess`, PowerShell `Stop-Process`, 200ms kernel settle delay, Chromium lockfile eviction) in `src-tauri/src/modules/instance/close.rs` and `create.rs`; enforced pre-switch PID eviction and 200ms settle delay in `switch.rs` and `credentials.rs` to eliminate Electron write-back race conditions; redesigned `SwitchAccountDialog.tsx` to 100% Royal Violet design tokens (`var(--ui-surface-1)`, `var(--ui-border-subtle)`, `var(--ui-interactive)`, `var(--ui-success)`) with segmented quota pill capsule; resolved empty audit trail in `switch_history.rs` and `InstanceAuditTrailModal.tsx` by expanding default instance aliases, guaranteeing response fields, and adding smart auto-tab fallback to operations; hardened caller IDE detection (`detect_caller_instance_id` walking 24 parent process generations) with exit code 2 immunity guard; and verified 100% green via `scripts/test-instance-lifecycle-e2e.ps1`.
+
+    *   **v4.230.0 (2026-10-18)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.229.0 (2026-10-18)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.228.0 (2026-10-18)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.227.0 (2026-10-18)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.226.0 (2026-10-18)**:
+        -   **[E9001 Sibling Isolation & UI Redesign] Error E9001 Root-Cause Resolution, Loop Throttling, Accounts Table Dark-Glass Redesign & 3D Riseup Yellow Switch (Thanks to @aukgit)**:
+            -   **Description**: Resolved Error E9001 (`Cannot switch instance to account: Account is actively bound to running sibling instance`) by guarding running instances from being considered stale or stealable in `instances.rs`, excluding running sibling accounts in `manual.rs`, and shielding candidates in `selection.rs`; prevented infinite 5-second retry loops in `PromptQueueScheduler` (`queue.rs`) for missing workspace directories by setting status to `failed` with retry backoff; implemented adaptive L1 quota cache TTL (120s/180s/300s) and 5-minute Supabase heartbeat error backoff; redesigned Accounts Table UI by removing blinding stark white hovers, flattening idle action buttons, styling Switch with Riseup Yellow 3D gradient, reordering action buttons, and moving custom label Tag into More menu; added Prompt Tree "Reset Filters" button in `TreePanel.tsx`; upgraded Win32 updater console to 18pt Consolas (`font_family = 54`); and refactored magic status strings into strongly-typed domain enums with inverted guard clauses.
+
+    *   **v4.225.0 (2026-10-17)**:
+        -   **[System Broadcasting & 30s Interval Guard] Cross-System 30-Second Minimum Interval Guard & Broadcast Storm Suppression Across Antigravity Manager & GitMap (Thanks to @aukgit)**:
+            -   **Description**: Enforced an architectural invariant across Antigravity Manager and GitMap mandating that all periodic background broadcasts, polling schedulers, worker tickers, and notification dispatchers operate at intervals of not less than 30 seconds (`>= 30s`) to prevent CPU spikes, database lock contention, and notification storms; clamped the detached prompt goal heartbeat worker loop in `goal_heartbeat.rs` to a strict 30-second minimum (`interval_secs.max(30)`, default 30s); expanded the duplicate switch notification broadcast suppression window in `channels.rs` from 5s to 30s (`(now_ts - guard.1).abs() <= 30`), completely preventing rapid notification storms across Email, Telegram, and Supabase; and aligned GitMap task synchronization defaults (`TaskMinInterval = 30`, `TaskDefaultInterval = 30` in `constants_task.go`), clamped async periodic monitors (`gitmap async -t`) to `>= 30s`, clamped macro runner intervals to `>= 30s`, and enforced minimum 30s cluster distribution heartbeat loops.
+
+    *   **v4.224.0 (2026-10-17)**:
+        -   **[Telegram Alerts & Collision Shielding] Compact Layout with Next-Line White Text Values, Step 2 Multi-Machine Deduplication, Node IP & Signal Attribution, and Action-Only Keyboards (Thanks to @aukgit)**:
+            -   **Description**: Modernized all Telegram alert cards (Account Rotation, Post-Switch Liveness, Emergency Alerts, System Updates) to be ~40% more vertically compact with key values indented on the next line in high-contrast bright white text (`kv_block`, `kv_white`); removed duplicate header and workspace fields; clamped project lists to top-3; eliminated duplicate Step 2 prompt wizard dispatch via `node_label::is_current_machine()` destination matching and <3s debounce guard; enriched instance selectors with explicit node alias, IP, and signal indicators (`🏷️ {name} ({alias} • {ip})`) in single-column layout; and streamlined Account Rotation inline keyboards to functional action-only buttons.
+
+    *   **v4.223.0 (2026-10-17)**:
+        -   **[Prompt Tree & Telegram Shielding] Custom Right-Click Context Menu, Right-Aligned Navigation Tabs, Header Dead-Space Removal, Top Toolbar Copy All Consolidation, and Telegram Cluster Routing Shielding (Thanks to @aukgit)**:
+            -   **Description**: Added right-click custom context menus to Project headers (`ProjectContextMenu.tsx`) with Import into Project, Export (JSON, SQLite DB, YAML), and Rerun (Queued or All) actions; wired context menus and keyboard accessibility to child subagents and prompt turns with active selection highlights (`bg-sky-500/10 border-l-2 border-sky-500 text-sky-400`); relocated primary navigation tabs (`[ Prompt Instruction | AI Results & Outputs ]`) to the right side of Row 2 in `DetailHeader.tsx` and eliminated the redundant 3rd row in `DetailTabs.tsx` to recover ~44px of vertical height; consolidated all copy operations into the top-level `[ Copy All | v ]` segmented capsule and removed redundant bottom copy buttons in `PromptInstructionView.tsx`; eliminated cluster-wide prompt broadcast storms by binding `target_node_id` in Supabase `command_queue` payloads across `injection.rs`, `open_shot.rs`, and `processing.rs`; unified current machine detection via `node_label::is_current_machine()`; deduplicated machine entries in Telegram picker; added native CLI support for `agm prompt <target> [flags] <prompt_text>`; and redesigned destination locked UX with expandable blockquotes for past prompts and clear instruction for direct prompt typing.
+
+    *   **v4.222.0 (2026-10-17)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+
+    *   **v4.221.0 (2026-10-17)**:
+        -   **[Multi-Machine Fleet & UI Overhaul] Fleet Sync Recovery, W2 TCP Retry Ladder, Dynamic IP Resolution, and Settings UI Overhaul (Thanks to @aukgit)**:
+            -   **Description**: Extended TCP probe timeout to 1500ms with a 2-stage retry ladder to resolve false-offline W2 machine status; normalized `${adminUser}` to `Administrator` and `${linuxUser}` to `root` across SSH connection imports and envelopes; eliminated empty `()` bug in Multi-Machine Matrix by serializing both `machine_ip` and `ip_address`; overhauled Settings SSH & GitMap actions with a contiguous segmented pill capsule, sleek metadata badges replacing raw path dumps, and active copy feedback for terminal installer commands; upgraded autonomous multi-agent concurrency capacity to A = 3, H = 2 (6 concurrent operations) across skills and coding guidelines.
+
+    *   **v4.220.0 (2026-10-17)**:
+        -   **[Accounts Management & UI Overhaul] Delete Remediation, Position-Locked Hover Inversion, Yellow Switch & Red Remove Buttons, and Disable Lifecycle (Thanks to @aukgit)**:
+            -   **Description**: Resolved non-responsive single and batch Delete buttons by mounting dedicated destructive `ModalDialog` components in `AccountsDialogs.tsx`; implemented table row color inversion to white background and black text with static geometry to eliminate layout jitter; styled Switch button with prominent yellow highlighter theme and styled Remove button with solid red background and white icon; added account disable/enable lifecycle via selection toolbar and action menu with auto-switcher candidate exclusion.
+
+    *   **v4.219.0 (2026-10-17)**:
+        -   **[Prompt Tree & Delegate Updater] Rich Verification Chapter Engine, Dual-MIME Image Transmission, Rerun Chapter Engine & Console Formatting**:
+            -   **Description**: Implemented 5-chapter prompt verification architecture (`verificationTemplates.ts`) for "Is it done?", "Is it released?", "Are you confident?", and "Edge Cases & Tests" embedding un-truncated original prompts; fixed image extraction regex index bug and implemented dual-MIME clipboard priming on dispatch; upgraded rerun engine to wrap full prompt context with round progression; fixed Windows console newline staircase wrapping in delegate updater and aligned summary fields.
+
+    *   **v4.218.0 (2026-10-17)**:
+        -   **[Repository Issues & System Hardening] Clean Stale Versions CLI, Telegram Fixes, Combined Instance Columns, Prompt Tree Layout & Multi-Segment Quota Bar**:
+            -   **Description**: Added `agm clean-other-versions` CLI command, dynamic host versioning in Telegram, internal ID stripping from prompts, configurable 100/200-word summaries with resend buttons, combined IDE Exe & Data directory column, PromptTree DetailHeader overlap resolution and live disk sync, rich clipboard media copying, 5-segment color quota bar, interaction telemetry attributes, and clean process termination.
+
+    *   **v4.217.0 (2026-10-17)**:
+        -   **[Instance Management & UI/UX Synchronization] Instance Audit Trail, Switch UI, CLI Caller Guard & Test Sandboxing**:
+            -   **Description**: Instance audit trail multi-source loading (switches + all operations), switch account dialog dark-glass styling & quota sorting, CLI caller IDE self-preservation guard, lightweight test instance lifecycle (`create-test`, `rm-test`), and automated E2E test suite. (Thanks to @aukgit)
+
+    *   **v4.216.2 (2026-10-17)**:
+        -   **[Feature Category] Main Update Summary (PR #xxx)**:
+            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
     *   **v4.216.1 (2026-10-17)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
 
-
     *   **v4.216.0 (2026-10-17)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:
             -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
-
 
     *   **v4.215.1 (2026-10-17)**:
         -   **[Telegram] Fix `/expand` format-string compile error (Thanks to @aukgit)**:
             -   **Description**: `format_expand_prompt_report` had 10 format placeholders but 9 arguments (leftover `{}` from the message rewrite); removed the stray placeholder. v4.215.0's tag pointed at the broken commit, so this patch carries the same Telegram enhancements on a green tree. (Thanks to @aukgit)
 
-
     *   **v4.215.0 (2026-10-17)**:
         -   **[Telegram] IDE exe on every prompt, history with one-tap rerun, professional messages (Thanks to @aukgit)**:
             -   **Description**: Every prompt the bot shows now ends with the IDE exe name (`ide_exe_line`, basename only, omitted when unknown rather than guessed). New `/history` lists recently sent prompts with a `↻ Rerun` button per row (`send:r:<id8>`, 64-byte-safe); `/rerun <id>` re-dispatches through the canonical injection path. All 64 prompt-related bot strings rewritten into professional human-readable messages: "Destination locked" is now "Destination confirmed", raw Id dumps became formatted cards with 8-char refs, jargon ("Inject", "Split DB", "Dual Seq ID", "Vault Path") purged; `/send` and `/target` added to the Telegram command menu. (Thanks to @aukgit)
-
 
     *   **v4.214.0 (2026-10-17)**:
         -   **[Telegram] Instance step shows the IDE exe and data folder ending (Thanks to @aukgit)**:
             -   **Description**: `/send` step 2 adds `IDE exe` and `IDE data` under each instance. `path_ending` keeps the last section only. (Thanks to @aukgit)
 
-
     *   **v4.213.0 (2026-10-17)**:
         -   **[Prompt tree] Dispatch hover stays inside the menu (Thanks to @aukgit)**:
             -   **Description**: Destination, Suffix, and the Copy AI rows use an in-menu hint anchored to the right edge. A browser `title` on that right-aligned menu is clipped by the window. See `.ai-memory/rca/20-dispatch-menu-hover-clipped.md`. (Thanks to @aukgit)
-
 
     *   **v4.212.0 (2026-10-17)**:
         -   **[Memory] Telegram picker root cause, checklist, and do-not-break rules (Thanks to @aukgit)**:
             -   **Description**: `.ai-memory/rca/18-telegram-project-listing-and-node-cache.md` explains the FIFO `session_id` label, the short `send:n:` callback, the This machine button, and the 24-hour `node_display_cache`. `.ai-memory/what-to-read.md` points at it. (Thanks to @aukgit)
 
-
     *   **v4.211.0 (2026-10-17)**:
         -   **[Telegram] Numbered project pages, conversation titles, and cached node names (Thanks to @aukgit)**:
             -   **Description**: `/send` lists eight projects per page, newest conversation first, with the project name and the conversation title. Numbers select a row, and Next loads the next eight. The current machine is labeled This machine with a green button. A missing node alias is resolved through GitMap once and stored in SQLite until `node_name_refresh_hours` (default 24). (Thanks to @aukgit)
-
 
     *   **v4.210.0 (2026-10-16)**:
         -   **[Console Logger & Diagnostics] ANSI Color Rendering, Compact Console Timer & Idempotent Migration Log Hygiene (Thanks to @aukgit)**:
@@ -501,11 +1926,9 @@
         -   **[Agent Skills & Sync Safety] 45 Native AGM Skills Restoration & Cross-Repo Sync Shielding (Thanks to @aukgit)**:
             -   **Description**: Restored 45 specialized Antigravity Manager skills across `.agents/skills` and `.cursor/skills`, documented skill navigation in `.ai-memory/what-to-read.md`, and protected AGM-specific skills in `03-ai-scripts/38-sync-prompts-skills-scripts.py` from deletion during cross-repository synchronizations.
 
-
     *   **v4.209.0 (2026-10-16)**:
         -   **[Instance Management] PID label, verified stop, switch dialog, and audit trail (Thanks to @aukgit)**:
             -   **Description**: The list badge shows `PID` and the process id, and path cells keep the filename ending. Stop and account switch kill that process and fail if it is still alive. The audit dialog reads `recent_switches`. `agm instances current` refuses to stop, switch, or delete the instance that owns the command. (Thanks to @aukgit)
-
 
     *   **v4.208.0 (2026-10-16)**:
         -   **[Feature Category] Main Update Summary (PR #xxx)**:

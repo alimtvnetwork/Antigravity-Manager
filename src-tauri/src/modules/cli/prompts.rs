@@ -1,4 +1,4 @@
-use crate::modules::{account, auto_switcher, config, instance, repo_db};
+use crate::modules::{instance, repo_db};
 
 use super::*;
 
@@ -44,11 +44,8 @@ pub fn handle_prompts_subcommand(args: &[String], entry_cmd: &str) {
         "enqueue" | "queue" => execute_prompts_enqueue(sub_args),
         "backup" => execute_prompts_backup(sub_args),
         "restore" => execute_prompts_restore(sub_args),
-        _ => {
-            eprintln!("Unknown prompts subcommand: {}", sub);
-            eprintln!("Run 'antigravity-manager prompts help' for usage instructions.");
-            std::process::exit(1);
-        }
+        "rename" => execute_prompts_rename(sub_args),
+        _ => execute_prompts_targeted_dispatch(args),
     }
 }
 
@@ -190,11 +187,12 @@ pub(crate) fn execute_prompts_send(sub_args: &[String]) {
     let is_json = is_flag_present(sub_args, &["--json", "-j"]);
     let instance_opt = extract_flag_value(sub_args, &["--instance", "-i", "--profile"]);
     let repo_opt = extract_flag_value(sub_args, &["--repo", "-r", "--workspace"]);
+    let conversation_opt = extract_flag_value(sub_args, &["--conversation"]);
     let positional = extract_positional_args(sub_args);
 
     if positional.is_empty() {
         eprintln!(
-            "Error: Usage: agm prompts send <prompt_text> [-i <instance>] [-r <repo>] [--json]"
+            "Error: Usage: agm prompts send <prompt_text> [-i <instance>] [-r <repo>] [--conversation <id>] [--json]"
         );
         std::process::exit(1);
     }
@@ -209,7 +207,12 @@ pub(crate) fn execute_prompts_send(sub_args: &[String]) {
             .unwrap_or_else(|_| ".".to_string())
     });
 
-    match repo_db::send_prompt_now_for_instance(&target_inst, &target_repo, &prompt_text, None) {
+    match repo_db::send_prompt_now_for_instance(
+        &target_inst,
+        &target_repo,
+        &prompt_text,
+        conversation_opt.as_deref(),
+    ) {
         Ok(active_prompt) => {
             if is_json {
                 let payload = serde_json::json!({
@@ -244,11 +247,12 @@ pub(crate) fn execute_prompts_enqueue(sub_args: &[String]) {
     let is_json = is_flag_present(sub_args, &["--json", "-j"]);
     let instance_opt = extract_flag_value(sub_args, &["--instance", "-i", "--profile"]);
     let repo_opt = extract_flag_value(sub_args, &["--repo", "-r", "--workspace"]);
+    let conversation_opt = extract_flag_value(sub_args, &["--conversation"]);
     let positional = extract_positional_args(sub_args);
 
     if positional.is_empty() {
         eprintln!(
-            "Error: Usage: agm prompts enqueue <prompt_text> [-i <instance>] [-r <repo>] [--json]"
+            "Error: Usage: agm prompts enqueue <prompt_text> [-i <instance>] [-r <repo>] [--conversation <id>] [--json]"
         );
         std::process::exit(1);
     }
@@ -267,7 +271,7 @@ pub(crate) fn execute_prompts_enqueue(sub_args: &[String]) {
         &target_inst,
         &prompt_text,
         Some(&target_repo),
-        None,
+        conversation_opt.as_deref(),
         None,
     ) {
         Ok(row_id) => {
@@ -340,11 +344,35 @@ pub(crate) fn execute_prompts_backup(sub_args: &[String]) {
 
 pub(crate) fn execute_prompts_restore(sub_args: &[String]) {
     let is_json = is_flag_present(sub_args, &["--json", "-j"]);
-    let instance_opt = extract_flag_value(sub_args, &["--instance", "-i", "--profile"]);
+    let positional = extract_positional_args(sub_args);
+    let instance_opt = extract_flag_value(sub_args, &["--instance", "-i", "--profile"])
+        .or_else(|| positional.iter().find(|p| p.as_str() != "running").cloned());
     let limit = extract_flag_value(sub_args, &["--limit", "-l"])
         .and_then(|v| v.parse::<usize>().ok())
         .unwrap_or(20);
     let target_inst = instance_opt.as_deref();
+    let target_instance_name = target_inst.unwrap_or("default");
+
+    if let Ok(conn) = crate::modules::backup_prompts_db::connect_backup_db(None) {
+        // Justification: sweep and reattribute orphaned backups during CLI restore; failure logged
+        crate::error::record_ignored(
+            crate::modules::backup_prompts_db::sweep_and_reattribute_orphaned_backups(
+                &conn,
+                target_instance_name,
+            )
+            .map_err(|e| e.to_string()),
+            "sweep_and_reattribute_orphaned_backups in execute_prompts_restore",
+        );
+    }
+    // Justification: restore running prompts from durable backup DB; failure logged
+    crate::error::record_ignored(
+        crate::modules::backup_prompts_db::restore_running_prompts_scoped_with_fallback(
+            target_instance_name,
+            false,
+            None,
+        ),
+        "restore_running_prompts_scoped_with_fallback in execute_prompts_restore",
+    );
 
     match repo_db::resend_running_commands_for_instance(target_inst, limit) {
         Ok(restored) => {
@@ -378,6 +406,160 @@ pub(crate) fn execute_prompts_restore(sub_args: &[String]) {
                 .print_and_exit();
             }
             eprintln!("[ERROR] Failed to restore prompts: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+pub(crate) fn execute_prompts_rename(sub_args: &[String]) {
+    let instance_opt = extract_flag_value(sub_args, &["--instance", "-i", "--profile"]);
+    let is_json = is_flag_present(sub_args, &["--json", "-j"]);
+
+    let positionals = extract_positional_args(sub_args);
+    if positionals.len() < 2 {
+        if is_json {
+            CliEnvelope::<()>::err(
+                "prompts rename",
+                instance_opt,
+                "MISSING_ARGUMENTS",
+                "Usage: agm prompts rename <conversation_id> \"<new_title>\" [--instance <id>]",
+            )
+            .print_and_exit();
+        }
+        eprintln!("Error: Missing required arguments.");
+        eprintln!("Usage: agm prompts rename <conversation_id> \"<new_title>\" [--instance <id>]");
+        std::process::exit(1);
+    }
+
+    let conversation_id = &positionals[0];
+    let new_title = &positionals[1];
+
+    let resolved_inst = instance_opt
+        .clone()
+        .unwrap_or_else(|| "default".to_string());
+
+    match repo_db::sequences::update_conversation_title(
+        Some(&resolved_inst),
+        conversation_id,
+        new_title,
+    ) {
+        Ok(_) => {
+            if is_json {
+                CliEnvelope::ok(
+                    "prompts rename",
+                    instance_opt,
+                    serde_json::json!({
+                        "renamed": true,
+                        "conversation_id": conversation_id,
+                        "new_title": new_title,
+                        "instance": resolved_inst
+                    }),
+                )
+                .print_and_exit();
+            }
+            println!(
+                "[AGM] Successfully renamed conversation '{}' to '{}' (instance: {})",
+                conversation_id, new_title, resolved_inst
+            );
+            std::process::exit(0);
+        }
+        Err(e) => {
+            let msg = e.to_string();
+            if is_json {
+                CliEnvelope::<()>::err("prompts rename", instance_opt, "RENAME_FAILED", &msg)
+                    .print_and_exit();
+            }
+            eprintln!("[AGM ERROR] Failed to rename conversation: {}", msg);
+            std::process::exit(1);
+        }
+    }
+}
+
+pub(crate) fn execute_prompts_targeted_dispatch(args: &[String]) {
+    let is_json = is_flag_present(args, &["--json", "-j"]);
+    let instance_opt = extract_flag_value(args, &["--instance", "-i", "--profile"]);
+    let repo_opt = extract_flag_value(args, &["--repo", "-r", "--workspace"]);
+    let positional = extract_positional_args(args);
+
+    if positional.is_empty() {
+        eprintln!("Error: Missing prompt text. Usage: agm prompt <target> [flags] <prompt_text>");
+        std::process::exit(1);
+    }
+
+    let (target, prompt_text) = if positional.len() > 1 {
+        (positional[0].as_str(), positional[1..].join(" "))
+    } else {
+        ("default", positional[0].clone())
+    };
+
+    let mut resolved_instance = instance_opt.clone();
+    let mut resolved_repo = repo_opt.clone();
+    let mut resolved_session: Option<String> = None;
+
+    // Try resolving target as sequence code (C001, P001, etc.)
+    if let Some(seq) = repo_db::resolve_agm_sequence_target(target) {
+        if resolved_instance.is_none() && !seq.instance_id.is_empty() {
+            resolved_instance = Some(seq.instance_id);
+        }
+        if resolved_repo.is_none() && !seq.repo_path.is_empty() {
+            resolved_repo = Some(seq.repo_path);
+        }
+        resolved_session = seq.conversation_id;
+    } else {
+        // Check live projects
+        let live_projects = repo_db::get_live_project_execution_info();
+        if let Some(matched) = live_projects.iter().find(|p| {
+            p.project_id.eq_ignore_ascii_case(target)
+                || p.repo_name.eq_ignore_ascii_case(target)
+                || target.eq_ignore_ascii_case("default")
+        }) {
+            if resolved_repo.is_none() && !matched.repo_path.is_empty() {
+                resolved_repo = Some(matched.repo_path.clone());
+            }
+        }
+    }
+
+    let target_inst = resolved_instance.unwrap_or_else(|| {
+        instance::get_active_instance_id().unwrap_or_else(|_| "default".to_string())
+    });
+    let target_repo = resolved_repo.unwrap_or_else(|| {
+        std::env::current_dir()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|_| ".".to_string())
+    });
+
+    match repo_db::send_prompt_now_for_instance(
+        &target_inst,
+        &target_repo,
+        &prompt_text,
+        resolved_session.as_deref(),
+    ) {
+        Ok(active_prompt) => {
+            if is_json {
+                let payload = serde_json::json!({
+                    "prompt_id": active_prompt.id,
+                    "target": target,
+                    "instance_id": active_prompt.instance_id,
+                    "repo_path": active_prompt.repo_path,
+                    "status": active_prompt.status,
+                    "is_running": active_prompt.status == "running",
+                    "created_at": active_prompt.created_at,
+                });
+                CliEnvelope::ok("prompt", Some(target_inst), payload).print_and_exit();
+            }
+            println!("[CLI] Prompt dispatched to {}:", target);
+            println!("  ID:          {}", active_prompt.id);
+            println!("  Instance:    {}", active_prompt.instance_id);
+            println!("  Repo:        {}", active_prompt.repo_path);
+            println!("  Status:      {}", active_prompt.status);
+            std::process::exit(0);
+        }
+        Err(e) => {
+            if is_json {
+                CliEnvelope::<()>::err("prompt", Some(target_inst), "DISPATCH_FAILED", &e)
+                    .print_and_exit();
+            }
+            eprintln!("[ERROR] Failed to send prompt: {}", e);
             std::process::exit(1);
         }
     }

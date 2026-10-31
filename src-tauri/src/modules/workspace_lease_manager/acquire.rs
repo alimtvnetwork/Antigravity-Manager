@@ -5,6 +5,21 @@ use serde_json::json;
 use super::*;
 use crate::modules::supabase_sync;
 
+/// Determines if an existing lease record is unexpired and owned by a foreign node.
+pub fn is_lease_held_by_other_node(
+    current_expires: i64,
+    now: i64,
+    current_owner: &str,
+    node_id: &str,
+) -> bool {
+    let is_unexpired = current_expires > now;
+    if !is_unexpired {
+        return false;
+    }
+    let is_same_node = current_owner.trim().eq_ignore_ascii_case(node_id.trim());
+    !is_same_node
+}
+
 /// Attempt to acquire an exclusive lease for an account
 pub async fn acquire_lease(
     account_id: &str,
@@ -33,6 +48,16 @@ pub async fn acquire_lease_with_details(
     };
 
     let config = supabase_sync::load_config()?;
+    if supabase_sync::is_supabase_circuit_open() {
+        return Ok(LeaseResult {
+            is_success: true,
+            error_message: None,
+            owner_node_id: Some(supabase_sync::get_local_node_id()),
+            owner_alias: Some(config.node_alias),
+            expires_at: Some(Utc::now().timestamp() + effective_ttl),
+        });
+    }
+
     let client = match get_root_client(&config) {
         Some(c) => c,
         None => {
@@ -50,7 +75,8 @@ pub async fn acquire_lease_with_details(
     let node_id = supabase_sync::get_local_node_id();
     let node_alias = config.node_alias;
     let local_ip = supabase_sync::get_local_ip();
-    let email_to_use = if !account_email.is_empty() {
+    let has_account_email = !account_email.trim().is_empty();
+    let email_to_use = if has_account_email {
         account_email.to_string()
     } else {
         crate::modules::account::load_account(account_id)
@@ -71,12 +97,56 @@ pub async fn acquire_lease_with_details(
         "p_ip_address": local_ip
     });
 
-    if let Ok(rpc_resp) = client.rpc("acquire_workspace_lease", rpc_payload).await {
-        let is_ok = rpc_resp
-            .get("is_success")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-        if is_ok {
+    match client.rpc("acquire_workspace_lease", rpc_payload).await {
+        Ok(rpc_resp) => {
+            let is_ok = rpc_resp
+                .get("is_success")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            if is_ok {
+                return Ok(LeaseResult {
+                    is_success: true,
+                    error_message: None,
+                    owner_node_id: Some(node_id),
+                    owner_alias: Some(node_alias),
+                    expires_at: Some(expires),
+                });
+            } else {
+                let owner_node_id = rpc_resp
+                    .get("owner_node_id")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let owner_alias = rpc_resp
+                    .get("owner_alias")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let expires_at = rpc_resp.get("expires_at").and_then(|v| v.as_i64());
+                let error_message = rpc_resp
+                    .get("error")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .or_else(|| {
+                        let alias = owner_alias.as_deref().unwrap_or("another machine");
+                        let rem = expires_at.map(|e| (e - now).max(0)).unwrap_or(0);
+                        Some(format!(
+                            "Account is currently held by node '{}' (expires in {}s)",
+                            alias, rem
+                        ))
+                    });
+                return Ok(LeaseResult {
+                    is_success: false,
+                    error_message,
+                    owner_node_id,
+                    owner_alias,
+                    expires_at,
+                });
+            }
+        }
+        Err(AppError::Network(err, _)) => {
+            tracing::warn!(
+                target: "workspace_lease",
+                "Supabase network unavailable during lease RPC ({err}); falling back to local lease"
+            );
             return Ok(LeaseResult {
                 is_success: true,
                 error_message: None,
@@ -84,40 +154,15 @@ pub async fn acquire_lease_with_details(
                 owner_alias: Some(node_alias),
                 expires_at: Some(expires),
             });
-        } else {
-            let owner_node_id = rpc_resp
-                .get("owner_node_id")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            let owner_alias = rpc_resp
-                .get("owner_alias")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            let expires_at = rpc_resp.get("expires_at").and_then(|v| v.as_i64());
-            let error_message = rpc_resp
-                .get("error")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
-                .or_else(|| {
-                    let alias = owner_alias.as_deref().unwrap_or("another machine");
-                    let rem = expires_at.map(|e| (e - now).max(0)).unwrap_or(0);
-                    Some(format!(
-                        "Account is currently held by node '{}' (expires in {}s)",
-                        alias, rem
-                    ))
-                });
-            return Ok(LeaseResult {
-                is_success: false,
-                error_message,
-                owner_node_id,
-                owner_alias,
-                expires_at,
-            });
+        }
+        Err(_) => {
+            // Function missing or schema mismatch, attempt REST fallback
         }
     }
 
     // Direct REST fallback check
-    let query = if !email_to_use.is_empty() {
+    let has_email_to_use = !email_to_use.trim().is_empty();
+    let query = if has_email_to_use {
         format!(
             "or=(account_id.eq.{},account_email.eq.{})&select=*",
             account_id, email_to_use
@@ -140,9 +185,7 @@ pub async fn acquire_lease_with_details(
                     .and_then(|v| v.as_i64())
                     .unwrap_or(0);
 
-                if current_expires > now
-                    && !current_owner.trim().eq_ignore_ascii_case(node_id.trim())
-                {
+                if is_lease_held_by_other_node(current_expires, now, current_owner, &node_id) {
                     let remaining = (current_expires - now).max(0);
                     return Ok(LeaseResult {
                         is_success: false,
@@ -182,4 +225,24 @@ pub async fn acquire_lease_with_details(
         owner_alias: Some(node_alias),
         expires_at: Some(expires),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_lease_held_by_other_node() {
+        let now = 1000;
+        // Unexpired and owned by foreign node -> true
+        assert!(is_lease_held_by_other_node(1500, now, "node-b", "node-a"));
+        // Unexpired but owned by same node -> false
+        assert!(!is_lease_held_by_other_node(1500, now, "node-a", "node-a"));
+        assert!(!is_lease_held_by_other_node(
+            1500, now, " Node-A ", "node-a"
+        ));
+        // Expired -> false
+        assert!(!is_lease_held_by_other_node(900, now, "node-b", "node-a"));
+        assert!(!is_lease_held_by_other_node(1000, now, "node-b", "node-a"));
+    }
 }

@@ -20,6 +20,18 @@ fn main() {
             antigravity_tools_lib::modules::delegate_updater::open_ui(&args[2..]);
             return;
         }
+        if sub == "version" || sub == "v" {
+            #[cfg(target_os = "windows")]
+            unsafe {
+                extern "system" {
+                    fn AttachConsole(dw_process_id: u32) -> i32;
+                }
+                const ATTACH_PARENT_PROCESS: u32 = 0xFFFFFFFF;
+                AttachConsole(ATTACH_PARENT_PROCESS);
+            }
+            println!("agm-ui v{}", antigravity_tools_lib::VERSION);
+            return;
+        }
     }
 
     #[cfg(target_os = "linux")]

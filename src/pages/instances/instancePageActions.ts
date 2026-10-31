@@ -28,6 +28,8 @@ export interface PageActionContext {
     setActionState: React.Dispatch<React.SetStateAction<Record<string, InstanceActionType>>>;
     setDeletingId: (v: string | null) => void;
     setIsSyncingAll: (v: boolean) => void;
+    isLaunchingAll: boolean;
+    setIsLaunchingAll: (v: boolean) => void;
     setSyncingInstanceIds: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
     setNewInstanceName: (v: string) => void;
     setNewInstanceBoundAccount: (v: string) => void;
@@ -53,7 +55,8 @@ export interface PageActionContext {
     deleteInstance: (id: string) => Promise<void>;
     wipeSession: (id: string) => Promise<void>;
     launchInstance: (id: string) => Promise<void>;
-    stopInstance: (id: string) => Promise<void>;
+    launchAllInstances: () => Promise<string[]>;
+    stopInstance: (id: string, targetPid?: number) => Promise<void>;
     restartInstance: (id: string) => Promise<InstanceStatus>;
     fastForwardInstance: (id: string) => Promise<string>;
     syncInstance: (id: string) => Promise<void>;
@@ -76,7 +79,8 @@ export interface PageActions {
     handleWipeSession: (id: string) => void;
     handleConfirmWipe: () => Promise<void>;
     handleLaunch: (id: string) => Promise<void>;
-    handleStop: (id: string) => Promise<void>;
+    handleLaunchAll: () => Promise<void>;
+    handleStop: (id: string, targetPid?: number) => Promise<void>;
     handleRestart: (id: string) => Promise<void>;
     handleFastForward: (id: string) => Promise<void>;
     handleSync: (id: string) => Promise<void>;
@@ -86,6 +90,7 @@ export interface PageActions {
     handleToggleAutoSwitcher: () => Promise<void>;
     handleTriggerRotation: () => Promise<void>;
     openSwitchDialog: (id: string) => void;
+    openCreateDialog: () => void;
     openAuditDialog: (id: string, name: string) => void;
     openSettingsDialog: (id: string) => void;
     openCopyDialog: (id: string, name: string) => void;
@@ -113,6 +118,8 @@ export function createPageActions(ctx: PageActionContext): PageActions {
         setActionState,
         setDeletingId,
         setIsSyncingAll,
+        isLaunchingAll,
+        setIsLaunchingAll,
         setSyncingInstanceIds,
         setNewInstanceName,
         setNewInstanceBoundAccount,
@@ -138,6 +145,7 @@ export function createPageActions(ctx: PageActionContext): PageActions {
         deleteInstance,
         wipeSession,
         launchInstance,
+        launchAllInstances,
         stopInstance,
         restartInstance,
         fastForwardInstance,
@@ -164,7 +172,8 @@ export function createPageActions(ctx: PageActionContext): PageActions {
                 }
                 setNewInstanceName('');
                 setNewInstanceBoundAccount('');
-                setNewInstanceFromInstance('');
+                const defaultInst = instances.find((i) => i.config.is_default || i.config.id === 'default');
+                setNewInstanceFromInstance(defaultInst?.config.id || 'default');
                 setNewInstanceLaunchImmediately(false);
                 setIsCreateOpen(false);
                 showToast(
@@ -291,7 +300,22 @@ export function createPageActions(ctx: PageActionContext): PageActions {
         };
 
         const handleLaunch = (id: string) => runGuardedAction(id, 'launch', () => launchInstance(id));
-        const handleStop = (id: string) => runGuardedAction(id, 'stop', () => stopInstance(id));
+        const handleLaunchAll = async () => {
+            if (isLaunchingAll) return;
+            setIsLaunchingAll(true);
+            setActionError(null);
+            try {
+                const launched = await launchAllInstances();
+                showToast(`Launched ${launched.length} instance(s)`, 'success');
+                await fetchInstances(true);
+            } catch (e: unknown) {
+                setActionError(actionErrorMessage(e) || 'Failed to launch all instances');
+            } finally {
+                setIsLaunchingAll(false);
+            }
+        };
+        const handleStop = (id: string, targetPid?: number) =>
+            runGuardedAction(id, 'stop', () => stopInstance(id, targetPid));
         const handleRestart = (id: string) =>
             runGuardedAction(id, 'restart', () => restartInstance(id), 'Instance restarted successfully on current account');
         const handleFastForward = (id: string) =>
@@ -398,6 +422,16 @@ export function createPageActions(ctx: PageActionContext): PageActions {
                 executablePath: target?.config.executable_path,
             });
         };
+    const openCreateDialog = () => {
+        setActionError(null);
+        setNewInstanceName('');
+        setNewInstanceBoundAccount('');
+        const defaultInst = instances.find((i) => i.config.is_default || i.config.id === 'default');
+        setNewInstanceFromInstance(defaultInst?.config.id || 'default');
+        setNewInstanceLaunchImmediately(false);
+        setIsCreateOpen(true);
+    };
+
     return {
         handleCreate,
         handleInitDefault,
@@ -408,6 +442,7 @@ export function createPageActions(ctx: PageActionContext): PageActions {
         handleWipeSession,
         handleConfirmWipe,
         handleLaunch,
+        handleLaunchAll,
         handleStop,
         handleRestart,
         handleFastForward,
@@ -418,6 +453,7 @@ export function createPageActions(ctx: PageActionContext): PageActions {
         handleToggleAutoSwitcher,
         handleTriggerRotation,
         openSwitchDialog,
+        openCreateDialog,
         openAuditDialog,
         openSettingsDialog,
         openCopyDialog,

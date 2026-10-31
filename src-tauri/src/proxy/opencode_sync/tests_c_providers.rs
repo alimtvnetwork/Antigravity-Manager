@@ -186,7 +186,7 @@ fn test_openai_sync_preserves_jsonc_unicode_and_backup() {
     let path = tmp.path().join(OPENCODE_CONFIG_FILE_JSONC);
     let content = r#"{
             // User settings must survive syncing another provider.
-            "instructions": ["инструкции.md", "日本語.md", "🚀.md",],
+            "instructions": ["инструкции.md", "Japanese.md", "🚀.md",],
             "provider": {"custom": {"name": "Мой провайдер",},},
         }"#;
     fs::write(&path, content).unwrap();
@@ -202,7 +202,7 @@ fn test_openai_sync_preserves_jsonc_unicode_and_backup() {
     let config: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
     assert_eq!(
         config["instructions"],
-        serde_json::json!(["инструкции.md", "日本語.md", "🚀.md"])
+        serde_json::json!(["инструкции.md", "Japanese.md", "🚀.md"])
     );
     assert_eq!(config["provider"]["custom"]["name"], "Мой провайдер");
     assert_eq!(

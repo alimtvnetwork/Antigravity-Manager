@@ -18,18 +18,37 @@ export async function createInstance(
     });
 }
 
+export interface CloneProgressPayload {
+    source_id: string;
+    target_name: string;
+    stage: 'initializing' | 'user_settings' | 'sqlite_databases' | 'workspace_storage' | 'telemetry_sync' | 'complete' | string;
+    percentage: number;
+    message: string;
+    timestamp_ms: number;
+}
+
 export async function copyInstance(
     sourceId: string,
     targetName: string,
     cloneMode?: string,
     copyProjects?: boolean
 ): Promise<InstanceConfig> {
-    return await invoke('copy_instance', {
-        sourceId,
-        targetName,
-        cloneMode: cloneMode || 'full',
-        copyProjects: copyProjects ?? true,
-    });
+    try {
+        return await invoke('copy_instance', {
+            sourceId,
+            targetName,
+            cloneMode: cloneMode || 'full',
+            copyProjects: copyProjects ?? true,
+        });
+    } catch (e: any) {
+        useErrorStore.getState().captureError(e, {
+            source: 'instanceService.copyInstance',
+            endpoint: 'copy_instance',
+            triggerAction: 'copy_instance',
+            context: { sourceId, targetName, cloneMode, copyProjects },
+        });
+        throw e;
+    }
 }
 
 export async function copyInstanceProjects(fromId: string, toId: string): Promise<number> {

@@ -6,8 +6,262 @@ use std::collections::{HashMap, HashSet};
 
 use super::*;
 
+/// Helper to construct a FleetMachineInfo from a registered SshConnectionRecord
+pub(crate) fn build_ssh_mesh_machine_info(
+    conn: &crate::modules::ssh_manager::SshConnectionRecord,
+    now: i64,
+) -> FleetMachineInfo {
+    let port = if conn.port == 0 { 22 } else { conn.port };
+    let mut is_online =
+        crate::modules::ssh_manager::check_tcp_liveness(&conn.ip_address, port, 1500);
+    if !is_online && crate::modules::ssh_manager::resolve_gitmap_bin().is_some() {
+        if let Ok((is_gm_online, _)) =
+            crate::modules::ssh_manager::check_node_via_gitmap(&conn.alias)
+        {
+            if is_gm_online {
+                is_online = true;
+            }
+        }
+    }
+    let status = if is_online {
+        "online".to_string()
+    } else {
+        "offline".to_string()
+    };
+    FleetMachineInfo {
+        node_id: format!("ssh_{}", conn.alias),
+        node_alias: conn.alias.clone(),
+        alias: conn.alias.clone(),
+        os_info: if conn.os.trim().is_empty() {
+            None
+        } else {
+            Some(conn.os.clone())
+        },
+        ip_address: conn.ip_address.clone(),
+        is_online,
+        last_heartbeat_timestamp: if is_online { now } else { 0 },
+        last_heartbeat_at: if is_online { now } else { 0 },
+        uptime_seconds: 0,
+        status,
+        is_local: false,
+        source: "ssh-mesh".to_string(),
+        in_flight_prompts_count: 0,
+        total_running_prompts: 0,
+        total_instances: 1,
+        active_instances: vec![FleetInstanceSummary {
+            profile_id: format!("{}:default", conn.alias),
+            profile_name: format!("{}:default", conn.alias),
+            is_running: is_online,
+            bound_account_id: None,
+            bound_account_email: None,
+        }],
+        instances: Vec::new(),
+        bound_emails: Vec::new(),
+        active_accounts: Vec::new(),
+        leases: Vec::new(),
+    }
+}
+
+/// Collect all known peer connections from SSH connections, candidate gitmap-ssh-nodes.json paths, and GitMap cluster nodes
+pub(crate) fn collect_all_peer_connections() -> Vec<crate::modules::ssh_manager::SshConnectionRecord>
+{
+    let mut all_conns = Vec::new();
+    let mut seen_aliases = HashSet::new();
+    let mut seen_ips = HashSet::new();
+
+    // 1. Load from ssh_manager registry
+    if let Ok(conns) = crate::modules::ssh_manager::load_ssh_connections() {
+        for c in conns {
+            let a_norm = c.alias.trim().to_ascii_lowercase();
+            let ip_norm = c.ip_address.trim().to_string();
+            if !a_norm.is_empty() && !seen_aliases.contains(&a_norm) {
+                seen_aliases.insert(a_norm);
+                if !ip_norm.is_empty() {
+                    seen_ips.insert(ip_norm);
+                }
+                all_conns.push(c);
+            }
+        }
+    }
+
+    // 2. Load from candidate gitmap-ssh-nodes.json files
+    for seed_path in crate::modules::ssh_manager::candidate_seed_node_paths() {
+        if let Ok(raw) = std::fs::read_to_string(&seed_path) {
+            if let Ok(conns) = crate::modules::ssh_manager::decode_connections_from_json(&raw) {
+                for c in conns {
+                    let a_norm = c.alias.trim().to_ascii_lowercase();
+                    let ip_norm = c.ip_address.trim().to_string();
+                    if !a_norm.is_empty() && !seen_aliases.contains(&a_norm) {
+                        seen_aliases.insert(a_norm);
+                        if !ip_norm.is_empty() {
+                            seen_ips.insert(ip_norm);
+                        }
+                        all_conns.push(c);
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Load from GitMap cluster nodes CLI (gitmap cluster nodes --json / status)
+    for gm_node in crate::modules::telegram_inbound::cluster::query_gitmap_cluster_nodes() {
+        let a_norm = gm_node.alias.trim().to_ascii_lowercase();
+        let ip_norm = gm_node.ip_address.trim().to_string();
+        if !a_norm.is_empty() && !seen_aliases.contains(&a_norm) {
+            seen_aliases.insert(a_norm);
+            if !ip_norm.is_empty() && ip_norm != "Cluster Mesh" {
+                seen_ips.insert(ip_norm.clone());
+            }
+            all_conns.push(crate::modules::ssh_manager::SshConnectionRecord {
+                alias: gm_node.alias.clone(),
+                ip_address: gm_node.ip_address.clone(),
+                port: 22,
+                username: "Administrator".to_string(),
+                key_path: String::new(),
+                os: "Windows".to_string(),
+                encrypted_password: String::new(),
+                encryption_algo: "RSA-2048".to_string(),
+                os_group: None,
+                os_version: None,
+                build_version: None,
+                first_run_at: None,
+                created_at: None,
+            });
+        }
+    }
+
+    // 4. Canonical fallback: ensure all 6 GitMap cluster nodes (w1, main, u1, w2, w3, w4) are present
+    for &(alias, ip, user, os) in crate::modules::ssh_manager::GITMAP_CLUSTER_NODES {
+        let a_norm = alias.trim().to_ascii_lowercase();
+        let ip_norm = ip.trim().to_string();
+        if !a_norm.is_empty() && !seen_aliases.contains(&a_norm) && !seen_ips.contains(&ip_norm) {
+            seen_aliases.insert(a_norm);
+            seen_ips.insert(ip_norm.clone());
+            all_conns.push(crate::modules::ssh_manager::SshConnectionRecord {
+                alias: alias.to_string(),
+                ip_address: ip.to_string(),
+                port: 22,
+                username: user.to_string(),
+                key_path: String::new(),
+                os: os.to_string(),
+                encrypted_password: String::new(),
+                encryption_algo: "RSA-2048".to_string(),
+                os_group: Some(if os.eq_ignore_ascii_case("windows") {
+                    "Windows".to_string()
+                } else {
+                    "Linux".to_string()
+                }),
+                os_version: None,
+                build_version: None,
+                first_run_at: None,
+                created_at: None,
+            });
+        }
+    }
+
+    all_conns
+}
+
+/// Build local machine info plus all registered SSH fleet and GitMap nodes
+pub fn build_local_and_ssh_fleet() -> Vec<FleetMachineInfo> {
+    let mut machines = build_local_fallback_machine();
+    if let Some(m) = machines.first_mut() {
+        m.node_alias = "w1".to_string();
+        m.alias = "w1".to_string();
+        m.is_local = true;
+    }
+    let local_ip = machines
+        .first()
+        .map(|m| m.ip_address.clone())
+        .unwrap_or_default();
+    let local_alias = machines
+        .first()
+        .map(|m| m.alias.clone())
+        .unwrap_or_default();
+    let now = Utc::now().timestamp();
+
+    let all_conns = collect_all_peer_connections();
+    for conn in all_conns {
+        let is_self = conn.ip_address == "192.168.1.3"
+            || (!local_ip.is_empty() && conn.ip_address == local_ip)
+            || conn.alias.eq_ignore_ascii_case("w1")
+            || (conn.alias.eq_ignore_ascii_case(&local_alias)
+                && (local_ip.is_empty() || conn.ip_address == local_ip));
+        if is_self {
+            if let Some(local_machine) = machines.first_mut() {
+                local_machine.node_alias = "w1".to_string();
+                local_machine.alias = "w1".to_string();
+                local_machine.is_local = true;
+            }
+            continue;
+        }
+        machines.push(build_ssh_mesh_machine_info(&conn, now));
+    }
+
+    // Ensure all canonical cluster nodes (w1, main, u1, w2, w3, w4) are preserved without dropping
+    for &(alias, ip, user, os) in crate::modules::ssh_manager::GITMAP_CLUSTER_NODES {
+        let exists = machines.iter().any(|m| {
+            m.node_alias.eq_ignore_ascii_case(alias) || (!ip.is_empty() && m.ip_address == ip)
+        });
+        if !exists {
+            let record = crate::modules::ssh_manager::SshConnectionRecord {
+                alias: alias.to_string(),
+                ip_address: ip.to_string(),
+                port: 22,
+                username: user.to_string(),
+                key_path: String::new(),
+                os: os.to_string(),
+                encrypted_password: String::new(),
+                encryption_algo: "RSA-2048".to_string(),
+                os_group: Some(if os.eq_ignore_ascii_case("windows") {
+                    "Windows".to_string()
+                } else {
+                    "Linux".to_string()
+                }),
+                os_version: None,
+                build_version: None,
+                first_run_at: None,
+                created_at: None,
+            };
+            machines.push(build_ssh_mesh_machine_info(&record, now));
+        }
+    }
+
+    machines.sort_by(|a, b| {
+        let a_is_w1 =
+            a.node_alias.eq_ignore_ascii_case("w1") || a.ip_address == "192.168.1.3" || a.is_local;
+        let b_is_w1 =
+            b.node_alias.eq_ignore_ascii_case("w1") || b.ip_address == "192.168.1.3" || b.is_local;
+        if a_is_w1 != b_is_w1 {
+            return b_is_w1.cmp(&a_is_w1);
+        }
+        let a_is_main = a.node_alias.eq_ignore_ascii_case("main") || a.ip_address == "192.168.1.20";
+        let b_is_main = b.node_alias.eq_ignore_ascii_case("main") || b.ip_address == "192.168.1.20";
+        if a_is_main != b_is_main {
+            return b_is_main.cmp(&a_is_main);
+        }
+        if a.is_online != b.is_online {
+            return b.is_online.cmp(&a.is_online);
+        }
+        a.node_alias
+            .to_lowercase()
+            .cmp(&b.node_alias.to_lowercase())
+    });
+
+    machines
+}
+
 /// Query fleet machines aggregating nodes, instance profiles, and workspace leases across the cluster
 pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
+    if is_supabase_circuit_open() {
+        tracing::debug!(
+            target: "supabase_sync",
+            remaining_secs = get_supabase_cooldown_remaining_secs(),
+            "Supabase circuit breaker is open; returning local and SSH fleet without network requests"
+        );
+        return Ok(build_local_and_ssh_fleet());
+    }
+
     let config = match load_config() {
         Ok(c) => c,
         Err(e) => {
@@ -15,11 +269,11 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
                 target: "supabase_sync",
                 "Failed to load config for query_fleet_machines: {e}"
             );
-            return Ok(build_local_fallback_machine());
+            return Ok(build_local_and_ssh_fleet());
         }
     };
     if !config.is_sync_enabled {
-        return Ok(build_local_fallback_machine());
+        return Ok(build_local_and_ssh_fleet());
     }
 
     let root_ep = match config
@@ -28,7 +282,7 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
         .find(|ep| ep.is_enabled && ep.role == "root")
     {
         Some(ep) => ep.clone(),
-        None => return Ok(build_local_fallback_machine()),
+        None => return Ok(build_local_and_ssh_fleet()),
     };
 
     let client = match SupabaseClient::new(&root_ep) {
@@ -38,7 +292,8 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
                 "[Fleet] Failed to create Supabase client for fleet query: {}",
                 e
             );
-            return Ok(build_local_fallback_machine());
+            record_supabase_network_error();
+            return Ok(build_local_and_ssh_fleet());
         }
     };
 
@@ -49,18 +304,20 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
         Ok(val) => val,
         Err(e) => {
             tracing::warn!("[Fleet] Failed to query nodes from Supabase: {}", e);
-            return Ok(build_local_fallback_machine());
+            record_supabase_network_error();
+            return Ok(build_local_and_ssh_fleet());
         }
     };
 
     if let Some(msg) = postgrest_error_message(&nodes_val) {
         tracing::warn!("[Fleet] PostgREST error querying nodes: {}", msg);
-        return Ok(build_local_fallback_machine());
+        record_supabase_network_error();
+        return Ok(build_local_and_ssh_fleet());
     }
 
     let nodes_array = match nodes_val.as_array() {
         Some(arr) => arr.clone(),
-        None => return Ok(build_local_fallback_machine()),
+        None => return Ok(build_local_and_ssh_fleet()),
     };
 
     let profiles_val = match client.select("instance_profiles", "select=*").await {
@@ -72,6 +329,7 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
                 error = %e,
                 "Failed to query instance_profiles table from Supabase"
             );
+            record_supabase_network_error();
             serde_json::Value::Array(Vec::new())
         }
     };
@@ -211,7 +469,15 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
             );
             continue;
         }
-        let is_local = node_id == local_node_id;
+        let ip_address = n
+            .get("ip_address")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let local_ip = get_local_ip();
+        let is_local = node_id == local_node_id
+            || ip_address == "192.168.1.3"
+            || (!local_ip.is_empty() && ip_address == local_ip);
         if is_local {
             has_local = true;
         }
@@ -220,14 +486,15 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
             .and_then(|v| v.as_str())
             .unwrap_or_default()
             .to_string();
-        if is_local && node_alias.is_empty() {
-            node_alias = config.node_alias.clone();
+        if is_local {
+            node_alias = "w1".to_string();
+        } else if (ip_address == "192.168.1.3" || (!local_ip.is_empty() && ip_address == local_ip))
+            && (node_alias.is_empty()
+                || node_alias == "agm-node-local"
+                || node_alias.starts_with("Node-"))
+        {
+            node_alias = "w1".to_string();
         }
-        let ip_address = n
-            .get("ip_address")
-            .and_then(|v| v.as_str())
-            .unwrap_or_default()
-            .to_string();
         let uptime_seconds = if is_local {
             get_uptime_seconds()
         } else {
@@ -349,14 +616,68 @@ pub async fn query_fleet_machines() -> Result<Vec<FleetMachineInfo>, AppError> {
 
     if !has_local {
         let fallback = build_local_fallback_machine();
-        if let Some(local_machine) = fallback.into_iter().next() {
+        if let Some(mut local_machine) = fallback.into_iter().next() {
+            local_machine.node_alias = "w1".to_string();
+            local_machine.alias = "w1".to_string();
+            local_machine.is_local = true;
             machines.push(local_machine);
         }
     }
 
+    // Merge registered SSH mesh nodes and GitMap peer nodes that are not present in Supabase
+    let now = Utc::now().timestamp();
+    let all_conns = collect_all_peer_connections();
+    for conn in all_conns {
+        let is_dup = machines.iter().any(|m| {
+            (!conn.ip_address.is_empty() && m.ip_address == conn.ip_address)
+                || m.node_alias.eq_ignore_ascii_case(&conn.alias)
+        });
+        if !is_dup {
+            machines.push(build_ssh_mesh_machine_info(&conn, now));
+        }
+    }
+
+    // Ensure all canonical cluster nodes (w1, main, u1, w2, w3, w4) are preserved without dropping
+    for &(alias, ip, user, os) in crate::modules::ssh_manager::GITMAP_CLUSTER_NODES {
+        let exists = machines.iter().any(|m| {
+            m.node_alias.eq_ignore_ascii_case(alias) || (!ip.is_empty() && m.ip_address == ip)
+        });
+        if !exists {
+            let record = crate::modules::ssh_manager::SshConnectionRecord {
+                alias: alias.to_string(),
+                ip_address: ip.to_string(),
+                port: 22,
+                username: user.to_string(),
+                key_path: String::new(),
+                os: os.to_string(),
+                encrypted_password: String::new(),
+                encryption_algo: "RSA-2048".to_string(),
+                os_group: Some(if os.eq_ignore_ascii_case("windows") {
+                    "Windows".to_string()
+                } else {
+                    "Linux".to_string()
+                }),
+                os_version: None,
+                build_version: None,
+                first_run_at: None,
+                created_at: None,
+            };
+            machines.push(build_ssh_mesh_machine_info(&record, now));
+        }
+    }
+
     machines.sort_by(|a, b| {
-        if a.is_local != b.is_local {
-            return b.is_local.cmp(&a.is_local);
+        let a_is_w1 =
+            a.node_alias.eq_ignore_ascii_case("w1") || a.ip_address == "192.168.1.3" || a.is_local;
+        let b_is_w1 =
+            b.node_alias.eq_ignore_ascii_case("w1") || b.ip_address == "192.168.1.3" || b.is_local;
+        if a_is_w1 != b_is_w1 {
+            return b_is_w1.cmp(&a_is_w1);
+        }
+        let a_is_main = a.node_alias.eq_ignore_ascii_case("main") || a.ip_address == "192.168.1.20";
+        let b_is_main = b.node_alias.eq_ignore_ascii_case("main") || b.ip_address == "192.168.1.20";
+        if a_is_main != b_is_main {
+            return b_is_main.cmp(&a_is_main);
         }
         if a.is_online != b.is_online {
             return b.is_online.cmp(&a.is_online);

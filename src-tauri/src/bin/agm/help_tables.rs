@@ -48,6 +48,18 @@ pub(crate) fn print_prompts_reference_table() {
         "Incremental targeted test runs without regressing",
         "Body: smart-test-runner"
     );
+    println!(
+        "  {:<26} {:<44} {:<30}",
+        "improvements-plan-100",
+        "Plan 100 improvements as 10 batches of 10",
+        "agm improvements plan"
+    );
+    println!(
+        "  {:<26} {:<44} {:<30}",
+        "implement-next-10",
+        "Dispatch 07-implement-next-10-improvements.md",
+        "agm improvements next"
+    );
     println!();
 }
 
@@ -184,6 +196,8 @@ pub(crate) fn print_supabase_help() {
     println!("   agm supabase set <id> <name> <url> <key> <role> [notes] [tags]");
     println!("                                          Configure/update endpoint directly from command line");
     println!("   agm supabase load-json <file>          Ingest and merge endpoints from JSON file");
+    println!("   agm supabase push-settings --vault <path> [--json]");
+    println!("                                          Import vault config, sync, and test connectivity in one command (path may also come from AGM_SUPABASE_VAULT)");
     println!("   agm supabase export [--file <path>]    Export Supabase configuration wrapped in JSON envelope");
     println!("   agm supabase sync                      Trigger immediate local node & instance profile sync");
     println!("   agm supabase schema [root|secondary]   Output SQL schema script for Supabase SQL Editor");

@@ -42,7 +42,7 @@ pub fn write_to_system_keyring(account: &crate::models::Account) -> Result<(), S
         account.email
     ));
 
-    // 2. 跨平台凭据注入
+    // 2. Cross-platform credential injection
     #[cfg(target_os = "macos")]
     {
         use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -50,7 +50,7 @@ pub fn write_to_system_keyring(account: &crate::models::Account) -> Result<(), S
         let full_keyring_value = format!("go-keyring-base64:{}", encoded_payload);
 
         // 2.1 macOS Keychain Access
-        // 删除旧的
+        // delete old
         // Justification: deletes a possibly-nonexistent old keychain entry; failure is expected when no entry exists
         crate::error::record_ignored(
             Command::new("security")
@@ -65,7 +65,7 @@ pub fn write_to_system_keyring(account: &crate::models::Account) -> Result<(), S
             "delete old macOS keychain entry",
         );
 
-        // 写入新的 (-A 参数允许所有本地应用免密码、无感直接读取凭据)
+        // Write new ones (-A parameter allows all local applications to read credentials directly without password and senseless)
         let output = Command::new("security")
             .args([
                 "add-generic-password",
@@ -168,10 +168,10 @@ pub fn write_to_system_keyring(account: &crate::models::Account) -> Result<(), S
     #[cfg(target_os = "linux")]
     {
         // 2.3 Linux Secret Service API
-        // [FIX #3418] 在 Linux GNOME 环境下，Secret Service 往往同时存在 'login' 集合与 'default' 集合。
-        // agy CLI 读取凭据时严格从 'login' 集合检索。若未指定 --collection，secret-tool 会写入 default 集合，
-        // 导致两个集合内容分叉，agy 持续读取到 login 集合中的旧账号。
-        // 此处封装辅助函数：优先写入 login 集合，同时确保与 default 集合同步。
+        // [FIX #3418] In the Linux GNOME environment, Secret Service often has both the 'login' collection and the 'default' collection.
+        // The agy CLI strictly retrieves credentials from the 'login' collection when reading them. If --collection is not specified, secret-tool will write to the default collection.
+        // As a result, the contents of the two collections diverge, and agy continues to read the old accounts in the login collection.
+        // The auxiliary function is encapsulated here: write to the login collection first, while ensuring synchronization with the default collection.
         use std::io::Write;
         use std::sync::mpsc;
 
@@ -195,14 +195,12 @@ pub fn write_to_system_keyring(account: &crate::models::Account) -> Result<(), S
                 Ok(child) => child,
                 Err(e) => {
                     if e.kind() == std::io::ErrorKind::NotFound {
-                        return Err(
-                            "Linux Secret Service utility 'secret-tool' not found (未检测到 secret-tool 工具)。\n\
+                        return Err("Linux Secret Service utility 'secret-tool' not found.\n\
                              Please install libsecret-tools to enable Keyring credential storage:\n\
                              • Ubuntu / Debian: sudo apt install -y libsecret-tools\n\
                              • Fedora / RHEL: sudo dnf install -y libsecret\n\
                              • Arch Linux: sudo pacman -S libsecret"
-                                .to_string(),
-                        );
+                            .to_string());
                     }
                     return Err(format!("Failed to spawn secret-tool: {}", e));
                 }
@@ -254,20 +252,20 @@ pub fn write_to_system_keyring(account: &crate::models::Account) -> Result<(), S
             Ok(())
         };
 
-        // 1. 优先尝试写入 'login' 集合（agy CLI 所需）
+        // 1. First try to write to the 'login' collection (required by agy CLI)
         let login_res = store_to_collection(Some("login"), payload_json.as_bytes());
 
-        // 2. 同时写入默认集合（保证其他依赖 default collection 的系统工具也能读取）
+        // 2. Write to the default collection at the same time (to ensure that other system tools that rely on the default collection can also read)
         let default_res = store_to_collection(None, payload_json.as_bytes());
 
-        // 尝试优先同步写入本地文件凭据 (~/.gemini/oauth_creds.json)
+        // Try to write local file credentials first synchronously (~/.gemini/oauth_creds.json)
         // Justification: file-credential mirror is opportunistic; the keyring writes are the authoritative path
         crate::error::record_ignored(
             write_to_file_credentials(account),
             "mirror credentials to file",
         );
 
-        // 若两者均失败，则返回错误；若至少一个成功，则记录并继续
+        // If both fail, return an error; if at least one succeeds, log and continue.
         if login_res.is_err() && default_res.is_err() {
             return Err(login_res.unwrap_err());
         } else if let Err(e) = login_res {
@@ -286,7 +284,7 @@ pub fn write_to_system_keyring(account: &crate::models::Account) -> Result<(), S
         "[Desktop] Successfully wrote token to system credential store.",
     );
 
-    // 同步写入 ~/.gemini/ 目录下的文件凭据，兼容 SSH 会话、容器环境和无 Keyring/D-Bus 场景
+    // Synchronously writes file credentials in the ~/.gemini/ directory, compatible with SSH sessions, container environments and Keyring/D-Bus-less scenarios
     if let Err(e) = write_to_file_credentials(account) {
         crate::modules::logger::log_warn(&format!("[Desktop] File credential sync warning: {}", e));
     }

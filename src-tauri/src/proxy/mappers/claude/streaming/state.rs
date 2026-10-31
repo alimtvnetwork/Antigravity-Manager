@@ -8,7 +8,7 @@ use crate::proxy::SignatureCache;
 use bytes::Bytes;
 use serde_json::{json, Value};
 
-/// 流式状态机
+/// Streaming state machine
 
 pub struct StreamingState {
     block_type: BlockType,
@@ -20,7 +20,7 @@ pub struct StreamingState {
     pub(crate) trailing_signature: Option<String>,
     pub web_search_query: Option<String>,
     pub grounding_chunks: Option<Vec<serde_json::Value>>,
-    // [IMPROVED] Error recovery 状态追踪 (prepared for future use)
+    // [IMPROVED] Error recovery status tracking (prepared for future use)
     #[allow(dead_code)]
     parse_error_count: usize,
     #[allow(dead_code)]
@@ -33,7 +33,7 @@ pub struct StreamingState {
     pub scaling_enabled: bool,
     // [NEW] Context limit for smart threshold recovery (default to 1M)
     pub context_limit: u32,
-    // [NEW] MCP XML Bridge 缓冲区
+    // [NEW] MCP XML Bridge Buffer
     pub mcp_xml_buffer: String,
     pub in_mcp_xml: bool,
     // [FIX] Estimated prompt tokens for calibrator learning
@@ -62,7 +62,7 @@ impl StreamingState {
             trailing_signature: None,
             web_search_query: None,
             grounding_chunks: None,
-            // [IMPROVED] 初始化 error recovery 字段
+            // [IMPROVED] Initialize error recovery field
             parse_error_count: 0,
             last_valid_state: None,
             model_name: None,
@@ -92,7 +92,7 @@ impl StreamingState {
         self.registered_tool_names = names;
     }
 
-    /// 发送 SSE 事件
+    /// Send SSE events
     pub fn emit(&self, event_type: &str, data: serde_json::Value) -> Bytes {
         let sse = format!(
             "event: {}\ndata: {}\n\n",
@@ -102,7 +102,7 @@ impl StreamingState {
         Bytes::from(sse)
     }
 
-    /// 发送 message_start 事件
+    /// Send message_start event
     pub fn emit_message_start(&mut self, raw_json: &serde_json::Value) -> Bytes {
         if self.message_start_sent {
             return Bytes::new();
@@ -153,7 +153,7 @@ impl StreamingState {
         result
     }
 
-    /// 开始新的内容块
+    /// Start a new content block
     pub fn start_block(
         &mut self,
         block_type: BlockType,
@@ -177,7 +177,7 @@ impl StreamingState {
         chunks
     }
 
-    /// 结束当前内容块
+    /// End current content block
     pub fn end_block(&mut self) -> Vec<Bytes> {
         if self.block_type == BlockType::None {
             return vec![];
@@ -185,10 +185,10 @@ impl StreamingState {
 
         let mut chunks = Vec::new();
 
-        // Thinking 块结束时发送暂存的签名（上游未下发时回退到会话签名）。
-        // **绝不发明哨兵** —— 哨兵是"跳过校验"开关而非假合法签名，
-        // 下发给客户端只会污染其历史；且官方流量里出现 0/23 次，不属于 Antigravity 协议。
-        // 真签名的恢复由网关侧 SQL 状态机（`hydrate`）与终审 `place_turn_signature` 承担。
+        // The temporary signature is sent at the end of the Thinking block (fallback to the session signature when the upstream has not issued it).
+        // **Never invent sentry** - Sentinel is a "skip verification" switch rather than a fake legal signature.
+        // Distributing it to the client will only pollute its history; and it appears 0/23 times in official traffic, it does not belong to the Antigravity protocol.
+        // The recovery of the true signature is undertaken by the gateway-side SQL state machine (`hydrate`) and the final review `place_turn_signature`.
         if self.block_type == BlockType::Thinking {
             let signature = if self.signatures.has_pending() {
                 self.signatures.consume()
@@ -217,7 +217,7 @@ impl StreamingState {
         chunks
     }
 
-    /// 发送 delta 事件
+    /// Send delta event
     pub fn emit_delta(&self, delta_type: &str, delta_content: serde_json::Value) -> Bytes {
         let mut delta = json!({ "type": delta_type });
         if let serde_json::Value::Object(map) = delta_content {
@@ -236,7 +236,7 @@ impl StreamingState {
         )
     }
 
-    /// 发送结束事件
+    /// Send end event
     pub fn emit_finish(
         &mut self,
         finish_reason: Option<&str>,
@@ -244,36 +244,36 @@ impl StreamingState {
     ) -> Vec<Bytes> {
         let mut chunks = Vec::new();
 
-        // 关闭最后一个块
+        // Close last block
         chunks.extend(self.end_block());
 
-        // 处理 trailingSignature (B4/C3 场景)
-        // [FIX] 只有当还没有发送过任何块时, 才能以 thinking 块结束(作为消息的开头)
-        // 实际上, 对于 Claude 协议, 如果已经发送过 Text, 就不能在此追加 Thinking。
-        // 这里的解决方案是: 只存储签名, 不再发送非法的末尾 Thinking 块。
-        // 签名会通过 SignatureCache 在下一轮请求中自动恢复。
+        // Handle trailingSignature (B4/C3 scenario)
+        // [FIX] Ending with thinking block (as start of message) only when no block has been sent yet
+        // In fact, for the Claude protocol, if Text has already been sent, Thinking cannot be appended here.
+        // The solution here is: just store the signature and no longer send the illegal last Thinking block.
+        // The signature is automatically restored on the next round of requests via SignatureCache.
         if let Some(signature) = self.trailing_signature.take() {
             tracing::info!(
                 "[Streaming] Captured trailing signature (len: {}), caching for session.",
                 signature.len()
             );
             self.signatures.store(Some(signature));
-            // 不再追加 chunks.push(self.emit("content_block_start", ...))
+            // No more appending chunks.push(self.emit("content_block_start", ...))
         }
 
-        // 处理 grounding(web search) -> 转换为 Markdown 文本块
+        // Process grounding(web search) -> Convert to Markdown text block
         if self.web_search_query.is_some() || self.grounding_chunks.is_some() {
             let mut grounding_text = String::new();
 
-            // 1. 处理搜索词
+            // 1. Process search terms
             if let Some(query) = &self.web_search_query {
                 if !query.is_empty() {
-                    grounding_text.push_str("\n\n---\n**🔍 已为您搜索：** ");
+                    grounding_text.push_str("\n\n---\n**🔍 Searched for you:**");
                     grounding_text.push_str(query);
                 }
             }
 
-            // 2. 处理来源链接
+            // 2. Process source links
             if let Some(chunks) = &self.grounding_chunks {
                 let mut links = Vec::new();
                 for (i, chunk) in chunks.iter().enumerate() {
@@ -281,21 +281,21 @@ impl StreamingState {
                         let title = web
                             .get("title")
                             .and_then(|v| v.as_str())
-                            .unwrap_or("网页来源");
+                            .unwrap_or("Web source");
                         let uri = web.get("uri").and_then(|v| v.as_str()).unwrap_or("#");
                         links.push(format!("[{}] [{}]({})", i + 1, title, uri));
                     }
                 }
 
                 if !links.is_empty() {
-                    grounding_text.push_str("\n\n**🌐 来源引文：**\n");
+                    grounding_text.push_str("\n\n**🌐 Source citation:**\n");
                     grounding_text.push_str(&links.join("\n"));
                 }
             }
 
             let trimmed_grounding = grounding_text.trim();
             if !trimmed_grounding.is_empty() {
-                // 发送一个新的 text 块
+                // Send a new text block
                 chunks.push(self.emit(
                     "content_block_start",
                     json!({
@@ -313,7 +313,7 @@ impl StreamingState {
             }
         }
 
-        // 确定 stop_reason
+        // OK stop_reason
         let stop_reason = if self.used_tool {
             "tool_use"
         } else if finish_reason == Some("MAX_TOKENS") {
@@ -368,42 +368,42 @@ impl StreamingState {
         chunks
     }
 
-    /// 标记使用了工具
+    /// Mark tools used
     pub fn mark_tool_used(&mut self) {
         self.used_tool = true;
     }
 
-    /// 获取当前块类型
+    /// Get the current block type
     pub fn current_block_type(&self) -> BlockType {
         self.block_type
     }
 
-    /// 获取当前块索引
+    /// Get the current block index
     pub fn current_block_index(&self) -> usize {
         self.block_index
     }
 
-    /// 存储签名
+    /// Store signature
     pub fn store_signature(&mut self, signature: Option<String>) {
         self.signatures.store(signature);
     }
 
-    /// 设置 trailing signature
+    /// Set trailing signature
     pub fn set_trailing_signature(&mut self, signature: Option<String>) {
         self.trailing_signature = signature;
     }
 
-    /// 获取 trailing signature (仅用于检查)
+    /// Get trailing signature (for checking only)
     pub fn has_trailing_signature(&self) -> bool {
         self.trailing_signature.is_some()
     }
 
-    /// 处理 SSE 解析错误，实现优雅降级
+    /// Handle SSE parsing errors to achieve graceful degradation
     ///
-    /// 当 SSE stream 中发生解析错误时:
-    /// 1. 安全关闭当前 block
-    /// 2. 递增错误计数器
-    /// 3. 在 debug 模式下输出错误信息
+    /// When a parsing error occurs in an SSE stream:
+    /// 1. Safely close the current block
+    /// 2. Increment error counter
+    /// 3. Output error information in debug mode
     #[allow(dead_code)] // Prepared for future error recovery implementation
     pub fn handle_parse_error(&mut self, raw_data: &str) -> Vec<Bytes> {
         let mut chunks = Vec::new();
@@ -416,13 +416,13 @@ impl StreamingState {
             raw_data.len()
         );
 
-        // 安全关闭当前 block
+        // Safely close the current block
         if self.block_type != BlockType::None {
             self.last_valid_state = Some(self.block_type);
             chunks.extend(self.end_block());
         }
 
-        // Debug 模式下输出详细错误信息
+        // Output detailed error information in Debug mode
         #[cfg(debug_assertions)]
         {
             let preview = if raw_data.len() > 100 {
@@ -436,9 +436,9 @@ impl StreamingState {
             tracing::debug!("[SSE-Parser] Failed chunk preview: {}", preview);
         }
 
-        // 错误率过高时发出警告并尝试发送错误信号
+        // Warn when the error rate is too high and try to send an error signal
         if self.parse_error_count > 3 {
-            // 降低阈值,更早通知用户
+            // Lower the threshold to notify users earlier
             tracing::error!(
                 "[SSE-Parser] High error rate detected ({} errors). Stream may be corrupted.",
                 self.parse_error_count
@@ -453,7 +453,7 @@ impl StreamingState {
                     "type": "error",
                     "error": {
                         "type": "overloaded_error", // Use standard type
-                        "message": "网络连接不稳定，请检查您的网络或代理设置。",
+                        "message": "The network connection is unstable, please check your network or proxy settings.",
                     }
                 }),
             ));
@@ -462,14 +462,14 @@ impl StreamingState {
         chunks
     }
 
-    /// 重置错误状态 (recovery 后调用)
+    /// Reset error status (called after recovery)
     #[allow(dead_code)]
     pub fn reset_error_state(&mut self) {
         self.parse_error_count = 0;
         self.last_valid_state = None;
     }
 
-    /// 获取错误计数 (用于监控)
+    /// Get error count (for monitoring)
     #[allow(dead_code)]
     pub fn get_error_count(&self) -> usize {
         self.parse_error_count

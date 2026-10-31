@@ -137,7 +137,7 @@ fn normalize_response_subsequent_request(
     }
     validate_responses_input_image_limits(payload.get("input"))?;
 
-    // [FIX] 拦截 compaction 和完整历史替换事件
+    // [FIX] Interception of compaction and full history replacement events
     if should_replace_websocket_transcript(&payload) {
         if let Some(obj) = payload.as_object_mut() {
             obj.remove("type");
@@ -148,9 +148,9 @@ fn normalize_response_subsequent_request(
         return Ok(payload);
     }
 
-    // [FIX] 始终走完整的 merge 逻辑，废弃 transcript replacement 分支
-    // 旧逻辑在检测到 function_call/assistant 时直接替换整个历史，导致多轮对话历史丢失
-    // 正确做法：last_request.input + last_response_output + new payload.input 全部合并
+    // [FIX] Always use the complete merge logic and abandon the transcript replacement branch
+    // The old logic directly replaces the entire history when function_call/assistant is detected, resulting in the loss of multiple rounds of conversation history.
+    // Correct approach: last_request.input + last_response_output + new payload.input merge them all
     let mut last_request = state.last_request.take().expect("checked above");
     let mut merged_input = last_request
         .as_object_mut()
@@ -161,13 +161,13 @@ fn normalize_response_subsequent_request(
         })
         .unwrap_or_default();
 
-    // 上一轮请求的 input 已按所有权移入 merged_input。
-    // 2. 上一轮 response 的 output items（assistant 回复、工具调用等）
+    // The input from the previous round of requests has been moved into merged_input by ownership.
+    // 2. The output items of the previous round of response (assistant reply, tool call, etc.)
     if let Value::Array(items) = std::mem::take(&mut state.last_response_output) {
         merged_input.extend(items);
     }
 
-    // 3. 本轮新的 input items（用户消息、工具调用结果等）
+    // 3. New input items for this round (user messages, tool call results, etc.)
     let current_input = payload
         .as_object_mut()
         .and_then(|obj| obj.remove("input"))

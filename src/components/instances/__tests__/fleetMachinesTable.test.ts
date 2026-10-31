@@ -55,12 +55,20 @@ function makeMachine(node_id: string, node_alias: string): FleetMachineInfo {
 // maskEmailAddress
 // ---------------------------------------------------------------------------
 
-test('maskEmailAddress masks a normal email keeping first/last local chars', () => {
-    assertEqual(maskEmailAddress('worker.alpha@example.com'), 'w***a@example.com');
+test('maskEmailAddress masks a normal email keeping 4 initial local chars', () => {
+    assertEqual(maskEmailAddress('worker.alpha@example.com'), 'work***@example.com');
+});
+
+test('maskEmailAddress displays 4 chars first and hides @gmail domains', () => {
+    assertEqual(maskEmailAddress('david.smith@gmail.com'), 'davi***');
+    assertEqual(maskEmailAddress('kevin.jones@googlemail.com'), 'kevi***');
+    assertEqual(maskEmailAddress('dan@gmail.com'), 'dan***');
+    assertEqual(maskEmailAddress('ab@gmail.com'), 'ab***');
+    assertEqual(maskEmailAddress('x@gmail.com'), 'x***');
 });
 
 test('maskEmailAddress handles short local parts', () => {
-    assertEqual(maskEmailAddress('ab@example.com'), 'a***@example.com');
+    assertEqual(maskEmailAddress('ab@example.com'), 'ab***@example.com');
     assertEqual(maskEmailAddress('x@example.com'), 'x***@example.com');
 });
 

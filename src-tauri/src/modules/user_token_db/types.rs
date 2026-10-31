@@ -12,8 +12,8 @@ pub struct UserToken {
     pub expires_type: String, // "day", "week", "month", "never"
     pub expires_at: Option<i64>,
     pub max_ips: i32,                 // 0 = unlimited
-    pub curfew_start: Option<String>, // "HH:MM" 宵禁开始时间
-    pub curfew_end: Option<String>,   // "HH:MM" 宵禁结束时间
+    pub curfew_start: Option<String>, // "HH:MM" curfew start time
+    pub curfew_end: Option<String>,   // "HH:MM" curfew end time
     pub created_at: i64,
     pub updated_at: i64,
     pub last_used_at: Option<i64>,
@@ -21,7 +21,7 @@ pub struct UserToken {
     pub total_tokens_used: i64,
 }
 
-/// 令牌 IP 绑定结构体
+/// Token IP binding structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenIpBinding {
     pub id: String,
@@ -33,7 +33,7 @@ pub struct TokenIpBinding {
     pub user_agent: Option<String>,
 }
 
-/// 令牌使用日志结构体
+/// Token usage log structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenUsageLog {
     pub id: String,

@@ -1,5 +1,5 @@
 // OpenAI SSE streams (split from streaming.rs).
-// OpenAI 流式转换
+// OpenAI streaming
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures::{Stream, StreamExt};
@@ -8,14 +8,14 @@ use serde_json::{json, Value};
 use std::pin::Pin;
 use uuid::Uuid;
 
-/// 保存 thoughtSignature 到会话缓存
+/// Save thoughtSignature to session cache
 
 pub fn store_thought_signature(sig: &str, session_id: &str, message_count: usize) {
     if sig.is_empty() {
         return;
     }
 
-    // 2. [CRITICAL] 存储到 Session 隔离缓存 (对齐 Claude 协议)
+    // 2. [CRITICAL] Store to Session isolation cache (aligned with Claude protocol)
     crate::proxy::SignatureCache::global().cache_session_signature(
         session_id,
         sig.to_string(),
@@ -23,7 +23,7 @@ pub fn store_thought_signature(sig: &str, session_id: &str, message_count: usize
     );
 
     tracing::debug!(
-        "[ThoughtSig] 存储 Session 签名 (sid: {}, len: {}, msg_count: {})",
+        "[ThoughtSig] Store Session signature (sid: {} , len: {} , msg_count: {} )",
         session_id,
         sig.len(),
         message_count
@@ -126,7 +126,7 @@ where
                                             }
 
                                             if let Some(candidates) = actual_data.get("candidates").and_then(|c| c.as_array()) {
-                                                // [DEBUG] 打印原始 candidate 以排查空回复问题
+                                                // [DEBUG] Print original candidate to troubleshoot empty replies
                                                 if candidates.len() > 0 {
                                                      tracing::debug!("[Stream-Debug] Raw Candidate: {:?}", candidates[0]);
                                                 }
@@ -141,11 +141,11 @@ where
                                                             let is_thought_part = part.get("thought").and_then(|v| v.as_bool()).unwrap_or(false);
                                                             if let Some(text) = part.get("text").and_then(|t| t.as_str()) {
                                                                 if is_thought_part {
-                                                                    // thought 内容只写入 thought_out（给支持 reasoning_content 的客户端），防止客户端重复显示思维过程
+                                                                    // thought content is only written to thought_out (for clients that support reasoning_content) to prevent the client from repeatedly displaying the thinking process
                                                                     let clean_text = text.replace("<think>\n", "").replace("<think>", "").replace("\n</think>", "").replace("</think>", "");
                                                                     thought_out.push_str(&clean_text);
                                                                 } else {
-                                                                    // 真实正文内容（非思考块）保留原始文本，避免技术讨论或代码反引号中的 `<think>` 标签被粗暴抹除为空
+                                                                    // The real body content (not think blocks) retains the original text to avoid technical discussions or code backticks in which `<think>` tags are rudely erased to be empty.
                                                                     content_out.push_str(text);
                                                                 }
                                                             }
@@ -166,7 +166,7 @@ where
                                                                     let name = func_call.get("name").and_then(|v| v.as_str()).unwrap_or("unknown");
                                                                     let mut args = func_call.get("args").unwrap_or(&json!({})).clone();
 
-                                                                    // [FIX #1575 & #3430] 标准化并清洗 shell / PowerShell 等工具参数名称与必填字段
+                                                                    // [FIX #1575 & #3430] Standardize and clean tool parameter names and required fields for shell / PowerShell and other tools
                                                                     super::super::response::normalize_and_sanitize_tool_args(name, &mut args);
 
                                                                     let final_name = super::super::response::resolve_shell_tool_name(name, &client_tool_names);
@@ -223,7 +223,7 @@ where
                                                         if let Some(queries) = grounding.get("webSearchQueries").and_then(|q| q.as_array()) {
                                                             let query_list: Vec<&str> = queries.iter().filter_map(|v| v.as_str()).collect();
                                                             if !query_list.is_empty() {
-                                                                grounding_text.push_str("\n\n---\n**🔍 已为您搜索：** ");
+                                                                grounding_text.push_str("\n\n---\n**🔍 Searched for you:**");
                                                                 grounding_text.push_str(&query_list.join(", "));
                                                             }
                                                         }
@@ -231,13 +231,13 @@ where
                                                             let mut links = Vec::new();
                                                             for (i, chunk) in chunks.iter().enumerate() {
                                                                 if let Some(web) = chunk.get("web") {
-                                                                    let title = web.get("title").and_then(|v| v.as_str()).unwrap_or("网页来源");
+                                                                    let title = web.get("title").and_then(|v| v.as_str()).unwrap_or("Web source");
                                                                     let uri = web.get("uri").and_then(|v| v.as_str()).unwrap_or("#");
                                                                     links.push(format!("[{}] [{}]({})", i + 1, title, uri));
                                                                 }
                                                             }
                                                             if !links.is_empty() {
-                                                                grounding_text.push_str("\n\n**🌐 来源引文：**\n");
+                                                                grounding_text.push_str("\n\n**🌐 Source citation:**\n");
                                                                 grounding_text.push_str(&links.join("\n"));
                                                             }
                                                         }
@@ -255,8 +255,8 @@ where
                                                         _ => "stop",
                                                     });
 
-                                                    // [FIX #1575] 如果发射了工具调用，强制设置为 tool_calls
-                                                    // 解决 Gemini 返回 STOP 但有工具调用时，OpenAI 客户端认为对话已结束的问题
+                                                    // [FIX #1575] If tool calls are emitted, force set to tool_calls
+                                                    // Solve the problem that when Gemini returns STOP but there is a tool call, the OpenAI client thinks that the conversation has ended
                                                     let finish_reason = if !emitted_tool_calls.is_empty() && gemini_finish_reason.is_some() {
                                                         Some("tool_calls")
                                                     } else {

@@ -128,11 +128,11 @@ export const useProxyModels = () => {
             const rawKey = id.toLowerCase();
             const mapped = ALIAS_TO_CANONICAL[rawKey];
             const canonicalId = mapped ? mapped.id : id;
-            const canonicalName = canonicalId; // 方案 A: 统一采用纯正 Model ID
+            const canonicalName = canonicalId; // Option A: Uniformly use pure Model ID
             const group = mapped ? mapped.group : (config.group || inferModelGroup(canonicalId));
 
             // Skip legacy marketing adjective labels
-            if (['Melhor Raciocínio', 'Visualização Flash', 'Geração de Imagem (1:1)', 'Alto Desempenho', '最高推理', '快速响应'].includes(canonicalName)) {
+            if (['Melhor Raciocínio', 'Visualização Flash', 'Geração de Imagem (1:1)', 'Alto Desempenho', 'supreme reasoning', 'Quick response'].includes(canonicalName)) {
                 continue;
             }
 

@@ -1,11 +1,11 @@
 use super::*;
 
-// ===== [Issue #467 Fix] Warmup 请求拦截 =====
+// ===== [Issue #467 Fix] Warmup request interception =====
 
-/// 检测是否为真正的 Claude Code 保活心跳请求（极度收窄规则，杜绝误杀）
+/// Detect whether it is a real Claude Code keep-alive heartbeat request (extremely narrow the rules to prevent accidental killing)
 ///
-/// 只有当最后一条消息为用户角色且内容严格全等于 "Warmup" 单词本身，且不包含任何工具调用或多余内容时，
-/// 才认定为客户端心跳。绝不使用 starts_with 匹配，绝不拦截 ToolResult。
+/// Only if the last message is a user role and the content is strictly equal to the word "Warmup" itself and does not contain any tool calls or redundant content,
+/// It is recognized as the client heartbeat. Never use starts_with matching and never intercept ToolResults.
 pub(crate) fn is_warmup_request(request: &ClaudeRequest) -> bool {
     if let Some(msg) = request.messages.last() {
         if msg.role != "user" {
@@ -34,15 +34,15 @@ pub(crate) fn is_warmup_request(request: &ClaudeRequest) -> bool {
     }
 }
 
-/// 创建 Warmup 请求的模拟响应
+/// Create a mock response to a Warmup request
 ///
-/// 返回一个简单的响应，不消耗上游配额
+/// Return a simple response that consumes no upstream quota
 pub(crate) fn create_warmup_response(request: &ClaudeRequest, is_stream: bool) -> Response {
     let model = &request.model;
     let message_id = format!("msg_warmup_{}", chrono::Utc::now().timestamp_millis());
 
     if is_stream {
-        // 流式响应：发送标准的 SSE 事件序列
+        // Streaming response: Sends a standard sequence of SSE events
         let events = vec![
             // message_start
             format!(
@@ -72,7 +72,7 @@ pub(crate) fn create_warmup_response(request: &ClaudeRequest, is_stream: bool) -
             .body(Body::from(body))
             .unwrap()
     } else {
-        // 非流式响应
+        // non-streaming response
         let response = json!({
             "id": message_id,
             "type": "message",

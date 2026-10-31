@@ -50,6 +50,8 @@ pub async fn switch_account_to_instance(
             err
         })?;
 
+    refuse_if_caller_instance(&target_id)?;
+
     // Sibling Local Running Guard: prevent switching to accounts actively bound to running sibling instances on the same host!
     let bound_inst = registry
         .instances
@@ -94,7 +96,12 @@ pub async fn switch_account_to_instance(
     let (prev_4h, prev_weekly) = if prev_email.is_some() {
         prev_account_opt
             .as_ref()
-            .map(|a| crate::modules::auto_switcher::extract_dual_window_quotas(a, "gemini-2.5-pro"))
+            .map(|a| {
+                crate::modules::auto_switcher::extract_dual_window_quotas(
+                    a,
+                    crate::models::config::DEFAULT_TARGET_MODEL,
+                )
+            })
             .unwrap_or((None, None))
     } else {
         (None, None)
@@ -150,14 +157,27 @@ pub async fn switch_account_to_instance(
         None
     };
 
-    // 1.5. [Step 1/5] Snapshot and re-enqueue running prompts scoped to THIS target instance BEFORE closing IDE
-    let existing_backed_up = crate::modules::repo_db::count_backed_up_prompts(&instance.id);
-    let newly_backed_up = match crate::modules::repo_db::backup_running_prompts(&instance.id) {
+    // 1.5. [Step 1/5] Snapshot the instance whose account is changing.
+    // Never use the globally-selected active instance: CLI `switch`/`ff` on a
+    // sandbox would otherwise steal Default's running prompts and skip the
+    // target instance's own running prompt.
+    let source_instance_id = prompt_backup_source_instance_id(&instance.id);
+
+    // Incomplete-prompt sweep: transition ALL uncompleted prompts (running, in_flight, dispatched, any age)
+    // to backed_up so long-running prompts are never dropped when switching or when quota expires.
+    crate::error::record_ignored(
+        crate::modules::repo_db::backup::sweep_incomplete_prompts_for_instance(&source_instance_id),
+        "sweep incomplete prompts before switch",
+    );
+
+    let existing_backed_up = crate::modules::repo_db::count_backed_up_prompts(&source_instance_id);
+    let newly_backed_up = match crate::modules::repo_db::backup_running_prompts(&source_instance_id)
+    {
         Ok(count) => count,
         Err(e) => {
             crate::modules::logger::log_warn(&format!(
-                "[INSTANCE_SWITCH] Failed to backup running prompts for '{}': {}",
-                instance.id, e
+                "[INSTANCE_SWITCH] Failed to backup running prompts for source '{}': {}",
+                source_instance_id, e
             ));
             0
         }
@@ -165,15 +185,73 @@ pub async fn switch_account_to_instance(
     let backed_up_count = newly_backed_up.max(existing_backed_up);
     // Justification: opportunistic prompt backup; re-attempted on the next switch
     crate::error::record_ignored(
-        crate::modules::backup_prompts_db::backup_active_running_prompts(Some(&instance.id), None),
+        crate::modules::backup_prompts_db::backup_active_running_prompts(
+            Some(&source_instance_id),
+            None,
+        ),
         "back up active prompts",
     );
 
+    // Re-attribute backed-up prompts from source instance to target instance prior to closing IDE
+    if source_instance_id != instance.id {
+        if let Ok(conn) = crate::modules::repo_db::connect_db() {
+            let now = chrono::Utc::now().timestamp();
+            let is_source_default =
+                source_instance_id == "default" || source_instance_id == "__default__";
+            // Justification: prompt re-attribution to target instance during switch
+            if is_source_default {
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE active_prompts SET instance_id = ?1, updated_at = ?2 WHERE (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL) AND status = 'backed_up'",
+                        rusqlite::params![&instance.id, now],
+                    ),
+                    "re-attribute active prompts to target instance",
+                );
+            } else {
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE active_prompts SET instance_id = ?1, updated_at = ?2 WHERE instance_id = ?3 AND status = 'backed_up'",
+                        rusqlite::params![&instance.id, now, &source_instance_id],
+                    ),
+                    "re-attribute active prompts to target instance",
+                );
+            }
+        }
+    }
+
+    // RC-2 parity with the auto-rotation path: also re-attribute durable
+    // prompt_backups rows (unrestored only) so the target-scoped restore finds
+    // backups recorded under the source instance.
+    if source_instance_id != instance.id {
+        if let Ok(conn) = crate::modules::backup_prompts_db::connect_db() {
+            let is_source_default =
+                source_instance_id == "default" || source_instance_id == "__default__";
+            // Justification: prompt re-attribution to target instance during switch
+            if is_source_default {
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE prompt_backups SET instance_id = ?1 WHERE (instance_id = 'default' OR instance_id = '__default__' OR instance_id IS NULL OR instance_id = '') AND is_restored = 0",
+                        rusqlite::params![&instance.id],
+                    ),
+                    "re-attribute prompt backups to target instance",
+                );
+            } else {
+                crate::error::record_ignored(
+                    conn.execute(
+                        "UPDATE prompt_backups SET instance_id = ?1 WHERE instance_id = ?2 AND is_restored = 0",
+                        rusqlite::params![&instance.id, &source_instance_id],
+                    ),
+                    "re-attribute prompt backups to target instance",
+                );
+            }
+        }
+    }
+
     let workspace_paths = get_instance_workspace_folders(&instance.id, &instance.data_dir);
     crate::modules::logger::log_info(&format!(
-        "[INSTANCE_SWITCH:STAGE_1_SNAPSHOT] Backed up {} prompts across {} workspaces for instance '{}'",
+        "[INSTANCE_SWITCH:STAGE_1_SNAPSHOT] Backed up {} prompts from active source instance '{}' for target '{}'",
         backed_up_count,
-        workspace_paths.len(),
+        source_instance_id,
         instance.id
     ));
     let project_names: Vec<String> = workspace_paths
@@ -196,39 +274,196 @@ pub async fn switch_account_to_instance(
         success: true,
     };
 
-    // 2. [Step 2/5] Close the running instance process FIRST ("Kill First -> Write Second -> Start Third")
+    // 2. [Step 2/5] Pre-Switch PID Eviction ("Kill First -> Write Second -> Start Third")
     //    Running Antigravity flushes in-memory state to state.vscdb/keyring on exit; closing first
     //    prevents the exiting process from overwriting our newly injected credentials.
-    //    The close is VERIFIED here: injecting credentials while the old IDE is still alive is
-    //    the fast-forward/restart reliability bug (the exiting process overwrites state.vscdb).
-    //    close_instance_verified retries once for stragglers; surviving orphans only
-    //    produce a warning — the switch must not brick over them.
-    //    Snapshot the pre-kill PID set for the audit trail first.
+    //    Before touching state.vscdb, verify that target instance PIDs are completely evicted and dead.
     let pids_to_kill = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
+    let target_is_running = is_instance_running(&instance.id, &instance.data_dir, instance.pid)
+        || !pids_to_kill.is_empty()
+        || get_instance_saved_pid(&instance.id)
+            .map_or(false, |p| is_pid_alive_targeted(p) && saved_pid_matches(p));
+
     let killed_agy_workers =
         crate::modules::repo_db::terminate_agy_workers_for_instance(&instance.id);
     crate::modules::logger::log_info(&format!(
-        "[INSTANCE_SWITCH:STAGE_2_TERMINATE] Terminating {} PIDs (and {} agy workers) for instance '{}': {:?}",
-        pids_to_kill.len(),
-        killed_agy_workers,
+        "[INSTANCE_SWITCH:STAGE_2_TERMINATE] Pre-switch PID eviction for instance '{}' (running: {}, PIDs: {:?}, agy workers: {})",
         instance.id,
-        pids_to_kill
+        target_is_running,
+        pids_to_kill,
+        killed_agy_workers
     ));
-    let closed = close_instance_verified(&instance.id, std::time::Duration::from_millis(5000))
-        .map_err(|e| {
-            format!(
-                "Failed to close instance '{}' before account switch: {}",
-                instance.id, e
-            )
-        })?;
-    if !closed {
+
+    if target_is_running || !pids_to_kill.is_empty() {
+        let closed = close_instance_verified(&instance.id, std::time::Duration::from_millis(5000))
+            .map_err(|e| {
+                format!(
+                    "Failed to close instance '{}' before account switch: {}",
+                    instance.id, e
+                )
+            })?;
+
+        if !closed {
+            crate::modules::logger::log_warn(&format!(
+                "[INSTANCE_SWITCH] Instance '{}' had lingering processes after close_instance_verified; escalating to force kill ladder",
+                instance.id
+            ));
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            let stragglers = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
+            for spid in stragglers {
+                if is_pid_alive_targeted(spid) && saved_pid_matches(spid) {
+                    crate::modules::logger::log_warn(&format!(
+                        "[INSTANCE_SWITCH] Found straggler PID {} before credential rewrite; force terminating via Win32",
+                        spid
+                    ));
+                    force_terminate_pid_win32(spid);
+                    if is_pid_alive_targeted(spid) {
+                        // Justification: powershell Stop-Process fallback when Win32 TerminateProcess fails
+                        crate::error::record_ignored(
+                            std::process::Command::new("powershell")
+                                .args([
+                                    "-NoProfile",
+                                    "-NonInteractive",
+                                    "-Command",
+                                    &format!("Stop-Process -Id {} -Force", spid),
+                                ])
+                                .creation_flags(0x08000000)
+                                .output(),
+                            "powershell Stop-Process fallback",
+                        );
+                    }
+                }
+            }
+        }
+
+        // Settle drain loop (up to 1500ms) after force_terminate_pid_win32 for OS kernel and NTFS file handle release
+        let drain_start = std::time::Instant::now();
+        let max_drain = std::time::Duration::from_millis(1500);
+        while drain_start.elapsed() < max_drain {
+            force_refresh_process_cache();
+            let remaining_live = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
+            let still_alive = remaining_live
+                .iter()
+                .any(|&p| is_pid_alive_targeted(p) && saved_pid_matches(p));
+            let saved_alive = get_instance_saved_pid(&instance.id)
+                .or(instance.pid)
+                .map_or(false, |p| is_pid_alive_targeted(p) && saved_pid_matches(p));
+            if !still_alive && !saved_alive {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    }
+
+    let target_data_path = std::path::PathBuf::from(&instance.data_dir);
+    // Ensure lockfiles are purged before credentials are written
+    clear_stale_instance_lockfiles(&target_data_path);
+
+    force_refresh_process_cache();
+    let final_live = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
+    let mut any_alive = final_live
+        .iter()
+        .any(|&p| is_pid_alive_targeted(p) && saved_pid_matches(p));
+    let mut saved_pid_alive = get_instance_saved_pid(&instance.id)
+        .or(instance.pid)
+        .map_or(false, |p| is_pid_alive_targeted(p) && saved_pid_matches(p));
+
+    if any_alive || saved_pid_alive {
+        crate::modules::logger::log_warn(&format!(
+            "[INSTANCE_SWITCH] Candidate PIDs still alive for '{}' before rewrite; attempting immediate force escalation",
+            instance.id
+        ));
+        for &spid in &final_live {
+            if is_pid_alive_targeted(spid) && saved_pid_matches(spid) {
+                #[cfg(target_os = "windows")]
+                {
+                    force_terminate_pid_win32(spid);
+                    if is_pid_alive_targeted(spid) {
+                        crate::error::record_ignored(
+                            std::process::Command::new("powershell")
+                                .args([
+                                    "-NoProfile",
+                                    "-NonInteractive",
+                                    "-Command",
+                                    &format!("Stop-Process -Id {} -Force", spid),
+                                ])
+                                .creation_flags(0x08000000)
+                                .output(),
+                            "powershell Stop-Process fallback",
+                        );
+                    }
+                }
+                #[cfg(not(target_os = "windows"))]
+                {
+                    // Justification: best effort fallback kill on surviving processes
+                    crate::error::record_ignored(
+                        std::process::Command::new("kill")
+                            .args(["-9", &spid.to_string()])
+                            .output(),
+                        "kill straggler pid",
+                    );
+                }
+            }
+        }
+        if let Some(spid) = get_instance_saved_pid(&instance.id).or(instance.pid) {
+            if is_pid_alive_targeted(spid) && saved_pid_matches(spid) {
+                #[cfg(target_os = "windows")]
+                {
+                    force_terminate_pid_win32(spid);
+                    if is_pid_alive_targeted(spid) {
+                        crate::error::record_ignored(
+                            std::process::Command::new("powershell")
+                                .args([
+                                    "-NoProfile",
+                                    "-NonInteractive",
+                                    "-Command",
+                                    &format!("Stop-Process -Id {} -Force", spid),
+                                ])
+                                .creation_flags(0x08000000)
+                                .output(),
+                            "powershell Stop-Process fallback",
+                        );
+                    }
+                }
+            }
+        }
+
+        // Additional drain after fallback force-termination
+        let fallback_drain = std::time::Instant::now();
+        while fallback_drain.elapsed() < std::time::Duration::from_millis(1000) {
+            force_refresh_process_cache();
+            let remaining_live = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
+            any_alive = remaining_live
+                .iter()
+                .any(|&p| is_pid_alive_targeted(p) && saved_pid_matches(p));
+            saved_pid_alive = get_instance_saved_pid(&instance.id)
+                .or(instance.pid)
+                .map_or(false, |p| is_pid_alive_targeted(p) && saved_pid_matches(p));
+            if !any_alive && !saved_pid_alive {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    }
+
+    if any_alive || saved_pid_alive {
         let err = format!(
-            "Instance '{}' is still running after close; account switch stopped before credentials were rewritten",
+            "Instance '{}' is still running after close; account switch stopped before credentials were rewritten to state.vscdb",
             instance.id
         );
         crate::modules::logger::log_error(&format!("[INSTANCE_SWITCH:ERROR] {}", err));
         return Err(err);
     }
+
+    // Enforce mandatory 200ms kernel settle delay to allow NTFS file handles to close
+    std::thread::sleep(std::time::Duration::from_millis(200));
+
+    // Ensure lockfiles are completely clean before injecting credentials
+    clear_stale_instance_lockfiles(&target_data_path);
+    invalidate_instance_process_cache(&instance.id);
 
     // 3. [Step 3/5] Inject credentials into target instance's state.vscdb & storage.json (and OS keyring) AFTER process exit
     inject_account_credentials(
@@ -309,6 +544,10 @@ pub async fn switch_account_to_instance(
             "sync local node",
         );
     });
+
+    // Imp-12: Port Rebind Settling Delay on Switch
+    // Allow lingering CDP debugger sockets and localhost IPC ports to release bindings before spawning new IDE
+    std::thread::sleep(std::time::Duration::from_millis(500));
 
     // 5. [Step 4/5] Relaunch Antigravity preserving exact executable path and bound workspace folders
     crate::modules::logger::log_info(&format!(
@@ -391,14 +630,84 @@ pub async fn switch_account_to_instance(
         }
     });
 
+    // Stage 6: Sync Live PID & Broadcast Events
+    let fresh_pid = {
+        let mut detected = None;
+        let start = std::time::Instant::now();
+        while start.elapsed() < std::time::Duration::from_millis(3000) {
+            let pids = find_pids_for_data_dir(&instance.data_dir, is_default_inst);
+            if let Some(&first) = pids.first() {
+                if is_pid_alive_targeted(first) {
+                    detected = Some(first);
+                    break;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        detected
+    };
+
+    if let Some(pid) = fresh_pid {
+        // Justification: recording live PID in DB and registry after relaunch
+        crate::error::record_ignored(
+            record_instance_pid(&instance.id, pid, &instance.data_dir),
+            "record live pid after switch",
+        );
+    }
+
+    if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+        use tauri::Emitter;
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("instances://refreshed", ()),
+            "emit instances://refreshed",
+        );
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("accounts://refreshed", ()),
+            "emit accounts://refreshed",
+        );
+    }
+
     let target_inst_id = instance.id.clone();
-    let channel_wait = crate::modules::repo_db::needs_prompt_channel_wait(backed_up_count);
+    let target_backed_up = crate::modules::repo_db::count_backed_up_prompts(&target_inst_id);
+    let target_unrestored =
+        crate::modules::backup_prompts_db::count_unrestored_prompts_for_instance(Some(
+            &target_inst_id,
+        ))
+        .unwrap_or(0);
+    let total_pending_restore = backed_up_count.max(target_backed_up).max(target_unrestored);
+    let has_unrestored_backups = target_unrestored > 0
+        || crate::modules::backup_prompts_db::count_unrestored_prompts_for_other_instances(
+            &target_inst_id,
+            None,
+        )
+        .map(|c| c > 0)
+        .unwrap_or(false);
+    let channel_wait = crate::modules::repo_db::needs_prompt_channel_wait(total_pending_restore)
+        || has_unrestored_backups;
+    let mut restored_count = 0usize;
     if channel_wait {
         crate::modules::logger::log_info(&format!(
-            "[INSTANCE_SWITCH:STAGE_5_RESTORE] Scheduling prompt restore for instance '{}' after the IDE is up ({} backed up)",
-            target_inst_id, backed_up_count
+            "[INSTANCE_SWITCH:STAGE_5_RESTORE] Scheduling prompt restore for instance '{}' after the IDE is up ({} backed up, unrestored available: {})",
+            target_inst_id, total_pending_restore, has_unrestored_backups
         ));
-        crate::modules::instance::schedule_prompt_restore_after_launch(target_inst_id.clone());
+        if crate::modules::log_bridge::get_app_handle().is_some() {
+            crate::modules::instance::schedule_prompt_restore_after_launch(target_inst_id.clone());
+        } else {
+            // CLI/headless: the 10s in-process timer dies when this process
+            // exits. Wait the settle delay and run STAGE_5 inline so a
+            // running prompt is actually restored after the next account.
+            crate::modules::logger::log_info(&format!(
+                "[INSTANCE_SWITCH:STAGE_5_RESTORE] CLI/headless path: waiting for post-switch resume on '{}'",
+                target_inst_id
+            ));
+            restored_count =
+                crate::modules::instance::post_switch_resume::run_post_switch_resume_after_delay(
+                    &target_inst_id,
+                )
+                .await;
+        }
     } else {
         crate::modules::logger::log_info(&format!(
             "[INSTANCE_SWITCH:STAGE_5_RESTORE] No backed-up prompt for instance '{}'",
@@ -406,10 +715,13 @@ pub async fn switch_account_to_instance(
         ));
     }
 
+    // RC-3: GUI restore is deferred to the post-switch timer, so audit
+    // reports 0 here. CLI/headless already ran STAGE_5 and reports the
+    // real dispatched count.
     let restore_step = crate::modules::task_history_db::SwitchRestoreStep {
         method: "resume_task_json + sync_agy_prompt_restore".to_string(),
-        restored_count: backed_up_count,
-        dispatched_count: 0,
+        restored_count,
+        dispatched_count: restored_count,
         prompt_channel_waited: channel_wait,
         success: true,
     };
@@ -423,11 +735,17 @@ pub async fn switch_account_to_instance(
                 "[Instance] Verified .antigravity_resume_task.json exists in workspace {}",
                 ws
             ));
+        } else {
+            verified = false;
         }
     }
     let verification_step = crate::modules::task_history_db::SwitchVerificationStep {
-        verified: true,
-        message: "Verified prompts restored and session active".to_string(),
+        verified,
+        message: if verified {
+            "Verified prompts restored and session active".to_string()
+        } else {
+            "Verified session active with best-effort prompt files".to_string()
+        },
     };
 
     let steps = crate::modules::task_history_db::SwitchAuditSteps {
@@ -438,8 +756,10 @@ pub async fn switch_account_to_instance(
     };
 
     // Mailbox poll, email, and Telegram run after the command returns.
-    let (target_4h, target_weekly) =
-        crate::modules::auto_switcher::extract_dual_window_quotas(&account, "gemini-2.5-pro");
+    let (target_4h, target_weekly) = crate::modules::auto_switcher::extract_dual_window_quotas(
+        &account,
+        crate::models::config::DEFAULT_TARGET_MODEL,
+    );
     let followup_id = account.id.clone();
     let followup_email = account.email.clone();
     let followup_prev = prev_email.clone();
@@ -452,7 +772,7 @@ pub async fn switch_account_to_instance(
         }
         let predicted_next_email = crate::modules::auto_switcher::select_candidate_profiles(
             &followup_instance_id,
-            "gemini-2.5-pro",
+            crate::models::config::DEFAULT_TARGET_MODEL,
             15.0,
             &pred_exclusions,
         )
@@ -479,6 +799,41 @@ pub async fn switch_account_to_instance(
         let unique_projs = crate::modules::notification_hub::deduplicate_names(
             running_projs.into_iter().map(|p| p.repo_name),
         );
+        let (node_alias, _) = crate::modules::email_sender::get_local_node_identity();
+        let m_name = crate::modules::email_watcher::detect_machine_name();
+        let m_ip = crate::modules::email_watcher::detect_local_ip();
+        let pkg_ver = format!("v{}", env!("CARGO_PKG_VERSION"));
+        crate::modules::audit::record_if_active(
+            "user",
+            "click",
+            "instance::switch_account",
+            &format!("instances | instance_table | switch_dialog | {followup_instance_id}"),
+            serde_json::json!({
+                "agm_version": pkg_ver,
+                "machine_name": m_name,
+                "node_alias": node_alias,
+                "local_ip": m_ip,
+                "instance_id": followup_instance_id,
+                "instance_name": followup_instance_name,
+                "switch_mode": "manual",
+                "condition": "manual_switch",
+                "from_account": followup_prev.as_deref().map(crate::modules::logger::mask_email),
+                "to_account": crate::modules::logger::mask_email(&followup_email),
+                "predicted_next_account": predicted_next_email.as_deref().map(crate::modules::logger::mask_email),
+                "previous_quota_4h": prev_4h,
+                "previous_quota_weekly": prev_weekly,
+                "target_quota_4h": target_4h,
+                "target_quota_weekly": target_weekly,
+                "credit_before_switch": prev_4h,
+                "backed_up_prompts": backed_up_count,
+                "backed_up_projects": unique_projs,
+                "auto_resume": backed_up_count > 0,
+                "reason": "Smart Rotator / Instance Account Switch",
+                "timestamp": chrono::Utc::now().timestamp_millis(),
+            }),
+            "ok",
+            "",
+        );
         crate::error::record_ignored(
             Ok::<String, String>(
                 crate::modules::notification_hub::notify_account_switched_details(
@@ -499,7 +854,9 @@ pub async fn switch_account_to_instance(
                         is_auto: false,
                         backed_up_projects: unique_projs,
                         backed_up_prompts_count: Some(backed_up_count),
-                        restored_prompts_count: Some(backed_up_count),
+                        // RC-3: restore is deferred to the post-switch timer and
+                        // has not run yet — do not report backed_up_count as restored.
+                        restored_prompts_count: None,
                     },
                 )
                 .await,
@@ -540,5 +897,42 @@ pub async fn switch_account_to_instance(
         "[INSTANCE_SWITCH:SUCCESS] Switch completed successfully for instance '{}' to account '{}'",
         instance.id, account.email
     ));
+    if let Some(handle) = crate::modules::log_bridge::get_app_handle() {
+        use tauri::Emitter;
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("instances://refreshed", ()),
+            "emit instances://refreshed",
+        );
+        // Justification: best-effort UI event emission; UI state is re-derived on poll
+        crate::error::record_ignored(
+            handle.emit("accounts://refreshed", ()),
+            "emit accounts://refreshed",
+        );
+    }
     Ok(())
+}
+
+/// Stage 1 snapshot source is the instance whose credentials are changing.
+fn prompt_backup_source_instance_id(target_instance_id: &str) -> String {
+    if target_instance_id.is_empty() {
+        "default".to_string()
+    } else {
+        target_instance_id.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::prompt_backup_source_instance_id;
+
+    #[test]
+    fn prompt_backup_source_is_the_switched_instance_not_global_active() {
+        assert_eq!(
+            prompt_backup_source_instance_id("test-restore-1"),
+            "test-restore-1"
+        );
+        assert_eq!(prompt_backup_source_instance_id("default"), "default");
+        assert_eq!(prompt_backup_source_instance_id(""), "default");
+    }
 }

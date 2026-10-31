@@ -1,9 +1,9 @@
 import { useErrorStore } from '../stores/error-store';
 
-// 探测环境
+// Detect the environment
 const isTauri = typeof window !== 'undefined' && (!!(window as any).__TAURI_INTERNALS__ || !!(window as any).__TAURI__);
 
-// 命令到 API 的映射
+// Command to API mapping
 const COMMAND_MAPPING: Record<string, { url: string; method: 'GET' | 'POST' | 'DELETE' | 'PATCH' }> = {
   // Accounts
   'list_accounts': { url: '/api/accounts', method: 'GET' },
@@ -68,6 +68,12 @@ const COMMAND_MAPPING: Record<string, { url: string; method: 'GET' | 'POST' | 'D
   'is_debug_console_enabled': { url: '/api/debug/enabled', method: 'GET' },
   'get_debug_console_logs': { url: '/api/debug/logs', method: 'GET' },
   'clear_debug_console_logs': { url: '/api/debug/logs/clear', method: 'POST' },
+
+  // Speed Error Database (errors.db)
+  'log_client_error': { url: '/api/errors/log', method: 'POST' },
+  'list_client_errors': { url: '/api/errors', method: 'GET' },
+  'clear_client_errors': { url: '/api/errors/clear', method: 'POST' },
+  'run_error_diagnostics': { url: '/api/errors/diagnostics', method: 'POST' },
 
   // CLI Sync
   'get_cli_sync_status': { url: '/api/proxy/cli/status', method: 'POST' },
@@ -202,7 +208,7 @@ export async function request<T>(cmd: string, args?: any): Promise<T> {
     cleanedArgs = Object.keys(rest).length > 0 ? rest : undefined;
   }
 
-  // 1. Tauri 环境：直接使用 invoke
+  // 1. Tauri environment: use invoke directly
   if (isTauri) {
     try {
       const { invoke } = await import('@tauri-apps/api/core');
@@ -221,7 +227,7 @@ export async function request<T>(cmd: string, args?: any): Promise<T> {
     }
   }
 
-  // 2. Web 环境：映射到 HTTP API
+  // 2. Web environment: mapping to HTTP API
   const mapping = COMMAND_MAPPING[cmd];
   if (!mapping) {
     console.error(`Command [${cmd}] is not yet mapped for Web mode. Failing.`);
@@ -229,16 +235,16 @@ export async function request<T>(cmd: string, args?: any): Promise<T> {
   }
 
   let url = mapping.url;
-  // [FIX] 创建 args 副本，用于移除已使用的路径参数
+  // [FIX] Create copy of args to remove used path parameters
   let bodyArgs = cleanedArgs ? { ...cleanedArgs } : undefined;
 
-  // 通用路径参数处理：替换 :key 为 cleanedArgs[key]
+  // Universal path parameter processing: replace :key with cleanedArgs[key]
   if (cleanedArgs) {
     Object.keys(cleanedArgs).forEach(key => {
       const placeholder = `:${key}`;
       if (url.includes(placeholder)) {
         url = url.replace(placeholder, encodeURIComponent(String(cleanedArgs[key])));
-        // [FIX] 从 body 参数中移除已用于路径的参数
+        // [FIX] Remove parameters already used for paths from body parameters
         if (bodyArgs) {
           delete bodyArgs[key];
         }
@@ -262,7 +268,7 @@ export async function request<T>(cmd: string, args?: any): Promise<T> {
   if ((mapping.method === 'GET' || mapping.method === 'DELETE') && args) {
     const params = new URLSearchParams();
     Object.entries(args).forEach(([key, value]) => {
-      // [FIX] 跳过已用于路径替换的参数
+      // [FIX] Skip parameters already used for path substitution
       if (url.includes(encodeURIComponent(String(value)))) return;
       if (value !== undefined && value !== null) {
         params.append(key, String(value));
@@ -271,7 +277,7 @@ export async function request<T>(cmd: string, args?: any): Promise<T> {
     const qs = params.toString();
     if (qs) url += `?${qs}`;
   } else if ((mapping.method === 'POST' || mapping.method === 'PATCH') && bodyArgs) {
-    // [FIX] 如果有 request 包装，提取其内容作为 body
+    // [FIX] If there is a request wrapper, extract its content as body
     const body = bodyArgs.request !== undefined ? bodyArgs.request : bodyArgs;
     options.body = JSON.stringify(body);
   }
@@ -280,7 +286,7 @@ export async function request<T>(cmd: string, args?: any): Promise<T> {
     const response = await fetch(url, options);
     if (!response.ok) {
       if (!isTauri && response.status === 401) {
-        // [FIX #1163] 增加防抖锁，避免重复事件导致 UI 抖动
+        // [FIX #1163] Add anti-shake lock to avoid repeated events causing UI jitter
         const now = Date.now();
         const lastAuthError = (window as any)._lastAuthErrorTime || 0;
         if (now - lastAuthError > 2000) {
@@ -292,7 +298,7 @@ export async function request<T>(cmd: string, args?: any): Promise<T> {
       throw errorData.error || `HTTP Error ${response.status}`;
     }
 
-    // 如果是 204 No Content，直接返回 null
+    // If it is 204 No Content, return null directly.
     if (response.status === 204) {
       return null as unknown as T;
     }

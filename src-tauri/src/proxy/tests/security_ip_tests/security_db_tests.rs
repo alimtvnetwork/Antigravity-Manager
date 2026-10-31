@@ -6,7 +6,7 @@ use crate::modules::security_db::{
 };
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// 辅助函数：获取当前时间戳
+/// Auxiliary function: get the current timestamp
 fn now_timestamp() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -14,7 +14,7 @@ fn now_timestamp() -> i64 {
         .as_secs() as i64
 }
 
-/// 辅助函数：初始化测试并加锁隔离
+/// Auxiliary function: initialize test and lock isolation
 fn setup_test() -> (
     std::sync::MutexGuard<'static, ()>,
     std::sync::MutexGuard<'static, ()>,
@@ -31,23 +31,23 @@ fn setup_test() -> (
     (env_lock, lock)
 }
 
-/// 辅助函数：清理测试环境
+/// Auxiliary function: clean up the test environment
 fn cleanup_test_data() {
-    // 清理黑名单
+    // Clear blacklist
     if let Ok(entries) = get_blacklist() {
         for entry in entries {
             // Justification: best-effort call; failure logged without changing control flow
             crate::error::record_ignored(remove_from_blacklist(&entry.id), "remove_from_blacklist");
         }
     }
-    // 清理白名单
+    // Clear whitelist
     if let Ok(entries) = get_whitelist() {
         for entry in entries {
             // Justification: best-effort call; failure logged without changing control flow
             crate::error::record_ignored(remove_from_whitelist(&entry.id), "remove_from_whitelist");
         }
     }
-    // 清理访问日志
+    // Clean access logs
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(clear_ip_access_logs(), "clear_ip_access_logs");
 }

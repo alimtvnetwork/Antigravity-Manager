@@ -174,7 +174,7 @@ export function InstanceAttachedModals({ api }: { api: InstancePageApi }) {
                 isOpen={Boolean(promptTreeInstance)}
                 onClose={() => {
                     setPromptTreeInstance(null);
-                    fetchRunningTasks();
+                    fetchRunningTasks(true);
                 }}
                 instanceId={promptTreeInstance?.id || ''}
                 instanceName={promptTreeInstance?.name || ''}

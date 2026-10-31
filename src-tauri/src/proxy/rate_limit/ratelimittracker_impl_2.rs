@@ -17,9 +17,9 @@ impl RateLimitTracker {
         cleared
     }
 
-    /// 安全释放因配额耗尽产生的持续锁定：
-    /// - 仅清除 reason 为 QuotaExhausted 的记录，严禁误触 429 速率限制 (RateLimitExceeded)、服务器错误等独立限流；
-    /// - 针对直接或标准 ID 均做精确比对；
+    /// Safely release persistent locks due to quota exhaustion:
+    /// - Only clear records whose reason is QuotaExhausted. Unintentional triggering of independent current limits such as 429 rate limit (RateLimitExceeded), server error, etc. is strictly prohibited;
+    /// - Accurate comparison for both direct and standard IDs;
     pub fn reconcile_quota_recovery(&self, account_id: &str, model: &str) -> bool {
         let normalized = crate::proxy::common::model_mapping::normalize_to_standard_id(model)
             .unwrap_or_else(|| model.to_string());
@@ -47,14 +47,14 @@ impl RateLimitTracker {
         cleared
     }
 
-    /// 检查账号是否仍在限流中
-    /// 检查账号是否仍在限流中 (支持模型级)
+    /// Check whether the account is still being restricted
+    /// Check whether the account is still restricted (supports model level)
     pub fn is_rate_limited(&self, account_id: &str, model: Option<&str>) -> bool {
         // Checking using get_remaining_wait which handles both global and model keys
         self.get_remaining_wait(account_id, model) > 0
     }
 
-    /// 获取距离限流重置还有多少秒
+    /// Get the number of seconds until the current limit is reset
     pub fn get_reset_seconds(&self, account_id: &str) -> Option<u64> {
         if let Some(info) = self.get(account_id) {
             info.reset_time
@@ -66,7 +66,7 @@ impl RateLimitTracker {
         }
     }
 
-    /// 清除过期的限流记录
+    /// Clear expired current limiting records
     #[allow(dead_code)]
     pub fn cleanup_expired(&self) -> usize {
         let now = SystemTime::now();
@@ -82,13 +82,13 @@ impl RateLimitTracker {
         });
 
         if count > 0 {
-            tracing::debug!("清除了 {} 个过期的限流记录", count);
+            tracing::debug!("Cleared {} expired throttling records", count);
         }
 
         count
     }
 
-    /// 清除指定账号的限流记录
+    /// Clear the current limit record of the specified account
     pub fn clear(&self, account_id: &str) -> bool {
         let prefix = format!("{}:", account_id);
         let before = self.limits.len();
@@ -110,10 +110,10 @@ impl RateLimitTracker {
         });
     }
 
-    /// 清除所有限流记录 (乐观重置策略)
+    /// Clear all throttling records (optimistic reset strategy)
     ///
-    /// 用于乐观重置机制,当所有账号都被限流但等待时间很短时,
-    /// 清除所有限流记录以解决时序竞争条件
+    /// Used for optimistic reset mechanism, when all accounts are restricted but the waiting time is short,
+    /// Clear all throttling records to resolve timing race conditions
     pub fn clear_all(&self) {
         let count = self.limits.len();
         self.limits.clear();
@@ -179,7 +179,7 @@ mod tests {
     #[test]
     fn test_safety_buffer() {
         let tracker = RateLimitTracker::new();
-        // 如果 API 返回 1s，我们强制设为 2s
+        // If the API returns 1s, we force it to 2s
         tracker.parse_from_error("acc1", 429, Some("1"), "", None, &[]);
         let wait = tracker.get_remaining_wait("acc1", None);
         // Due to time passing, it might be 1 or 2
@@ -306,10 +306,10 @@ mod tests {
     #[test]
     fn test_tpm_exhausted_is_rate_limit_exceeded() {
         let tracker = RateLimitTracker::new();
-        // 模拟真实世界的 TPM 错误，同时包含 "Resource exhausted" 和 "per minute"
+        // Simulates real-world TPM errors, including both "Resource exhausted" and "per minute"
         let body = "Resource has been exhausted (e.g. check quota). Quota limit 'Tokens per minute' exceeded.";
         let reason = tracker.parse_rate_limit_reason(body);
-        // 应该被识别为 RateLimitExceeded，而不是 QuotaExhausted
+        // Should be recognized as RateLimitExceeded, not QuotaExhausted
         assert_eq!(reason, RateLimitReason::RateLimitExceeded);
     }
 
@@ -332,7 +332,7 @@ mod tests {
         let tracker = RateLimitTracker::new();
         let backoff_steps = vec![60, 300, 1800, 7200];
 
-        // 模拟连续 5 次 529 (ServerError) 错误
+        // Simulate 5 consecutive 529 (ServerError) errors
         for i in 1..=5 {
             let info = tracker.parse_from_error(
                 "acc1",
@@ -342,22 +342,30 @@ mod tests {
                 None,
                 &backoff_steps,
             );
-            assert!(info.is_some(), "第 {} 次 529 应该返回 RateLimitInfo", i);
+            assert!(
+                info.is_some(),
+                "The {} time 529 should return RateLimitInfo",
+                i
+            );
             let info = info.unwrap();
-            // 529 应该始终锁定 8 秒，不受 failure_count 影响
-            assert_eq!(info.retry_after_sec, 8, "529 第 {} 次应该锁定 8 秒", i);
+            // 529 should always lock for 8 seconds regardless of failure_count
+            assert_eq!(
+                info.retry_after_sec, 8,
+                "529 {} time should be locked for 8 seconds",
+                i
+            );
         }
 
-        // 现在触发一次 429 QuotaExhausted（没有 quotaResetDelay）
+        // 429 QuotaExhausted is now triggered once (without quotaResetDelay)
         let quota_body = r#"{"error":{"details":[{"reason":"QUOTA_EXHAUSTED"}]}}"#;
         let info = tracker.parse_from_error("acc1", 429, None, quota_body, None, &backoff_steps);
         assert!(info.is_some());
         let info = info.unwrap();
 
-        // 关键断言：429 应该从第 1 次开始（锁 60 秒），而不是继承 5xx 的计数
+        // Key assertion: 429 should start from 1st time (lock for 60 seconds) instead of inheriting the count of 5xx
         assert_eq!(
             info.retry_after_sec, 60,
-            "429 应该从第 1 次退避开始(60秒),而不是被 5xx 污染"
+            "429 should start from the 1st backoff (60 seconds) instead of being tainted by 5xx"
         );
     }
 
@@ -367,19 +375,19 @@ mod tests {
         let backoff_steps = vec![60, 300, 1800, 7200];
         let quota_body = r#"{"error":{"details":[{"reason":"QUOTA_EXHAUSTED"}]}}"#;
 
-        // 第 1 次 429 → 60 秒
+        // 1st time 429 → 60 seconds
         let info = tracker.parse_from_error("acc2", 429, None, quota_body, None, &backoff_steps);
         assert_eq!(info.unwrap().retry_after_sec, 60);
 
-        // 第 2 次 429 → 300 秒
+        // 2nd time 429 → 300 seconds
         let info = tracker.parse_from_error("acc2", 429, None, quota_body, None, &backoff_steps);
         assert_eq!(info.unwrap().retry_after_sec, 300);
 
-        // 第 3 次 429 → 1800 秒
+        // 3rd time 429 → 1800 seconds
         let info = tracker.parse_from_error("acc2", 429, None, quota_body, None, &backoff_steps);
         assert_eq!(info.unwrap().retry_after_sec, 1800);
 
-        // 第 4 次 429 → 7200 秒
+        // 4th time 429 → 7200 seconds
         let info = tracker.parse_from_error("acc2", 429, None, quota_body, None, &backoff_steps);
         assert_eq!(info.unwrap().retry_after_sec, 7200);
     }
@@ -417,7 +425,7 @@ mod tests {
         let tracker = RateLimitTracker::new();
         let target_time = SystemTime::now() + Duration::from_secs(3600);
 
-        // 1. 设置一个 QuotaExhausted 锁定
+        // 1. Set a QuotaExhausted lock
         tracker.set_lockout_until_with_cap(
             "acc_test",
             target_time,
@@ -427,11 +435,11 @@ mod tests {
         );
         assert!(tracker.is_rate_limited("acc_test", Some("claude-sonnet-4-6")));
 
-        // 恢复配额：应该成功解除
+        // Restoring quotas: should be lifted successfully
         assert!(tracker.reconcile_quota_recovery("acc_test", "claude-sonnet-4-6"));
         assert!(!tracker.is_rate_limited("acc_test", Some("claude-sonnet-4-6")));
 
-        // 2. 设置一个 RateLimitExceeded (429 速率限制)
+        // 2. Set a RateLimitExceeded (429 rate limit)
         tracker.set_lockout_until_with_cap(
             "acc_test",
             target_time,
@@ -441,7 +449,7 @@ mod tests {
         );
         assert!(tracker.is_rate_limited("acc_test", Some("claude-sonnet-4-6")));
 
-        // 配额恢复：严禁清除独立 429 速率限制！
+        // Quota Recovery: Clearing independent 429 rate limits is strictly prohibited!
         assert!(!tracker.reconcile_quota_recovery("acc_test", "claude-sonnet-4-6"));
         assert!(tracker.is_rate_limited("acc_test", Some("claude-sonnet-4-6")));
     }
@@ -451,9 +459,9 @@ mod tests {
         let tracker = RateLimitTracker::new();
         let now = SystemTime::now();
         let detected_at = now - Duration::from_secs(60);
-        let reset_time = now + Duration::from_secs(86400); // 24小时显式长锁定
+        let reset_time = now + Duration::from_secs(86400); // 24 hours explicit long lock
 
-        // 文本模型应该成功恢复长锁定
+        // Text models should successfully recover from long locks
         assert!(tracker.restore_persisted_long_limit(
             "acc_text",
             reset_time,
@@ -461,7 +469,7 @@ mod tests {
             "gemini-2.5-pro",
         ));
         assert!(tracker.is_rate_limited("acc_text", Some("gemini-2.5-pro")));
-        // 归一化标准 ID 也能探测到该锁定
+        // The lock is also detected by the normalized standard ID
         assert!(tracker.is_rate_limited("acc_text", Some("gemini-3-pro-high")));
     }
 }

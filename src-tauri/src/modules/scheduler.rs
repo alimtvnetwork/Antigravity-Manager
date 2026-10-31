@@ -7,6 +7,19 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tokio::time::{self, Duration};
 
+// --- Scheduler Timing & Duration Constants ---
+pub const WEEKLY_WARMUP_STARTUP_DELAY: Duration = Duration::from_secs(60);
+pub const WEEKLY_WARMUP_SCAN_INTERVAL: Duration = Duration::from_secs(300);
+pub const MODEL_WARMUP_THROTTLE_DELAY: Duration = Duration::from_secs(2);
+pub const WARMUP_UI_REFRESH_DELAY: Duration = Duration::from_secs(2);
+pub const WARMUP_HISTORY_RETENTION_SECS: i64 = 30 * 86_400;
+pub const WARMUP_COOLDOWN_SECS: i64 = 6 * 86_400;
+pub const PROMPT_QUEUE_STARTUP_DELAY: Duration = Duration::from_secs(5);
+pub const PROMPT_QUEUE_ACTIVE_POLL_INTERVAL: Duration = Duration::from_secs(5);
+pub const PROMPT_QUEUE_IDLE_BACKOFF_INTERVAL: Duration = Duration::from_secs(30);
+pub const PID_QUOTA_SYNC_STARTUP_DELAY: Duration = Duration::from_secs(35);
+pub const PID_QUOTA_SYNC_INTERVAL: Duration = Duration::from_secs(600);
+
 // Warmup history: key = "email:bucket_or_model:weekly:cycle_id", value = warmup timestamp
 static WARMUP_HISTORY: Lazy<Mutex<HashMap<String, i64>>> =
     Lazy::new(|| Mutex::new(load_warmup_history()));
@@ -101,10 +114,10 @@ pub fn start_scheduler(
         );
 
         // Enforce 60-second startup quiet period: nothing runs until 1 minute after launch
-        tokio::time::sleep(Duration::from_secs(60)).await;
+        tokio::time::sleep(WEEKLY_WARMUP_STARTUP_DELAY).await;
 
         // Scan every 5 minutes (300s) to check for accounts reaching weekly reset time
-        let mut interval = time::interval(Duration::from_secs(300));
+        let mut interval = time::interval(WEEKLY_WARMUP_SCAN_INTERVAL);
         interval.tick().await; // consume initial 0ms tick
 
         loop {
@@ -285,11 +298,11 @@ pub fn start_scheduler(
                                 model, email
                             ));
                         }
-                        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                        tokio::time::sleep(MODEL_WARMUP_THROTTLE_DELAY).await;
                     }
 
                     // Refresh UI
-                    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                    tokio::time::sleep(WARMUP_UI_REFRESH_DELAY).await;
                     // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
                     crate::error::record_ignored(
                         crate::commands::refresh_all_quotas_internal(
@@ -306,7 +319,7 @@ pub fn start_scheduler(
             {
                 let now_ts = Utc::now().timestamp();
                 let mut history = WARMUP_HISTORY.lock().unwrap();
-                let cutoff = now_ts - 30 * 86400;
+                let cutoff = now_ts - WARMUP_HISTORY_RETENTION_SECS;
                 history.retain(|_, &mut ts| ts > cutoff);
             }
         }
@@ -377,7 +390,7 @@ pub async fn trigger_warmup_for_account(account: &Account) {
                             }
                         };
 
-                        if !check_cooldown(&history_key, 6 * 86400) {
+                        if !check_cooldown(&history_key, WARMUP_COOLDOWN_SECS) {
                             let model_to_ping = pick_model_for_group(
                                 &group.display_name,
                                 &bucket.bucket_id,
@@ -408,12 +421,19 @@ pub async fn trigger_warmup_for_account(account: &Account) {
 /// Start prompt queue scheduler that runs on an adaptive FIFO background ticker.
 /// When pending prompts are queued, ticks every 5 seconds to immediately dispatch
 /// as soon as projects become idle. When queue is empty, backs off to 30 seconds.
+pub static PROMPT_QUEUE_NOTIFY: once_cell::sync::Lazy<tokio::sync::Notify> =
+    once_cell::sync::Lazy::new(tokio::sync::Notify::new);
+
+pub fn notify_prompt_queue() {
+    PROMPT_QUEUE_NOTIFY.notify_one();
+}
+
 pub fn start_prompt_queue_scheduler() {
     tauri::async_runtime::spawn(async move {
         logger::log_info(
             "[PromptQueueScheduler] Background adaptive FIFO prompt queue ticker initialized.",
         );
-        tokio::time::sleep(Duration::from_secs(5)).await;
+        tokio::time::sleep(PROMPT_QUEUE_STARTUP_DELAY).await;
 
         loop {
             let pending_count = tauri::async_runtime::spawn_blocking(|| {
@@ -422,7 +442,7 @@ pub fn start_prompt_queue_scheduler() {
             .await
             .unwrap_or(0);
 
-            if pending_count > 0 {
+            let poll_interval = if pending_count > 0 {
                 // Fast ticker interval when prompts are queued waiting for project to become idle
                 match tauri::async_runtime::spawn_blocking(|| {
                     crate::modules::repo_db::check_and_dispatch_enqueued_prompts(None)
@@ -450,10 +470,17 @@ pub fn start_prompt_queue_scheduler() {
                         ));
                     }
                 }
-                tokio::time::sleep(Duration::from_secs(5)).await;
+                PROMPT_QUEUE_ACTIVE_POLL_INTERVAL
             } else {
                 // Idle backoff interval when queue is empty
-                tokio::time::sleep(Duration::from_secs(30)).await;
+                PROMPT_QUEUE_IDLE_BACKOFF_INTERVAL
+            };
+
+            tokio::select! {
+                _ = PROMPT_QUEUE_NOTIFY.notified() => {
+                    crate::modules::logger::log_info("[PromptQueueScheduler] Prompt queue notified; waking up immediately");
+                }
+                _ = tokio::time::sleep(poll_interval) => {}
             }
         }
     });
@@ -468,9 +495,9 @@ pub fn start_instance_pid_quota_scheduler() {
             "[InstancePidQuotaScheduler] Background 10-minute instance PID & quota scheduler initialized.",
         );
         // Quiet delay after startup
-        tokio::time::sleep(Duration::from_secs(35)).await;
+        tokio::time::sleep(PID_QUOTA_SYNC_STARTUP_DELAY).await;
 
-        let mut interval = time::interval(Duration::from_secs(600));
+        let mut interval = time::interval(PID_QUOTA_SYNC_INTERVAL);
         interval.tick().await; // consume initial tick
 
         loop {

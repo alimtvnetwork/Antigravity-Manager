@@ -198,7 +198,8 @@ pub fn resolve_prompt_template_content(query: &str) -> Option<String> {
 
 /// Helper to wrap telegram prompt text with template prefixes, suffixes, or voice instruction notes
 pub fn wrap_telegram_prompt(raw: &str) -> String {
-    let trimmed = raw.trim();
+    let stripped = crate::modules::repo_db::strip_internal_id_wrappers(raw);
+    let trimmed = stripped.trim();
     if trimmed.is_empty() {
         return String::new();
     }

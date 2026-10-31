@@ -74,6 +74,7 @@ obj/
 tmp/
 *.tmp
 *.cache
+.temp/
 .gitmap/
 .ai-memory/cicd/
 .ai-memory/temp-agents/
@@ -105,4 +106,15 @@ scratch/*.dump
 
 # GitMap & Task Persistence
 .gitmap/backup/
+.antigravity/
 .antigravity_*.json
+*.db
+AGM_INSTANCE_STATUS.md
+.ai-memory/temp/recent-file-changes.json
+
+
+
+# GitMap & Task Persistence
+antigravity-resume_task.json
+antigravity_resume_task.json
+.antigravity-resume_task.json

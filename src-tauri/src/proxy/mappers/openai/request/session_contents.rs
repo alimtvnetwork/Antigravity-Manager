@@ -1,5 +1,5 @@
 // Contents building phase (split from request.rs).
-// OpenAI → Gemini 请求转换
+// OpenAI → Gemini request conversion
 use super::super::models::*;
 use crate::proxy::model_specs;
 use crate::proxy::token_manager::ProxyToken;
@@ -15,14 +15,14 @@ pub(crate) fn phase_contents(
     tool_name_to_schema: &std::collections::HashMap<String, serde_json::Value>,
     session_id: &str,
 ) -> Vec<serde_json::Value> {
-    // 2. 构建 Gemini contents (过滤掉已作为 leading system 的指令，中途 system 消息就地转为 user 保持前缀)
+    // 2. Build Gemini contents (filter out the instructions that have been used as leading system, and convert system messages to user in place to maintain the prefix)
     let leading_system_count = request
         .messages
         .iter()
         .take_while(|m| m.role == "system" || m.role == "developer")
         .count();
 
-    // 找出 messages 中最后一个 assistant 角色的下标 (绝对索引)
+    // Find the index of the last assistant role in messages (absolute index)
     let _last_assistant_msg_idx = request
         .messages
         .iter()
@@ -51,13 +51,13 @@ pub(crate) fn phase_contents(
                 .filter(|s| !s.is_empty());
 
             if role == "model" {
-                // [2026-09-27] 占位/缺失 reasoning 不再写 "..." 思考块。
-                // 官方样本 9/24 轮是「无思考块 + 锚点带签名」，空/占位思考不出站；
-                // 签名归位由流水线终审 place_turn_signature 按锚点规则处理。
+                // [2026-09-27] Placeholder/missing reasoning no longer writes "..." thinking blocks.
+                // The official sample round 9/24 is "no thinking block + anchor point with signature", empty/placeholder thinking does not leave the station;
+                // The signature return is processed by the pipeline final review place_turn_signature according to anchor rules.
                 if actual_include_thinking {
                     if let Some(rc) = client_reasoning {
                         if !crate::proxy::thinking_store::is_placeholder_thought(rc) {
-                            // 纯净线缆透传：客户端若自带签名则无损透传；缺失签名全权委托流水线统一对齐与回填
+                            // Pure cable transparent transmission: if the client comes with a signature, it will be transparently transmitted losslessly; missing signatures are fully entrusted to the pipeline for unified alignment and backfilling
                             let mut thought_part = json!({
                                 "text": rc,
                                 "thought": true,
@@ -69,7 +69,7 @@ pub(crate) fn phase_contents(
                         }
                     }
                 } else if let Some(rc) = client_reasoning {
-                    // 思考关闭时，非占位思考降级为普通文本；占位/空直接跳过
+                    // When thinking is turned off, non-placeholder thoughts are downgraded to ordinary text; placeholder/empty thoughts are skipped directly.
                     if !crate::proxy::thinking_store::is_placeholder_thought(rc) {
                         parts.push(json!({ "text": rc }));
                     }
@@ -83,7 +83,7 @@ pub(crate) fn phase_contents(
             let is_mid_system_role = msg.role == "system" || msg.role == "developer";
             if let (Some(content), false) = (&msg.content, is_tool_role) {
                 if is_mid_system_role {
-                    // [JEIKCODE SYNTHETIC USER] 中途系统消息，转换为用户态下的 <system-reminder>，不破坏全局 systemInstruction 前缀
+                    // [JEIKCODE SYNTHETIC USER] Midway system messages are converted into <system-reminder> in user mode without destroying the global systemInstruction prefix.
                     let sys_text = match content {
                         OpenAIContent::String(s) => s.clone(),
                         OpenAIContent::Array(blocks) => {
@@ -138,9 +138,9 @@ pub(crate) fn phase_contents(
                                             "fileData": { "fileUri": &image_url.url, "mimeType": "image/jpeg" }
                                         }));
                                     } else {
-                                        // [NEW] 处理本地文件路径 (file:// 或 Windows/Unix 路径)
+                                        // [NEW] Handle local file paths (file:// or Windows/Unix paths)
                                         let file_path = if image_url.url.starts_with("file://") {
-                                            // 移除 file:// 前缀
+                                            // Remove file:// prefix
                                             #[cfg(target_os = "windows")]
                                             { image_url.url.trim_start_matches("file:///").replace('/', "\\") }
                                             #[cfg(not(target_os = "windows"))]
@@ -151,12 +151,12 @@ pub(crate) fn phase_contents(
 
                                         tracing::debug!("[OpenAI-Request] Reading local image: {}", file_path);
 
-                                        // 读取文件并转换为 base64
+                                        // Read file and convert to base64
                                         if let Ok(file_bytes) = std::fs::read(&file_path) {
                                             use base64::Engine as _;
                                             let b64 = base64::engine::general_purpose::STANDARD.encode(&file_bytes);
 
-                                            // 根据文件扩展名推断 MIME 类型
+                                            // Infer MIME type based on file extension
                                             let mime_type = if file_path.to_lowercase().ends_with(".png") {
                                                 "image/png"
                                             } else if file_path.to_lowercase().ends_with(".gif") {
@@ -194,7 +194,7 @@ pub(crate) fn phase_contents(
                                     }
                                 }
                                 OpenAIContentBlock::InputAudio { input_audio } => {
-                                    // [NEW] OpenAI 官方 input_audio (base64 + format) -> Gemini inlineData
+                                    // [NEW] OpenAI official input_audio (base64 + format) -> Gemini inlineData
                                     let mime = input_audio.mime_type();
                                     match crate::proxy::audio::audio_part_from_source(
                                         &input_audio.data,
@@ -234,7 +234,7 @@ pub(crate) fn phase_contents(
             // Handle tool calls (assistant message)
             if let Some(tool_calls) = &msg.tool_calls {
                 for (_index, tc) in tool_calls.iter().enumerate() {
-                    /* 暂时移除：防止 Codex CLI 界面碎片化
+                    /* Temporarily removed: prevent Codex CLI UI fragmentation
                     if index == 0 && parts.is_empty() {
                          if mapped_model.contains("gemini-3") {
                               parts.push(json!({"text": "Thinking Process: Determining necessary tool actions."}));
@@ -257,7 +257,7 @@ pub(crate) fn phase_contents(
 
                     let mut args = serde_json::from_str::<Value>(&args_str).unwrap_or(json!({}));
 
-                    // [New] 利用通用引擎修正参数类型 (替代以前硬编码的 shell 工具修复逻辑)
+                    // [New] Utilize universal engine to correct parameter types (replacing the previous hard-coded shell tool repair logic)
                     if let Some(original_schema) = tool_name_to_schema.get(&func_name) {
                         crate::proxy::common::json_schema::fix_tool_call_args(&mut args, original_schema);
                     }
@@ -270,7 +270,7 @@ pub(crate) fn phase_contents(
                         }
                     });
 
-                    // 纯净线缆透传：客户端若自带签名则原样透传，未带则留空，全权委托进站流水线统一对齐与回填
+                    // Pure cable transparent transmission: If the client has its own signature, it will be transparently transmitted as it is. If it does not bring it, it will be left blank. The inbound pipeline is fully authorized to be aligned and backfilled.
                     if let Some(ref sig) = tc.signature {
                         func_call_part["thoughtSignature"] = json!(sig);
                     }
@@ -282,7 +282,7 @@ pub(crate) fn phase_contents(
             // Handle tool response
             if msg.role == "tool" || msg.role == "function" {
                 let name = msg.name.as_deref().unwrap_or("unknown");
-                // 优先从紧邻的前置 assistant 消息中查找匹配该 tool_call_id 的工具名称 (精准杜绝长会话 ID 碰撞时全局 Map 覆盖错误)
+                // Prioritize the search for the tool name matching the tool_call_id from the immediately preceding assistant message (precisely eliminate global Map overwriting errors when long session IDs collide)
                 let matched_preceding_name = if let Some(ref target_id) = msg.tool_call_id {
                     let mut found = None;
                     for prev_idx in (0..msg_index).rev() {
@@ -389,7 +389,7 @@ pub(crate) fn phase_contents(
                     None => "".to_string()
                 };
 
-                // [优化] 如果结果为空，注入显式确认信号，防止模型幻觉与 Gemini 400 校验异常
+                // [Optimization] If the result is empty, inject an explicit confirmation signal to prevent model hallucinations and Gemini 400 verification anomalies.
                 let final_content = if content_val.trim().is_empty() {
                     "Command executed successfully.".to_string()
                 } else {
@@ -403,7 +403,7 @@ pub(crate) fn phase_contents(
                        "id": msg.tool_call_id.clone().unwrap_or_default()
                     }
                 });
-                // 危险测试分支法则：tool 响应 (functionResponse) 绝不携带签名
+                // Dangerous test branch rule: tool response (functionResponse) never carries a signature
                 if let Some(obj) = fr_part.as_object_mut() {
                     obj.remove("thoughtSignature");
                     obj.remove("thought_signature");
@@ -425,12 +425,12 @@ pub(crate) fn phase_contents(
         .filter(|msg| !msg["parts"].as_array().map(|a| a.is_empty()).unwrap_or(true))
         .collect();
 
-    // 连续相同角色的消息**保持独立**（对齐官方形态）。
+    // Messages for the same character in a row **remain independent** (aligned to official form).
     //
-    // 历史实现会合并它们，理由是 "Gemini 强制要求 user/model 交替"。但官方
-    // Antigravity 报文里连续 user 轮与连续 model 轮都是常态，v1internal 上游
-    // 并不要求严格交替；实测（2026-09-26，`gemini-3.8-flash-tiered` @ daily）
-    // 两种形态均 200 且上下文理解一致。
+    // Historical implementations would have merged them, citing "Gemini enforces user/model alternation". But the official
+    // Continuous user rounds and continuous model rounds are normal in Antigravity messages, v1internal upstream
+    // Strict alternation is not required; actual measurement (2026-09-26, `gemini-3.8-flash-tiered` @ daily)
+    // Both forms are 200 and the context is consistent.
     let mut merged_contents = contents;
     let protocol = if is_responses_api {
         crate::proxy::pipeline::ProxyProtocol::OpenAIResponses

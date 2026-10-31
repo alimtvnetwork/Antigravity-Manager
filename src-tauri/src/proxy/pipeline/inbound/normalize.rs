@@ -1,11 +1,11 @@
 use super::*;
 
 impl InboundThinkingPipeline {
-    /// 工具调用 ID 统一规范化治理（Pipeline First）：
-    /// 规范化 contents 中所有的 `functionCall` 与 `functionResponse` 的 `id`，
-    /// 统一对齐为带下划线的标准形态 (`call_...`)，杜绝客户端格式漂移导致的签名与思考回填脱落。
+    /// Unified and standardized management of tool call IDs (Pipeline First):
+    /// Normalize the `ids` of all `functionCall` and `functionResponse` in contents,
+    /// Uniformly align to the standard underlined form (`call_...`) to prevent signatures and reflection backfills from falling off due to client format drift.
     ///
-    /// 返回被规范化的 ID 数量。
+    /// Returns the number of normalized IDs.
     pub fn normalize_tool_call_ids(contents: &mut [Value]) -> usize {
         let mut normalized_count = 0usize;
         for content in contents.iter_mut() {
@@ -41,39 +41,39 @@ impl InboundThinkingPipeline {
         normalized_count
     }
 
-    /// 把工具回执（`functionResponse`）轮的 role 归一化为官方 Antigravity 形态。
+    /// Normalize the role of the function response (`functionResponse`) wheel to the official Antigravity form.
     ///
-    /// **官方形态**（3 份实样本逐字核对）：`functionResponse` 恒位于 `role: "model"` 的
-    /// content 中，紧跟同 role 的 `functionCall` content 之后。
-    /// 而 Gemini 原生协议与四大客户端协议都把工具回执放在 `role: "user"`。
+    /// **Official form** (verified verbatim in 3 real samples): `functionResponse` is always located in `role: "model"`
+    /// content, immediately after the `functionCall` content with the same role.
+    /// The Gemini native protocol and the four major client protocols all put the tool receipt in `role: "user"`.
     ///
-    /// **实测**（2026-09-26，`gemini-3.8-flash-tiered` @ daily，魔数回执判据）：
+    /// **Actual measurement** (2026-09-26, `gemini-3.8-flash-tiered` @ daily, magic number receipt criterion):
     ///
     /// ```text
-    /// fr @ role:user             → 200，回执被正确消费
-    /// fr @ role:model            → 200，回执被正确消费
-    /// fc + fr 同 content @ model → 200，回执被正确消费
+    /// fr @ role:user → 200, the receipt is consumed correctly
+    /// fr @ role:model → 200, the receipt is consumed correctly
+    /// fc + fr is the same as content @ model → 200, the receipt is consumed correctly
     /// ```
     ///
-    /// 上游对两种 role **完全宽容**。故本归一化是「对齐官方形态 + 稳定前缀字节」，
-    /// 而不是「修复 400」；同时天然**向下兼容** user / model 两种入站形态。
+    /// Upstream is **fully tolerant** of both roles. Therefore, this normalization is "aligning the official form + stable prefix byte".
+    /// Instead of "fixing 400"; at the same time, it is naturally **downward compatible** with two inbound forms: user / model.
     ///
-    /// 行为：
+    /// Behavior:
     ///
-    /// 1. 纯回执轮（parts 含 `functionResponse`，且无非回执 part）→ 就地改为 `role: "model"`；
-    /// 2. 混合轮（回执与可见文本同处一轮）→ 按 part 类型切段，回执段归 `model`、
-    ///    其余段保持原 role，**part 相对顺序与 content 相对顺序原样保持**；
-    /// 3. 已在 `model` 轮内的回执不动（幂等）；无回执的轮次完全不碰；
-    /// 4. `inlineData` 视为「随行媒体」——跟随其前驱 part 的族群，
-    ///    避免把 `user [inlineData, text]`（用户发图提问）误判为回执轮。
+    /// 1. Pure receipt wheel (parts contains `functionResponse`, and has no non-receipt part) → changed to `role: "model"` in place;
+    /// 2. Mixed round (receipt and visible text are in the same round) → cut into segments according to part type, and the receipt segment belongs to `model`,
+    ///    The remaining segments maintain their original roles, and the relative order of part and content remain unchanged;
+    /// 3. Receipts already in the `model` round are not touched (idempotent); rounds without receipts are not touched at all;
+    /// 4. `inlineData` is regarded as "traveling media" - a group of people who follow its predecessor part.
+    ///    Avoid mistaking `user [inlineData, text]` (the user posts a picture to ask a question) as a receipt wheel.
     ///
-    /// 返回被改写的 content 数。
+    /// Returns the number of rewritten content.
     pub fn normalize_function_response_roles(contents: &mut Vec<Value>) -> usize {
-        /// part 是否携带工具回执本体。
+        /// Whether part carries the tool receipt itself.
         fn has_fr(p: &Value) -> bool {
             p.get("functionResponse").is_some()
         }
-        /// part 是否仅为随行媒体（无文本、无回执、无调用）。
+        /// Whether part is companion media only (no text, no receipt, no call).
         fn is_media(p: &Value) -> bool {
             (p.get("inlineData").is_some() || p.get("inline_data").is_some())
                 && p.get("text").is_none()
@@ -99,7 +99,7 @@ impl InboundThinkingPipeline {
                 }
             };
 
-            // 只处理「含回执本体」且当前不是 model 的轮次
+            // Only processes "including receipt body" and the current round is not a model
             if !parts.iter().any(has_fr) || role == "model" {
                 out.push(content);
                 continue;
@@ -107,9 +107,9 @@ impl InboundThinkingPipeline {
 
             let all_response = parts.iter().all(|p| has_fr(p) || is_media(p));
 
-            // 纯回执轮：只改 role，parts 原样。
-            // 例外：首条 content 不得变成 model（Gemini 要求对话以 user 开头），
-            // 实际上回执必然跟在 functionCall 轮之后，此处仅作防御。
+            // Pure receipt wheel: only change the role, leaving the parts as they are.
+            // Exception: the first content must not become a model (Gemini requires the conversation to start with user),
+            // In fact, the receipt must follow the functionCall round, this is just for defense.
             if all_response {
                 if out.is_empty() {
                     out.push(content);
@@ -122,13 +122,13 @@ impl InboundThinkingPipeline {
                 continue;
             }
 
-            // 混合轮：按「回执族 / 非回执族」切段，保持 parts 相对顺序
+            // Mixed wheel: Cut into segments according to "receipt family/non-receipt family", keeping the relative order of parts
             let mut segments: Vec<(bool, Vec<Value>)> = Vec::new();
             for part in parts {
                 let flag = if has_fr(&part) {
                     true
                 } else if is_media(&part) {
-                    // 随行媒体跟随前驱族群；无前驱则视为普通内容
+                    // Follow-up media follows the pioneer group; without a pioneer, it is regarded as ordinary content
                     segments.last().map(|(f, _)| *f).unwrap_or(false)
                 } else {
                     false
@@ -144,8 +144,8 @@ impl InboundThinkingPipeline {
                 continue;
             }
 
-            // 首段若为回执族且前面没有已产出的 content，会破坏「以 user 开头」——
-            // 此时把该段改为原 role（保留结构与顺序，仅不做对齐）。
+            // If the first paragraph is a receipt family and there is no generated content before it, it will destroy "starting with user"——
+            // At this time, change the paragraph to the original role (retaining the structure and order, just not aligning).
             let mut first = true;
             for (flag, seg) in segments {
                 let seg_role = if flag {

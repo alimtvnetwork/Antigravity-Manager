@@ -56,7 +56,7 @@ pub(crate) fn print_help_json() {
                 "group": "Account Rotation & Quota Governance",
                 "items": [
                     { "name": "status", "aliases": ["credits"], "flags": ["--json"], "description": "Show node status, immediate & weekly credits" },
-                    { "name": "ff", "aliases": ["smart-switch", "fast-forward"], "flags": [], "description": "Trigger fast-forward rotation to freshest 100% quota account" },
+                    { "name": "ff", "aliases": ["smart-switch", "fast-forward"], "flags": ["[instance]"], "description": "Fast-forward instance account rotation with pre-switch prompt snapshot and 10s settling" },
                     { "name": "switch-if-low-credit", "aliases": ["swlc", "sfc"], "flags": ["-t <pct>", "--json", "-f [file]", "--force"], "description": "Check live quota & rotate if quota <= threshold" },
                     { "name": "is-low-credit-for-switch", "aliases": ["ilc"], "flags": ["-t <pct>", "--json", "-f [file]"], "description": "Check if active quota <= threshold" },
                     { "name": "accounts", "aliases": ["acc"], "flags": ["--active", "--json"], "description": "List registered accounts, tiers, and quotas" },
@@ -72,12 +72,16 @@ pub(crate) fn print_help_json() {
                     { "name": "delegate-update", "aliases": ["ui-update-runner"], "flags": ["--wait-pid <PID>", "--relaunch", "--target-exe <EXE>"], "description": "Delegated out-of-process updater for AGM UI & CLI (zero file-locks & auto-relaunch)" },
                     { "name": "sync", "aliases": [], "flags": [], "description": "Synchronize local accounts, instances, and DB vaults" },
                     { "name": "pull", "aliases": [], "flags": [], "description": "Execute git pull origin main in repository root" },
-                    { "name": "ssh", "aliases": [], "flags": ["<target>", "--update"], "description": "Connect to remote VM via SSH or run remote command" }
+                    { "name": "ssh", "aliases": [], "flags": ["<target>", "--update"], "description": "Connect to remote VM via SSH or run remote command" },
+                    { "name": "clean-other-versions", "aliases": ["ov", "versions clean"], "flags": ["--dry-run", "--verbose"], "description": "Scan and remove stale versions, .old files, and updater artifacts" }
                 ]
             },
             {
                 "group": "Parallel Prompt Backup & Workspace Restoration",
                 "items": [
+                    { "name": "running", "aliases": ["active", "wpr"], "flags": ["--words <W>", "--limit <Y>", "--full", "-i <instance>", "--json"], "description": "Inspect active and queued prompts under each instance with sequence numbers, word limit, image counts, and --json" },
+                    { "name": "backup running [instance]", "aliases": ["backup", "backpack", "brp", "backup-running-prompts"], "flags": ["-f <file>", "--json"], "description": "Multimodal running prompts snapshot and FIFO restoration with image tracing and positional instance support" },
+                    { "name": "restore running [instance]", "aliases": ["restore", "rrp", "restore-running-prompts"], "flags": ["--keep", "-f <file>", "--json"], "description": "Multimodal running prompts snapshot and FIFO restoration with image tracing and positional instance support" },
                     { "name": "backup", "aliases": ["backpack", "brp", "backup-running-prompts"], "flags": ["ls", "clean", "-f <file>", "--json"], "description": "Parallel snapshot of active prompts across all workspaces to split SQLite DB" },
                     { "name": "restore", "aliases": ["rrp", "restore-running-prompts", "resend-running"], "flags": ["--keep", "--json", "-f <file>"], "description": "Restore and re-enqueue in-flight prompts into active workspaces" },
                     { "name": "export-compact", "aliases": ["compact-export", "ec"], "flags": ["-f <file>", "-w <work-dir>", "--no-pinned", "--absolute"], "description": "Export portable workspace compaction snapshot to JSON envelope v2.0 or SQLite DB" },
@@ -110,7 +114,8 @@ pub(crate) fn print_help_json() {
                 "items": [
                     { "name": "email", "aliases": [], "flags": ["status", "help", "ls", "add", "rm", "mv", "export", "--json"], "description": "Manage email alerts, sender accounts, and recipients" },
                     { "name": "telegram", "aliases": [], "flags": ["ls", "set", "ping", "cmds", "chat", "setup", "help"], "description": "Manage Telegram bot token, chat ID, automated setup, and alerts" },
-                    { "name": "broadcast-email", "aliases": [], "flags": ["ls", "add", "rm", "send-to-all", "send", "test"], "description": "Broadcast status cards to all configured recipients" }
+                    { "name": "broadcast-email", "aliases": [], "flags": ["ls", "add", "rm", "send-to-all", "send", "test"], "description": "Broadcast status cards to all configured recipients" },
+                    { "name": "improvements", "aliases": ["improve", "next10"], "flags": ["plan", "next", "status", "check", "--dry-run", "--json"], "description": "Plan 100 improvements as 10 batches of 10, then implement next-10 via 01-prompts/30-improvements" }
                 ]
             },
             {
@@ -124,6 +129,26 @@ pub(crate) fn print_help_json() {
                     { "name": "supabase load-json", "aliases": ["import"], "flags": ["<file>"], "description": "Ingest and merge endpoints from JSON file" },
                     { "name": "supabase sync", "aliases": ["supa sync"], "flags": [], "description": "Trigger immediate local node heartbeat and instance profile sync" },
                     { "name": "supabase schema", "aliases": ["supa schema"], "flags": ["[root|secondary]"], "description": "Output SQL schema DDL for Supabase SQL Editor" }
+                ]
+            },
+            {
+                "group": "Speed Error Database & Automated Self-Healing",
+                "items": [
+                    { "name": "errors", "aliases": ["error", "err"], "flags": ["list", "clear", "fix", "--limit <N>", "--severity <S>", "--json"], "description": "Inspect SQLite speed error database (errors.db), purge error logs, or run automated self-healing engine" },
+                    { "name": "errors list", "aliases": ["errors ls"], "flags": ["--limit <N>", "--severity <S>", "--json"], "description": "List captured errors with timestamp, severity, code, source, and message" },
+                    { "name": "errors fix", "aliases": ["errors heal"], "flags": ["--dry-run", "--json"], "description": "Surgically resolve stale lockfiles, permissions, corrupted configs, and database WAL locks" },
+                    { "name": "errors clear", "aliases": ["errors clean"], "flags": ["--json"], "description": "Purge all error history from errors.db" },
+                    { "name": "failed-commands", "aliases": ["fc", "failed-command", "unknown-commands", "fcc"], "flags": ["[N]", "count", "clear", "--json"], "description": "Inspect undetected or failed terminal commands with frequency metrics and suggestions" },
+                    { "name": "paths", "aliases": ["dirs", "path"], "flags": ["--json"], "description": "Display AGM data directory, database paths, log locations, and binary paths" }
+                ]
+            },
+            {
+                "group": "Split Database & Zero-Loss Migration",
+                "items": [
+                    { "name": "db status", "aliases": ["db"], "flags": ["--json"], "description": "Inspect all Split SQLite databases, schema versions, and row counts" },
+                    { "name": "db backup", "aliases": [], "flags": ["--file <path>", "--json"], "description": "Export single-file pre-migration snapshot (pre_migration_v4_snapshot.json)" },
+                    { "name": "db restore", "aliases": [], "flags": ["--file <path>", "--json"], "description": "Freshly initialize PascalCase Split-DBs and re-import snapshot data" },
+                    { "name": "db verify", "aliases": [], "flags": ["--json"], "description": "Validate zero account loss and SQLite integrity pragmas" }
                 ]
             }
         ]
@@ -152,7 +177,9 @@ pub(crate) fn print_help() {
     println!("    status, credits [--json]");
     println!("        Show node status, immediate & weekly credits, active account");
     println!("    ff, smart-switch, fast-forward [instance]");
-    println!("        Trigger fast-forward rotation to freshest 100% quota account (for instance or all)");
+    println!(
+        "        Fast-forward instance account rotation with pre-switch prompt snapshot and 10s settling"
+    );
     println!("    switch, switch-account <email|prefix|id|#seq> [--instance <id|alias>]");
     println!(
         "        Directly switch active profile (or specified instance) without GUI intervention"
@@ -212,6 +239,20 @@ pub(crate) fn print_help() {
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("  PARALLEL PROMPT BACKUP & WORKSPACE RESTORATION");
     println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!(
+        "    running, active, wpr [--words <W>] [--limit <Y>] [--full] [-i <instance>] [--json]"
+    );
+    println!(
+        "        Inspect active and queued prompts under each instance with sequence numbers, word limit, image counts, and --json"
+    );
+    println!("    backup running [instance], backup, backpack, backup-running-prompts [-f file] [--json]");
+    println!(
+        "        Multimodal running prompts snapshot and FIFO restoration with image tracing and positional instance support"
+    );
+    println!("    restore running [instance], restore, restore-running-prompts [--keep] [-f file] [--json]");
+    println!(
+        "        Multimodal running prompts snapshot and FIFO restoration with image tracing and positional instance support"
+    );
     println!("    backup, backpack, backup-running-prompts [ls|clean] [-f file] [--json]");
     println!(
         "        Parallel snapshot of active prompts across all workspaces to split SQLite DB"
@@ -232,6 +273,8 @@ pub(crate) fn print_help() {
     println!("        Render Project → Conversation → 200-Word Prompt tree with Dual Seq IDs ([AGM:P001 | GM:#1], [AGM:C001 | GM:<cid>])");
     println!("    prompts reset-tree, prompts reset-db [-i <inst>] [--json]");
     println!("        Clear the prompt tree cache for one instance or all instances. Running and queued prompts stay.");
+    println!("    prompts tree [-i <inst>] [--json] [--local|--no-daemon]");
+    println!("        Dump the conversation tree. --local rebuilds in this binary and skips the running GUI daemon cache.");
     println!("    which-prompts-running, wpr [--json]");
     println!("        List running projects, conversation IDs, and prompt queues");
     println!("    query, search [term] [--words <W>] [--limit <N>] [--status <S>] [--json]");
@@ -306,6 +349,15 @@ pub(crate) fn print_help() {
     println!("        Manage Telegram bot token, chat ID, automated setup, and alerts");
     println!("    broadcast-email [ls|add|rm|send-to-all|send|send-help|test]");
     println!("        Manage multi-recipient email broadcasts");
+    println!("    improvements, improve [plan|next|status|check|detail|help] [ui|code|system|ideas] [--dry-run] [--json]");
+    println!("        Plan 100 improvements as 10 batches of 10, then implement next-10");
+    println!("        Ledger: .ai-memory/improvements/flywheel.json");
+    println!("        Examples:");
+    println!("          agm improvements help");
+    println!("          agm improvements plan ui --dry-run --json");
+    println!("          agm improvements next --dry-run --json");
+    println!("          agm next10 --dry-run");
+    println!("          Telegram: /improvements  /improvements plan  /next10");
     println!();
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("  SUPABASE FLEET SYNC & LEASE ARCHITECTURE");
@@ -326,6 +378,39 @@ pub(crate) fn print_help() {
     println!("        Synchronize local machine node and instance profiles to Supabase");
     println!("    supabase schema [root|secondary]");
     println!("        Output SQL schema DDL to create tables in Supabase SQL Editor");
+    println!();
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("  SPEED ERROR DATABASE & SELF-HEALING DIAGNOSTICS");
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("    errors, error, err [list] [--limit <N>] [--severity <S>] [--json]");
+    println!("        Display errors tracked in SQLite errors.db in table or JSON format");
+    println!("    errors list, errors ls [--limit <N>] [--severity <S>] [--json]");
+    println!("        List captured errors with timestamp, severity, code, source, and message");
+    println!("    errors fix, errors heal [--dry-run] [--json]");
+    println!("        Run automated diagnostic engine & surgically repair stale locks, permissions & configs");
+    println!("    errors clear, errors clean [--json]");
+    println!("        Purge all error history from SQLite errors.db");
+    println!("    failed-commands, fc, failed-command [N] [--json] [count|clear]");
+    println!(
+        "        Inspect undetected/failed terminal commands with hit count & suggestion telemetry"
+    );
+    println!("        Examples:");
+    println!("          agm failed-commands           # View top 20 failed commands");
+    println!("          agm fc 50                     # View top 50 failed commands");
+    println!("          agm fc count                  # View distinct and total failed counts");
+    println!("          agm fc clear                  # Purge failed command history");
+    println!();
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("  SPLIT DATABASE & ZERO-LOSS MIGRATION");
+    println!("  ────────────────────────────────────────────────────────────────────────────");
+    println!("    db status [--json]");
+    println!("        Inspect all Split SQLite databases, schema versions, and row counts");
+    println!("    db backup [--file <path>] [--json]");
+    println!("        Export single-file pre-migration snapshot (pre_migration_v4_snapshot.json)");
+    println!("    db restore [--file <path>] [--json]");
+    println!("        Freshly initialize PascalCase Split-DBs and re-import snapshot data");
+    println!("    db verify [--json]");
+    println!("        Validate zero account loss and SQLite PRAGMA integrity checks");
     println!();
     println!("  ────────────────────────────────────────────────────────────────────────────");
     println!("  REAL-WORLD EXAMPLES (AGM & GITMAP PARITY)");
@@ -349,7 +434,16 @@ pub(crate) fn print_help() {
     println!("    gitmap agy prompt-project P001 -n is-done -t \"Check build\"");
     println!();
     println!("    # 3. Backup & Restore Running Storage Prompts + FPUG / SUG (AGM & GitMap):");
+    println!("    agm running --json                  # List instances and running prompts with image counts in JSON");
+    println!("    agm backup running default --json   # Snapshot active prompts for default instance with image tracing");
+    println!("    agm restore running default --json  # FIFO restore prompts for default instance with image reconstruction");
     println!("    agm backup && agm backup ls && agm restore");
+    println!("    gitmap agy running --json           # GitMap parity running prompts inspection");
+    println!(
+        "    gitmap agy ff                       # GitMap parity fast-forward account rotation"
+    );
+    println!("    gitmap agy backup rp                # GitMap parity running prompt snapshot");
+    println!("    gitmap ag restore rp                # GitMap parity running prompt FIFO restore");
     println!("    gitmap agy running-prompts ls | backup | restore");
     println!("    gitmap backup-running-prompts && gitmap restore-running-prompts");
     println!("    agm agy fpug ls && agm agy sug ls");
@@ -484,7 +578,55 @@ pub(crate) fn print_commands_table() {
     );
     println!(
         "  {:<26} {:<36} {:<32}",
+        "Inspect Running Prompts",
+        format!("cmd: {} | agm running", node_alias),
+        "agm running [--json]"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Fast-Forward Switch",
+        format!("cmd: {} | agm ff", node_alias),
+        "agm ff [instance]"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Backup Running Prompts",
+        format!("cmd: {} | agm backup running", node_alias),
+        "agm backup running [instance]"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Restore Running Prompts",
+        format!("cmd: {} | agm restore running", node_alias),
+        "agm restore running [instance]"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Run Diagnostics Fix",
+        format!("cmd: {} | agm errors fix", node_alias),
+        "agm errors fix"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Failed Commands Telemetry",
+        format!("cmd: {} | agm fc", node_alias),
+        "agm fc"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
         "Inbound Commands Manual", "Subject: help", "agm help"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Plan 100 Improvements",
+        format!("cmd: {} | agm improvements plan", node_alias),
+        "agm improvements plan [--dry-run]"
+    );
+    println!(
+        "  {:<26} {:<36} {:<32}",
+        "Implement Next 10",
+        format!("cmd: {} | agm improvements next", node_alias),
+        "agm improvements next [--dry-run]"
     );
     println!();
 }

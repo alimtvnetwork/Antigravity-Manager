@@ -118,7 +118,7 @@ If sources conflict, follow stricter one and record under `Conflicts:` in ledger
 - **R8/R9 Atomic Commit & Push via GitMap (TOTAL BAN ON RAW GIT COMMITS).** The run ends with ONE GitMap call:
   - For features: `gitmap cpf "<module> - <feature summary>"` (e.g. `gitmap cpf "CBF - implement user profile dashboard"`). GitMap automatically prepends `Feature: ` (which already provides the colon), so mention and format as a hyphen `-`; there is NO need to provide a colon in the GitMap `cpf` (or `cpb`/`cpr`) message argument. DO NOT provide a colon; use a hyphen `-` to separate module/scope from summary. NEVER include `feat(...)` or `feature:` in your message.
   - For bug fixes: `gitmap cpb "<module> - <fix summary>"` (e.g. `gitmap cpb "AUM - validate regex without nil fallback"`). GitMap automatically prepends `Bug: ` (which already provides the colon), so mention and format as a hyphen `-`; there is NO need to provide a colon in the GitMap message argument. DO NOT provide a colon; use a hyphen `-` to separate module/scope from summary. NEVER include `fix(...)` or `bug:` in your message.
-  GitMap stages, formats, commits, and pushes atomically. TOTAL BAN on raw git commits (`git commit`, `git commit -m "..."`, `git add -A`, raw `git push`), colons inside the GitMap message argument, and conventional prefixes (`docs(...)`, `feat(...)`, `fix(...)`, `chore(...)`). ZERO intermediate commits: never commit during Phase 1 (plans/specs) or Phase 2; all files across the turn MUST be committed together at the final step of Phase 3. Before GitMap, all push gates must pass (targeted checks, secrets gate, and `.gitignore` hygiene; untrack any ignored files: `git rm --cached`). Push rejected: `git pull --rebase`, re-run command. Miss after push: allow one follow-up `gitmap cpb "<module> - <fix summary>"`, logged as `FOLLOW_UP_PUSH: <sha>`. Never amend pushed commits. Workers never run git commands or GitMap commit tools; only lead does.
+  GitMap stages, formats, commits, and pushes atomically. TOTAL BAN on raw git commits (`git commit`, `git commit -m "..."`, `git add -A`, raw `git push`), colons inside the GitMap message argument, and conventional prefixes (`docs(...)`, `feat(...)`, `fix(...)`, `chore(...)`). ZERO intermediate commits: never commit during Phase 1 (plans/specs) or Phase 2; all files across the turn MUST be committed together at the final step of Phase 3. Before GitMap, all push gates must pass (targeted checks, secrets gate, and `.gitignore` hygiene; untrack any ignored files: `git rm --cached`). Push rejected: `gitmap pull` (fallback `git pull --rebase`), re-run command. Miss after push: allow one follow-up `gitmap cpb "<module> - <fix summary>"`, logged as `FOLLOW_UP_PUSH: <sha>`. Never amend pushed commits. Workers never run git commands or GitMap commit tools; only lead does.
 - **R10 Zero Unauthorized Releases.** Never bump versions, edit `version.json`, update changelogs, or trigger release scripts unless user explicitly requested release.
 - **R11 Strict Relative Git Paths & Lowercase Hygiene.** Strict ban on absolute paths (`C:\...`, `/home/...`) and `file:///` URIs. Only add the relative paths, never add the absolute path during your work, and ensure this is respected on the release page and in release notes as well. Paths relative from git root. All filenames, documentation, and specs strictly lowercase (e.g. `readme.md`, `agents.md`, `skill.md`).
 - **R12 No Polling / Immediate Turn Yielding.** When calling `invoke_subagent`, make it the sole tool action at turn end, print progress line (`Dispatched Worker 01 .. Worker <A> (wave k / WAVES); waiting for their results.`) and **STOP CALLING TOOLS**. Never poll in loop. Check `manage_subagents` once if wave runs long.
@@ -161,14 +161,15 @@ GitMap is your **PRIMARY** acceleration engine. NEVER use `rg`, `ripgrep`, `grep
 1. **Platform Handshake:** Confirm tools (`invoke_subagent`, `send_message`, `manage_subagents`, `ask_question`, `write_to_file`, `replace_file_content`, `run_command`).
 2. **Commands & Directory:** Confirm `gitmap --version` and `python --version` exit 0. Verify GitMap with harmless call (`gitmap lf readme.md`), not `--help`. `run_command` uses `Cwd` in workspace root, paths relative. Never cd to other drives or tool folders.
 3. **Working Tree Cleanliness:** Run `git status --porcelain`. Record modified files in ledger; never touch them. Confirm root `readme.md` is lowercase. Read `.ai-memory/what-to-read.md`, `strictly-avoid.md`, `coding-guidelines.md`.
-4. **SQLite Task DB & Deterministic Slug Initialization:**
-   - Initialize or inspect task state via the Antigravity SQLite task manager:
-     `python 03-ai-scripts/46-agent-sqlite-task-manager.py init --name "execute-pending-tasks" --budget 300`
-   - Inspect Task DB Schema & Data Integrity Rules:
-     `python 03-ai-scripts/46-agent-sqlite-task-manager.py schema`
+4. **SQLite Task DB & Deterministic Slug Initialization (Check Before Creating):**
+   - Initialize or inspect task state via GitMap SQLite task manager (compiled Go, sub-millisecond):
+     `gitmap agent task init --name "execute-pending-tasks" --budget 300`
+   - Inspect Task DB Schema & Data Integrity Rules (Mandatory Preflight):
+     `gitmap agent task status`
+   - TOTAL BAN ON RAW PYTHON SQLITE: NEVER execute `python -c "import sqlite3..."` or ad-hoc Python DB scripts. Inspect status via `gitmap agent task status` or list subtasks via `gitmap agent subtask ls`.
    - Output Analysis & Crash Forensics:
      - If `action: "RESUME_FOUND"`: Forensic report identifies crashed agent state. Resume execution from the uncompleted subtask.
-     - If `action: "INITIALIZED"`: Created dedicated run directory `.ai-memory/temp-agents/<nn>-execute-pending-tasks/` and SQLite database `agent-task.db` with WAL mode.
+     - If `action: "INITIALIZED"`: Created dedicated run directory `.ai-memory/temp-agents/<nn>-execute-pending-tasks/` and SQLite database `agent-task.db` with WAL mode (`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;`).
 5. **Ledger Creation:** Also create `.ai-memory/temp-agents/<nn>-execute-pending-tasks/ledger.md` mirroring the DB initialization for human readability:
 
 ```markdown
@@ -206,7 +207,7 @@ You must use `invoke_subagent` to delegate inventory discovery and wave partitio
    - Wave 2: Business logic and services
    - Wave 3: UI and documentation
 3. **Populate Subtasks in SQLite Task DB:**
-   `python 03-ai-scripts/46-agent-sqlite-task-manager.py add-subtasks --db <databasePath> --tasks-json '[{"code": "Task-01", "title": "<title>", "owned_files": ["<paths>"], "agent_role": "Worker 01"}]'`
+   `gitmap agent subtask add --json '[{"code": "Task-01", "title": "<title>", "owned_files": ["<paths>"], "agent_role": "Worker 01"}]'`
 4. **Readiness Gate:** Complete Phase 1 inventory and wave grouping within `PHASE_1_BUDGET` steps, then proceed **UNCONDITIONALLY** into Phase 2 execution. ZERO intermediate git commits during Phase 1!
 
 ---

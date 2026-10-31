@@ -1,4 +1,5 @@
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -169,8 +170,10 @@ pub fn import_ssh_from_gitmap() -> Result<(String, NodeSyncStats), String> {
     let mut all_discovered: Vec<SshConnectionRecord> = Vec::new();
     let mut sources: Vec<String> = Vec::new();
 
-    // 1. Try `gitmap ssh nodes export-json` or `gitmap ssh nodes --json`
+    // 1. Try `gitmap cluster nodes --json`, `gitmap cluster nodes export-json`, or `gitmap ssh nodes`
     for args in [
+        &["cluster", "nodes", "--json"][..],
+        &["cluster", "nodes", "export-json"][..],
         &["ssh", "nodes", "export-json"][..],
         &["ssh", "nodes", "--json"][..],
     ] {
@@ -239,4 +242,128 @@ pub fn import_ssh_from_gitmap() -> Result<(String, NodeSyncStats), String> {
 
     let stats = sync_ssh_connections_locally(&all_discovered)?;
     Ok((sources.join(" + "), stats))
+}
+
+/// Reset SSH connections to the canonical 6-node GitMap cluster topology (w1, main, u1, w2, w3, w4)
+pub fn reset_ssh_cluster_nodes() -> Result<NodeSyncStats, String> {
+    // 1. Scan candidate paths and existing connections to preserve credentials (passwords, key_path, port)
+    let mut cred_map: HashMap<String, (String, String, String, u16)> = HashMap::new();
+
+    let mut record_cred = |conn: &SshConnectionRecord| {
+        let has_cred =
+            !conn.encrypted_password.trim().is_empty() || !conn.key_path.trim().is_empty();
+        if has_cred {
+            let entry = (
+                conn.encrypted_password.trim().to_string(),
+                conn.encryption_algo.trim().to_string(),
+                conn.key_path.trim().to_string(),
+                if conn.port == 0 { 22 } else { conn.port },
+            );
+            let alias_key = conn.alias.trim().to_ascii_lowercase();
+            if !alias_key.is_empty() {
+                cred_map.insert(alias_key, entry.clone());
+            }
+            let ip_key = conn.ip_address.trim().to_string();
+            if !ip_key.is_empty() {
+                cred_map.insert(ip_key, entry);
+            }
+        }
+    };
+
+    for seed_path in candidate_seed_node_paths() {
+        if seed_path.exists() && seed_path.is_file() {
+            if let Ok(raw) = fs::read_to_string(&seed_path) {
+                if let Ok(conns) = decode_connections_from_json(&raw) {
+                    for c in conns {
+                        record_cred(&c);
+                    }
+                }
+            }
+        }
+    }
+
+    if let Ok(existing) = load_ssh_connections() {
+        for c in existing {
+            record_cred(&c);
+        }
+    }
+
+    // 2. Invalidate TCP liveness and cluster balances caches immediately
+    invalidate_ssh_liveness_cache(None, None);
+    invalidate_cluster_balances_cache();
+
+    // 3. Clear stale cache: truncate node_display_cache.db and delete ssh_nodes.json
+    if let Ok(data_dir) = crate::modules::account::get_data_dir() {
+        let cache_db = data_dir.join("node_display_cache.db");
+        if cache_db.exists() {
+            if let Ok(conn) = rusqlite::Connection::open(&cache_db) {
+                // Justification: best-effort truncate node display cache before re-seeding
+                crate::error::record_ignored(
+                    conn.execute("DELETE FROM node_display_cache", []),
+                    "truncate node_display_cache",
+                );
+            }
+        }
+        let nodes_json = data_dir.join("ssh_nodes.json");
+        if nodes_json.exists() {
+            // Justification: best effort remove stale ssh_nodes.json before re-seeding
+            crate::error::record_ignored(
+                fs::remove_file(&nodes_json),
+                "remove stale ssh_nodes.json",
+            );
+        }
+    }
+
+    // 4. Re-seed all 6 canonical GitMap cluster nodes preserving credentials
+    let mut canonical_records = Vec::new();
+    let now = chrono::Utc::now().to_rfc3339();
+
+    for &(alias, ip, user, os) in GITMAP_CLUSTER_NODES {
+        let preserved = cred_map
+            .get(&alias.to_ascii_lowercase())
+            .or_else(|| cred_map.get(ip));
+
+        let (enc_pw, enc_algo, key_p, port) = match preserved {
+            Some((pw, algo, key, p)) => (
+                pw.clone(),
+                if algo.is_empty() {
+                    "RSA-2048".to_string()
+                } else {
+                    algo.clone()
+                },
+                key.clone(),
+                if *p == 0 { 22 } else { *p },
+            ),
+            None => (String::new(), "RSA-2048".to_string(), String::new(), 22),
+        };
+
+        canonical_records.push(SshConnectionRecord {
+            alias: alias.to_string(),
+            ip_address: ip.to_string(),
+            port,
+            username: user.to_string(),
+            key_path: key_p,
+            os: os.to_string(),
+            encrypted_password: enc_pw,
+            encryption_algo: enc_algo,
+            os_group: Some(if os.eq_ignore_ascii_case("windows") {
+                "Windows".to_string()
+            } else {
+                "Linux".to_string()
+            }),
+            os_version: None,
+            build_version: None,
+            first_run_at: Some(now.clone()),
+            created_at: Some(now.clone()),
+        });
+    }
+
+    let stats = sync_ssh_connections_locally(&canonical_records)?;
+    // Ensure OpenSSH config reflects canonical entries
+    // Justification: best-effort sync to ~/.ssh/config; logged
+    crate::error::record_ignored(
+        update_ssh_config(false),
+        "reset_ssh_cluster update_ssh_config",
+    );
+    Ok(stats)
 }

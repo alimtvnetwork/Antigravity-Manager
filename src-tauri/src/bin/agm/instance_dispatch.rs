@@ -128,16 +128,80 @@ pub(crate) fn cmd_instances(args: &[String]) {
         return;
     }
 
+    if is_help
+        && non_flag_args
+            .first()
+            .map(|s| {
+                s.eq_ignore_ascii_case("self")
+                    || s.eq_ignore_ascii_case("current")
+                    || s.eq_ignore_ascii_case("whoami")
+                    || s.eq_ignore_ascii_case("which-self")
+            })
+            .unwrap_or(false)
+    {
+        println!("AGM Instance Self / Caller Detection CLI:");
+        println!("  agm instances self [--json]");
+        println!("  agm instances current [--json]");
+        println!("  agm instances whoami [--json]");
+        println!("\nDescription:");
+        println!("  Detect and display the caller's running instance profile, avoiding self-termination.");
+        println!("\nOptions:");
+        println!("  --json, -j                        Output result in structured JSON format");
+        return;
+    }
+
+    if is_help
+        && non_flag_args
+            .first()
+            .map(|s| s.eq_ignore_ascii_case("test-create") || s.eq_ignore_ascii_case("create-test"))
+            .unwrap_or(false)
+    {
+        println!("AGM Instance Test Sandbox Creation CLI:");
+        println!("  agm instances test-create [name] [--json]");
+        println!("\nDescription:");
+        println!("  Fast creation of an isolated test instance.");
+        println!("\nOptions:");
+        println!("  --name, -n <name>                 Custom name for the test instance");
+        println!("  --json, -j                        Output result in structured JSON format");
+        return;
+    }
+
+    if is_help
+        && non_flag_args
+            .first()
+            .map(|s| {
+                s.eq_ignore_ascii_case("test-clean")
+                    || s.eq_ignore_ascii_case("test-destroy")
+                    || s.eq_ignore_ascii_case("clean-test")
+                    || s.eq_ignore_ascii_case("destroy-test")
+                    || s.eq_ignore_ascii_case("rm-test")
+            })
+            .unwrap_or(false)
+    {
+        println!("AGM Instance Test Sandbox Teardown CLI:");
+        println!("  agm instances test-clean [--json]");
+        println!("  agm instances test-destroy [name] [--json]");
+        println!("\nDescription:");
+        println!("  Safely stop and purge test instances.");
+        println!("\nOptions:");
+        println!("  --json, -j                        Output result in structured JSON format");
+        return;
+    }
+
     if is_help {
         println!("AGM Multi-Instance & Profile CLI:");
         println!("  agm instances [ls] [--json]");
+        println!("  agm instances self [--json]");
+        println!("  agm instances test-create [name] [--json]");
+        println!("  agm instances test-clean [--json]");
+        println!("  agm instances test-destroy [name] [--json]");
         println!("  agm instances create <name> [--account <email|id>] [--from <inst>] [--data-only] [--launch]");
         println!("  agm instances switch <instance> <account>");
         println!("  agm instances ff [instance]");
         println!("  agm instances all ff");
         println!("  agm instances auto-switch [status|enable|disable|toggle|run]");
         println!("  agm instances launch <instance>");
-        println!("  agm instances stop <instance>");
+        println!("  agm instances stop <instance> [--force]");
         println!("  agm instances rm <instance> [--force]");
         println!("  agm instances rm-all [--force]");
         println!("  agm instances assign <instance> <repo_paths...>");
@@ -152,6 +216,9 @@ pub(crate) fn cmd_instances(args: &[String]) {
         println!("\nAliases: agm instances, agm instance, agm ls");
         println!("\nSubcommands:");
         println!("  ls, list                          List all registered instance profiles, statuses, and bound emails (default)");
+        println!("  self, current, whoami             Detect and display the caller's running instance profile, avoiding self-termination");
+        println!("  test-create [name]                Fast creation of an isolated test instance");
+        println!("  test-clean, test-destroy [name]   Safely stop and purge test instances");
         println!(
             "  create, add <name> [options]      Create a new isolated sandbox instance profile"
         );
@@ -271,6 +338,14 @@ pub(crate) fn cmd_instances(args: &[String]) {
     }
 
     if crate::instance_routes_a::route_instances_rm_all(args, &non_flag_args, is_json) {
+        return;
+    }
+
+    if crate::instance_routes_b::route_instances_self(args, &non_flag_args, is_json) {
+        return;
+    }
+
+    if crate::instance_routes_b::route_instances_test_lifecycle(args, &non_flag_args, is_json) {
         return;
     }
 

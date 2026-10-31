@@ -51,13 +51,25 @@ pub struct AppConfig {
     #[serde(default = "default_true")]
     pub auto_refresh_missing_tiers: bool, // [NEW] Startup backfill for accounts with missing subscription tier
     #[serde(default)]
-    pub suggestion_delete_thinking_store: Option<bool>, // [NEW] 建议删除历史思考块缓存开关
+    pub suggestion_delete_thinking_store: Option<bool>, // [NEW] It is recommended to delete the historical thinking block cache switch
     #[serde(default)]
-    pub thinking_cleanup_dismissed: Option<bool>, // [NEW] 用户是否已确认/忽略该建议
+    pub thinking_cleanup_dismissed: Option<bool>, // [NEW] Whether the user has confirmed/ignored the suggestion
     #[serde(default)]
-    pub dismissed_thinking_cleanup_version: Option<String>, // [NEW] 用户已确认或忽略建议的目标版本号
+    pub dismissed_thinking_cleanup_version: Option<String>, // [NEW] User has confirmed or ignored the suggested target version number
     #[serde(default = "default_max_backup_prompts")]
     pub max_backup_prompts: usize,
+    #[serde(default = "default_prompt_preview_max_words")]
+    pub prompt_preview_max_words: usize,
+    #[serde(default = "default_prompt_preview_words")]
+    pub prompt_preview_words: usize,
+}
+
+fn default_prompt_preview_words() -> usize {
+    200
+}
+
+fn default_prompt_preview_max_words() -> usize {
+    100
 }
 
 fn default_max_backup_prompts() -> usize {
@@ -260,6 +272,16 @@ impl AppConfig {
             thinking_cleanup_dismissed: None,
             dismissed_thinking_cleanup_version: None,
             max_backup_prompts: 100,
+            prompt_preview_max_words: 100,
+            prompt_preview_words: 200,
+        }
+    }
+
+    pub fn get_clamped_prompt_preview_words(&self) -> usize {
+        if self.prompt_preview_words == 0 {
+            200
+        } else {
+            self.prompt_preview_words.clamp(50, 500)
         }
     }
 }
@@ -311,6 +333,9 @@ fn default_account_lockout_window_minutes() -> u32 {
 fn default_account_cooldown_minutes() -> u32 {
     60
 }
+
+pub const DEFAULT_TARGET_MODEL: &str = "gemini-3.8-flash-high";
+pub const DEFAULT_EVALUATION_MODEL_LABEL: &str = "Gemini 3.8 Flash";
 
 /// Auto profile switcher configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -364,8 +389,14 @@ pub struct AutoProfileSwitcherConfig {
     pub pro_tier_multiplier: f64,
     #[serde(default = "default_free_tier_multiplier")]
     pub free_tier_multiplier: f64,
+    #[serde(default = "default_min_weekly_quota_percent")]
+    pub min_weekly_quota_percent: f64,
     #[serde(default = "default_max_backup_prompts_u32")]
     pub max_backup_prompts: u32,
+}
+
+fn default_min_weekly_quota_percent() -> f64 {
+    15.0
 }
 
 fn default_max_backup_prompts_u32() -> u32 {
@@ -378,7 +409,7 @@ impl Default for AutoProfileSwitcherConfig {
             is_enabled: true,
             check_interval_seconds: 300,
             low_quota_threshold_percent: 15.0,
-            target_model: "gemini-3.8-flash-high".to_string(),
+            target_model: DEFAULT_TARGET_MODEL.to_string(),
             has_auto_resume: true,
             cooldown_seconds: 180,
             caution_interval_seconds: 60,
@@ -399,6 +430,7 @@ impl Default for AutoProfileSwitcherConfig {
             ultra_tier_multiplier: 4.0,
             pro_tier_multiplier: 2.0,
             free_tier_multiplier: 1.0,
+            min_weekly_quota_percent: 15.0,
             max_backup_prompts: 100,
         }
     }
@@ -488,5 +520,39 @@ mod tests {
         assert!(restored.auto_sync);
         assert!(restored.auto_sync_migrated);
         assert_eq!(restored.sync_interval, 5);
+    }
+
+    #[test]
+    fn test_prompt_preview_max_words_default() {
+        let config = AppConfig::new();
+        assert_eq!(config.prompt_preview_max_words, 100);
+
+        let json_str =
+            r#"{"language":"en","theme":"system","auto_refresh":true,"refresh_interval":15}"#;
+        let restored: AppConfig = serde_json::from_str(json_str).unwrap();
+        assert_eq!(restored.prompt_preview_max_words, 100);
+    }
+
+    #[test]
+    fn test_prompt_preview_words_default_and_clamping() {
+        let config = AppConfig::new();
+        assert_eq!(config.prompt_preview_words, 200);
+        assert_eq!(config.get_clamped_prompt_preview_words(), 200);
+
+        let mut clamped = config.clone();
+        clamped.prompt_preview_words = 10;
+        assert_eq!(clamped.get_clamped_prompt_preview_words(), 50);
+
+        clamped.prompt_preview_words = 600;
+        assert_eq!(clamped.get_clamped_prompt_preview_words(), 500);
+
+        clamped.prompt_preview_words = 150;
+        assert_eq!(clamped.get_clamped_prompt_preview_words(), 150);
+
+        // Deserializing JSON without prompt_preview_words defaults to 200
+        let json_str =
+            r#"{"language":"en","theme":"system","auto_refresh":true,"refresh_interval":15}"#;
+        let restored: AppConfig = serde_json::from_str(json_str).unwrap();
+        assert_eq!(restored.prompt_preview_words, 200);
     }
 }

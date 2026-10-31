@@ -7,19 +7,19 @@ import { showToast } from './ToastContainer';
 import { useErrorStore } from '../../stores/error-store';
 
 // ============================================================================
-// 开发者发版控制项 (Release Control Configuration)
+// Developer Release Control Configuration
 // ============================================================================
-// 当你需要发布新版本并控制是否提醒用户删除思考块缓存时，修改以下两个配置项：
+// When you need to release a new version and control whether to remind users to delete the think block cache, modify the following two configuration items:
 //
 // 1. SUGGESTION_DELETE_THINKING_STORE:
-//    - true:  开启本版本建议（若检测到老用户升级且有旧缓存，会弹窗提醒一次）
-//    - false: 关闭建议（任何用户升级都不会弹窗打扰）
+//    - true: Enable this version recommendation (if it is detected that an old user has upgraded and has an old cache, a pop-up window will pop up to remind you)
+//    - false: Turn off suggestions (any user upgrade will not be disturbed by pop-ups)
 export const SUGGESTION_DELETE_THINKING_STORE = false;
 
 // 2. SUGGESTION_TARGET_VERSION:
-//    - 建议清理的目标版本号 / 批次号（例如 "4.8.2"）。
-//    - 只要你将此版本号更新为当前发布的新版本，老用户升级后就会获得一次弹窗建议。
-//    - 用户无论点击【立即删除】还是【暂不删除】，本地均会记录已确认此版本，绝不重复弹窗。
+//    - Suggested target version number/batch number for cleanup (e.g. "4.8.2").
+//    - As long as you update this version number to the currently released new version, old users will get a pop-up suggestion after upgrading.
+//    - Regardless of whether the user clicks [Delete Now] or [Don’t Delete Now], the confirmed version will be recorded locally and pop-ups will never pop up again.
 export const SUGGESTION_TARGET_VERSION = '4.8.1';
 
 export const SuggestionDeleteThinkingModal: React.FC = () => {
@@ -35,23 +35,23 @@ export const SuggestionDeleteThinkingModal: React.FC = () => {
     const checkSuggestion = async () => {
       checkedRef.current = true;
 
-      // 1. 若开发者在本版本未开启建议删除，直接退出
+      // 1. If the developer has not enabled this version, it is recommended to delete it and exit directly.
       if (!SUGGESTION_DELETE_THINKING_STORE) {
         return;
       }
 
-      // 2. 若用户在此版本已经做出过选择（已清理或已取消），永久不再弹窗骚扰
+      // 2. If the user has already made a choice in this version (cleaned or canceled), there will be no more pop-up harassment permanently.
       if (config.dismissed_thinking_cleanup_version === SUGGESTION_TARGET_VERSION) {
         return;
       }
 
-      // 3. 检查当前 SQLite 数据库中是否存在历史思考块记录
+      // 3. Check whether there is a historical thinking block record in the current SQLite database
       try {
         const res = await request<number | { count?: number }>('get_thinking_store_count');
         const count = typeof res === 'number' ? res : res?.count ?? 0;
 
         if (count === 0) {
-          // 纯新安装用户或当前无旧思考块记录，静默标记为当前版本已对齐，避免弹窗打扰新用户
+          // For new installation users or if there is currently no old thinking block record, the current version is silently marked as aligned to avoid pop-ups disturbing new users.
           await saveConfig(
             {
               ...config,
@@ -64,7 +64,7 @@ export const SuggestionDeleteThinkingModal: React.FC = () => {
           return;
         }
 
-        // 老用户且本地存在历史旧数据，延迟展示弹窗
+        // For old users and old historical data exists locally, the pop-up window will be displayed with delay.
         setTimeout(() => {
           setIsOpen(true);
         }, 1200);
@@ -113,7 +113,7 @@ export const SuggestionDeleteThinkingModal: React.FC = () => {
   const handleCancel = async () => {
     if (!config) return;
     try {
-      // 写入建议为 false，并记录用户已确认该版本，下次启动绝不再弹窗
+      // Write the suggestion as false, and record that the user has confirmed this version, and the window will never pop up next time it is started.
       await saveConfig(
         {
           ...config,

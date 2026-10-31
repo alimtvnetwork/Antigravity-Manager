@@ -22,7 +22,10 @@ use tracing::{debug, error, info, warn};
 mod handle_generate;
 mod handle_generate_error;
 mod handle_list_models;
+#[path = "gemini/part_envelope_validator.rs"]
+pub mod part_envelope_validator;
 mod response_has_inline_image_data;
+pub mod system_sanitizer;
 
 pub use handle_generate::handle_generate;
 pub(crate) use handle_generate_error::handle_generate_error;
@@ -30,9 +33,11 @@ pub use handle_list_models::execute_count_tokens;
 pub use handle_list_models::handle_count_tokens;
 pub use handle_list_models::handle_get_model;
 pub use handle_list_models::handle_list_models;
+pub use part_envelope_validator::*;
 pub(crate) use response_has_inline_image_data::handle_generate_success;
 #[cfg(test)]
 pub(crate) use response_has_inline_image_data::image_success_tests;
 pub(crate) use response_has_inline_image_data::response_has_inline_image_data;
 pub(crate) use response_has_inline_image_data::ErrorOutcome;
 pub(crate) use response_has_inline_image_data::HandleSuccessOutcome;
+pub use system_sanitizer::*;

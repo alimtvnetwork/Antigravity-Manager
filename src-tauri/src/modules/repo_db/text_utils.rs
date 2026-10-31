@@ -5,7 +5,59 @@ use rusqlite::Connection;
 use std::fs;
 use std::path::Path;
 
-/// Extract clean prompt text by stripping <USER_REQUEST> / <ADDITIONAL_METADATA> tags if present
+/// Strip unnecessary internal ID wrappers (e.g. 'Id: ...', 'ID: ...', '[Id: ...]')
+pub fn strip_internal_id_wrappers(raw: &str) -> String {
+    let mut text = raw.trim();
+    let mut changed = true;
+    while changed {
+        changed = false;
+        let trimmed = text.trim_start();
+
+        let lower = trimmed.to_lowercase();
+        if lower.starts_with("id:")
+            || lower.starts_with("id :")
+            || lower.starts_with("prompt_id:")
+            || lower.starts_with("prompt id:")
+            || lower.starts_with("session_id:")
+            || lower.starts_with("session id:")
+            || lower.starts_with("traceability id:")
+        {
+            if let Some(colon_pos) = trimmed.find(':') {
+                let rest = trimmed[colon_pos + 1..].trim_start();
+                if let Some(newline_pos) = rest.find('\n') {
+                    text = rest[newline_pos + 1..].trim();
+                    changed = true;
+                    continue;
+                } else {
+                    let parts: Vec<&str> = rest.splitn(2, char::is_whitespace).collect();
+                    if parts.len() == 2 && !parts[1].trim().is_empty() {
+                        text = parts[1].trim();
+                        changed = true;
+                        continue;
+                    }
+                }
+            }
+        } else if trimmed.starts_with('[') {
+            if let Some(close_bracket) = trimmed.find(']') {
+                let bracket_content = trimmed[1..close_bracket].trim().to_lowercase();
+                if bracket_content.starts_with("id:")
+                    || bracket_content.starts_with("id :")
+                    || bracket_content.starts_with("prompt_id:")
+                    || bracket_content.starts_with("ref:")
+                {
+                    text = trimmed[close_bracket + 1..].trim();
+                    changed = true;
+                    continue;
+                }
+            }
+        }
+    }
+    text.trim().to_string()
+}
+
+/// Extract clean prompt text by stripping <USER_REQUEST> / <ADDITIONAL_METADATA> tags if present.
+/// If stripping XML tags results in an empty string, falls back to returning the original trimmed prompt.
+/// Attached markdown images (![...](...)) present anywhere in `raw` are preserved.
 pub fn extract_clean_user_prompt(raw: &str) -> String {
     let mut text = raw.trim();
     if let Some(start) = text.find("<USER_REQUEST>") {
@@ -22,7 +74,34 @@ pub fn extract_clean_user_prompt(raw: &str) -> String {
     if let Some(end) = text.find("<CONTEXT_SUMMARY>") {
         text = &text[..end];
     }
-    text.trim().to_string()
+    let cleaned = strip_internal_id_wrappers(text.trim());
+    let mut result = if cleaned.trim().is_empty() && !raw.trim().is_empty() {
+        raw.trim().to_string()
+    } else {
+        cleaned
+    };
+
+    // Preserve any markdown images in raw that were placed outside <USER_REQUEST>
+    let mut cursor = raw;
+    while let Some(img_start) = cursor.find("![") {
+        let after_start = &cursor[img_start..];
+        if let Some(open_paren) = after_start.find("](") {
+            if let Some(close_paren) = after_start[open_paren + 2..].find(')') {
+                let full_img = &after_start[..open_paren + 2 + close_paren + 1];
+                if !result.contains(full_img) {
+                    if !result.is_empty() {
+                        result.push_str("\n\n");
+                    }
+                    result.push_str(full_img);
+                }
+                cursor = &after_start[open_paren + 2 + close_paren + 1..];
+                continue;
+            }
+        }
+        cursor = &after_start[2..];
+    }
+
+    result
 }
 
 /// Extract smart, readable summary of a prompt for display in CLI and Telegram.
@@ -53,17 +132,24 @@ pub fn extract_smart_prompt_summary(raw: &str, max_len: usize) -> String {
             continue;
         }
 
-        // Check if line is a markdown header (# Title), horizontal rule (---, ***), or blockquote (> ...)
-        if trimmed.starts_with('#')
-            || trimmed.starts_with('>')
-            || trimmed.starts_with("---")
-            || trimmed.starts_with("***")
+        // Strip leading markdown header (# Title) glyphs without discarding the title line
+        let unheadered = if trimmed.starts_with('#') {
+            trimmed.trim_start_matches('#').trim()
+        } else {
+            trimmed
+        };
+
+        // Skip horizontal rules (---, ***), blockquotes (> ...), or empty lines after header strip
+        if unheadered.is_empty()
+            || unheadered.starts_with('>')
+            || unheadered.starts_with("---")
+            || unheadered.starts_with("***")
         {
             continue;
         }
 
         // Check for common prompt preamble / telemetry boilerplates
-        let lower = trimmed.to_lowercase();
+        let lower = unheadered.to_lowercase();
         if lower.starts_with("prompt version:")
             || lower.starts_with("synchronization:")
             || lower.starts_with("top-instruction priority mandate")
@@ -79,7 +165,7 @@ pub fn extract_smart_prompt_summary(raw: &str, max_len: usize) -> String {
             continue;
         }
 
-        substantive_lines.push(trimmed);
+        substantive_lines.push(unheadered);
     }
 
     let candidate = if !substantive_lines.is_empty() {
@@ -235,6 +321,157 @@ pub fn format_friendly_workspace_label(
     label
 }
 
+/// Extension trait adding fluent string inspection methods (mirroring .NET / C# StringExtensions).
+///
+/// Enables idiomatic, affirmative, and declarative pattern matching without chained `||` expressions.
+pub trait StrExt {
+    /// Returns true if `self` contains any of the provided candidate substrings.
+    fn has_any_word(&self, words: &[&str]) -> bool;
+
+    /// Case-insensitive check: returns true if `self` contains any of the candidate substrings.
+    fn has_any_word_ignore_case(&self, words: &[&str]) -> bool;
+
+    /// Returns true if `self` starts with any of the provided prefixes.
+    fn starts_with_any(&self, prefixes: &[&str]) -> bool;
+
+    /// Case-insensitive check: returns true if `self` starts with any of the provided prefixes.
+    fn starts_with_any_ignore_case(&self, prefixes: &[&str]) -> bool;
+
+    /// Returns true if `self` ends with any of the provided suffixes.
+    fn ends_with_any(&self, suffixes: &[&str]) -> bool;
+
+    /// Returns true if `self` exactly equals any of the provided candidate strings.
+    fn equals_any(&self, candidates: &[&str]) -> bool;
+
+    /// Case-insensitive equality: returns true if `self` equals any of the candidates (ASCII).
+    fn equals_any_ignore_case(&self, candidates: &[&str]) -> bool;
+}
+
+impl StrExt for str {
+    #[inline]
+    fn has_any_word(&self, words: &[&str]) -> bool {
+        words.iter().any(|&w| self.contains(w))
+    }
+
+    #[inline]
+    fn has_any_word_ignore_case(&self, words: &[&str]) -> bool {
+        let lower = self.to_ascii_lowercase();
+        words.iter().any(|&w| {
+            if w.chars()
+                .all(|c| c.is_ascii_lowercase() || !c.is_ascii_alphabetic())
+            {
+                lower.contains(w)
+            } else {
+                lower.contains(&w.to_ascii_lowercase())
+            }
+        })
+    }
+
+    #[inline]
+    fn starts_with_any(&self, prefixes: &[&str]) -> bool {
+        prefixes.iter().any(|&p| self.starts_with(p))
+    }
+
+    #[inline]
+    fn starts_with_any_ignore_case(&self, prefixes: &[&str]) -> bool {
+        let lower = self.to_ascii_lowercase();
+        prefixes.iter().any(|&p| {
+            if p.chars()
+                .all(|c| c.is_ascii_lowercase() || !c.is_ascii_alphabetic())
+            {
+                lower.starts_with(p)
+            } else {
+                lower.starts_with(&p.to_ascii_lowercase())
+            }
+        })
+    }
+
+    #[inline]
+    fn ends_with_any(&self, suffixes: &[&str]) -> bool {
+        suffixes.iter().any(|&s| self.ends_with(s))
+    }
+
+    #[inline]
+    fn equals_any(&self, candidates: &[&str]) -> bool {
+        candidates.iter().any(|&c| self == c)
+    }
+
+    #[inline]
+    fn equals_any_ignore_case(&self, candidates: &[&str]) -> bool {
+        candidates.iter().any(|&c| self.eq_ignore_ascii_case(c))
+    }
+}
+
+/// Retrieve the configured maximum words limit for prompt previews (clamped between 100 and 200, default 100).
+pub fn get_configured_prompt_preview_word_limit() -> usize {
+    crate::modules::config::load_app_config()
+        .map(|cfg| cfg.prompt_preview_max_words.clamp(100, 200))
+        .unwrap_or(100)
+}
+
+/// Truncate text to at most `limit` words while preserving paragraph structure (`\n\n`) and line breaks.
+/// Appends trailing `" ..."` if the total word count exceeds `limit`.
+/// Returns `(truncated_text, total_word_count)`.
+pub fn truncate_words_bounded(text: &str, limit: usize) -> (String, usize) {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return (String::new(), 0);
+    }
+
+    let total_words = trimmed.split_whitespace().count();
+    let max_words = limit.max(1);
+
+    if total_words <= max_words {
+        return (trimmed.to_string(), total_words);
+    }
+
+    let mut selected_lines: Vec<String> = Vec::new();
+    let mut words_collected = 0;
+    let mut reached_limit = false;
+
+    for line in trimmed.lines() {
+        let t = line.trim();
+        let line_words: Vec<&str> = t.split_whitespace().collect();
+        let count = line_words.len();
+
+        if !reached_limit {
+            if count == 0 {
+                // Preserve blank line between paragraphs
+                if !selected_lines.is_empty()
+                    && !selected_lines.last().map(|s| s.is_empty()).unwrap_or(false)
+                {
+                    selected_lines.push(String::new());
+                }
+            } else if words_collected + count <= max_words {
+                selected_lines.push(line.to_string());
+                words_collected += count;
+                if words_collected == max_words {
+                    reached_limit = true;
+                    if let Some(last) = selected_lines.last_mut() {
+                        *last = format!("{} ...", last);
+                    }
+                }
+            } else {
+                let remaining = max_words.saturating_sub(words_collected);
+                if remaining > 0 {
+                    let truncated_line = line_words[..remaining].join(" ");
+                    selected_lines.push(format!("{} ...", truncated_line));
+                } else if let Some(last) = selected_lines.last_mut() {
+                    *last = format!("{} ...", last);
+                }
+                words_collected = max_words;
+                reached_limit = true;
+            }
+        }
+    }
+
+    let mut preview = selected_lines.join("\n").trim().to_string();
+    if !preview.ends_with(" ...") && !preview.ends_with("...") {
+        preview.push_str(" ...");
+    }
+    (preview, total_words)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -247,6 +484,15 @@ mod tests {
 
         let simple = "Simple task prompt";
         assert_eq!(extract_clean_user_prompt(simple), "Simple task prompt");
+
+        let stripped_empty = "<ADDITIONAL_METADATA>only meta</ADDITIONAL_METADATA>";
+        assert_eq!(extract_clean_user_prompt(stripped_empty), stripped_empty);
+
+        let with_img =
+            "<USER_REQUEST>\nFix the button\n</USER_REQUEST>\n\n![Attached Image 1](C:/test.png)";
+        let clean_img = extract_clean_user_prompt(with_img);
+        assert!(clean_img.contains("Fix the button"));
+        assert!(clean_img.contains("![Attached Image 1](C:/test.png)"));
     }
 
     #[test]
@@ -267,5 +513,64 @@ mod tests {
             "d:/work/Antigravity-Manager",
         );
         assert!(label.starts_with("Antigravity-Manager"));
+    }
+
+    #[test]
+    fn test_str_ext_has_any_word() {
+        let sample = "You are an autonomous subagent working on tasks";
+        assert!(sample.has_any_word(&["subagent", "lead"]));
+        assert!(!sample.has_any_word(&["supervisor", "director"]));
+    }
+
+    #[test]
+    fn test_str_ext_has_any_word_ignore_case() {
+        let sample = "You Are An Autonomous SUBAGENT Working On Tasks";
+        assert!(sample.has_any_word_ignore_case(&["subagent", "lead"]));
+        assert!(sample.has_any_word_ignore_case(&["WORKER", "AUTONOMOUS"]));
+        assert!(!sample.has_any_word_ignore_case(&["supervisor", "director"]));
+    }
+
+    #[test]
+    fn test_str_ext_starts_with_any() {
+        let title = "system: initialize memory";
+        assert!(title.starts_with_any(&["system:", "[system]"]));
+        assert!(!title.starts_with_any(&["user:", "bot:"]));
+
+        let title_upper = "SYSTEM: INITIALIZE MEMORY";
+        assert!(title_upper.starts_with_any_ignore_case(&["system:", "[system]"]));
+        assert!(!title_upper.starts_with_any_ignore_case(&["user:", "bot:"]));
+    }
+
+    #[test]
+    fn test_str_ext_equals_any() {
+        let inst = "default";
+        assert!(inst.equals_any(&["default", "__default__", ""]));
+        assert!(!inst.equals_any(&["custom-1", "custom-2"]));
+
+        let inst_upper = "DEFAULT";
+        assert!(inst_upper.equals_any_ignore_case(&["default", "__default__"]));
+    }
+
+    #[test]
+    fn test_truncate_words_bounded_within_limit() {
+        let text = "Paragraph one with some text.\n\nParagraph two here.";
+        let (out, count) = truncate_words_bounded(text, 100);
+        assert_eq!(count, 8);
+        assert_eq!(out, text);
+    }
+
+    #[test]
+    fn test_truncate_words_bounded_exceeds_limit() {
+        let text = "Line 1 has four words.\n\nLine 2 has four words.";
+        let (out, count) = truncate_words_bounded(text, 6);
+        assert_eq!(count, 10);
+        assert!(out.ends_with(" ..."));
+        assert!(out.contains("\n\n"));
+    }
+
+    #[test]
+    fn test_get_configured_prompt_preview_word_limit() {
+        let limit = get_configured_prompt_preview_word_limit();
+        assert!((100..=200).contains(&limit));
     }
 }

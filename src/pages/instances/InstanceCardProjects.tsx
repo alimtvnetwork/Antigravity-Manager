@@ -1,8 +1,23 @@
 import { Folder } from 'lucide-react';
 import type { InstanceStatus } from '../../services/instanceService';
 import type { AgmProjectTreeNode } from '../../components/instances/PromptTreeViewModal';
-import { isNodeOwnedByInstance } from './instancePageUtils';
+import { isNodeOwnedByInstance, isConversationGenuinelyRunning, isConversationOwnedByInstance } from './instancePageUtils';
 import type { InstancePageApi } from './instancePageTypes';
+
+export function isProjectRunningForInstance(proj: AgmProjectTreeNode, inst: InstanceStatus): boolean {
+    const isInstanceRunning = Boolean(inst.is_running);
+    if (!isInstanceRunning) {
+        return false;
+    }
+    const isProjectRunning = Boolean(proj.is_running);
+    if (!isProjectRunning) {
+        return false;
+    }
+    const conversations = proj.conversations || [];
+    return conversations.some((c) =>
+        isConversationGenuinelyRunning(c, inst.config, proj.instance_seq_num)
+    );
+}
 
 export function InstanceCardProjects({ api, inst }: { api: InstancePageApi; inst: InstanceStatus }) {
     const { config, projectTreeNodes, setPromptTreeInstance } = api;
@@ -12,10 +27,11 @@ export function InstanceCardProjects({ api, inst }: { api: InstancePageApi; inst
     );
 
     const sortedProjects = [...instanceProjects].sort((a, b) => {
-        const isARunning = Boolean(inst.is_running) && Boolean(a.is_running);
-        const isBRunning = Boolean(inst.is_running) && Boolean(b.is_running);
-        if (isARunning && !isBRunning) return -1;
-        if (isBRunning && !isARunning) return 1;
+        const isARunning = isProjectRunningForInstance(a, inst);
+        const isBRunning = isProjectRunningForInstance(b, inst);
+        if (isARunning !== isBRunning) {
+            return isARunning ? -1 : 1;
+        }
         const aLatest = Math.max(0, ...(a.conversations || []).map((c) => new Date(c.last_modified).getTime() || 0));
         const bLatest = Math.max(0, ...(b.conversations || []).map((c) => new Date(c.last_modified).getTime() || 0));
         if (bLatest !== aLatest) return bLatest - aLatest;
@@ -40,9 +56,12 @@ export function InstanceCardProjects({ api, inst }: { api: InstancePageApi; inst
             {displayedProjects.length > 0 ? (
                 <div className="space-y-1">
                     {displayedProjects.map((proj) => {
-                        const isProjRunning = Boolean(inst.is_running) && Boolean(proj.is_running);
+                        const isProjRunning = isProjectRunningForInstance(proj, inst);
+                        const instanceConvs = (proj.conversations || []).filter((c) =>
+                            isConversationOwnedByInstance(c.instance_id, inst.config, c.instance_seq_num ?? proj.instance_seq_num)
+                        );
                         const totalTurns =
-                            proj.conversations?.reduce((sum, c) => sum + Math.max(c.step_count || 1, 1), 0) || 0;
+                            instanceConvs.reduce((sum, c) => sum + Math.max(c.prompts?.length || 1, 1), 0);
 
                         return (
                             <div
@@ -70,8 +89,8 @@ export function InstanceCardProjects({ api, inst }: { api: InstancePageApi; inst
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
                                     {isProjRunning && (
-                                        <span className="px-1 py-0.2 rounded-[4px] text-[9px] font-bold bg-[#1af18d]/15 text-emerald-700 dark:text-[#1af18d] border border-[#1af18d]/30 flex items-center gap-0.5 shadow-2xs">
-                                            <span className="w-1 h-1 rounded-full bg-[#1af18d] shadow-[0_0_4px_rgba(26,241,141,0.9)] animate-pulse" />
+                                        <span className="px-1 py-0.2 rounded-[4px] text-[9px] font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 flex items-center gap-0.5 shadow-2xs">
+                                            <span className="w-1 h-1 rounded-full bg-emerald-500 shadow-[0_0_2px_rgba(16,185,129,0.5)]" />
                                             RUNNING
                                         </span>
                                     )}

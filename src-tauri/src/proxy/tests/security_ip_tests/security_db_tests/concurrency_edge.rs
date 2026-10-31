@@ -1,7 +1,7 @@
 use super::*;
 
 // ============================================================================
-// 测试类别 9: 并发安全性
+// Test Category 9: Concurrency Safety
 // ============================================================================
 
 #[test]
@@ -13,7 +13,7 @@ fn test_concurrent_access() {
     let handles: Vec<_> = (0..10)
         .map(|i| {
             thread::spawn(move || {
-                // 每个线程添加不同的 IP
+                // Add different IP per thread
                 let ip = format!("concurrent.test.{}", i);
                 // Justification: best-effort call; failure logged without changing control flow
                 crate::error::record_ignored(
@@ -21,7 +21,7 @@ fn test_concurrent_access() {
                     "add_to_blacklist",
                 );
 
-                // 验证自己添加的 IP
+                // Verify the IP you added
                 is_ip_in_blacklist(&ip).unwrap_or(false)
             })
         })
@@ -29,7 +29,7 @@ fn test_concurrent_access() {
 
     let results: Vec<bool> = handles.into_iter().map(|h| h.join().unwrap()).collect();
 
-    // 所有线程都应该成功
+    // All threads should succeed
     assert!(
         results.iter().all(|&r| r),
         "All concurrent adds should succeed"
@@ -39,18 +39,18 @@ fn test_concurrent_access() {
 }
 
 // ============================================================================
-// 测试类别 10: 边界情况和错误处理
+// Test Category 10: Edge Cases and Error Handling
 // ============================================================================
 
 #[test]
 fn test_duplicate_blacklist_entry() {
     let _lock = setup_test();
 
-    // 第一次添加应该成功
+    // The first addition should be successful
     let result1 = add_to_blacklist("duplicate.test.ip", Some("First"), None, "test");
     assert!(result1.is_ok());
 
-    // 第二次添加相同 IP 应该失败 (UNIQUE constraint)
+    // Adding the same IP for the second time should fail (UNIQUE constraint)
     let result2 = add_to_blacklist("duplicate.test.ip", Some("Second"), None, "test");
     assert!(result2.is_err(), "Duplicate IP should fail");
 
@@ -61,10 +61,10 @@ fn test_duplicate_blacklist_entry() {
 fn test_empty_ip_pattern() {
     let _lock = setup_test();
 
-    // 空 IP 模式应该仍然可以添加 (取决于业务需求)
-    // 这里只测试不会 panic
+    // Empty IP patterns should still be added (depending on business requirements)
+    // Here we only test without panic
     let result = add_to_blacklist("", Some("Empty IP"), None, "test");
-    // 结果可能成功或失败，但不应该 panic
+    // The result may succeed or fail, but there should be no panic
     // Justification: test asserts no-panic only; either outcome is acceptable, failure is logged.
     crate::error::record_ignored(result, "add_to_blacklist empty ip");
 
@@ -75,7 +75,7 @@ fn test_empty_ip_pattern() {
 fn test_special_characters_in_reason() {
     let _lock = setup_test();
 
-    // 测试包含特殊字符的原因
+    // Reason why test contains special characters
     let reason = "Test with 'quotes' and \"double quotes\" and emoji 🚫";
     let result = add_to_blacklist("special.char.test", Some(reason), None, "test");
     assert!(result.is_ok());
@@ -92,14 +92,14 @@ fn test_special_characters_in_reason() {
 fn test_hit_count_increment() {
     let _lock = setup_test();
 
-    // 添加一个黑名单条目
+    // Add a blacklist entry
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(
         add_to_blacklist("hit.count.test", Some("Count test"), None, "test"),
         "add_to_blacklist",
     );
 
-    // 多次查询应该增加 hit_count
+    // Multiple queries should increase hit_count
     for _ in 0..5 {
         // Justification: best-effort call; failure logged without changing control flow
         crate::error::record_ignored(
@@ -108,7 +108,7 @@ fn test_hit_count_increment() {
         );
     }
 
-    // 检查 hit_count
+    // Check hit_count
     let blacklist = get_blacklist().unwrap();
     let entry = blacklist.iter().find(|e| e.ip_pattern == "hit.count.test");
     assert!(entry.is_some());

@@ -11,12 +11,16 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
     AlertTriangle,
+    ArrowRight,
     Bot,
     Check,
     ChevronDown,
     Copy,
     FileJson,
     FileText,
+    Layers,
+    Mail,
+    MousePointerClick,
     RefreshCw,
     Terminal,
     Trash2,
@@ -28,6 +32,7 @@ import { useErrorStore } from '../../stores/error-store';
 import { copyToClipboard } from '../../utils/clipboard';
 import { cn } from '../../utils/cn';
 import { showToast } from '../common/ToastContainer';
+import { formatTime24 } from '../../utils/date';
 import { useAuditStore, type AuditActorFilter, type AuditResultFilter } from './audit-store';
 import type { AuditActor, AuditEntry, AuditStackFrame } from './audit-types';
 
@@ -93,16 +98,27 @@ function lastTwoCallerFrames(
     stackTrace: unknown,
 ): CallerFrame[] {
     const stored = params.stack_frames ?? params.stackFrames;
-    if (Array.isArray(stored)) {
-        return stored.map(frameFromUnknown).filter((frame): frame is CallerFrame => frame !== null).slice(0, 2);
+    if (Array.isArray(stored) && stored.length > 0) {
+        const parsed = stored.map(frameFromUnknown).filter((frame): frame is CallerFrame => frame !== null).slice(0, 2);
+        if (parsed.length > 0) return parsed;
     }
-    return framesFromStackText(String(stackTrace || ''));
+    const fromText = framesFromStackText(String(stackTrace || ''));
+    if (fromText.length > 0) return fromText;
+    const caller = String(params.callerInfo || params.caller || (params.metadata as Record<string, unknown> | undefined)?.callerInfo || '').trim();
+    if (caller) {
+        const parts = caller.split(/\s+/);
+        if (parts.length >= 2) {
+            return [{ function: parts[0], location: parts.slice(1).join(' ') }];
+        }
+        return [{ function: caller, location: 'caller' }];
+    }
+    return [];
 }
 
 function formatTimestamp(timestamp: AuditEntry['timestamp']): string {
     const ms = typeof timestamp === 'number' ? timestamp : Date.parse(timestamp);
     if (Number.isNaN(ms)) return String(timestamp);
-    return new Date(ms).toLocaleTimeString();
+    return formatTime24(ms, { withSeconds: true });
 }
 
 function ActorBadge({ actor }: { actor: AuditActor }) {
@@ -122,19 +138,184 @@ function ActorBadge({ actor }: { actor: AuditActor }) {
 }
 
 const METHOD_LABELS: Record<string, string> = {
-    send_prompt_now: 'Send prompt now',
-    enqueue_prompt: 'Enqueue prompt',
+    send_prompt_now: 'Send Prompt Now (Immediate Dispatch)',
+    enqueue_prompt: 'Enqueue Prompt (FIFO Queue)',
+    fast_forward_instance: 'Fast-Forward Profile Rotation',
+    switch_account_to_instance: 'Switch Profile to Instance',
+    'auto_switcher.post_switch_resume.scheduled': 'Schedule Prompt Restore Timer (10s)',
+    'auto_switcher.post_switch_resume.fired': 'Execute Prompt Restore Rehydration',
+    'auto_switcher.post_switch_resume.cancelled': 'Cancel Prompt Restore Settling Timer',
+    'auto_switcher.post_switch_resume.rearmed': 'Re-Arm Persisted Prompt Restore',
+    'auto_switcher.post_switch_resume.force_dispatched': 'Force Dispatch Prompt Restore',
+    'instance-row-prompts-btn': 'Prompts & History',
+    'instance-row-switch-btn': 'Switch Profile',
+    'instance-row-stop-btn': 'Stop Instance',
+    'instance-row-restart-btn': 'Restart Instance',
+    'instance-row-more-menu-btn': 'More Options Menu',
+    'instance-menu-delete-cache': 'Delete Cache & Re-inject',
+    'instance-menu-fast-forward': 'Fast Forward Shortcut',
+    'instance-menu-open-folder': 'Open Data Directory',
+    'instance-menu-copy-token': 'Copy Auth Token',
+    'prompt-tree-refresh-btn': 'Refresh Prompt Tree',
+    'prompt-tree-copy-all-btn': 'Copy All With Images',
+    'prompt-tree-send-now-btn': 'Send Prompt Now',
+    'prompt-tree-enqueue-btn': 'Enqueue Prompt',
+    'prompt-tree-instructions-tab': 'Prompt Instructions View',
+    'prompt-tree-results-tab': 'AI Results & Outputs View',
+    'quota-progress-bar': 'Quota Progress Bar',
+    'quota-progress-track': 'Quota Progress Track',
+    'quota-milestone-node': 'Quota Milestone Node',
 };
 
-function humanMethodLabel(methodName: string): string {
-    return METHOD_LABELS[methodName] ?? methodName;
+function humanMethodLabel(methodName: string, params: Record<string, unknown> = {}): string {
+    if (typeof params.cleanMethodLabel === 'string' && params.cleanMethodLabel) {
+        return params.cleanMethodLabel;
+    }
+    const uiName = params.uiName;
+    if (typeof uiName === 'string' && uiName) {
+        if (METHOD_LABELS[uiName]) return METHOD_LABELS[uiName];
+        return uiName
+            .replace(/-(btn|tab|menu|card|item|view)$/, '')
+            .replace(/-/g, ' ')
+            .replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+    if (METHOD_LABELS[methodName]) {
+        return METHOD_LABELS[methodName];
+    }
+    if (methodName.startsWith('auto_switcher.post_switch_resume.')) {
+        const stage = methodName.replace('auto_switcher.post_switch_resume.', '');
+        const map: Record<string, string> = {
+            scheduled: 'Schedule Prompt Restore Timer (10s)',
+            fired: 'Execute Prompt Restore Rehydration',
+            cancelled: 'Cancel Prompt Restore Settling Timer',
+            rearmed: 'Re-Arm Persisted Prompt Restore',
+            force_dispatched: 'Force Dispatch Prompt Restore',
+        };
+        if (map[stage]) return map[stage];
+        const formatted = stage.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        return `Post-Switch Settling Timer: ${formatted}`;
+    }
+    if (methodName.startsWith('auto_switcher.')) {
+        const action = methodName.replace('auto_switcher.', '').replace(/[._]/g, ' ');
+        return `AutoSwitcher: ${action.replace(/\b\w/g, (c) => c.toUpperCase())}`;
+    }
+    if (methodName.startsWith('scroll:')) {
+        const route = methodName.slice(7) || '/';
+        return `Scroll: ${route} Page`;
+    }
+    if (methodName.startsWith('click:')) {
+        const sub = methodName.slice(6);
+        if (METHOD_LABELS[sub]) return `Click: ${METHOD_LABELS[sub]}`;
+
+        // Match structured targets
+        const btnMatch = sub.match(/^button\("(.+)"\)$/);
+        if (btnMatch) return `Click: "${btnMatch[1]}" Button`;
+
+        const instMatch = sub.match(/^instance-card\("(.+)"\)$/);
+        if (instMatch) return `Click: Instance "${instMatch[1]}"`;
+
+        const projMatch = sub.match(/^project\("(.+)"\)$/);
+        if (projMatch) return `Click: Project "${projMatch[1]}"`;
+
+        const quoteMatch = sub.match(/^"(.+)"$/);
+        if (quoteMatch) return `Click: "${quoteMatch[1]}"`;
+
+        // Clean up legacy class names like div.grid, div.group, span.truncate, Button.P 1.5
+        if (sub === 'div.grid' || sub === 'instances-grid-area') {
+            return 'Click: Instances Grid Area';
+        }
+        if (sub === 'div.group') {
+            const containerName = typeof params.container === 'string' ? params.container : 'Instance Card';
+            const textSnippet = typeof params.textSnippet === 'string' ? `"${params.textSnippet}"` : '';
+            return `Click: ${containerName} ${textSnippet}`.trim();
+        }
+        if (sub === 'span.truncate') {
+            const textSnippet = typeof params.textSnippet === 'string' ? params.textSnippet : '';
+            return textSnippet ? `Click: "${textSnippet}"` : 'Click: Label Item';
+        }
+        if (sub.toLowerCase().includes('button.p-') || sub === 'Button.P 1.5') {
+            const label = (params.title as string) || (params.ariaLabel as string) || (params.textSnippet as string) || 'Action Button';
+            return `Click: "${label}" Button`;
+        }
+
+        if (sub.includes('-')) {
+            const formatted = sub
+                .replace(/-(btn|tab|menu|card|item|view)$/, '')
+                .replace(/-/g, ' ')
+                .replace(/\b\w/g, (c) => c.toUpperCase());
+            return `Click: ${formatted}`;
+        }
+        return `Click: ${sub}`;
+    }
+    if (methodName.startsWith('input:')) {
+        const sub = methodName.slice(6);
+        return `Input: ${sub}`;
+    }
+    return methodName;
+}
+
+function resolveStepSummary(
+    entry: AuditEntry,
+    params: Record<string, unknown>,
+    methodLabel: string,
+    uiTarget: string
+): string {
+    if (typeof params.stepSummary === 'string' && params.stepSummary) {
+        return params.stepSummary;
+    }
+    const methodName = entry.methodName || entry.method_name || '';
+    const instanceId = String(params.instance_id || uiTarget.replace(/^instance:\/\//, '').split(/[ >|]/)[0] || '').trim();
+
+    if (methodName.startsWith('auto_switcher.post_switch_resume.')) {
+        const stage = String(params.stage || methodName.split('.').pop() || '');
+        const reason = String(params.reason || entry.message || 'superseded by a newer schedule');
+        switch (stage) {
+            case 'cancelled':
+                return `AutoSwitcher cancelled 10s prompt restore settling timer on instance "${instanceId || 'active'}": ${reason}`;
+            case 'scheduled':
+                return `AutoSwitcher scheduled 10s settling window and prompt restore on instance "${instanceId || 'active'}": ${reason}`;
+            case 'fired':
+                return `AutoSwitcher executed prompt restore rehydration on instance "${instanceId || 'active'}": ${reason}`;
+            case 'rearmed':
+                return `AutoSwitcher re-armed persisted prompt restore on instance "${instanceId || 'active'}" after restart: ${reason}`;
+            case 'force_dispatched':
+                return `AutoSwitcher force-dispatched immediate prompt restore on instance "${instanceId || 'active'}": ${reason}`;
+            default:
+                return `AutoSwitcher post-switch lifecycle stage "${stage}" on instance "${instanceId || 'active'}": ${reason}`;
+        }
+    }
+
+    if (methodName === 'fast_forward_instance') {
+        return `User executed Fast-Forward profile rotation on instance "${instanceId || 'active'}"`;
+    }
+
+    if (methodName === 'switch_account_to_instance') {
+        const accId = String(params.account_id || '');
+        return `User switched account "${accId}" to instance "${instanceId || 'active'}"`;
+    }
+
+    if (methodName === 'send_prompt_now') {
+        return `User dispatched immediate prompt to instance "${instanceId || 'active'}"`;
+    }
+
+    if (methodName === 'enqueue_prompt') {
+        return `User enqueued prompt for sequential FIFO queue processing on instance "${instanceId || 'active'}"`;
+    }
+
+    if (entry.trigger === 'programmatic' && entry.actor === 'system') {
+        const cleanedTarget = uiTarget.replace(/^instance:\/\//, 'Instance ').replace(/ > /, ' › ');
+        const reason = entry.message ? ` (${entry.message})` : '';
+        return `System Daemon executed ${methodLabel} on ${cleanedTarget}${reason}`;
+    }
+
+    return `${String(entry.actor).toUpperCase()} performed ${entry.trigger} on ${uiTarget}`;
 }
 
 function EntryRow({ entry }: { entry: AuditEntry }) {
     const [expanded, setExpanded] = useState(false);
     const params = useMemo(() => parseParams(entry.params), [entry.params]);
     const methodName = entry.methodName || entry.method_name || 'CLICK';
-    const methodLabel = humanMethodLabel(methodName);
+    const methodLabel = humanMethodLabel(methodName, params);
     const uiTarget = entry.uiTarget || entry.ui_target || '-';
 
     const stackTrace = params.stackTrace || params.stack || (params.metadata as Record<string, unknown> | undefined)?.stackTrace;
@@ -154,11 +335,11 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
                 </td>
                 <td className="px-2 py-1.5"><ActorBadge actor={entry.actor} /></td>
                 <td className="px-2 py-1.5">
-                    <span className="inline-block rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] text-slate-300">
+                    <span className="inline-block rounded bg-slate-700/60 px-1.5 py-0.5 text-[10px] text-slate-300 font-mono">
                         {entry.trigger}
                     </span>
                 </td>
-                <td className="px-2 py-1.5 text-[10px] text-slate-200 max-w-[220px] truncate" title={methodName}>
+                <td className="px-2 py-1.5 text-[10px] text-slate-200 max-w-[220px] truncate font-medium" title={methodName}>
                     {methodLabel}
                 </td>
                 <td className="px-2 py-1.5 font-mono text-[10px] text-slate-400 max-w-[260px] truncate" title={uiTarget}>
@@ -177,7 +358,206 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
             </tr>
             {expanded && (
                 <tr className="border-b border-slate-700/40 bg-slate-900/60">
-                    <td colSpan={7} className="px-3 py-3 space-y-2">
+                    <td colSpan={7} className="px-3 py-3 space-y-3">
+                        {/* 1. Step Performed & Execution Path Card */}
+                        <div className="rounded-xl border border-sky-500/30 bg-gradient-to-r from-sky-950/40 via-slate-900/60 to-purple-950/30 p-3.5 shadow-lg space-y-3">
+                            <div className="flex items-center justify-between gap-2 border-b border-sky-500/20 pb-2.5">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="p-1.5 rounded-lg bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                                        {entry.trigger === 'programmatic' || entry.actor === 'system' ? (
+                                            <Wrench className="w-4 h-4 text-amber-400" />
+                                        ) : entry.trigger === 'input' ? (
+                                            <Terminal className="w-4 h-4 text-sky-400" />
+                                        ) : (
+                                            <MousePointerClick className="w-4 h-4 text-sky-400" />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <span className="text-[10px] font-mono uppercase tracking-wider text-sky-400 font-bold block">
+                                            Step Performed
+                                        </span>
+                                        <h4 className="text-xs font-semibold text-slate-100">
+                                            {resolveStepSummary(entry, params, methodLabel, uiTarget)}
+                                        </h4>
+                                    </div>
+                                </div>
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-sky-500/15 text-sky-300 border border-sky-500/30 font-bold">
+                                    {entry.trigger.toUpperCase()}
+                                </span>
+                            </div>
+
+                            {/* Execution Step Path / Breadcrumb Trail */}
+                            <div>
+                                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+                                    <Layers className="w-3.5 h-3.5 text-sky-400" />
+                                    Interaction Execution Path
+                                </span>
+                                <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
+                                    {(Array.isArray(params.elementHierarchy) && params.elementHierarchy.length > 0
+                                        ? (params.elementHierarchy as string[])
+                                        : [
+                                              `Route: ${String(params.route || (uiTarget.startsWith('instance://') ? uiTarget.replace('instance://', '/instances?id=') : uiTarget?.split('|')[0]?.trim()) || '/instances')}`,
+                                              `Container: ${String(params.container || (uiTarget.startsWith('instance://') ? `Instance Card: ${uiTarget.replace('instance://', '').split(/[ >|]/)[0]}` : 'Workspace Area'))}`,
+                                              `Action: ${methodLabel}`,
+                                          ]
+                                    ).map((step, idx, arr) => (
+                                        <div key={idx} className="flex items-center gap-1.5">
+                                            <span className="px-2 py-1 rounded-md bg-slate-800/80 text-slate-200 border border-slate-700/60 text-[11px] shadow-2xs font-mono">
+                                                {step}
+                                            </span>
+                                            {idx < arr.length - 1 && (
+                                                <ArrowRight className="w-3 h-3 text-sky-400 shrink-0" />
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Contextual Target Properties Grid */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px] font-mono">
+                                <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800/80">
+                                    <span className="text-[9px] text-slate-500 block uppercase">Target Tag</span>
+                                    <span className="text-slate-200">
+                                        {String(params.tag || (entry.trigger === 'programmatic' ? 'System Daemon' : entry.trigger || 'unknown'))}
+                                    </span>
+                                </div>
+                                <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800/80">
+                                    <span className="text-[9px] text-slate-500 block uppercase">Label / Text</span>
+                                    <span
+                                        className="text-emerald-400 truncate block"
+                                        title={String(
+                                            params.textSnippet ||
+                                                params.text ||
+                                                params.title ||
+                                                params.ariaLabel ||
+                                                (params.stage ? `Stage: ${params.stage}` : '') ||
+                                                (entry.message ? `Reason: ${entry.message}` : '') ||
+                                                methodLabel
+                                        )}
+                                    >
+                                        {String(
+                                            params.textSnippet ||
+                                                params.text ||
+                                                params.title ||
+                                                params.ariaLabel ||
+                                                (params.stage ? `Stage: ${params.stage}` : '') ||
+                                                (entry.message ? `Reason: ${entry.message}` : '') ||
+                                                methodLabel
+                                        )}
+                                    </span>
+                                </div>
+                                <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800/80">
+                                    <span className="text-[9px] text-slate-500 block uppercase">Container / Card</span>
+                                    <span
+                                        className="text-cyan-300 truncate block"
+                                        title={String(
+                                            params.container ||
+                                                (uiTarget.startsWith('instance://')
+                                                    ? `Instance Card: ${uiTarget.replace('instance://', '').split(/[ >|]/)[0]}`
+                                                    : 'Workspace Area')
+                                        )}
+                                    >
+                                        {String(
+                                            params.container ||
+                                                (uiTarget.startsWith('instance://')
+                                                    ? `Instance Card: ${uiTarget.replace('instance://', '').split(/[ >|]/)[0]}`
+                                                    : 'Workspace Area')
+                                        )}
+                                    </span>
+                                </div>
+                                <div className="p-2 rounded-lg bg-slate-950/50 border border-slate-800/80">
+                                    <span className="text-[9px] text-slate-500 block uppercase">Route Target</span>
+                                    <span
+                                        className="text-sky-300 truncate block"
+                                        title={String(
+                                            params.route ||
+                                                (uiTarget.startsWith('instance://')
+                                                    ? uiTarget.replace('instance://', '/instances?id=')
+                                                    : uiTarget)
+                                        )}
+                                    >
+                                        {String(
+                                            params.route ||
+                                                (uiTarget.startsWith('instance://')
+                                                    ? uiTarget.replace('instance://', '/instances?id=')
+                                                    : uiTarget)
+                                        )}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 2. Email-Style Executive Briefing Box */}
+                        <div className="rounded-xl border border-sky-500/40 bg-gradient-to-br from-slate-900/95 via-sky-950/30 to-slate-900/95 p-3.5 shadow-xl space-y-3">
+                            <div className="flex items-center justify-between gap-2 border-b border-sky-500/20 pb-2">
+                                <div className="flex items-center gap-2 text-sky-300 font-bold text-xs uppercase tracking-wider">
+                                    <Mail className="w-4 h-4 text-sky-400" />
+                                    <span>Executive Event Briefing (Email Notice Format)</span>
+                                </div>
+                                <span
+                                    className={cn(
+                                        'px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border',
+                                        entry.result === 'ok'
+                                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                            : 'bg-red-500/15 text-red-300 border-red-500/30'
+                                    )}
+                                >
+                                    {entry.result === 'ok' ? '✓ STATUS: NORMAL / SUCCESS' : '✕ STATUS: ERROR'}
+                                </span>
+                            </div>
+
+                            {/* Email-Style Key-Value Attributes Table */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
+                                <div className="flex items-center gap-2 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                                    <span className="text-slate-400 font-sans font-medium min-w-[95px] shrink-0">🎯 Target Scope:</span>
+                                    <span className="text-sky-300 font-semibold truncate" title={String(params.instance_id || uiTarget)}>
+                                        {String(params.instance_id ? `Instance: ${params.instance_id}` : uiTarget)}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                                    <span className="text-slate-400 font-sans font-medium min-w-[95px] shrink-0">⚙️ Operation:</span>
+                                    <span className="text-slate-200 font-semibold truncate" title={methodLabel}>
+                                        {methodLabel}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                                    <span className="text-slate-400 font-sans font-medium min-w-[95px] shrink-0">💡 Rationale / Cause:</span>
+                                    <span className="text-amber-300 font-sans font-medium truncate" title={String(params.reason || entry.message || params.stage || 'Routine system dispatch')}>
+                                        {String(params.reason || entry.message || params.stage || 'Routine system dispatch')}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                                    <span className="text-slate-400 font-sans font-medium min-w-[95px] shrink-0">🛡️ Continuity:</span>
+                                    <span className="text-emerald-400 font-sans font-medium truncate" title="Strict FIFO Queue Monotonicity (created_at ASC, id ASC)">
+                                        Strict FIFO Queue Monotonicity Guaranteed
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Full Human Description (Like Email Content Body) */}
+                            <div className="bg-slate-950/80 p-3 rounded-lg border border-sky-500/20 text-xs text-slate-200 leading-relaxed font-sans">
+                                <p>
+                                    {typeof params.action_description === 'string'
+                                        ? params.action_description
+                                        : typeof (params.executive_briefing as Record<string, unknown> | undefined)?.operation === 'string'
+                                        ? String((params.executive_briefing as Record<string, unknown>).operation)
+                                        : `${String(entry.actor).toUpperCase()} executed action "${methodLabel}" on ${uiTarget}. ${entry.message ? `Details: ${entry.message}.` : 'Completed with verified queue stability.'}`}
+                                </p>
+                            </div>
+                        </div>
+
+                        {Boolean(params.machine_name || params.node_alias || params.agm_version) && (
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-cyan-300 bg-cyan-950/40 px-2.5 py-1.5 rounded-md border border-cyan-500/20">
+                                <Terminal className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                <span className="font-semibold text-cyan-400">Node Telemetry:</span>
+                                {Boolean(params.machine_name) && <span>🖥️ {String(params.machine_name)}</span>}
+                                {Boolean(params.local_ip) && <span className="text-slate-400">({String(params.local_ip)})</span>}
+                                {Boolean(params.node_alias) && <span>🏷️ {String(params.node_alias)}</span>}
+                                {Boolean(params.agm_version) && <span className="text-slate-400">📦 {String(params.agm_version)}</span>}
+                                {Boolean(params.switch_mode) && <span className="text-emerald-400 uppercase font-bold">[{String(params.switch_mode)}]</span>}
+                                {Boolean(params.condition) && <span className="text-amber-400 font-semibold">{String(params.condition)}</span>}
+                            </div>
+                        )}
                         {Boolean(callerInfo) && (
                             <div className="flex items-center gap-2 text-[11px] font-mono text-sky-300 bg-sky-950/40 px-2.5 py-1.5 rounded-md border border-sky-500/20">
                                 <Terminal className="w-3.5 h-3.5 text-sky-400 shrink-0" />
@@ -191,7 +571,14 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
                                 Stack trace{traceFrames.length > 0 ? ` (${traceFrames.length} frame${traceFrames.length === 1 ? '' : 's'})` : ''}
                             </h5>
                             {traceFrames.length === 0 ? (
-                                <p className="font-mono text-[10px] text-slate-500">Stack trace unavailable for this entry (recorded before trace capture).</p>
+                                <p className="font-mono text-[10px] text-slate-400 bg-slate-950/40 p-2.5 rounded-lg border border-slate-800 flex items-center gap-2">
+                                    <Terminal className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                    <span>
+                                        {entry.trigger === 'programmatic' || entry.actor === 'system'
+                                            ? '⚡ Asynchronous Engine Daemon (Executed in background Tokio runtime / daemon timer — zero DOM frames).'
+                                            : 'Stack trace unavailable for this entry.'}
+                                    </span>
+                                </p>
                             ) : (
                                 <ol className="font-mono text-[10px] text-sky-200/90 bg-slate-950/80 p-2.5 rounded-lg border border-sky-500/20 space-y-1">
                                     {traceFrames.map((frame, index) => (
@@ -225,10 +612,23 @@ function EntryRow({ entry }: { entry: AuditEntry }) {
                             </pre>
                         </div>
                         {entry.message && (
-                            <p className="mt-1 text-[11px] font-medium text-red-400 flex items-center gap-1.5">
-                                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                                {entry.message}
-                            </p>
+                            entry.result === 'ok' ? (
+                                <div className="mt-2 p-2.5 rounded-lg bg-sky-950/40 border border-sky-500/30 text-[11px] text-sky-200 flex items-start gap-2">
+                                    <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                                    <div>
+                                        <span className="font-semibold text-sky-300 block text-[10px] uppercase tracking-wider">Lifecycle Note / Reason</span>
+                                        <span className="text-slate-200">{entry.message}</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="mt-2 p-2.5 rounded-lg bg-red-950/40 border border-red-500/30 text-[11px] text-red-200 flex items-start gap-2">
+                                    <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                                    <div>
+                                        <span className="font-semibold text-red-400 block text-[10px] uppercase tracking-wider">Error Details</span>
+                                        <span className="text-red-200">{entry.message}</span>
+                                    </div>
+                                </div>
+                            )
                         )}
                     </td>
                 </tr>
@@ -261,9 +661,70 @@ export function AuditPanel() {
         [entries, actorFilter, resultFilter]
     );
 
-    const [copiedType, setCopiedType] = useState<'json' | 'jsonl' | null>(null);
+    const [copiedType, setCopiedType] = useState<'json' | 'jsonl' | 'summary' | null>(null);
 
     if (!isOpen) return null;
+
+    const handleCopySummary = async () => {
+        try {
+            const total = filtered.length;
+            const actorCounts: Record<string, number> = {};
+            const resultCounts: Record<string, number> = {};
+            const triggerCounts: Record<string, number> = {};
+
+            filtered.forEach((e) => {
+                actorCounts[e.actor] = (actorCounts[e.actor] || 0) + 1;
+                resultCounts[e.result] = (resultCounts[e.result] || 0) + 1;
+                triggerCounts[e.trigger] = (triggerCounts[e.trigger] || 0) + 1;
+            });
+
+            const recentEntries = filtered.slice(0, 10).map((e, idx) => {
+                const time = formatTimestamp(e.timestamp);
+                const p = parseParams(e.params);
+                const mName = e.methodName || e.method_name || 'CLICK';
+                const label = humanMethodLabel(mName, p);
+                const target = e.uiTarget || e.ui_target || '-';
+                return `  ${idx + 1}. [${time}] [${e.actor.toUpperCase()}] [${e.result.toUpperCase()}] ${label} (${target})`;
+            });
+
+            const summaryLines = [
+                `========================================`,
+                `INTERACTION AUDIT LOG SUMMARY`,
+                `Generated: ${new Date().toISOString()}`,
+                `Total Filtered Entries: ${total} (out of ${entries.length} total)`,
+                `========================================`,
+                ``,
+                `[BREAKDOWN BY ACTOR]`,
+                ...Object.entries(actorCounts).map(([actor, count]) => `  - ${actor}: ${count}`),
+                ``,
+                `[BREAKDOWN BY RESULT]`,
+                ...Object.entries(resultCounts).map(([res, count]) => `  - ${res}: ${count}`),
+                ``,
+                `[BREAKDOWN BY TRIGGER]`,
+                ...Object.entries(triggerCounts).map(([trig, count]) => `  - ${trig}: ${count}`),
+                ``,
+                `[RECENT INTERACTIONS (Up to 10)]`,
+                ...(recentEntries.length > 0 ? recentEntries : ['  (None)']),
+                ``,
+                `========================================`,
+            ];
+
+            const summaryText = summaryLines.join('\n');
+            const success = await copyToClipboard(summaryText);
+            if (success) {
+                setCopiedType('summary');
+                showToast({ message: t('audit.copied_summary', 'Audit summary copied to clipboard'), type: 'success' });
+                window.setTimeout(() => setCopiedType(null), 2000);
+            } else {
+                showToast(t('audit.copy_failed', 'Failed to copy audit log to clipboard'), 'error');
+            }
+        } catch (err) {
+            useErrorStore.getState().captureError(err, {
+                source: `${SOURCE}.handleCopySummary`,
+                triggerAction: 'copyToClipboard',
+            });
+        }
+    };
 
     const handleCopyJson = async () => {
         try {
@@ -332,6 +793,8 @@ export function AuditPanel() {
                     </div>
                     <button
                         type="button"
+                        data-ui-name="audit-close-btn"
+                        data-ui-id="audit-modal-close"
                         onClick={() => setPanelOpen(false)}
                         className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-700/60 transition-colors cursor-pointer"
                         aria-label={t('common.close', 'Close')}
@@ -373,6 +836,8 @@ export function AuditPanel() {
                     <div className="flex-1" />
                     <button
                         type="button"
+                        data-ui-name="audit-refresh-btn"
+                        data-ui-id="audit-refresh"
                         onClick={() => void refreshEntries()}
                         disabled={isLoading}
                         className="inline-flex items-center gap-1 rounded-full border border-slate-700/60 bg-slate-800/60 px-2.5 py-1 text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors cursor-pointer disabled:opacity-50"
@@ -384,6 +849,24 @@ export function AuditPanel() {
                     <div className="inline-flex items-center rounded-full border border-slate-700/60 bg-slate-800/60 divide-x divide-slate-700/60 overflow-hidden shadow-2xs">
                         <button
                             type="button"
+                            data-ui-name="audit-copy-summary-btn"
+                            data-ui-id="audit-copy-summary"
+                            onClick={handleCopySummary}
+                            className={cn(
+                                "inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium transition-colors cursor-pointer",
+                                copiedType === 'summary'
+                                    ? "bg-emerald-500/20 text-emerald-300 font-semibold"
+                                    : "text-slate-300 hover:text-white hover:bg-slate-700/50"
+                            )}
+                            title={t('audit.copy_summary_tooltip', 'Copy human-readable audit summary to clipboard')}
+                        >
+                            {copiedType === 'summary' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                            {copiedType === 'summary' ? t('common.copied', 'Copied!') : t('audit.summary', 'Copy Summary')}
+                        </button>
+                        <button
+                            type="button"
+                            data-ui-name="audit-copy-json-btn"
+                            data-ui-id="audit-copy-json"
                             onClick={handleCopyJson}
                             className={cn(
                                 "inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium transition-colors cursor-pointer",
@@ -398,6 +881,8 @@ export function AuditPanel() {
                         </button>
                         <button
                             type="button"
+                            data-ui-name="audit-copy-jsonl-btn"
+                            data-ui-id="audit-copy-jsonl"
                             onClick={handleCopyJsonl}
                             className={cn(
                                 "inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-medium transition-colors cursor-pointer",
@@ -413,6 +898,8 @@ export function AuditPanel() {
                     </div>
                     <button
                         type="button"
+                        data-ui-name="audit-clear-btn"
+                        data-ui-id="audit-clear"
                         onClick={handleClear}
                         className="inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/10 px-2.5 py-1 text-red-300 hover:text-red-200 hover:bg-red-500/20 transition-colors cursor-pointer"
                     >

@@ -25,17 +25,74 @@ pub async fn detect_telegram_chat_id(bot_token: &str) -> Result<TelegramDetected
         .await
         .map_err(|e| AppError::Network(e.to_string(), None))?;
 
-    if !resp.status().is_success() {
-        return Err(AppError::Network(
-            format!("Telegram getUpdates failed with status {}", resp.status()),
-            Some(resp.status().as_u16()),
-        ));
-    }
-
-    let body: Value = resp
-        .json()
-        .await
-        .map_err(|e| AppError::Network(e.to_string(), None))?;
+    let status = resp.status().as_u16();
+    let body: Value = if status == 409 {
+        tracing::warn!("[TelegramDetect] HTTP 409 Conflict detected on getUpdates; attempting delete_telegram_webhook auto-heal");
+        if let Err(wh_err) = delete_telegram_webhook(clean_token).await {
+            tracing::error!("[TelegramDetect] Failed to auto-delete webhook: {}", wh_err);
+        }
+        let retry_resp = client
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| AppError::Network(e.to_string(), None))?;
+        if !retry_resp.status().is_success() {
+            return Err(AppError::Network(
+                format!(
+                    "Telegram getUpdates retry failed with status {}",
+                    retry_resp.status()
+                ),
+                Some(retry_resp.status().as_u16()),
+            ));
+        }
+        retry_resp
+            .json()
+            .await
+            .map_err(|e| AppError::Network(e.to_string(), None))?
+    } else {
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| AppError::Network(e.to_string(), None))?;
+        if text.contains("can't use getUpdates method while webhook is active")
+            || text.to_lowercase().contains("webhook is active")
+        {
+            tracing::warn!("[TelegramDetect] Webhook active detected in getUpdates response; attempting delete_telegram_webhook auto-heal");
+            if let Err(wh_err) = delete_telegram_webhook(clean_token).await {
+                tracing::error!("[TelegramDetect] Failed to auto-delete webhook: {}", wh_err);
+            }
+            let retry_resp = client
+                .get(&url)
+                .send()
+                .await
+                .map_err(|e| AppError::Network(e.to_string(), None))?;
+            if !retry_resp.status().is_success() {
+                return Err(AppError::Network(
+                    format!(
+                        "Telegram getUpdates retry failed with status {}",
+                        retry_resp.status()
+                    ),
+                    Some(retry_resp.status().as_u16()),
+                ));
+            }
+            retry_resp
+                .json()
+                .await
+                .map_err(|e| AppError::Network(e.to_string(), None))?
+        } else if status != 200 {
+            return Err(AppError::Network(
+                format!(
+                    "Telegram getUpdates failed with status {}: {}",
+                    status, text
+                ),
+                Some(status),
+            ));
+        } else {
+            serde_json::from_str(&text).map_err(|e| {
+                AppError::Network(format!("Failed to parse getUpdates JSON: {}", e), None)
+            })?
+        }
+    };
 
     if let Some(updates) = body["result"].as_array() {
         for update in updates.iter().rev() {

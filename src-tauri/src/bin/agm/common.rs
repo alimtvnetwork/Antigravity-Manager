@@ -49,6 +49,11 @@ pub(crate) fn is_prompt_subcommand(sub: &str) -> bool {
             | "purge"
             | "clean"
             | "help"
+            | "template"
+            | "templates"
+            | "suffix"
+            | "resend-as"
+            | "resend-titles"
     )
 }
 
@@ -235,6 +240,23 @@ pub(crate) fn suggest_agm_commands(input: &str) -> Vec<String> {
         "add-key",
         "gitignore",
         "gitignore-agm",
+        "errors",
+        "status",
+        "switch",
+        "ff",
+        "backup",
+        "restore",
+        "compact",
+        "logs",
+        "notifications",
+        "whoami",
+        "list",
+        "ls",
+        "audit",
+        "history",
+        "health",
+        "paths",
+        "dirs",
     ];
 
     let low = input.to_lowercase();

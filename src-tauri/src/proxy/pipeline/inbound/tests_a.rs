@@ -9,7 +9,7 @@ mod tests {
         let mut contents = vec![json!({
             "role": "model",
             "parts": [
-                { "text": "正在检查网关与后端的连接配置。" },
+                { "text": "Checking the connection configuration of the gateway and backend." },
                 {
                     "functionCall": {
                         "name": "inspect_case",
@@ -29,12 +29,15 @@ mod tests {
         );
 
         let parts = contents[0]["parts"].as_array().expect("parts array");
-        // 开启思考时，补齐首位思考块，随后的普通进度文本与工具调用均完整保留
+        // When thinking is enabled, the first thinking block is completed, and subsequent normal progress text and tool calls are kept intact.
         assert!(parts[0]
             .get("thought")
             .and_then(Value::as_bool)
             .unwrap_or(false));
-        assert_eq!(parts[1]["text"], "正在检查网关与后端的连接配置。");
+        assert_eq!(
+            parts[1]["text"],
+            "Checking the connection configuration of the gateway and backend."
+        );
         assert!(parts[2].get("functionCall").is_some());
     }
 
@@ -43,8 +46,8 @@ mod tests {
         let mut contents = vec![json!({
             "role": "model",
             "parts": [
-                { "text": "第一阶段：检查概览。" },
-                { "text": "第二阶段：深入诊断。" },
+                { "text": "Phase One: Check Overview." },
+                { "text": "The second stage: in-depth diagnosis." },
                 {
                     "functionCall": {
                         "name": "run_check",
@@ -65,8 +68,8 @@ mod tests {
 
         let parts = contents[0]["parts"].as_array().expect("parts array");
         assert_eq!(parts.len(), 3);
-        assert_eq!(parts[0]["text"], "第一阶段：检查概览。");
-        assert_eq!(parts[1]["text"], "第二阶段：深入诊断。");
+        assert_eq!(parts[0]["text"], "Phase One: Check Overview.");
+        assert_eq!(parts[1]["text"], "The second stage: in-depth diagnosis.");
         assert!(parts[2].get("functionCall").is_some());
     }
 
@@ -75,8 +78,8 @@ mod tests {
         let mut contents = vec![json!({
             "role": "model",
             "parts": [
-                { "text": "**Thinking**\n\n分析了案例数据，准备调用工具。" },
-                { "text": "正在执行检查。" },
+                { "text": "**Thinking**\n\nAnalyzed the case data and prepared to call the tool." },
+                { "text": "Checking in progress." },
                 {
                     "functionCall": {
                         "name": "inspect",
@@ -100,8 +103,11 @@ mod tests {
             .get("thought")
             .and_then(Value::as_bool)
             .unwrap_or(false));
-        assert_eq!(parts[0]["text"], "分析了案例数据，准备调用工具。");
-        assert_eq!(parts[1]["text"], "正在执行检查。");
+        assert_eq!(
+            parts[0]["text"],
+            "Analyzed the case data and prepared to call the tool."
+        );
+        assert_eq!(parts[1]["text"], "Checking in progress.");
         assert!(parts[2].get("functionCall").is_some());
     }
 
@@ -206,7 +212,7 @@ mod tests {
 
         let parts = contents[0]["parts"].as_array().expect("parts array");
         assert_eq!(parts.len(), 2);
-        // Gemini 原生签名在工具调用轮次绝不被二次编码，必须原样保留在 functionCall 部件上
+        // Gemini native signatures are never re-encoded during tool call rounds and must remain intact on the functionCall component
         assert_eq!(parts[1]["thoughtSignature"], gemini_sig);
     }
 
@@ -257,7 +263,7 @@ mod tests {
 
     #[test]
     fn test_inbound_pipeline_intercepts_foreign_gemini_signature_for_claude() {
-        // 模拟 Gemini 原生签名
+        // Simulate Gemini native signature
         let foreign_gemini_sig =
             "Ep4KCpsKAWkUfRMa5ZYMDdlPjxrQTLzVZ6MZeopI88888888888888888888888888888888";
 
@@ -295,8 +301,8 @@ mod tests {
         );
 
         let model_parts = contents[1]["parts"].as_array().expect("parts array");
-        // 关键验证：发往 Claude 时，由于历史异构签名不是合法 Claude 签名，
-        // 思考块绝不能带着 Gemini 签名发给 Claude，而是安全降级为普通正文文本！
+        // Key verification: When sending to Claude, because the historical heterogeneous signature is not a legal Claude signature,
+        // The thought block must never be sent to Claude with a Gemini signature, but is safely downgraded to normal body text!
         let has_thought_block = model_parts
             .iter()
             .any(|p| p.get("thought").and_then(|v| v.as_bool()) == Some(true));
@@ -358,7 +364,7 @@ mod tests {
 
     #[test]
     fn test_extract_client_thinking_switch_coverage() {
-        // 1. 显式关闭 (一票否决)
+        // 1. Explicit shutdown (one vote veto)
         assert_eq!(
             extract_client_thinking_switch(Some("disabled"), None, None),
             ClientThinkingSwitch::Disabled
@@ -380,7 +386,7 @@ mod tests {
             ClientThinkingSwitch::Disabled
         );
 
-        // 2. 显式开启
+        // 2. Explicitly enable
         assert_eq!(
             extract_client_thinking_switch(Some("enabled"), None, None),
             ClientThinkingSwitch::Enabled
@@ -398,7 +404,7 @@ mod tests {
             ClientThinkingSwitch::Enabled
         );
 
-        // 3. 缺省（开关缺省就是默认开）
+        // 3. Default (the switch is on by default)
         assert_eq!(
             extract_client_thinking_switch(None, None, None),
             ClientThinkingSwitch::Default

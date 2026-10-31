@@ -55,8 +55,8 @@ pub fn parse_markdown_images_to_parts(text: &str) -> Vec<Value> {
     parts
 }
 
-/// 严格受支持的常见图片 MIME 白名单（Gemini 官方原生兼容），
-/// 坚决排除非图片格式（音频、视频、PDF、文档、二进制文件等），避免上游报 400 不兼容。
+/// Strictly supported common image MIME whitelist (Gemini official native compatible),
+/// Resolutely exclude non-image formats (audio, video, PDF, documents, binary files, etc.) to avoid upstream reporting 400 incompatibility.
 pub const SUPPORTED_TOOL_IMAGE_MIMES: &[&str] = &[
     "image/png",
     "image/jpeg",
@@ -71,24 +71,24 @@ pub fn is_supported_tool_image_mime(mime: &str) -> bool {
     SUPPORTED_TOOL_IMAGE_MIMES.contains(&lower.as_str())
 }
 
-/// 智能解析并提取工具输出中的多模态图像数据（全协议共享：OpenAI / Claude / Gemini / Responses）。
-/// 支持：
-/// 1. Markdown 格式图片：`![alt](data:image/...;base64,...)`
-/// 2. 文本中内嵌或直接传递的 Data URL：`data:image/...;base64,...`
-/// 3. JSON 格式工具输出中的图片字段：`{"image": "data:image/...", ...}` 或 `{"screenshot": "...", ...}`
+/// Intelligently parse and extract multi-modal image data from tool output (full protocol sharing: OpenAI/Claude/Gemini/Responses).
+/// Support:
+/// 1. Markdown format image: `![alt](data:image/...;base64,...)`
+/// 2. Data URL embedded in the text or passed directly: `data:image/...;base64,...`
+/// 3. Image field in JSON format tool output: ` {"image": "data:image/...", ...} ` or ` {"screenshot": "...", ...} `
 ///
-/// 安全约束：
-/// - 仅严格识别并放行常见白名单图片格式（png, jpeg, webp, gif）；
-/// - 绝对不处理音频、视频、PDF、文本或二进制文件，保证非图片数据原样透传，杜绝破坏兼容性；
-/// - 自动将提取出的 Base64 图像转化为规范的 Gemini `inlineData` part，追加到 `extra_parts` 中；
-/// - 将原工具响应字符串中冗长庞大的 Base64 替换为精炼的摘要标记（如 `[Image: forwarded to visual input (image/png)]`），
-///   既避免了 `functionResponse` JSON 负载膨胀，又让底层视觉模型能够原汁原味地进行视觉感知。
+/// Security constraints:
+/// - Only strictly identify and release common whitelist image formats (png, jpeg, webp, gif);
+/// - Absolutely no audio, video, PDF, text or binary files are processed, ensuring that non-image data is transparently transmitted as is to avoid damaging compatibility;
+/// - Automatically convert the extracted Base64 image into the standard Gemini `inlineData` part and append it to `extra_parts`;
+/// - Replace the verbose Base64 in the original tool response string with a concise summary tag (such as `[Image: forwarded to visual input (image/png)]`),
+///   It not only avoids `functionResponse` JSON load expansion, but also allows the underlying visual model to perform visual perception authentically.
 pub fn extract_multimodal_from_tool_text(raw_text: &str, extra_parts: &mut Vec<Value>) -> String {
     if !raw_text.contains("data:image/") {
         return raw_text.to_string();
     }
 
-    // 1. 如果 raw_text 是 JSON 字符串，尝试解析并提取其中的图片字段
+    // 1. If raw_text is a JSON string, try to parse and extract the image field in it
     if let Ok(mut val) = serde_json::from_str::<Value>(raw_text) {
         let mut extracted_any = false;
         if let Some(obj) = val.as_object_mut() {
@@ -100,7 +100,7 @@ pub fn extract_multimodal_from_tool_text(raw_text: &str, extra_parts: &mut Vec<V
                             if let Some(pos) = s.find(',') {
                                 let mime_part = &s[5..pos];
                                 let mime_type = mime_part.split(';').next().unwrap_or("image/png");
-                                // 严格限制：只允许白名单中的常见图片格式，排除任何音频、文档或非标图片
+                                // Strictly restricted: only common image formats in the whitelist are allowed, excluding any audio, documents or non-standard images
                                 if is_supported_tool_image_mime(mime_type) {
                                     let b64_data = &s[pos + 1..];
                                     if let Some((valid_mime, valid_b64)) =
@@ -129,7 +129,7 @@ pub fn extract_multimodal_from_tool_text(raw_text: &str, extra_parts: &mut Vec<V
         }
     }
 
-    // 2. 检测 Markdown 图片格式：![alt](data:image/...) 或文本内嵌的 data:image/
+    // 2. Detect Markdown image format: ![alt](data:image/...) or data:image/ embedded in text
     let mut clean_text = String::new();
     let mut rest = raw_text;
     let mut found_image = false;
@@ -142,7 +142,7 @@ pub fn extract_multimodal_from_tool_text(raw_text: &str, extra_parts: &mut Vec<V
             let mime_part = &data_slice[5..comma_idx];
             let mime_type = mime_part.split(';').next().unwrap_or("image/png");
 
-            // 严格白名单校验：非白名单图片（如 svg/tiff/未知）或伪装格式不予解构，直接作为普通文本保留
+            // Strict whitelist verification: non-whitelist images (such as svg/tiff/unknown) or disguised formats will not be deconstructed and will be directly retained as ordinary text.
             if !is_supported_tool_image_mime(mime_type) {
                 clean_text.push_str("data:image/");
                 rest = &data_slice["data:image/".len()..];

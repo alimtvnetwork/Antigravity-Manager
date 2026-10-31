@@ -1,4 +1,4 @@
-//! Token 预过滤：能力过滤排序、固定账号（FIX #820）优先。
+//! Token pre-filtering: ability filtering and sorting, fixed account (FIX #820) priority.
 
 use super::types::OnDiskAccountState;
 use super::ProxyToken;
@@ -10,27 +10,27 @@ impl TokenManager {
         mut tokens_snapshot: Vec<ProxyToken>,
         target_model: &str,
     ) -> Result<Vec<ProxyToken>, String> {
-        // [NEW] 1. 动态能力过滤 (Capability Filter)
+        // [NEW] 1. Dynamic capability filter (Capability Filter)
 
-        // 定义常量
-        const RESET_TIME_THRESHOLD_SECS: i64 = 600; // 10 分钟阈值
+        // Define constants
+        const RESET_TIME_THRESHOLD_SECS: i64 = 600; // 10 minute threshold
 
-        // 归一化目标模型名为标准 ID
+        // The normalized target model is named Standard ID
         let normalized_target =
             crate::proxy::common::model_mapping::normalize_to_standard_id(target_model)
                 .unwrap_or_else(|| target_model.to_string());
 
-        // 仅保留明确拥有该模型配额的账号
-        // 这一步确保了 "保证有模型才可以进入轮询"，特别是对 Opus 4.6 等高端模型
+        // Only keep accounts that explicitly have a quota for that model
+        // This step ensures that "there is a model before you can enter polling", especially for high-end models such as Opus 4.6
         let candidate_count_before = tokens_snapshot.len();
 
-        // 此处假设所有受支持的模型都会出现在 model_quotas 中
-        // 如果 API 返回的配额信息不完整，可能会导致误杀，但为了严格性，我们执行此过滤
+        // It is assumed here that all supported models will be present in model_quotas
+        // If the quota information returned by the API is incomplete, it may lead to accidental killing, but for the sake of strictness, we perform this filtering
         tokens_snapshot.retain(|t| t.model_quotas.contains_key(&normalized_target));
 
         if tokens_snapshot.is_empty() {
             if candidate_count_before > 0 {
-                // 如果过滤前有账号，过滤后没了，说明所有账号都没有该模型的配额
+                // If there were accounts before filtering but disappeared after filtering, it means that all accounts do not have quotas for this model.
                 tracing::warn!(
                     "No accounts have satisfied quota for model: {}",
                     normalized_target
@@ -49,13 +49,13 @@ impl TokenManager {
                 return priority_cmp;
             }
 
-            // Priority 0: 严格的订阅等级排序 (ULTRA > PRO > FREE)
-            // 用户要求：轮询应当遵循 Ultra -> Pro -> Free
-            // 既然已经过滤掉了不支持该模型的账号，剩下的都是支持的
-            // 此时我们优先使用高级订阅
-            // 统一走 models::quota::tier_priority，保证与 UI / 配额解析使用同一套关键词表。
-            // 未知等级一律按 FREE 处理（不再返回 3），否则会出现「UI 显示 FREE、
-            // 调度器却把它排在 FREE 之后」的隐形档位。
+            // Priority 0: Strict subscription ranking (ULTRA > PRO > FREE)
+            // User requirement: Polling should follow Ultra -> Pro -> Free
+            // Now that the accounts that do not support the model have been filtered out, the rest are supported.
+            // At this time we prioritize premium subscriptions
+            // Use models::quota::tier_priority in a unified manner to ensure that the same set of keyword tables is used for UI/quota resolution.
+            // Unknown levels will always be treated as FREE (no return to 3), otherwise "UI displays FREE,
+            // The scheduler ranks it in the invisible position after FREE.
             let tier_priority =
                 |tier: &Option<String>| crate::models::quota::tier_priority(tier.as_deref());
 
@@ -65,8 +65,8 @@ impl TokenManager {
                 return tier_cmp;
             }
 
-            // Priority 1: 目标模型的 quota (higher is better) -> 保护低配额账号
-            // 经过过滤，key 肯定存在
+            // Priority 1: Target model's quota (higher is better) -> Protect low-quota accounts
+            // After filtering, the key must exist
             let quota_a = a.model_quotas.get(&normalized_target).copied().unwrap_or(0);
             let quota_b = b.model_quotas.get(&normalized_target).copied().unwrap_or(0);
 
@@ -94,7 +94,7 @@ impl TokenManager {
             }
         });
 
-        // 【调试日志】打印排序后的账号顺序（显示目标模型的 quota）
+        // [Debug Log] Print the sorted account order (display the quota of the target model)
         tracing::debug!(
             "🔄 [Token Rotation] target={} Accounts: {:?}",
             normalized_target,
@@ -120,8 +120,8 @@ impl TokenManager {
         Ok(tokens_snapshot)
     }
 
-    /// [FIX #820] 固定账号模式：优先使用指定账号。
-    /// 返回 `Some` 表示调用方可直接返回该结果；返回 `None` 表示回退到常规轮询。
+    /// [FIX #820] Fixed account mode: Prioritize the use of designated accounts.
+    /// Returning `Some` means the caller can return the result directly; returning `None` means falling back to regular polling.
     pub(crate) async fn try_preferred_account(
         &self,
         tokens_snapshot: &mut Vec<ProxyToken>,
@@ -130,13 +130,13 @@ impl TokenManager {
         target_model: &str,
         quota_protection_enabled: bool,
     ) -> Option<Result<(String, String, String, String, u64), String>> {
-        // 查找优先账号
+        // Find priority account
         if let Some(preferred_token) = tokens_snapshot
             .iter()
             .find(|t| &t.account_id == pref_id)
             .cloned()
         {
-            // 检查账号是否可用（未限流、未被配额保护）
+            // Check whether the account is available (not limited, not protected by quota)
             match Self::get_account_state_on_disk(&preferred_token.account_path).await {
                 OnDiskAccountState::Disabled => {
                     tracing::warn!(
@@ -189,38 +189,38 @@ impl TokenManager {
                             preferred_token.email
                         );
 
-                        // 直接使用优先账号，跳过轮询逻辑
+                        // Use the priority account directly and skip the polling logic
                         let mut token = preferred_token.clone();
 
-                        // [NEW] 检查 token 是否过期（调整刷新时机对齐官方：90s 宽限期）
+                        // [NEW] Check whether the token has expired (adjust the refresh timing to align with the official: 90s grace period)
                         let now = chrono::Utc::now().timestamp();
                         if now >= token.timestamp - 90 {
-                            // [NEW] 双重检查锁定逻辑 (Double-Checked Locking)
-                            // 1. 获取（或创建）该账号专属的刷新锁
+                            // [NEW] Double-Checked Locking
+                            // 1. Obtain (or create) a refresh lock exclusive to the account
                             let refresh_mu = self
                                 .refresh_locks
                                 .entry(token.account_id.clone())
                                 .or_insert_with(|| Arc::new(tokio::sync::Mutex::new(())))
                                 .clone();
 
-                            // 2. 尝试获取锁
+                            // 2. Try to acquire the lock
                             let _guard = refresh_mu.lock().await;
 
-                            // 3. 再次检查本账号最新状态（可能已被其他并发请求刷新完毕）
+                            // 3. Check the latest status of this account again (it may have been refreshed by other concurrent requests)
                             let latest_token_opt =
                                 self.tokens.get(&token.account_id).map(|r| r.clone());
                             if let Some(latest) = latest_token_opt {
                                 if now < latest.timestamp - 90 {
-                                    // 已经被别人刷过了，同步最新数据并跳过刷新动作
+                                    // It has been refreshed by others, synchronize the latest data and skip the refresh action
                                     token = latest.clone();
                                     tracing::debug!(
-                                        "账号 {} 已由并发线程刷新，跳过重复刷新",
+                                        "Account {} has been refreshed by a concurrent thread, skipping repeated refreshes",
                                         token.email
                                     );
                                 } else {
-                                    // 确实需要刷新
+                                    // Really needs to be refreshed
                                     tracing::debug!(
-                                        "账号 {} 的 token 即将过期 ({}s)，正在刷新...",
+                                        "The token of account {} is about to expire ( {} s) and is being refreshed...",
                                         token.email,
                                         token.timestamp - now
                                     );
@@ -243,8 +243,8 @@ impl TokenManager {
                                                 entry.expires_in = token.expires_in;
                                                 entry.timestamp = token.timestamp;
                                             }
-                                            // [FIX] 写盘操作后台化：避免阻塞 get_token 的 5s 超时窗口
-                                            // 内存已更新完毕，将磁盘持久化 spawn 到 blocking 线程池
+                                            // [FIX] Backend disk writing operations: avoid blocking the 5s timeout window of get_token
+                                            // The memory has been updated, and the disk persistence is spawned to the blocking thread pool.
                                             {
                                                 let write_path = token.account_path.clone();
                                                 let access_token =
@@ -295,14 +295,14 @@ impl TokenManager {
                                                 "Preferred account token refresh failed: {}",
                                                 e
                                             );
-                                            // 继续使用旧 token，让后续逻辑处理失败
+                                            // Continue to use the old token, causing subsequent logic processing to fail.
                                         }
                                     }
                                 }
                             }
                         }
 
-                        // 确保有 project_id (filter empty strings to trigger re-fetch)
+                        // Make sure there is project_id (filter empty strings to trigger re-fetch)
                         let project_id = if let Some(pid) = &token.project_id {
                             if pid.is_empty() {
                                 None
@@ -325,7 +325,7 @@ impl TokenManager {
                                     {
                                         entry.project_id = Some(pid.clone());
                                     }
-                                    // [FIX] 写盘后台化：project_id 已写入内存，磁盘持久化不阻塞热路径
+                                    // [FIX] Disk writing background: project_id has been written to memory, disk persistence does not block the hot path
                                     {
                                         let write_path = token.account_path.clone();
                                         let pid_clone = pid.clone();

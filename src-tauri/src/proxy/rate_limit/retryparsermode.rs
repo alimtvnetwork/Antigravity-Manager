@@ -8,18 +8,18 @@ pub(crate) enum RetryParserMode {
     Baseline,
 }
 
-/// 限流原因类型
+/// Current limiting reason type
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum RateLimitReason {
-    /// 配额耗尽 (QUOTA_EXHAUSTED)
+    /// Quota exhausted (QUOTA_EXHAUSTED)
     QuotaExhausted,
-    /// 速率限制 (RATE_LIMIT_EXCEEDED)
+    /// Rate Limit (RATE_LIMIT_EXCEEDED)
     RateLimitExceeded,
-    /// 模型容量耗尽 (MODEL_CAPACITY_EXHAUSTED)
+    /// Model capacity exhausted (MODEL_CAPACITY_EXHAUSTED)
     ModelCapacityExhausted,
-    /// 服务器错误 (5xx)
+    /// Server error (5xx)
     ServerError,
-    /// 未知原因
+    /// unknown reason
     Unknown,
 }
 
@@ -60,31 +60,31 @@ pub(crate) fn is_active_persisted_long_image_limit(
         && is_active_persisted_long_limit(model_key, status, now)
 }
 
-/// 限流信息
+/// Current limiting information
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct RateLimitInfo {
-    /// 限流重置时间
+    /// Current limit reset time
     pub reset_time: SystemTime,
-    /// 重试间隔(秒)
+    /// Retry interval (seconds)
     #[allow(dead_code)]
     pub retry_after_sec: u64,
-    /// 检测时间
+    /// Detection time
     #[allow(dead_code)]
     pub detected_at: SystemTime,
-    /// 限流原因
+    /// Reasons for current limiting
     #[allow(dead_code)] // Used for logging and diagnostics
     pub reason: RateLimitReason,
-    /// 关联的模型 (用于模型级别限流)
-    /// None 表示账号级别限流,Some(model) 表示特定模型限流
+    /// Associated models (for model-level current limiting)
+    /// None indicates account level current limit, Some(model) indicates specific model current limit
     #[allow(dead_code)] // Used for model-level rate limiting
     pub model: Option<String>,
 }
 
-/// 失败计数过期时间：1小时（超过此时间未失败则重置计数）
+/// Failure count expiration time: 1 hour (if there is no failure after this time, the count will be reset)
 pub(crate) const FAILURE_COUNT_EXPIRY_SECONDS: u64 = 3600;
 
-/// 限流跟踪器
+/// Current limit tracker
 pub(crate) struct QuotaBucketLimit {
     pub(crate) observed_at: i64,
     pub(crate) reset_time: Option<SystemTime>,
@@ -95,7 +95,7 @@ pub struct RateLimitTracker {
     pub(crate) limits: DashMap<String, RateLimitInfo>,
     // Independent official quota windows must survive transient-limit resets.
     pub(crate) quota_limits: DashMap<(String, String), QuotaBucketLimit>,
-    /// 连续失败计数（用于智能指数退避），带时间戳用于自动过期
+    /// Consecutive failure count (for smart exponential backoff) with timestamp for automatic expiration
     pub(crate) failure_counts: DashMap<String, (u32, SystemTime)>,
 }
 
@@ -108,9 +108,9 @@ impl RateLimitTracker {
         }
     }
 
-    /// 生成限流 Key
-    /// - 账号级: "account_id"
-    /// - 模型级: "account_id:model_id"
+    /// Generate current limiting Key
+    /// - Account level: "account_id"
+    /// - Model level: "account_id:model_id"
     pub(crate) fn get_limit_key(&self, account_id: &str, model: Option<&str>) -> String {
         match model {
             Some(m) if !m.is_empty() => format!("{}:{}", account_id, m),
@@ -118,8 +118,8 @@ impl RateLimitTracker {
         }
     }
 
-    /// 获取账号剩余的等待时间(秒)
-    /// 支持检查账号级和模型级锁
+    /// Get the remaining waiting time of the account (seconds)
+    /// Supports checking account-level and model-level locks
     pub fn get_remaining_wait(&self, account_id: &str, model: Option<&str>) -> u64 {
         let now = SystemTime::now();
         let model_key = self.get_limit_key(account_id, model);
@@ -136,7 +136,7 @@ impl RateLimitTracker {
             return direct_wait;
         }
 
-        // [双重守卫] 若直接匹配未命中，通过归一化标准 ID 兜底检查（确保 gemini-*-pro 等所有变体对齐标准组锁定）
+        // [Double guard] If direct matching misses, pass normalized standard ID back-up check (make sure all variants such as gemini-*-pro are aligned with the standard group lock)
         if let Some(m) = model {
             if let Some(std_id) = crate::proxy::common::model_mapping::normalize_to_standard_id(m) {
                 if std_id != m {
@@ -205,27 +205,30 @@ impl RateLimitTracker {
             });
     }
 
-    /// 标记账号请求成功，重置连续失败计数
+    /// Mark the account request as successful and reset the consecutive failure count
     ///
-    /// 当账号成功完成请求后调用此方法，将其失败计数归零，
-    /// 这样下次失败时会从最短的锁定时间（60秒）开始。
+    /// This method is called when the account successfully completes the request to reset its failure count to zero.
+    /// In this way, the next time it fails, it will start from the shortest lock time (60 seconds).
     pub fn mark_success(&self, account_id: &str) {
         if self.failure_counts.remove(account_id).is_some() {
-            tracing::debug!("账号 {} 请求成功，已重置失败计数", account_id);
+            tracing::debug!(
+                "The request for account {} was successful and the failure count has been reset.",
+                account_id
+            );
         }
-        // 清除账号级限流
+        // Clear account-level current limit
         self.limits.remove(account_id);
-        // 注意：我们暂时无法清除该账号下的所有模型级锁，因为我们不知道哪些模型被锁了
-        // 除非遍历 limits。考虑到模型级锁通常是 QuotaExhausted，让其自然过期也是可以接受的。
-        // 或者我们可以引入索引，但为了简单，暂时只清除 Account 级锁。
+        // Note: We are currently unable to clear all model-level locks under this account because we do not know which models are locked.
+        // Unless limits are traversed. Considering that model-level locks are usually QuotaExhausted, it is also acceptable to let them expire naturally.
+        // Or we can introduce an index, but for the sake of simplicity, only clear Account-level locks for now.
     }
 
-    /// 精确锁定账号到指定时间点 (支持是否遵循 MAX_LOCKOUT_SECONDS 上限)
+    /// Accurately lock the account to a specified time point (supports whether to comply with the MAX_LOCKOUT_SECONDS upper limit)
     ///
-    /// # 参数
-    /// - `model`: 可选的模型名称,用于模型级别限流。None 表示账号级别限流
-    /// - `cap_to_max`: 是否将锁定时长限制在 MAX_LOCKOUT_SECONDS (300s) 以内。
-    ///   如果为 false，则直接锁定到真实的 reset_time（用于零配额持续熔断）。
+    /// # Parameters
+    /// - `model`: Optional model name, used for model-level current limiting. None means account level current limit
+    /// - `cap_to_max`: Whether to limit the lock duration to MAX_LOCKOUT_SECONDS (300s).
+    ///   If false, lock directly to the real reset_time (for zero quota continuous circuit breaker).
     pub fn set_lockout_until_with_cap(
         &self,
         account_id: &str,
@@ -255,12 +258,12 @@ impl RateLimitTracker {
             retry_after_sec: retry_sec,
             detected_at: now,
             reason,
-            model: model.clone(), // 🆕 支持模型级别限流
+            model: model.clone(), // 🆕 Support model level current limiting
         };
 
         let key = self.get_limit_key(account_id, model.as_deref());
 
-        // [防倒退保护] 若已有更长、未过期的锁定时间，防止被后续较短的重置时间覆盖（如周配额 5 天不被 5H 窗口覆盖）
+        // [Anti-regression protection] If there is a longer, unexpired lock time, prevent it from being overwritten by a subsequent shorter reset time (for example, the weekly quota of 5 days is not covered by the 5H window)
         if let Some(existing) = self.limits.get(&key) {
             if existing.reset_time > now && existing.reset_time > effective_reset_time {
                 tracing::info!(
@@ -277,7 +280,7 @@ impl RateLimitTracker {
 
         if let Some(m) = &model {
             tracing::info!(
-                "账号 {} 的模型 {} 已精确锁定到配额刷新时间,剩余 {} 秒 (cap_to_max: {})",
+                "Model {} of account {} has been accurately locked to the quota refresh time, with {} seconds remaining (cap_to_max: {} )",
                 account_id,
                 m,
                 retry_sec,
@@ -285,7 +288,7 @@ impl RateLimitTracker {
             );
         } else {
             tracing::info!(
-                "账号 {} 已精确锁定到配额刷新时间,剩余 {} 秒 (cap_to_max: {})",
+                "Account {} has been accurately locked to the quota refresh time, with {} seconds remaining (cap_to_max: {} )",
                 account_id,
                 retry_sec,
                 cap_to_max
@@ -293,7 +296,7 @@ impl RateLimitTracker {
         }
     }
 
-    /// 精确锁定账号到指定时间点 (默认限制在 300s 内)
+    /// Precisely lock the account to a specified time point (default limit is within 300s)
     pub fn set_lockout_until(
         &self,
         account_id: &str,

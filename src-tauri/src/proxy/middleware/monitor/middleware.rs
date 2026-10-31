@@ -130,7 +130,7 @@ pub async fn monitor_middleware(
     let duration = ctx.start.elapsed().as_millis() as u64;
     let status = response.status().as_u16();
 
-    // 过滤噪音请求，避免客户端探针刷屏淹没真实业务日志 (Issue #3498 + `/v1/models` 轮询刷屏)
+    // Filter noisy requests to prevent client probes from flooding the real business logs (Issue #3498 + `/v1/models` polling and flushing)
     let capture_health_enabled =
         state.monitor.is_capture_health_logs() || should_log_health_checks();
     if should_skip_request_log(&ctx.method, response.status(), capture_health_enabled) {
@@ -276,7 +276,7 @@ async fn handle_non_streaming_response(
         Ok(bytes) => {
             if let Ok(s) = std::str::from_utf8(&bytes) {
                 if let Ok(json) = serde_json::from_str::<Value>(&s) {
-                    // 支持 OpenAI "usage" 或 Gemini "usageMetadata"
+                    // Supports OpenAI "usage" or Gemini "usageMetadata"
                     if let Some(usage) = json
                         .get("usage")
                         .or(json.get("usageMetadata"))
@@ -303,7 +303,7 @@ async fn handle_non_streaming_response(
                         .and_then(|json| summarize_image_json_response(&json))
                         .or_else(|| Some(s.to_string()));
                 } else if let Ok(json) = serde_json::from_str::<Value>(&s) {
-                    // 🌟 非流式响应入库统一转换为满血简要版 (包含网关权威签名回填与防雪崩确定性 Tool ID)
+                    // 🌟 Non-streaming response storage is uniformly converted into a full-blooded simplified version (including gateway authoritative signature backfill and anti-avalanche deterministic Tool ID)
                     if let Some(canonical) =
                         consolidate_non_streaming_response(&json, &log, &headers_map)
                     {

@@ -265,7 +265,7 @@ pub fn start_antigravity_with_fallback_path(
         }
     }
 
-    // 次优：如果切换前捕获到了运行中进程的真实有效路径，优先使用它以防止非标准安装路径丢失
+    // Suboptimal: If the real effective path of the running process is captured before switching, use it first to prevent non-standard installation paths from being lost.
     if let Some(pref_path) = preferred_path {
         let pref_str = pref_path.to_string_lossy().to_lowercase();
         if pref_path.exists() && !pref_str.contains(".trash") {

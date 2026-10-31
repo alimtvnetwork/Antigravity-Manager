@@ -1,24 +1,24 @@
-//! 限流标记：mark_rate_limited 系列与原子化记录。
+//! Rate limit mark: mark_rate_limited series and atomic records.
 
 use super::types::TrackerParserMode;
 use super::TokenManager;
 
 impl TokenManager {
-    /// 使用配额刷新时间精确锁定账号
+    /// Use quota refresh time to accurately lock accounts
     ///
-    /// 当 API 返回 429 但没有 quotaResetDelay 时,尝试使用账号的配额刷新时间
+    /// When the API returns 429 but there is no quotaResetDelay, try to use the account's quota refresh time
     ///
-    /// # 参数
-    /// - `account_id`: 账号 ID
-    /// - `reason`: 限流原因（QuotaExhausted/ServerError 等）
-    /// - `model`: 可选的模型名称,用于模型级别限流
+    /// # Parameters
+    /// - `account_id`: account ID
+    /// - `reason`: current limiting reason (QuotaExhausted/ServerError, etc.)
+    /// - `model`: optional model name, used for model-level current limiting
     pub fn set_precise_lockout(
         &self,
         account_id: &str,
         reason: crate::proxy::rate_limit::RateLimitReason,
         model: Option<String>,
     ) -> bool {
-        // [FIX #2209] 统一归一化模型名称
+        // [FIX #2209] Unify normalized model names
         let normalized_model = model
             .as_deref()
             .and_then(|m| crate::proxy::common::model_mapping::normalize_to_standard_id(m));
@@ -32,7 +32,7 @@ impl TokenManager {
 
         if let Some(reset_time_str) = self.get_quota_reset_time(account_id) {
             tracing::info!(
-                "找到账号 {} 的配额刷新时间: {} (cap_to_max: {})",
+                "Find the quota refresh time of account {} : {} (cap_to_max: {} )",
                 account_id,
                 reset_time_str,
                 cap
@@ -46,30 +46,30 @@ impl TokenManager {
             )
         } else {
             tracing::debug!(
-                "未找到账号 {} 的配额刷新时间,将使用默认退避策略",
+                "The quota refresh time for account {} was not found, and the default backoff policy will be used.",
                 account_id
             );
             false
         }
     }
 
-    /// 实时刷新配额并精确锁定账号
+    /// Refresh quotas in real time and lock accounts accurately
     ///
-    /// 当 429 发生时调用此方法:
-    /// 1. 实时调用配额刷新 API 获取最新的 reset_time
-    /// 2. 使用最新的 reset_time 精确锁定账号
-    /// 3. 如果获取失败,返回 false 让调用方使用回退策略
+    /// This method is called when 429 occurs:
+    /// 1. Call the quota refresh API in real time to obtain the latest reset_time
+    /// 2. Use the latest reset_time to accurately lock the account
+    /// 3. If the acquisition fails, return false to let the caller use the fallback strategy.
     ///
-    /// # 参数
-    /// - `model`: 可选的模型名称,用于模型级别限流
+    /// # Parameters
+    /// - `model`: optional model name, used for model-level current limiting
     pub async fn fetch_and_lock_with_realtime_quota(
         &self,
         email: &str,
         reason: crate::proxy::rate_limit::RateLimitReason,
         model: Option<String>,
     ) -> bool {
-        // 1. 从 tokens 中获取该账号的 access_token 和 account_id
-        // 同时获取 account_id，确保锁定 key 与检查 key 一致
+        // 1. Obtain the access_token and account_id of the account from tokens
+        // At the same time, obtain the account_id and ensure that the lock key is consistent with the check key.
         let (access_token, account_id) = {
             let mut found: Option<(String, String)> = None;
             for entry in self.tokens.iter() {
@@ -88,16 +88,16 @@ impl TokenManager {
         let (access_token, account_id) = match (access_token, account_id) {
             (Some(token), Some(id)) => (token, id),
             _ => {
-                tracing::warn!("无法找到账号 {} 的 access_token,无法实时刷新配额", email);
+                tracing::warn!("The access_token of account {} cannot be found and the quota cannot be refreshed in real time.", email);
                 return false;
             }
         };
 
-        // 2. 调用配额刷新 API
-        tracing::info!("账号 {} 正在实时刷新配额...", email);
+        // 2. Call the quota refresh API
+        tracing::info!("Account {} is refreshing the quota in real time...", email);
         match crate::modules::quota::fetch_quota(&access_token, email, Some(&account_id)).await {
             Ok((quota_data, _project_id)) => {
-                // 3. 从最新配额中提取 reset_time
+                // 3. Extract reset_time from latest quota
                 let earliest_reset = quota_data
                     .models
                     .iter()
@@ -112,12 +112,12 @@ impl TokenManager {
 
                 if let Some(reset_time_str) = earliest_reset {
                     tracing::info!(
-                        "账号 {} 实时配额刷新成功,reset_time: {}",
+                        "Account {} real-time quota refresh successful, reset_time: {}",
                         email,
                         reset_time_str
                     );
 
-                    // [FIX #2209] 统一归一化模型名称
+                    // [FIX #2209] Unify normalized model names
                     let normalized_model = model.as_deref().and_then(|m| {
                         crate::proxy::common::model_mapping::normalize_to_standard_id(m)
                     });
@@ -129,7 +129,7 @@ impl TokenManager {
                         true
                     };
 
-                    // [FIX] 使用 account_id 作为 key，与 is_rate_limited 检查一致
+                    // [FIX] Use account_id as key, consistent with is_rate_limited check
                     self.rate_limit_tracker.set_lockout_until_iso_with_cap(
                         &account_id,
                         reset_time_str,
@@ -138,12 +138,15 @@ impl TokenManager {
                         cap,
                     )
                 } else {
-                    tracing::warn!("账号 {} 配额刷新成功但未找到 reset_time", email);
+                    tracing::warn!(
+                        "Account {} quota refreshed successfully but reset_time not found",
+                        email
+                    );
                     false
                 }
             }
             Err(e) => {
-                tracing::warn!("账号 {} 实时配额刷新失败: {:?}", email, e);
+                tracing::warn!("Account {} real-time quota refresh failed: {:?}", email, e);
                 false
             }
         }

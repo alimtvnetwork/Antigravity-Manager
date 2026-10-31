@@ -5,7 +5,7 @@ pub async fn get_http_api_settings() -> Result<crate::modules::http_api::HttpApi
     crate::modules::http_api::load_settings()
 }
 
-/// 保存 HTTP API 设置
+/// Save HTTP API settings
 #[tauri::command]
 pub async fn save_http_api_settings(
     settings: crate::modules::http_api::HttpApiSettings,

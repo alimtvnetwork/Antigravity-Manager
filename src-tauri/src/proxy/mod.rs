@@ -18,6 +18,7 @@ pub mod token_manager;
 // New architecture modules
 pub mod audio; // Audio processing module
 pub mod cache_manager; // Context Cache management (prefix hash -> cache_id mapping)
+pub mod canonical; // Canonical IR Envelope (Imp-19)
 pub mod cli_sync; // CLI configuration sync (v3.3.35)
 pub mod common; // Common utilities
 pub mod debug_logger;
@@ -39,6 +40,7 @@ pub mod session_manager; // Session fingerprint management
 pub mod signature_cache; // Signature Cache (v3.3.16)
 pub mod sticky_config; // Sticky routing configuration
 pub mod thinking_store; // Server-side thinking block persistence
+pub mod token_stats; // Token statistics, analytics, and pricing calculations
 pub mod upstream; // Upstream client
 pub mod video; // Video processing module
 pub mod zai_vision_mcp; // Built-in Vision MCP server state

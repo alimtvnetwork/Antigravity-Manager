@@ -1,5 +1,6 @@
 //! Repo DB: tree project node builder
 
+use super::dispatch::parse_flexible_timestamp;
 use super::models::{ActivePrompt, AgmConversationNode, AgmProjectTreeNode, RunningProject};
 use super::project_queries::normalize_path_for_compare;
 use super::sequences::ensure_project_sequence_in_conn;
@@ -133,6 +134,25 @@ pub(crate) fn build_project_tree_node(
         is_inst_alive,
         &conv_nodes,
     );
+
+    // Reconcile conversation liveness with project liveness and 10-minute thinking window
+    for c in &mut conv_nodes {
+        if !proj_is_running {
+            c.is_running = false;
+            if c.status.eq_ignore_ascii_case("RUNNING") {
+                c.status = "IDLE".to_string();
+            }
+        } else if c.is_running {
+            let conv_ts = parse_flexible_timestamp(&c.last_modified);
+            let is_fresh = conv_ts > 0 && (ctx.now - conv_ts <= 600);
+            if !is_fresh {
+                c.is_running = false;
+                if c.status.eq_ignore_ascii_case("RUNNING") {
+                    c.status = "IDLE".to_string();
+                }
+            }
+        }
+    }
     crate::modules::logger::log_info(&format!(
         "[PROMPT_LIVENESS_PROBE][PROJECT] instance_id=\"{}\" project=\"{}\" is_running={} rationale=\"{}\"",
         proj.instance_id, proj.repo_name, proj_is_running, rationale

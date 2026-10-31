@@ -181,7 +181,7 @@ For each target repository, execute the complete 8-step safety ceremony:
 ```text
 SYNCHRONIZATION PIPELINE PER TARGET REPOSITORY:
 1. Pre-flight pull on base branch:
-   git pull origin <base_branch> --no-rebase
+   gitmap pull  # (fallback if gitmap unavailable: git pull origin <base_branch> --no-rebase)
 2. Safety backup branch creation & push:
    git checkout -b backup/sync-<timestamp>
    git push origin backup/sync-<timestamp>
@@ -199,7 +199,7 @@ SYNCHRONIZATION PIPELINE PER TARGET REPOSITORY:
    - Verify bump scripts (bump*) were NOT overwritten
    - Verify .ai-memory/memory/ and .ai-memory/plans/ were NOT modified
 7. Atomic commit via GitMap:
-   gitmap cpf "sync - update prompts skills and shared specs across repository"
+   gitmap cpc "SYNC - update prompts skills and shared specs across repository"
 8. Automation command execution:
    python 03-ai-scripts/38-sync-prompts-skills-scripts.py
 ```
@@ -311,7 +311,7 @@ Proceeding directly to Preflight & Phase 1B Discovery (Active Tool Call Running 
 
 1. **Platform Handshake & SQLite Task DB:**
    - Confirm active tools.
-   - Initialize task DB: `python 03-ai-scripts/46-agent-sqlite-task-manager.py init --name "<sync task name>" --budget 300`
+   - Initialize task DB: `gitmap agent task init --name "<sync task name>" --budget 300`
    - Initialize `.ai-memory/temp-agents/<nn>-<slug>/ledger.md`.
 2. **Spawn Discovery Subagents (A = 2 `research` subagents):**
    - Subagent 1: Inspect target repositories, check git working trees, detect base branches (`main`/`master`), verify existing tags.
@@ -324,7 +324,7 @@ Proceeding directly to Preflight & Phase 1B Discovery (Active Tool Call Running 
 1. Author canonical sync spec in `02-spec/21-app/nn-<slug>/01-sync-architecture-spec.md` (in source repo only; NEVER in target repos).
 2. Author modular subtasks in `.ai-memory/plans/subtasks/nn-<slug>/`.
 3. Populate subtasks into SQLite database:
-   `python 03-ai-scripts/46-agent-sqlite-task-manager.py add-subtasks --db <databasePath> --tasks-json '[...]'`
+   `gitmap agent subtask add --json '[...]'`
 4. Unconditionally proceed to Phase 2. ZERO intermediate commits during Phase 1!
 
 ### Phase 2: Execution Step (Worker Waves) (Steps 151 .. 300)
@@ -352,7 +352,7 @@ Proceeding directly to Preflight & Phase 1B Discovery (Active Tool Call Running 
 3. **Update Central Registers:**
    - Update `01-prompts/readme.md`, `.ai-memory/prompts.md`, and `.ai-memory/plans/readme.md`.
 4. **Final Atomic Commit in Source Repo:**
-   - Call `gitmap cpf "sync - update prompts skills and shared specs across repository"`.
+   - Call `gitmap cpc "SYNC - update prompts skills and shared specs across repository"`.
    - Use hyphen `-` format (no colons in GitMap message argument).
 
 ---
@@ -388,7 +388,7 @@ You are Worker <NN> for task nn-<slug>. You have no prior chat context; this bri
 - Before action: gitmap task log-action --db <databasePath> --subtask-id <id> --agent "Worker <NN>" --action "write_to_file" --file "<path>" --details "<action>"
 - On complete: gitmap task complete --db <databasePath> --subtask-id <id> --evidence "PASS <evidence>"
 - On failure: gitmap task fail --db <databasePath> --subtask-id <id> --reason "<reason>"
-*(Legacy Python fallback: python 03-ai-scripts/46-agent-sqlite-task-manager.py with identical flags)*
+*(Native compiled Go engine: gitmap agent executes in <1ms without python overhead)*
 
 ### Output Contract:
 Write subtask output to .ai-memory/plans/subtasks/nn-<slug>/01-<name>.json and reply with this JSON block, then stop:

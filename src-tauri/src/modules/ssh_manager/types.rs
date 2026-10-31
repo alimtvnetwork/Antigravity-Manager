@@ -169,13 +169,21 @@ pub struct SshGitmapStatus {
 pub struct SshNodeRecord {
     pub id: String,
     pub alias: String,
+    #[serde(default)]
     pub host: String,
+    #[serde(default)]
+    pub ip_address: String,
     pub port: u16,
     pub username: String,
     pub auth_method: String,
     pub key_path: Option<String>,
     pub encrypted_password: Option<String>,
+    #[serde(default)]
     pub has_password: bool,
+    #[serde(default)]
+    pub has_encrypted_password: bool,
+    #[serde(default)]
+    pub encrypted_password_preview: Option<String>,
     pub encryption_algo: String,
     pub os: String,
     pub source: String,
@@ -193,7 +201,7 @@ pub struct SaveSshNodeRsaPayload {
     #[serde(default = "default_ssh_port")]
     pub port: u16,
     pub username: String,
-    #[serde(default)]
+    #[serde(default, alias = "plaintext_password", alias = "password")]
     pub raw_password: Option<String>,
     #[serde(default)]
     pub key_path: Option<String>,
@@ -206,6 +214,12 @@ pub struct SaveSshNodeRsaPayload {
 pub struct ClusterInstanceBalanceItem {
     pub machine_alias: String,
     pub machine_ip: String,
+    #[serde(default, alias = "ip_address")]
+    pub ip_address: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latency_ms: Option<u64>,
     pub is_local: bool,
     pub instance_id: String,
     pub instance_name: String,
@@ -222,6 +236,7 @@ pub struct ClusterInstanceBalanceItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemotePromptDispatchPayload {
     pub node_alias: String,
+    #[serde(alias = "instance_target", alias = "instance_id")]
     pub instance_name: String,
     pub prompt_text: String,
     #[serde(default)]
@@ -233,9 +248,20 @@ pub struct RemotePromptDispatchPayload {
 pub struct RemotePromptDispatchResult {
     pub success: bool,
     pub node_alias: String,
+    #[serde(alias = "instance_target")]
     pub instance_name: String,
+    #[serde(default)]
     pub dispatch_route: String,
+    #[serde(default)]
     pub message: String,
+    #[serde(default)]
+    pub command_executed: String,
+    #[serde(default)]
+    pub stdout: String,
+    #[serde(default)]
+    pub stderr: String,
+    #[serde(default)]
+    pub duration_ms: u128,
 }
 
 /// Result of exporting system data as CSV or JSON

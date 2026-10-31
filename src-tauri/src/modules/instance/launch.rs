@@ -22,6 +22,12 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
             crate::error::AppError::Config(format!("Instance {} not found", instance_id))
         })?;
 
+    let mut audit = crate::modules::task_history_db::AuditTask::start(
+        crate::modules::audit_action::AuditAction::StartInstance,
+        &format!("Launch instance {}", instance_id),
+        Some(instance_id),
+    );
+
     let inst_config = registry.instances[pos].clone();
     let data_dir = registry.instances[pos].data_dir.clone();
     let is_default = registry.instances[pos].is_default;
@@ -137,6 +143,7 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
         let inst_home_opt = if has_custom_data {
             app_args.push(format!("--user-data-dir={}", data_dir));
             app_args.push("--password-store=basic".to_string());
+            app_args.push("--use-mock-keychain".to_string());
             let home_opt = get_instance_home_dir(instance_id).ok();
             write_keyring_bypass_markers(&target_data_path, home_opt.as_deref());
             if let Some(ref inst_home) = home_opt {
@@ -329,8 +336,8 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
             wait_for_instance_prompt_channel(instance_id);
             // Justification: background restore; prompts are re-restored on the next launch
             crate::error::record_ignored(
-                crate::modules::backup_prompts_db::restore_running_prompts(
-                    Some(instance_id),
+                crate::modules::backup_prompts_db::restore_running_prompts_scoped_with_fallback(
+                    instance_id,
                     false,
                     None,
                 ),
@@ -358,6 +365,26 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
             bound_email.clone(),
             std::time::Duration::from_secs(25),
         );
+        let payload = serde_json::json!({
+            "instance_id": instance_id,
+            "pid": actual_pid,
+            "data_dir": data_dir,
+            "executable": exe_str,
+            "reinject_prompts": reinject_prompts,
+        })
+        .to_string();
+        let primary_pid = Some(actual_pid);
+        audit.succeed(&format!(
+            "Launched instance {} (PID: {:?})",
+            instance_id, primary_pid
+        ));
+        crate::modules::task_history_db::record(
+            crate::modules::audit_action::AuditAction::StartInstance,
+            &inst_config.name,
+            "ok",
+            &format!("Launched process PID {}", actual_pid),
+            Some(&inst_config.id),
+        );
         return Ok(());
     }
 
@@ -376,6 +403,7 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
         if has_custom_data {
             cmd.arg(format!("--user-data-dir={}", data_dir));
             cmd.arg("--password-store=basic");
+            cmd.arg("--use-mock-keychain");
             write_keyring_bypass_markers(&target_data_path, inst_home_opt.as_deref());
             cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
             cmd.env("SSH_CLIENT", "127.0.0.1 50000 22");
@@ -481,6 +509,7 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
                         if has_custom_data {
                             fallback_cmd.arg(format!("--user-data-dir={}", data_dir));
                             fallback_cmd.arg("--password-store=basic");
+                            fallback_cmd.arg("--use-mock-keychain");
                             fallback_cmd.env("SSH_CONNECTION", "127.0.0.1 50000 127.0.0.1 22");
                             fallback_cmd.env("SSH_CLIENT", "127.0.0.1 50000 22");
                             fallback_cmd.env("SSH_TTY", "pty/0");
@@ -565,6 +594,7 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
                             if has_custom_data {
                                 shell_args.push(format!("--user-data-dir={}", data_dir));
                                 shell_args.push("--password-store=basic".to_string());
+                                shell_args.push("--use-mock-keychain".to_string());
                             }
                             if let Some(ref ext_dir) = extensions_dir {
                                 shell_args.push(format!("--extensions-dir={}", ext_dir));
@@ -666,25 +696,72 @@ pub(crate) fn launch_instance_inner_with_extra_workspaces(
                                     bound_email.clone(),
                                     std::time::Duration::from_secs(25),
                                 );
+                                let payload = serde_json::json!({
+                                    "instance_id": instance_id,
+                                    "pid": detected_pid,
+                                    "data_dir": data_dir,
+                                    "executable": target_bin,
+                                    "reinject_prompts": reinject_prompts,
+                                })
+                                .to_string();
+                                let primary_pid = if detected_pid > 0 {
+                                    Some(detected_pid)
+                                } else {
+                                    None
+                                };
+                                audit.succeed(&format!(
+                                    "Launched instance {} (PID: {:?})",
+                                    instance_id, primary_pid
+                                ));
+                                crate::modules::task_history_db::record(
+                                    crate::modules::audit_action::AuditAction::StartInstance,
+                                    &inst_config.name,
+                                    "ok",
+                                    &format!("Launched process PID {}", detected_pid),
+                                    Some(&inst_config.id),
+                                );
                                 return Ok(());
                             }
                         }
                     }
 
-                    return Err(crate::error::AppError::Process(format!(
-                        "Failed to spawn instance process: {}",
-                        initial_err
-                    )));
+                    let err_msg = format!("Failed to spawn instance process: {}", initial_err);
+                    audit.fail(&format!(
+                        "Launch failed for instance {}: {}",
+                        instance_id, initial_err
+                    ));
+                    return Err(crate::error::AppError::Process(err_msg));
                 }
             }
         };
 
         // Justification: PID cache bookkeeping; staleness is tolerated via the OS-level re-detect fallback
-        record_spawned_instance_process(instance_id, &data_dir, reinject_prompts, child.id())?;
+        let spawned_pid = child.id();
+        let primary_pid = Some(spawned_pid);
+        record_spawned_instance_process(instance_id, &data_dir, reinject_prompts, spawned_pid)?;
         spawn_security_notice_dismisser(
             target_data_path.clone(),
             bound_email.clone(),
             std::time::Duration::from_secs(25),
+        );
+        let payload = serde_json::json!({
+            "instance_id": instance_id,
+            "pid": spawned_pid,
+            "data_dir": data_dir,
+            "executable": exe_str,
+            "reinject_prompts": reinject_prompts,
+        })
+        .to_string();
+        audit.succeed(&format!(
+            "Launched instance {} (PID: {:?})",
+            instance_id, primary_pid
+        ));
+        crate::modules::task_history_db::record(
+            crate::modules::audit_action::AuditAction::StartInstance,
+            &inst_config.name,
+            "ok",
+            &format!("Launched process PID {}", spawned_pid),
+            Some(&inst_config.id),
         );
         Ok(())
     }

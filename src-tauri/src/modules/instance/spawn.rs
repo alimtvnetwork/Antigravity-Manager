@@ -14,12 +14,19 @@ pub(crate) fn record_spawned_instance_process(
         record_instance_pid(instance_id, child_pid, data_dir),
         "record instance pid",
     );
+    crate::modules::task_history_db::record(
+        crate::modules::audit_action::AuditAction::StartInstance,
+        &format!("Launch Instance: {}", instance_id),
+        "completed",
+        &format!("Instance spawned with PID {}", child_pid),
+        Some(instance_id),
+    );
     if reinject_prompts {
         wait_for_instance_prompt_channel(instance_id);
         // Justification: background restore; prompts are re-restored on the next launch
         crate::error::record_ignored(
-            crate::modules::backup_prompts_db::restore_running_prompts(
-                Some(instance_id),
+            crate::modules::backup_prompts_db::restore_running_prompts_scoped_with_fallback(
+                instance_id,
                 false,
                 None,
             ),

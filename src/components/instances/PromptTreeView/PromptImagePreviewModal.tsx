@@ -1,0 +1,466 @@
+import { useState, useEffect, useCallback, useRef, type WheelEvent, type MouseEvent } from 'react';
+import { ZoomIn, ZoomOut, RotateCcw, Copy, Check, Download, X, Image as ImageIcon, FileText, Maximize2, ExternalLink, Link2 } from 'lucide-react';
+import { writeNativeImageToClipboard, copyImageAsMarkdownText, copySingleImageForOneNoteOrIde, extractLocalPathFromUri } from './clipboard';
+import { copyToClipboard } from '../../../utils/clipboard';
+import { useErrorStore } from '../../../stores/error-store';
+
+export interface PromptImagePreviewModalProps {
+    isOpen: boolean;
+    imageSrc: string | null;
+    altText?: string;
+    onClose: () => void;
+}
+
+export function PromptImagePreviewModal({
+    isOpen,
+    imageSrc,
+    altText,
+    onClose,
+}: PromptImagePreviewModalProps) {
+    const [zoomScale, setZoomScale] = useState(1);
+    const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
+    const [isPanning, setIsPanning] = useState(false);
+    const [isCopied, setIsCopied] = useState(false);
+    const [isTextCopied, setIsTextCopied] = useState(false);
+    const [isOneNoteCopied, setIsOneNoteCopied] = useState(false);
+    const [isIdeLinkCopied, setIsIdeLinkCopied] = useState(false);
+    const dragStartRef = useRef({ x: 0, y: 0, initialPanX: 0, initialPanY: 0 });
+
+    const handleResetZoom = useCallback(() => {
+        setZoomScale(1);
+        setPanPosition({ x: 0, y: 0 });
+    }, []);
+
+    const handleScaleToFit = useCallback(() => {
+        setZoomScale(1);
+        setPanPosition({ x: 0, y: 0 });
+    }, []);
+
+    const handleZoomIn = useCallback(() => {
+        setZoomScale((prev) => Math.min(5, Math.round((prev + 0.25) * 100) / 100));
+    }, []);
+
+    const handleZoomOut = useCallback(() => {
+        setZoomScale((prev) => Math.max(0.25, Math.round((prev - 0.25) * 100) / 100));
+    }, []);
+
+    // Reset view whenever a new image opens
+    useEffect(() => {
+        if (isOpen) {
+            handleResetZoom();
+            setIsCopied(false);
+            setIsTextCopied(false);
+            setIsOneNoteCopied(false);
+        }
+    }, [isOpen, imageSrc, handleResetZoom]);
+
+    // Handle Escape key and keyboard shortcuts via Map dispatch table
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const keyActionMap = new Map<string, () => void>([
+            ['Escape', onClose],
+            ['+', handleZoomIn],
+            ['=', handleZoomIn],
+            ['-', handleZoomOut],
+            ['_', handleZoomOut],
+            ['0', handleResetZoom],
+        ]);
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const action = keyActionMap.get(e.key);
+            if (action) {
+                e.preventDefault();
+                e.stopPropagation();
+                action();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose, handleZoomIn, handleZoomOut, handleResetZoom]);
+
+    // Wheel zoom
+    const handleWheel = useCallback((e: WheelEvent) => {
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.15 : -0.15;
+        setZoomScale((prev) => Math.min(5, Math.max(0.25, Math.round((prev + delta) * 100) / 100)));
+    }, []);
+
+    // Pan / Drag handlers with window-level coordinate tracking for fluid pan
+    const handleMouseDown = useCallback((e: MouseEvent) => {
+        if (e.button !== 0) return;
+        setIsPanning(true);
+        dragStartRef.current = {
+            x: e.clientX,
+            y: e.clientY,
+            initialPanX: panPosition.x,
+            initialPanY: panPosition.y,
+        };
+    }, [panPosition]);
+
+    const handleMouseMove = useCallback((e: MouseEvent) => {
+        if (!isPanning) return;
+        const dx = e.clientX - dragStartRef.current.x;
+        const dy = e.clientY - dragStartRef.current.y;
+        setPanPosition({
+            x: dragStartRef.current.initialPanX + dx,
+            y: dragStartRef.current.initialPanY + dy,
+        });
+    }, [isPanning]);
+
+    const handleMouseUp = useCallback(() => {
+        setIsPanning(false);
+    }, []);
+
+    // Global drag capture guard so pan coordinates do not drop when cursor exits viewport
+    useEffect(() => {
+        if (!isPanning) return;
+        const handleGlobalMouseMove = (e: globalThis.MouseEvent) => {
+            const dx = e.clientX - dragStartRef.current.x;
+            const dy = e.clientY - dragStartRef.current.y;
+            setPanPosition({
+                x: dragStartRef.current.initialPanX + dx,
+                y: dragStartRef.current.initialPanY + dy,
+            });
+        };
+        const handleGlobalMouseUp = () => {
+            setIsPanning(false);
+        };
+        window.addEventListener('mousemove', handleGlobalMouseMove);
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+        return () => {
+            window.removeEventListener('mousemove', handleGlobalMouseMove);
+            window.removeEventListener('mouseup', handleGlobalMouseUp);
+        };
+    }, [isPanning]);
+
+    const handleOpenInIde = useCallback(async () => {
+        if (!imageSrc) return;
+        const local = extractLocalPathFromUri(imageSrc) || imageSrc;
+        const clean = local.replace(/^[/\\]+([a-zA-Z]:)/, '$1');
+        if (/^[a-zA-Z]:[\\/]/.test(clean) || clean.startsWith('/') || clean.startsWith('\\\\')) {
+            try {
+                const { openPath } = await import('@tauri-apps/plugin-opener');
+                await openPath(clean);
+            } catch (err) {
+                useErrorStore.getState().trackWarning(err, {
+                    source: 'PromptImagePreviewModal.handleOpenInIde',
+                    triggerAction: 'open_image_in_ide',
+                });
+            }
+        }
+    }, [imageSrc]);
+
+    const handleCopyIdeLink = useCallback(async () => {
+        if (!imageSrc) return;
+        try {
+            const local = extractLocalPathFromUri(imageSrc) || imageSrc;
+            const cleanPath = local.replace(/^file:\/\/\/?/, '').replace(/\\/g, '/');
+            const filename = cleanPath.split('/').pop() || 'image.png';
+            const fileUri = cleanPath.startsWith('/') ? `file://${cleanPath}` : `file:///${cleanPath}`;
+            const md = `[${altText || filename}](${fileUri})`;
+            const ok = await copyToClipboard(md);
+            if (ok) {
+                setIsIdeLinkCopied(true);
+                setTimeout(() => setIsIdeLinkCopied(false), 2200);
+            }
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'PromptImagePreviewModal.handleCopyIdeLink',
+                triggerAction: 'copy_ide_link',
+            });
+        }
+    }, [altText, imageSrc]);
+
+    const handleCopyNative = useCallback(async () => {
+        if (!imageSrc) return;
+        try {
+            const isSuccess = await writeNativeImageToClipboard(
+                imageSrc,
+                () => {
+                    setIsCopied(true);
+                    setTimeout(() => setIsCopied(false), 2200);
+                },
+                (err) => {
+                    useErrorStore.getState().trackWarning(err, {
+                        source: 'PromptImagePreviewModal.handleCopyNative',
+                        triggerAction: 'write_native_image_preview',
+                    });
+                }
+            );
+            if (isSuccess) {
+                setIsCopied(true);
+                setTimeout(() => setIsCopied(false), 2200);
+            }
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'PromptImagePreviewModal.handleCopyNative.outer',
+                triggerAction: 'copy_native_image_outer',
+            });
+        }
+    }, [imageSrc]);
+
+    const handleCopyOneNote = useCallback(async () => {
+        if (!imageSrc) return;
+        try {
+            const isSuccess = await copySingleImageForOneNoteOrIde(
+                imageSrc,
+                altText || 'Image',
+                () => {
+                    setIsOneNoteCopied(true);
+                    setTimeout(() => setIsOneNoteCopied(false), 2200);
+                },
+                (err) => {
+                    useErrorStore.getState().trackWarning(err, {
+                        source: 'PromptImagePreviewModal.handleCopyOneNote',
+                        triggerAction: 'copy_image_onenote_preview',
+                    });
+                }
+            );
+            if (isSuccess) {
+                setIsOneNoteCopied(true);
+                setTimeout(() => setIsOneNoteCopied(false), 2200);
+            }
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'PromptImagePreviewModal.handleCopyOneNote.outer',
+                triggerAction: 'copy_image_onenote_preview_outer',
+            });
+        }
+    }, [altText, imageSrc]);
+
+    const handleCopyText = useCallback(async () => {
+        if (!imageSrc) return;
+        try {
+            const isSuccess = await copyImageAsMarkdownText(
+                imageSrc,
+                altText || 'Image',
+                () => {
+                    setIsTextCopied(true);
+                    setTimeout(() => setIsTextCopied(false), 2200);
+                },
+                (err) => {
+                    useErrorStore.getState().trackWarning(err, {
+                        source: 'PromptImagePreviewModal.handleCopyText',
+                        triggerAction: 'copy_image_as_markdown_text_preview',
+                    });
+                }
+            );
+            if (isSuccess) {
+                setIsTextCopied(true);
+                setTimeout(() => setIsTextCopied(false), 2200);
+            }
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'PromptImagePreviewModal.handleCopyText.outer',
+                triggerAction: 'copy_image_text_preview_outer',
+            });
+        }
+    }, [altText, imageSrc]);
+
+    const handleDownload = useCallback(async () => {
+        if (!imageSrc) return;
+        try {
+            const extMatch = imageSrc.match(/\.(png|jpe?g|webp|gif|svg)(?:\?.*)?$/i);
+            const ext = extMatch ? extMatch[1].toLowerCase() : 'png';
+            const filename = `prompt-attachment-${Date.now()}.${ext}`;
+
+            if (imageSrc.startsWith('data:')) {
+                const a = document.createElement('a');
+                a.href = imageSrc;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } else {
+                // For http/https/asset urls, fetch blob to ensure cross-origin/Tauri asset downloads properly
+                const response = await fetch(imageSrc);
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+            }
+        } catch (err) {
+            useErrorStore.getState().trackWarning(err, {
+                source: 'PromptImagePreviewModal.handleDownload',
+                triggerAction: 'download_image',
+            });
+            // Fallback to direct anchor click
+            try {
+                const a = document.createElement('a');
+                a.href = imageSrc;
+                a.download = `prompt-attachment-${Date.now()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } catch (fallbackErr) {
+                useErrorStore.getState().trackWarning(fallbackErr, {
+                    source: 'PromptImagePreviewModal.handleDownload.fallback',
+                    triggerAction: 'download_image_fallback',
+                });
+            }
+        }
+    }, [imageSrc]);
+
+    if (!isOpen || !imageSrc) return null;
+
+    const isZoomed = zoomScale > 1;
+
+    return (
+        <div
+            className="fixed inset-0 z-[100050] flex flex-col items-center justify-between bg-black/85 backdrop-blur-md select-none transition-opacity duration-200"
+            onClick={onClose}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+        >
+            {/* Top Toolbar / Header Capsule */}
+            <div
+                className="w-full flex items-center justify-between px-6 py-4 pointer-events-auto"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center gap-2 text-slate-300 text-xs font-medium">
+                    <ImageIcon className="w-4 h-4 text-purple-400" />
+                    <span className="truncate max-w-sm text-slate-200">
+                        {altText || 'Prompt Image Attachment'}
+                    </span>
+                </div>
+
+                {/* Segmented Capsule Actions */}
+                <div className="inline-flex items-center rounded-lg border border-slate-700/60 bg-slate-900/90 shadow-lg px-2 py-1 gap-1 text-slate-300 text-xs">
+                    <button
+                        type="button"
+                        onClick={handleZoomOut}
+                        disabled={zoomScale <= 0.25}
+                        className="p-1.5 rounded-md hover:bg-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
+                        title="Zoom Out (-)"
+                    >
+                        <ZoomOut className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="px-1.5 font-mono text-[11px] min-w-[48px] text-center text-purple-300">
+                        {Math.round(zoomScale * 100)}%
+                    </span>
+                    <button
+                        type="button"
+                        onClick={handleZoomIn}
+                        disabled={zoomScale >= 5}
+                        className="p-1.5 rounded-md hover:bg-slate-800 disabled:opacity-40 transition-colors cursor-pointer"
+                        title="Zoom In (+)"
+                    >
+                        <ZoomIn className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="w-[1px] h-4 bg-slate-700 mx-0.5" />
+                    <button
+                        type="button"
+                        onClick={handleScaleToFit}
+                        className="p-1.5 rounded-md hover:bg-slate-800 transition-colors cursor-pointer"
+                        title="Scale to Fit (100%)"
+                    >
+                        <Maximize2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleResetZoom}
+                        className="p-1.5 rounded-md hover:bg-slate-800 transition-colors cursor-pointer"
+                        title="Reset Zoom (0)"
+                    >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="w-[1px] h-4 bg-slate-700 mx-0.5" />
+                    <button
+                        type="button"
+                        onClick={handleCopyNative}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 transition-colors cursor-pointer font-medium"
+                        title="Copy native PNG image binary to clipboard for pasting into Gemini Web, Photoshop, Paint"
+                    >
+                        {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{isCopied ? 'Copied Single Image!' : 'Copy Single Image (PNG)'}</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleCopyOneNote}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 transition-colors cursor-pointer font-medium"
+                        title="Copy rich image for OneNote, Word, or Markdown for IDEs"
+                    >
+                        {isOneNoteCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <FileText className="w-3.5 h-3.5 text-indigo-400" />}
+                        <span>{isOneNoteCopied ? 'Copied for OneNote/IDE!' : 'Copy Image for OneNote/IDE'}</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleCopyText}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-sky-600/30 hover:bg-sky-600/50 text-sky-200 transition-colors cursor-pointer font-medium"
+                        title="Copy image as Markdown text (![Image](...))"
+                    >
+                        {isTextCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <FileText className="w-3.5 h-3.5 text-sky-400" />}
+                        <span>{isTextCopied ? 'Copied Image as Text!' : 'Copy Image as Text (Markdown)'}</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleCopyIdeLink}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-teal-600/30 hover:bg-teal-600/50 text-teal-200 transition-colors cursor-pointer font-medium"
+                        title="Copy clickable file link for IDE ([filename](file:///...))"
+                    >
+                        {isIdeLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Link2 className="w-3.5 h-3.5 text-teal-400" />}
+                        <span>{isIdeLinkCopied ? 'Copied IDE Link!' : 'Copy IDE Link'}</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleOpenInIde}
+                        className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 transition-colors cursor-pointer font-medium"
+                        title="Open image file in IDE or default OS viewer"
+                    >
+                        <ExternalLink className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Open in IDE</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleDownload}
+                        className="p-1.5 rounded-md hover:bg-slate-800 transition-colors cursor-pointer"
+                        title="Download image file"
+                    >
+                        <Download className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="w-[1px] h-4 bg-slate-700 mx-0.5" />
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="p-1.5 rounded-md hover:bg-red-500/20 hover:text-red-300 transition-colors cursor-pointer text-slate-400"
+                        title="Close (Esc)"
+                    >
+                        <X className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+            </div>
+
+            {/* Central Canvas Viewport */}
+            <div
+                className="relative flex-1 w-full flex items-center justify-center overflow-hidden cursor-grab active:cursor-grabbing p-4"
+                onWheel={handleWheel}
+                onMouseDown={handleMouseDown}
+                onDoubleClick={handleResetZoom}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <img
+                    src={imageSrc}
+                    alt={altText || 'Preview'}
+                    draggable={false}
+                    className="max-h-[82vh] max-w-[90vw] object-contain rounded-lg shadow-2xl transition-transform duration-75 ease-out select-none"
+                    style={{
+                        transform: `translate(${panPosition.x}px, ${panPosition.y}px) scale(${zoomScale})`,
+                        cursor: isZoomed ? (isPanning ? 'grabbing' : 'grab') : 'default',
+                    }}
+                />
+            </div>
+
+            {/* Footer Hint */}
+            <div className="py-2 text-[11px] text-slate-500 font-mono pointer-events-none">
+                Scroll to zoom · Drag to pan · Double click or press 0 to reset · Esc to close
+            </div>
+        </div>
+    );
+}

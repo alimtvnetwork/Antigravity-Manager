@@ -11,21 +11,22 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  # Runs on main always finish (plan 91): a cancelled CI run must never be the reason a release gate cannot verify green CI.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # 前端构建检查
   build-frontend:
     name: Build Frontend
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Node.js setup
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: "npm"
@@ -44,13 +45,21 @@ jobs:
     name: Check Rust Code
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 30
+    # Non-blocking for the experimental Ubuntu 26.04 entry (plan 91): validates WebKitGTK package names ahead of the runner change.
+    continue-on-error: ${{ matrix.experimental == true }}
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-latest, windows-2022, macos-latest]
+        # macOS hosted arm64 runners are often never acquired (jobs conclude cancelled).
+        # Cancelled jobs fail the workflow even with continue-on-error, which blocked the Release gate.
+        platform: [ubuntu-24.04, windows-2022]
+        experimental: [false]
+        include:
+          - platform: ubuntu-26.04
+            experimental: true
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Optimize Windows Runner I/O
         if: startsWith(matrix.platform, 'windows')
@@ -126,10 +135,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-latest, windows-2022, macos-latest]
+        # Omit macos-latest: hosted arm64 capacity cancels the job and fails CI (plan 91 Release gate).
+        platform: [ubuntu-24.04, windows-2022]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Optimize Windows Runner I/O
         if: startsWith(matrix.platform, 'windows')
@@ -166,7 +176,7 @@ jobs:
           cache-targets: "true"
 
       - name: Node.js setup
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: "npm"

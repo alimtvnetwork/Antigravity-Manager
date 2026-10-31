@@ -16,7 +16,7 @@ pub struct ProfileCandidate {
 pub fn is_model_matching_target(model_name: &str, target_model: &str) -> bool {
     let m = model_name.trim().to_lowercase();
     let t = target_model.trim().to_lowercase();
-    if t.is_empty() {
+    if t.is_empty() || t == "*" {
         return true;
     }
     if m == t || m.contains(&t) || t.contains(&m) {
@@ -25,6 +25,7 @@ pub fn is_model_matching_target(model_name: &str, target_model: &str) -> bool {
     let is_target_flash = t.contains("flash");
     let is_target_pro = t.contains("pro");
     let is_target_claude = t.contains("claude") || t.contains("sonnet");
+    let is_target_gpt = t.contains("gpt") || t.contains("o1") || t.contains("o3");
     if is_target_flash && m.contains("flash") {
         return true;
     }
@@ -32,6 +33,9 @@ pub fn is_model_matching_target(model_name: &str, target_model: &str) -> bool {
         return true;
     }
     if is_target_claude && (m.contains("claude") || m.contains("sonnet")) {
+        return true;
+    }
+    if is_target_gpt && (m.contains("gpt") || m.contains("o1") || m.contains("o3")) {
         return true;
     }
     false
@@ -69,16 +73,87 @@ pub(crate) fn compute_weekly_hours_elapsed(
         .min(TOTAL_WEEK_HOURS)
 }
 
-/// Headroom-weighted weekly quota scoring algorithm:
+/// Helper to check if an account is active, enabled, and permitted for proxy/switch usage.
+pub fn is_account_active_and_enabled(acc: &Account) -> bool {
+    !acc.disabled && !acc.proxy_disabled
+}
+
+/// Helper to check if candidate is eligible for switch scoring.
+pub fn is_candidate_eligible_for_switch(acc: &Account) -> bool {
+    is_account_active_and_enabled(acc) && acc.quota.is_some()
+}
+
+/// Helper to filter native Gemini models from third-party or Claude models.
+pub fn is_gemini_native_model(model_name: &str) -> bool {
+    let n = model_name.to_lowercase();
+    !n.contains("claude") && !n.contains("3p")
+}
+
+/// Helper to check if a quota bucket belongs to Gemini weekly cycle.
+pub fn is_gemini_weekly_bucket(window: &str, bucket_id: &str) -> bool {
+    let win = window.to_lowercase();
+    let bid = bucket_id.to_lowercase();
+    let is_weekly = win.contains("week") || bid.contains("week");
+    let is_gemini = !bid.contains("3p") && !bid.contains("claude");
+    is_weekly && is_gemini
+}
+
+/// Computes the Expiration Urgency Multiplier for an account's weekly quota cycle.
+///
+/// If an account has usable weekly quota (>= floor, default 15%) and its reset time is
+/// within 24 hours, returns an urgency multiplier between 5.0 and 10.0 (closest to reset = highest).
+/// Within 48 hours, returns an elevated multiplier between 1.5 and 5.0.
+/// Otherwise returns 1.0 (neutral).
+pub fn compute_expiration_urgency_multiplier(
+    weekly_pct: f64,
+    remaining_hours: f64,
+    weekly_floor: f64,
+) -> f64 {
+    if weekly_pct < weekly_floor {
+        return 1.0;
+    }
+    if (0.0..=24.0).contains(&remaining_hours) {
+        // Critical Urgency Window: 5.0 .. 10.0
+        let fraction = (24.0 - remaining_hours) / 24.0;
+        5.0 + fraction * 5.0
+    } else if remaining_hours > 24.0 && remaining_hours <= 48.0 {
+        // Elevated Urgency Window: 1.5 .. 5.0
+        let fraction = (48.0 - remaining_hours) / 24.0;
+        1.5 + fraction * 3.5
+    } else {
+        1.0
+    }
+}
+
+/// Helper accepting Unix reset timestamp directly
+pub fn compute_expiration_urgency_multiplier_from_ts(
+    reset_ts: i64,
+    now_sec: i64,
+    weekly_pct: f64,
+    weekly_floor: f64,
+) -> f64 {
+    if reset_ts <= now_sec {
+        return 1.0;
+    }
+    let remaining_hours = (reset_ts - now_sec).max(0) as f64 / 3600.0;
+    compute_expiration_urgency_multiplier(weekly_pct, remaining_hours, weekly_floor)
+}
+
+/// Quota expiration urgency weekly quota scoring algorithm:
 /// - Any candidate with < 100% 4-hour quota (and period not finished) evaluates to `0.0`.
-/// - Fresh accounts with 168h headroom receive maximum scaling (Headroom Multiplier = 2.0).
-/// - Accounts nearing reset boundary receive minimal headroom multiplier (Headroom Multiplier = 1.0).
+/// - Accounts nearing reset boundary (<= 24h or <= 48h) with usable weekly quota receive an
+///   Expiration Urgency Multiplier (E_urgency up to 10.0x) prioritizing consuming quota before reset.
+/// - Fresh accounts with days of headroom receive neutral multiplier (1.0).
 /// - Formula: `Score = (tier_multiplier * weekly_effective_score) / 100.0`
-///   where weekly_effective_score = effective_weekly_pct * remaining_hours (or 168.0 * 100.0 on reset).
-/// - Sorting direction: DESCENDING (highest score = freshly reset 100% account = selected first).
-/// - Weekly quota < 8% treated as 0 (below viable threshold for Gemini).
+///   where weekly_effective_score = effective_weekly_pct * urgency (or 100.0 on reset).
+/// - Sorting direction: DESCENDING (highest score = urgent expiring or high tier/quota selected first).
+/// - Weekly quota < floor threshold (default 15%, user configurable) treated as 0 (below viable threshold).
 /// - Claude/3p buckets are excluded.
 pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
+    if !is_account_active_and_enabled(acc) {
+        return 0.0;
+    }
+
     let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
     let is_period_finished = period_stat
         .as_ref()
@@ -106,36 +181,40 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
     };
 
     const TOTAL_WEEK_HOURS: f64 = 168.0;
-    const WEEKLY_ZERO_THRESHOLD: f64 = 8.0;
+    let weekly_zero_threshold: f64 = switcher_cfg.min_weekly_quota_percent.max(0.0);
 
     let mut weekly_effective_score = 0.0_f64;
 
-    if is_period_finished {
-        // Reset boundary: credits refresh to full 100% capacity with maximum headroom
-        weekly_effective_score = TOTAL_WEEK_HOURS * 100.0;
+    let q_4h_check = calculate_4h_window_quota(acc, target_model).unwrap_or(0.0);
+    if is_period_finished && q_4h_check >= 100.0 {
+        // Reset boundary: credits refresh to full 100% capacity
+        weekly_effective_score = 100.0;
     } else if let Some(quota_data) = acc.quota.as_ref() {
         let mut gemini_weekly_scores: Vec<f64> = Vec::new();
 
         if let Some(ref groups) = quota_data.quota_groups {
             for g in groups {
                 for b in &g.buckets {
-                    let win = b.window.to_lowercase();
-                    let bid = b.bucket_id.to_lowercase();
-                    // Gemini-only: skip 3p/claude buckets (Claude TODO)
-                    let is_gemini_weekly = (win.contains("week") || bid.contains("week"))
-                        && !bid.contains("3p")
-                        && !bid.contains("claude");
-                    if is_gemini_weekly && (0.0..=1.0).contains(&b.remaining_fraction) {
-                        let pct = (b.remaining_fraction * 100.0).round();
-                        let eff_pct = if pct < WEEKLY_ZERO_THRESHOLD {
-                            0.0
-                        } else {
-                            pct
-                        };
-                        // Modernized: remaining cycle headroom gives highest score to freshly reset accounts
-                        let remaining_hours = compute_weekly_remaining_headroom_hours(b, now_sec);
-                        gemini_weekly_scores.push(eff_pct * remaining_hours);
+                    if !is_gemini_weekly_bucket(&b.window, &b.bucket_id) {
+                        continue;
                     }
+                    if !(0.0..=1.0).contains(&b.remaining_fraction) {
+                        continue;
+                    }
+                    let pct = (b.remaining_fraction * 100.0).round();
+                    let eff_pct = if pct < weekly_zero_threshold {
+                        0.0
+                    } else {
+                        pct
+                    };
+                    // Quota Expiration Urgency: prioritize consuming usable quota before reset
+                    let remaining_hours = compute_weekly_remaining_headroom_hours(b, now_sec);
+                    let urgency = compute_expiration_urgency_multiplier(
+                        eff_pct,
+                        remaining_hours,
+                        weekly_zero_threshold,
+                    );
+                    gemini_weekly_scores.push(eff_pct * urgency);
                 }
             }
         }
@@ -153,21 +232,18 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
                 .find(|m| is_model_matching_target(&m.name, target_model))
                 .map(|m| m.percentage as f64);
             let eff_pct = match target_pct {
-                Some(pct) if pct < WEEKLY_ZERO_THRESHOLD => 0.0,
+                Some(pct) if pct < weekly_zero_threshold => 0.0,
                 Some(pct) => pct,
                 None => {
                     let valid_models: Vec<_> = quota_data
                         .models
                         .iter()
-                        .filter(|m| {
-                            let n = m.name.to_lowercase();
-                            !n.contains("claude") && !n.contains("3p")
-                        })
+                        .filter(|m| is_gemini_native_model(&m.name))
                         .collect();
                     if !valid_models.is_empty() {
                         let sum: i32 = valid_models.iter().map(|m| m.percentage).sum();
                         let avg_pct = (sum as f64 / valid_models.len() as f64).round();
-                        if avg_pct < WEEKLY_ZERO_THRESHOLD {
+                        if avg_pct < weekly_zero_threshold {
                             0.0
                         } else {
                             avg_pct
@@ -177,7 +253,7 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
                     }
                 }
             };
-            weekly_effective_score = eff_pct * TOTAL_WEEK_HOURS;
+            weekly_effective_score = eff_pct;
         }
     }
 
@@ -185,24 +261,19 @@ pub fn calculate_weekly_base_score(acc: &Account, target_model: &str, now_sec: i
 }
 
 /// Primary candidate scoring ("usually"):
-/// - If 4h quota is less than 100% (and period not finished): strictly returns 0.0.
-/// - Otherwise (4h quota == 100% or period finished): returns base weekly score.
+/// - If 4h quota is less than 100% (even reduced by 1% or 2%): strictly returns 0.0.
+/// - Only genuine 100% 4h quota accounts receive base weekly score.
 /// Sort direction: DESCENDING (highest score selected first).
 pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
-    let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
-    let is_period_finished = period_stat
-        .as_ref()
-        .map(|s| s.is_period_finished)
-        .unwrap_or(false);
-    let q_4h = period_stat
-        .as_ref()
-        .map(|s| s.quota_percent)
-        .or_else(|| calculate_4h_window_quota(acc, target_model))
-        .unwrap_or(0.0);
+    if !is_account_active_and_enabled(acc) {
+        return 0.0;
+    }
+
+    let q_4h = calculate_4h_window_quota(acc, target_model).unwrap_or(0.0);
 
     // Primary 100% 4-Hour Quota Gate:
-    // If 4h time is less than 100%, usually it should be 0.
-    if q_4h < 100.0 && !is_period_finished {
+    // Any candidate with < 100% 4-hour quota (even reduced by 1% or 2%) strictly evaluates to 0.0.
+    if q_4h < 100.0 {
         return 0.0;
     }
 
@@ -214,27 +285,26 @@ pub fn score_candidate_account(acc: &Account, target_model: &str, now_sec: i64) 
 ///   Score = 4h percentage % × (score what we have) = ((q_4h / 100.0) * base_weekly_score).
 /// - Accounts with weekly quota < 8% strictly evaluate to 0.0.
 pub fn score_candidate_account_fallback(acc: &Account, target_model: &str, now_sec: i64) -> f64 {
-    let period_stat = evaluate_account_period_status(acc, target_model, 20.0, now_sec);
-    let is_period_finished = period_stat
-        .as_ref()
-        .map(|s| s.is_period_finished)
-        .unwrap_or(false);
-    let q_4h = if is_period_finished {
-        100.0
-    } else {
-        period_stat
-            .as_ref()
-            .map(|s| s.quota_percent)
-            .or_else(|| calculate_4h_window_quota(acc, target_model))
-            .unwrap_or(0.0)
-    };
+    if !is_account_active_and_enabled(acc) {
+        return 0.0;
+    }
 
+    let q_4h = calculate_4h_window_quota(acc, target_model).unwrap_or(0.0);
     if q_4h <= 0.0 {
         return 0.0;
     }
 
     let base_score = calculate_weekly_base_score(acc, target_model, now_sec);
-    (q_4h / 100.0) * base_score
+    calculate_proportional_fallback_score(q_4h, base_score)
+}
+
+/// Helper computing proportional score: (q_4h / 100.0) * weekly_score.
+/// Returns 0.0 if q_4h <= 0.0 or weekly_score <= 0.0.
+pub fn calculate_proportional_fallback_score(q_4h: f64, weekly_score: f64) -> f64 {
+    if q_4h <= 0.0 || weekly_score <= 0.0 {
+        return 0.0;
+    }
+    ((q_4h.clamp(0.0, 100.0)) / 100.0) * weekly_score
 }
 
 /// Specifically evaluate the 4-hour / 5-hour immediate rolling window quota (0-100%)
@@ -387,14 +457,46 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_scoring_formula_rewards_headroom() {
+    fn test_compute_expiration_urgency_multiplier() {
+        // Under 24h: 4.4h left, 33% quota
+        let m_urgent = compute_expiration_urgency_multiplier(33.0, 4.4, 15.0);
+        let expected = 5.0 + ((24.0 - 4.4) / 24.0) * 5.0; // ~9.0833
+        assert!(
+            (m_urgent - expected).abs() < 1e-4,
+            "Expected {}, got {}",
+            expected,
+            m_urgent
+        );
+
+        // Under 48h: 36h left, 50% quota
+        let m_elevated = compute_expiration_urgency_multiplier(50.0, 36.0, 15.0);
+        let expected_elevated = 1.5 + ((48.0 - 36.0) / 24.0) * 3.5; // 3.25
+        assert!(
+            (m_elevated - expected_elevated).abs() < 1e-4,
+            "Expected {}, got {}",
+            expected_elevated,
+            m_elevated
+        );
+
+        // Over 48h: 152h left
+        let m_neutral = compute_expiration_urgency_multiplier(78.0, 152.0, 15.0);
+        assert_eq!(m_neutral, 1.0);
+
+        // Below floor threshold (5% < 15%)
+        let m_below_floor = compute_expiration_urgency_multiplier(5.0, 2.0, 15.0);
+        assert_eq!(m_below_floor, 1.0);
+    }
+
+    #[test]
+    fn test_scoring_formula_prioritizes_expiring_quota() {
         let now_sec = 1790090000;
         let future_time_fresh = "2026-09-29T14:30:00Z";
-        let future_time_low = "2026-09-22T17:30:00Z";
+        let future_time_expiring = "2026-09-22T17:30:00Z";
 
+        // Fresh account: 78% weekly quota, ~167h headroom
         let mut acc_fresh = make_test_account(
             "acc-fresh",
-            "fresh@test.local",
+            "riseup.team.now@gmail.com",
             "gemini-pro",
             100,
             future_time_fresh,
@@ -406,7 +508,7 @@ mod tests {
                 buckets: vec![crate::models::quota::QuotaBucket {
                     bucket_id: "gemini-weekly".to_string(),
                     window: "weekly".to_string(),
-                    remaining_fraction: 1.0,
+                    remaining_fraction: 0.78,
                     reset_time: future_time_fresh.to_string(),
                     observed_at: None,
                     cycle_tokens: None,
@@ -416,22 +518,23 @@ mod tests {
             }]);
         }
 
-        let mut acc_low = make_test_account(
-            "acc-low",
-            "low@test.local",
+        // Expiring account: 33% weekly quota, ~2.3h headroom
+        let mut acc_expiring = make_test_account(
+            "acc-expiring",
+            "shohagbazar004@gmail.com",
             "gemini-pro",
             100,
-            future_time_low,
+            future_time_expiring,
         );
-        if let Some(ref mut q) = acc_low.quota {
+        if let Some(ref mut q) = acc_expiring.quota {
             q.quota_groups = Some(vec![crate::models::quota::QuotaGroup {
                 display_name: "Gemini Models".to_string(),
                 description: None,
                 buckets: vec![crate::models::quota::QuotaBucket {
                     bucket_id: "gemini-weekly".to_string(),
                     window: "weekly".to_string(),
-                    remaining_fraction: 1.0,
-                    reset_time: future_time_low.to_string(),
+                    remaining_fraction: 0.33,
+                    reset_time: future_time_expiring.to_string(),
                     observed_at: None,
                     cycle_tokens: None,
                     display_name: None,
@@ -441,13 +544,13 @@ mod tests {
         }
 
         let score_fresh = score_candidate_account(&acc_fresh, "gemini-pro", now_sec);
-        let score_low = score_candidate_account(&acc_low, "gemini-pro", now_sec);
+        let score_expiring = score_candidate_account(&acc_expiring, "gemini-pro", now_sec);
 
         assert!(
-            score_fresh > score_low,
-            "Freshly reset accounts must rank higher than low headroom accounts: fresh={} low={}",
-            score_fresh,
-            score_low
+            score_expiring > score_fresh,
+            "Urgent expiring account (33% @ ~2.3h left) must score higher than fresh account (78% @ ~167h left) because weekly quota is use-it-or-lose-it: expiring={} fresh={}",
+            score_expiring,
+            score_fresh
         );
     }
 
@@ -536,6 +639,42 @@ mod tests {
             fallback_score > 0.0,
             "Fallback score for 95% quota account must be > 0.0, got {}",
             fallback_score
+        );
+    }
+
+    #[test]
+    fn test_score_candidate_account_disabled_is_zero() {
+        let now_sec = 1790090000;
+        let future_time = "2026-09-30T14:30:00Z";
+        let mut acc = make_test_account(
+            "acc-disabled",
+            "disabled@test.local",
+            "gemini-pro",
+            100,
+            future_time,
+        );
+        acc.disabled = true;
+
+        assert_eq!(
+            calculate_weekly_base_score(&acc, "gemini-pro", now_sec),
+            0.0
+        );
+        assert_eq!(score_candidate_account(&acc, "gemini-pro", now_sec), 0.0);
+        assert_eq!(
+            score_candidate_account_fallback(&acc, "gemini-pro", now_sec),
+            0.0
+        );
+
+        acc.disabled = false;
+        acc.proxy_disabled = true;
+        assert_eq!(
+            calculate_weekly_base_score(&acc, "gemini-pro", now_sec),
+            0.0
+        );
+        assert_eq!(score_candidate_account(&acc, "gemini-pro", now_sec), 0.0);
+        assert_eq!(
+            score_candidate_account_fallback(&acc, "gemini-pro", now_sec),
+            0.0
         );
     }
 }

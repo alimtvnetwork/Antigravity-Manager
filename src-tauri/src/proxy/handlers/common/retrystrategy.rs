@@ -1,19 +1,19 @@
 use super::*;
 
-// ===== 统一重试与退避策略 =====
+// ===== Unified retry and backoff strategy =====
 
-/// 重试策略枚举
+/// Retry strategy enumeration
 #[derive(Debug, Clone)]
 pub enum RetryStrategy {
-    /// 不重试，直接返回错误
+    /// No retry, return error directly
     NoRetry,
-    /// 固定延迟
+    /// fixed delay
     FixedDelay(Duration),
-    /// 线性退避：base_ms * (attempt + 1)
+    /// Linear backoff: base_ms * (attempt + 1)
     LinearBackoff { base_ms: u64 },
-    /// 指数退避：base_ms * 2^attempt，上限 max_ms
+    /// Exponential backoff: base_ms * 2^attempt, upper limit max_ms
     ExponentialBackoff { base_ms: u64, max_ms: u64 },
-    /// [NEW] 原地重试 (Grace Retry)：在当前账号上小窗口等待后直接重试，不计入常规切换
+    /// [NEW] Retry in place (Grace Retry): Retry directly after waiting in a small window on the current account, not counted in regular switching
     GraceRetry(Duration),
 }
 
@@ -179,14 +179,14 @@ pub fn determine_retry_strategy_adaptive(
     attempt: usize,
     pool_size: usize,
 ) -> RetryStrategy {
-    // [DEFENSE] 若错误已明确为模型不存在，绝对禁止无效轮换或退避重试！
+    // [DEFENSE] If the error is clearly that the model does not exist, invalid rotation or backoff retries are absolutely prohibited!
     if is_model_not_found_error(status_code, error_text) {
         return RetryStrategy::NoRetry;
     }
 
     let lower = error_text.to_lowercase();
     match status_code {
-        // 400 错误：仅在特定 Thinking 签名失败时重试一次
+        // 400 Error: Retry only if specific Thinking signature fails
         400 if !retried_without_thinking
             && (lower.contains("invalid thought signature")
                 || lower.contains("invalid `signature`")
@@ -220,7 +220,7 @@ pub fn determine_retry_strategy_adaptive(
                 return RetryStrategy::FixedDelay(Duration::from_millis(50));
             }
 
-            // 3. 单账号模式 (pool_size <= 1)：无法切号，等待是唯一选择
+            // 3. Single account mode (pool_size <= 1): Unable to switch accounts, waiting is the only option
             if pool_size <= 1 {
                 if let Some(delay) = parsed_delay {
                     let actual_ms = delay.actual_wait_ms();
@@ -236,7 +236,7 @@ pub fn determine_retry_strategy_adaptive(
                         ));
                     }
                 } else {
-                    // 没有给出明确延迟时的保底退避 (单账号等待 3s~5s，杜绝 50ms 闪电耗尽重试)
+                    // Guaranteed backoff when no clear delay is given (wait 3s~5s for a single account, avoid 50ms lightning exhaustion and retry)
                     let backoff_ms = (3000 * (attempt + 1) as u64).min(10_000);
                     tracing::info!(
                         "[Retry] Single account 429 without explicit delay: backing off {}ms",
@@ -250,10 +250,10 @@ pub fn determine_retry_strategy_adaptive(
                 }
             }
 
-            // 4. 多账号模式 (pool_size > 1)
+            // 4. Multi-account mode (pool_size > 1)
             let is_first_round = attempt < pool_size;
             if is_first_round {
-                // Round 1 (第一轮)：全池闪电快切，毫秒级逃逸至其他健康账号
+                // Round 1 (first round): Lightning fast cut across the entire pool, escaping to other healthy accounts in milliseconds
                 tracing::info!(
                     "[Retry] Multi-account Round 1 (attempt {}/{}): fast rotating to next account in pool (50ms)",
                     attempt + 1, pool_size
@@ -261,10 +261,10 @@ pub fn determine_retry_strategy_adaptive(
                 return RetryStrategy::FixedDelay(Duration::from_millis(50));
             }
 
-            // Round 2 (第二轮)：全池在第一轮已全部遭遇 429，进入智能退避与小间隙等待阶段
+            // Round 2 (Second round): The entire pool has encountered 429 in the first round and has entered the stage of intelligent retreat and small gap waiting.
             if let Some(delay) = parsed_delay {
                 let actual_ms = delay.actual_wait_ms();
-                // 遇到小间隙 (<= 5s) 时，在当前账号原地小等并重试
+                // When encountering a small gap (<= 5s), wait in the current account and try again.
                 if actual_ms <= 5000 && allow_grace_retry {
                     tracing::info!(
                         "[Retry] Multi-account Round 2 (attempt {}): small reset gap ({}ms <= 5s), applying GraceRetry",
@@ -273,7 +273,7 @@ pub fn determine_retry_strategy_adaptive(
                     return RetryStrategy::GraceRetry(Duration::from_millis(actual_ms));
                 }
 
-                // 延迟较大 (> 5s，如 10s 以上) 且可用账号数 > 2：优先继续闪电轮换寻找其他可能到期的账号
+                // The delay is large (> 5s, such as more than 10s) and the number of available accounts is > 2: Give priority to continuing the lightning rotation to look for other accounts that may expire.
                 if pool_size > 2 && attempt + 1 < pool_size * 2 {
                     tracing::info!(
                         "[Retry] Multi-account Round 2 (attempt {}): delay is {}ms (> 5s) with pool_size > 2, fast rotating",
@@ -282,7 +282,7 @@ pub fn determine_retry_strategy_adaptive(
                     return RetryStrategy::FixedDelay(Duration::from_millis(50));
                 }
 
-                // 其余情况 (例如仅 2 账号或第二轮后半段)：等待该延迟 (上限 12s，防止客户端超时)
+                // Other situations (such as only 2 accounts or the second half of the second round): wait for the delay (upper limit 12s to prevent client timeout)
                 let capped_ms = actual_ms.min(12_000);
                 tracing::info!(
                     "[Retry] Multi-account Round 2: waiting capped delay {}ms before retry",
@@ -291,22 +291,22 @@ pub fn determine_retry_strategy_adaptive(
                 return RetryStrategy::FixedDelay(Duration::from_millis(capped_ms));
             }
 
-            // 第二轮未解析出具体 delay：线性温和退避 2s~4s，让瞬时并发高峰平息
+            // The second round did not resolve the specific delay: linear gentle backoff of 2s~4s to allow the instantaneous concurrency peak to subside.
             let backoff_ms = (2000 * ((attempt.saturating_sub(pool_size)) + 1) as u64).min(5000);
             RetryStrategy::FixedDelay(Duration::from_millis(backoff_ms))
         }
 
-        // 503 服务不可用 / 529 服务器过载
+        // 503 Service Unavailable / 529 Server Overloaded
         503 | 529 => {
             if pool_size > 1 && attempt < pool_size {
-                // 多账号第一轮遭遇 503/529: 快速切向其他健康账号 (50ms)
+                // Multi-account first round encounter 503/529: Quickly switch to other healthy accounts (50ms)
                 tracing::info!(
                     "[Retry] 503/529 detected in multi-account pool (attempt {}/{}): fast escaping to other accounts",
                     attempt + 1, pool_size
                 );
                 RetryStrategy::FixedDelay(Duration::from_millis(50))
             } else {
-                // 单账号或已遍历全池: 指数退避 (起始 5s，上限 30s)
+                // Single account or the entire pool has been traversed: exponential backoff (starting 5s, upper limit 30s)
                 RetryStrategy::ExponentialBackoff {
                     base_ms: 5000,
                     max_ms: 30000,
@@ -314,20 +314,20 @@ pub fn determine_retry_strategy_adaptive(
             }
         }
 
-        // 500 服务器内部错误
+        // 500 Server internal error
         500 => {
-            // 线性退避：起始 3s
+            // Linear backoff: starting 3s
             RetryStrategy::LinearBackoff { base_ms: 3000 }
         }
 
-        // 401/403 认证/权限错误：切换账号前给予极短缓冲
+        // 401/403 Authentication/permission error: give a very short buffer before switching accounts
         401 | 403 => RetryStrategy::FixedDelay(Duration::from_millis(200)),
 
-        // 404 资源未找到：Google Cloud Code API 的 404 通常是账号级别的间歇性问题
-        // (灰度发布、账号权限不同步等)，轮换账号往往能解决
+        // 404 Resource Not Found: 404 for Google Cloud Code API is usually an intermittent issue at the account level
+        // (Grayscale publishing, out-of-sync account permissions, etc.), rotating accounts can often solve the problem
         404 => RetryStrategy::FixedDelay(Duration::from_millis(300)),
 
-        // 其他错误：不重试
+        // Other errors: Do not retry
         _ => RetryStrategy::NoRetry,
     }
 }
@@ -384,7 +384,7 @@ pub(crate) mod tests {
     }
 }
 
-/// 执行退避策略并返回是否应该继续重试
+/// Execute the backoff strategy and return whether it should continue to try again
 pub async fn apply_retry_strategy(
     strategy: RetryStrategy,
     attempt: usize,
@@ -450,21 +450,21 @@ pub async fn apply_retry_strategy(
                 duration.as_millis()
             );
             sleep(duration).await;
-            true // 原地重试在 handlers 层面通过 should_rotate_account 判断是否切换
+            true // Retry in place and use should_rotate_account at the handlers level to determine whether to switch.
         }
     }
 }
 
-/// 判断是否应该轮换账号
+/// Determine whether accounts should be rotated
 pub fn should_rotate_account(status_code: u16, strategy: Option<&RetryStrategy>) -> bool {
-    // [NEW] 如果识别为 Grace Retry，则显式要求不轮换账号
+    // [NEW] If identified as Grace Retry, explicitly request not to rotate the account
     if let Some(RetryStrategy::GraceRetry(_)) = strategy {
         return false;
     }
 
     match status_code {
-        // 这些错误是账号级别或特定节点配额的，需要轮换
-        // [FIX #3485] 503/529 边缘节点熔断或特定账号负载过高，多账号时支持轮换逃逸，杜绝死锁死等
+        // These errors are account level or specific node quota and need to be rotated
+        // [FIX #3485] 503/529 Edge node meltdown or specific account load is too high. Support rotation escape when multiple accounts are used to prevent deadlocks, etc.
         429 | 401 | 403 | 404 | 500 | 503 | 529 => true,
         _ => false,
     }

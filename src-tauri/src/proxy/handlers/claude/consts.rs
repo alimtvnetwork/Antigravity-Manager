@@ -70,13 +70,13 @@ The structure MUST be as follows:
 // Jitter was causing connection instability, reverted to fixed delays
 // const JITTER_FACTOR: f64 = 0.2;
 
-// ===== 统一退避策略模块 =====
+// ===== Unified backoff strategy module =====
 
 // [REMOVED] apply_jitter function
 // Jitter logic removed to restore stability (v3.3.16 fix)
 
-// ===== 统一退避策略模块 =====
-// 移除本地重复定义，使用 common 中的统一实现
+// ===== Unified backoff strategy module =====
+// Remove local duplicate definitions and use unified implementation in common
 use crate::proxy::handlers::common::{apply_retry_strategy, should_rotate_account, RetryStrategy};
 
-// ===== 退避策略模块结束 =====
+// ===== End of backoff strategy module =====

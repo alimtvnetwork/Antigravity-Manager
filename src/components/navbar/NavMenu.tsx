@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Users, Laptop, Settings, ChevronDown, Check, Download, Search, X } from 'lucide-react';
+import { Users, Laptop, Settings, ChevronDown, Check, Download, Search, X, MessageSquare } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useClickOutside } from './NavDropdowns';
 import { isActive, type NavItem } from './constants';
@@ -8,6 +8,7 @@ import { useConfigStore } from '../../stores/useConfigStore';
 import { useUpdateStore } from '../../stores/use-update-store';
 import { showToast } from '../common/ToastContainer';
 import { cn } from '../../utils/cn';
+import { TelegramGuideModal } from '../telegram/TelegramGuideModal';
 
 interface NavMenuProps {
     navItems: NavItem[];
@@ -18,6 +19,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
     const { t } = useTranslation();
     const { isMenuItemHidden } = useConfigStore();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isTelegramGuideOpen, setIsTelegramGuideOpen] = useState(false);
     const [dropdownSearch, setDropdownSearch] = useState('');
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -72,18 +74,6 @@ export function NavMenu({ navItems }: NavMenuProps) {
     const activeDropdownItem = dropdownNavItems.find(item => isActive(location.pathname, item.path));
     const isDropdownRouteActive = Boolean(activeDropdownItem);
 
-    // Segmented capsule rounding: first visible button gets the circular left
-    // edge, the last gets the circular right edge, middle buttons stay
-    // rectangular so the three join into one continuous pill.
-    const visibleDirect = [accountsItem, instancesItem, settingsItem].filter(
-        (x): x is NavItem => Boolean(x)
-    );
-    const segRounding = (item: NavItem) => {
-        const i = visibleDirect.indexOf(item);
-        if (i === 0) return 'rounded-l-full rounded-r-none';
-        return 'rounded-none';
-    };
-
     const checkForUpdates = useUpdateStore((s) => s.checkForUpdates);
     const handleCheckUpdates = async () => {
         setIsMenuOpen(false);
@@ -105,7 +95,7 @@ export function NavMenu({ navItems }: NavMenuProps) {
     };
 
     return (
-        <div className="flex items-center rounded-full bg-gray-100 dark:bg-[#171025] border border-gray-200/60 dark:border-[#40285e] p-0.5 shadow-xs divide-x divide-gray-200/70 dark:divide-[#40285e]/70">
+        <div className="flex items-center rounded-full bg-gray-100 dark:bg-slate-900/90 border border-gray-200/60 dark:border-slate-800 p-0.5 shadow-xs divide-x divide-gray-200/70 dark:divide-slate-800/80">
             {/* 1. Accounts direct button (Icon-only with tooltip) */}
             {accountsItem && (
                 <div className="relative group">
@@ -113,11 +103,10 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         to="/accounts"
                         draggable="false"
                         className={cn(
-                            "flex items-center justify-center px-2.5 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none",
-                            segRounding(accountsItem),
+                            "flex items-center justify-center h-7 px-2.5 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-l-full",
                             isAccountsActive
                                 ? "bg-blue-600 text-white shadow-xs"
-                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]"
+                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-gray-200/80 dark:hover:bg-slate-800/60"
                         )}
                         aria-label="Accounts (Profile Vault)"
                         title="Accounts (Profile Vault)"
@@ -137,11 +126,10 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         to="/instances"
                         draggable="false"
                         className={cn(
-                            "flex items-center justify-center px-2.5 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none",
-                            segRounding(instancesItem),
+                            "flex items-center justify-center h-7 px-2.5 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-none",
                             isInstancesActive
                                 ? "bg-blue-600 text-white shadow-xs"
-                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]"
+                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-gray-200/80 dark:hover:bg-slate-800/60"
                         )}
                         aria-label="Instances (Engine Runner)"
                         title="Instances (Engine Runner)"
@@ -154,6 +142,27 @@ export function NavMenu({ navItems }: NavMenuProps) {
                 </div>
             )}
 
+            {/* Standalone Telegram Button (Beside instances, opens TelegramGuideModal) */}
+            <div className="relative group">
+                <button
+                    type="button"
+                    onClick={() => setIsTelegramGuideOpen(true)}
+                    className={cn(
+                        "flex items-center justify-center h-7 px-2.5 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-none",
+                        isActive(location.pathname, '/telegram')
+                            ? "bg-blue-600 text-white shadow-xs"
+                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-gray-200/80 dark:hover:bg-slate-800/60"
+                    )}
+                    aria-label="Telegram Remote Control Guide"
+                    title="Telegram Remote Control Guide"
+                >
+                    <MessageSquare className={cn("w-3.5 h-3.5 shrink-0", isActive(location.pathname, '/telegram') ? "text-white" : "text-sky-500 dark:text-sky-400")} />
+                </button>
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-0.5 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-md text-white text-[10px] font-medium rounded-md shadow-lg border border-slate-700/60 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-[9999] whitespace-nowrap">
+                    Telegram Remote Guide
+                </div>
+            </div>
+
             {/* 3. Settings direct button (Icon-only with tooltip) */}
             {settingsItem && (
                 <div className="relative group">
@@ -161,10 +170,10 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         to="/settings"
                         draggable="false"
                         className={cn(
-                            "flex items-center justify-center px-2.5 py-1 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-none",
+                            "flex items-center justify-center h-7 px-2.5 text-xs font-semibold transition-all duration-150 cursor-pointer select-none rounded-none",
                             isSettingsActive
                                 ? "bg-blue-600 text-white shadow-xs"
-                                : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]"
+                                : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-gray-200/80 dark:hover:bg-slate-800/60"
                         )}
                         aria-label="Settings"
                         title="Settings"
@@ -189,10 +198,10 @@ export function NavMenu({ navItems }: NavMenuProps) {
                         }
                     }}
                     className={cn(
-                        "h-7 px-2 rounded-r-full rounded-l-none flex items-center justify-center transition-all duration-150 cursor-pointer",
+                        "h-7 px-2 flex items-center justify-center transition-all duration-150 cursor-pointer rounded-r-full",
                         isDropdownRouteActive || isMenuOpen
                             ? "bg-blue-600 text-white shadow-xs"
-                            : "text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#40285e]"
+                            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-gray-200/80 dark:hover:bg-slate-800/60"
                     )}
                     title={activeDropdownItem ? `${activeDropdownItem.label} (More)` : t('common.menu', 'More Views')}
                     aria-label="More Navigation"
@@ -214,6 +223,22 @@ export function NavMenu({ navItems }: NavMenuProps) {
                             >
                                 <Download className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400 transition-transform duration-300 ease-out group-hover:-translate-y-0.5 group-hover:scale-110" />
                                 <span className="font-semibold text-blue-600 dark:text-blue-400">{t('nav.check_for_updates', 'Check for Updates')}</span>
+                            </button>
+                        </div>
+
+                        {/* Telegram Guide quick access */}
+                        <div className="px-1.5 pb-1 mb-1 border-b border-gray-100 dark:border-slate-800">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsMenuOpen(false);
+                                    setIsTelegramGuideOpen(true);
+                                }}
+                                className="w-full px-3 py-1.5 text-left text-xs flex items-center gap-2.5 rounded-lg hover:bg-sky-50/80 dark:hover:bg-sky-900/25 transition-colors cursor-pointer text-gray-700 dark:text-gray-300 group"
+                                title="Open Telegram Setup Guide & CLI Reference"
+                            >
+                                <MessageSquare className="w-4 h-4 shrink-0 text-sky-500 dark:text-sky-400 transition-transform duration-300 ease-out group-hover:scale-110" />
+                                <span className="font-semibold text-sky-600 dark:text-sky-400">Telegram Setup Guide</span>
                             </button>
                         </div>
 
@@ -286,6 +311,11 @@ export function NavMenu({ navItems }: NavMenuProps) {
                     </div>
                 )}
             </div>
+
+            <TelegramGuideModal
+                isOpen={isTelegramGuideOpen}
+                onClose={() => setIsTelegramGuideOpen(false)}
+            />
         </div>
     );
 }

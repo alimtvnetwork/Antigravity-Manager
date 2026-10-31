@@ -12,27 +12,27 @@ impl InboundThinkingPipeline {
         let trusts_signature = protocol.trusts_client_signature();
         let is_claude = target_model.to_lowercase().contains("claude");
 
-        // 0. 工具调用 ID 统一归一化治理（Pipeline First）：
-        // 彻底解决不同客户端在 tool call ID 格式上不一致（如缺少下划线 `call573077` vs `call_573077`）的问题，
-        // 将 `functionCall.id` 与 `functionResponse.id` 统一对齐为带 `_` 的标准形态 (`call_...`)。
+        // 0. Tool call ID unified and normalized management (Pipeline First):
+        // Completely solve the problem of inconsistency in tool call ID format between different clients (such as missing underscore `call573077` vs `call_573077`),
+        // Align `functionCall.id` and `functionResponse.id` into the standard form with `_` (`call_...`).
         Self::normalize_tool_call_ids(contents);
 
-        // 0.1 统一上下文结构对齐（Pipeline First 统一治理）：
-        // 将连续的 user 消息直到下一个 model，统一合并为一个 user 轮次的多个 block (parts)，保持严格顺序。
-        // 这彻底消除了 Adapter 层各自为政导致的轮次错位，使得四大协议进入流水线后结构 100% 同构！
-        // 连续 user 轮**保持独立**（对齐官方形态）。
+        // 0.1 Unified context structure alignment (Pipeline First unified governance):
+        // Merge consecutive user messages until the next model into multiple blocks (parts) of one user round, maintaining strict order.
+        // This completely eliminates the round misalignment caused by the Adapter layer's siled approach, making the four major protocols 100% isomorphic after entering the pipeline!
+        // Consecutive user rounds remain independent (aligned with official form).
         //
-        // 历史实现会把连续 user 轮的 parts 合并进前一个 content，理由是
-        // "Gemini 强制要求 user/model 交替"。但官方 Antigravity 报文里连续 user 轮
-        // 是常态（`f81eae5c` 的 contents[11] 用户消息紧接 contents[12] SYSTEM_MESSAGE，
-        // 两者独立），v1internal 上游并不要求严格交替。
+        // The historical implementation will merge the parts of consecutive user rounds into the previous content because
+        // "Gemini enforces user/model alternation". However, there are consecutive user rounds in the official Antigravity message.
+        // is the norm (`f81eae5c`’s contents[11] user message follows contents[12] SYSTEM_MESSAGE,
+        // The two are independent), v1internal upstream does not require strict alternation.
         //
-        // 实测（2026-09-26，`gemini-3.8-flash-tiered` @ daily）：
-        //   两个独立 user content     → 200，上下文理解正确
-        //   合并为单个 user content   → 200，上下文理解正确
-        // 两者都成立，故按官方形态保留独立，以获得跨协议一致的前缀字节。
+        // Actual measurement (2026-09-26, `gemini-3.8-flash-tiered`@daily):
+        //   Two independent user content → 200, correct context understanding
+        //   Merged into a single user content → 200, context understood correctly
+        // Both are true, so they are kept independent according to the official form to obtain consistent prefix bytes across protocols.
 
-        // 预先计算每一轮的前置因果锚点 (causal anchor)，以便无 ID 的 Gemini 原生工具调用也能无损合成确定性 ID
+        // Precompute the causal anchor for each round so that calls to Gemini's native tools without ID can also losslessly synthesize deterministic IDs
         let anchors: Vec<String> = (0..contents.len())
             .map(|i| {
                 let preceding = if i > 0 { contents.get(i - 1) } else { None };
@@ -40,7 +40,7 @@ impl InboundThinkingPipeline {
             })
             .collect();
 
-        // 1. 协议策略清洗与位置规范化
+        // 1. Protocol policy cleaning and location standardization
         for (msg_idx, content) in contents.iter_mut().enumerate() {
             let _anchor = &anchors[msg_idx];
             let is_model = matches!(
@@ -53,14 +53,14 @@ impl InboundThinkingPipeline {
                     let mut thinking_part = None;
                     let mut extra_thinking_parts = Vec::new();
                     let mut other_parts = Vec::new();
-                    // [2026-09-27] 占位思考块被丢弃时，若其携带真实签名则暂存于此，
-                    // 组装阶段转挂到该轮第一个非思考 part（锚点）。
+                    // [2026-09-27] When the placeholder block is discarded, if it carries a real signature, it will be temporarily stored here.
+                    // During the assembly phase, transfer to the first non-thinking part (anchor point) of the round.
                     let mut placeholder_sig: Option<String> = None;
 
                     for mut part in parts.drain(..) {
-                        // 铁律：只认 thought: true。真机报文的正文 part 同样携带签名，
-                        // 绝不能凭"有签名"判定思考块 —— 否则可见回答会被改写成内部思考，
-                        // 并静默丢弃该轮唯一的签名。
+                        // Iron rule: only recognize thought: true. The body part of the real machine message also carries the signature.
+                        // Thinking blocks must not be judged based on "signature" - otherwise the visible answer will be rewritten as internal thinking,
+                        // and silently discards the round's only signature.
                         let is_thought = crate::proxy::thinking_store::is_thought_part(&part);
 
                         if is_thought {
@@ -68,7 +68,7 @@ impl InboundThinkingPipeline {
                             let is_placeholder =
                                 crate::proxy::thinking_store::is_placeholder_thought(text);
 
-                            // 校验客户端签名有效性与模型兼容性
+                            // Verify client signature validity and model compatibility
                             let mut effective_sig = None;
                             if let Some(sig) = part
                                 .get("thoughtSignature")
@@ -77,7 +77,7 @@ impl InboundThinkingPipeline {
                                 .and_then(|s| s.as_str())
                             {
                                 if sig == crate::proxy::thinking_store::SENTINEL_SIGNATURE {
-                                    // Claude 模型绝不接受 Gemini 哨兵签名，避免触发 400 Invalid signature
+                                    // The Claude model will never accept Gemini sentinel signatures to avoid triggering 400 Invalid signature
                                     if !is_claude {
                                         effective_sig = Some(sig.to_string());
                                     }
@@ -127,20 +127,20 @@ impl InboundThinkingPipeline {
                                 }
                             }
 
-                            // [2026-09-27] 占位思考块直接丢弃（不写思考块），签名照常落锚点。
+                            // [2026-09-27] The placeholder thinking block is discarded directly (no thinking block is written), and the signature falls on the anchor point as usual.
                             //
-                            // 官方样本（baogao.txt 24 轮）：9 轮无思考块但首非思考 part 带签名，
-                            // 「无思考块 + 锚点带签名」是官方标准形态。占位思考块（空 /
-                            // "." / "..." / 空格 / "·" 等）无信息量，不该出现在出站报文中：
-                            // 它曾是网关"防御性占位"的产物（FIX #3382 / Layer-2 压缩已移除）。
+                            // Official sample (baogao.txt 24 rounds): 9 rounds without thinking block but first non-thinking part with signature,
+                            // "No thinking block + anchor with signature" is the official standard form. placeholder block (empty /
+                            // "." / "..." / space / "·", etc.) have no information and should not appear in outbound messages:
+                            // It used to be a "defensive placeholder" for the gateway (FIX #3382 / Layer-2 compression has been removed).
                             //
-                            // 若占位块本身携带真实签名（客户端把签名误挂在思考块上），
-                            // 签名不随思考块丢弃 —— 摘出后挂到第一个非思考 part（锚点），
-                            // finalize 的 place_turn_signature 会按锚点规则最终归位。
+                            // If the placeholder block itself carries a real signature (the client mistakenly attaches the signature to the thinking block),
+                            // The signature is not discarded with the thinking block - it is hung to the first non-thinking part (anchor) after being taken out.
+                            // The place_turn_signature of finalize will eventually return according to the anchor rules.
                             let text_trimmed = text.trim();
                             if is_placeholder || text_trimmed.is_empty() {
                                 if let Some(ref sig) = effective_sig {
-                                    // 占位思考块携带的签名：转移给该轮锚点（首个非思考 part）
+                                    // The signature carried by the placeholder thinking block: transferred to the anchor point of this round (the first non-thinking part)
                                     placeholder_sig = Some(sig.clone());
                                     tracing::debug!(
                                         "[InboundPipeline] Placeholder thought block dropped; its signature (len: {}) kept for anchor backfill.",
@@ -162,15 +162,15 @@ impl InboundThinkingPipeline {
                                 "thought": true,
                             });
                             if let Some(sig) = effective_sig {
-                                // 铁律 I4：Gemini 目标的思考块**绝不**携带签名。
-                                // 客户端在思考块上携带签名属于**矛盾组合** ——
-                                // 官方 33 个 model 轮里 `thought:true` 与签名共现 0 次；
-                                // 文本为占位符（`...` / `·` / `[undefined]` 等）时更属
-                                // 典型的客户端占位脏数据污染。
+                                // Iron Rule I4: A Gemini target's thought block **never** carries a signature.
+                                // The client carrying a signature on the thinking block is a **contradictory combination**——
+                                // In the official 33 model rounds, `thought:true` and signature appear together 0 times;
+                                // This is especially true when the text is a placeholder (`...` / `·` / `[undefined]`, etc.)
+                                // Typical client-side placeholder dirty data pollution.
                                 //
-                                // 只剥离 Gemini 目标的思考块签名 —— Claude 目标按
-                                // Anthropic 规范**必须**在思考块上携带签名。
-                                // 也不因此关闭思考：那会反向改写历史轮语义。
+                                // Stripping only thinkblock signatures for Gemini targets - Claude target press
+                                // Anthropic specifications MUST carry signatures on think blocks.
+                                // Don’t shut down your thinking because of this: that would reversely rewrite the semantics of the historical wheel.
                                 if is_claude {
                                     thought_obj["thoughtSignature"] = json!(sig);
                                 } else {
@@ -184,7 +184,7 @@ impl InboundThinkingPipeline {
                             if thinking_part.is_none() {
                                 thinking_part = Some(thought_obj);
                             } else {
-                                // 多个思考块时，非首位的多余思考块降级为普通文本
+                                // When there are multiple think blocks, the redundant think blocks that are not the first will be demoted to ordinary text.
                                 if !final_thought_text.is_empty() {
                                     extra_thinking_parts
                                         .push(json!({ "text": final_thought_text }));
@@ -192,10 +192,10 @@ impl InboundThinkingPipeline {
                             }
                         } else {
                             if target_model.to_lowercase().contains("gemini") {
-                                // Gemini 原生：客户端自带的真实签名**原样透传**，绝不发明哨兵。
-                                // 依据（3 份官方报文 / 23 处签名）：哨兵出现 0 次，它不属于
-                                // Antigravity 协议；而签名缺失是被上游容忍的（在飞轮即缺席）。
-                                // 归位（含清除非锚点签名）统一交给终审 place_turn_signature。
+                                // Gemini native: The real signature that comes with the client is passed through as it is, and no sentinel is created.
+                                // Basis (3 official documents / 23 signatures): Sentinel appears 0 times, it does not belong
+                                // Antigravity protocol; the absence of signatures is tolerated by upstream (absent in flywheel).
+                                // Returning (including clearing non-anchor signatures) is uniformly handed over to place_turn_signature for final review.
                                 if let Some(obj) = part.as_object_mut() {
                                     obj.remove("thought_signature");
                                 }
@@ -205,7 +205,7 @@ impl InboundThinkingPipeline {
                                     obj.remove("thought_signature");
                                 }
                             }
-                            // 非思考部件：可能是普通正文/过程进度说明（commentary），也可能是 functionCall 等
+                            // Non-thinking parts: It may be ordinary text/process progress description (commentary), or it may be functionCall, etc.
                             let is_plain_text = part.get("text").is_some()
                                 && part.get("functionCall").is_none()
                                 && part.get("functionResponse").is_none();
@@ -214,11 +214,11 @@ impl InboundThinkingPipeline {
                                 let raw_text =
                                     part.get("text").and_then(|v| v.as_str()).unwrap_or("");
                                 if raw_text.trim().is_empty() {
-                                    // 丢弃纯空白文本部件，避免触发 Gemini 400 校验或破坏前缀缓存哈希稳定性
+                                    // Discard plain white text parts to avoid triggering Gemini 400 checks or breaking prefix cache hash stability
                                     continue;
                                 }
 
-                                // 跨家族协议自愈：检查是否夹带 <think> 标签包裹的思考内容（如从 Claude 跨切回 Gemini）
+                                // Cross-family protocol self-healing: Check whether the thinking content wrapped in the <think> tag is included (such as switching back to Gemini from Claude)
                                 if let Some((extracted_thought, clean_visible)) =
                                     crate::proxy::thinking_store::extract_think_tags(raw_text)
                                 {
@@ -226,8 +226,8 @@ impl InboundThinkingPipeline {
                                         if crate::proxy::thinking_store::is_meaningful_thought(
                                             &extracted_thought,
                                         ) {
-                                            // 铁律 I4：思考块绝不携带签名
-                                            // （官方报文里 thought:true 的 part 没有 thoughtSignature）
+                                            // Iron Rule I4: Think blocks never carry signatures
+                                            // (The part of thought:true in the official message does not have thoughtSignature)
                                             let t_obj = json!({
                                                 "text": extracted_thought.as_str(),
                                                 "thought": true,
@@ -241,14 +241,14 @@ impl InboundThinkingPipeline {
                                     continue;
                                 }
 
-                                // 协议无关自愈：检查是否夹带旧版遗留思考前缀 (如 **Thinking**)
+                                // Protocol-independent self-healing: Check whether old version legacy thinking prefixes are included (such as **Thinking**)
                                 if raw_text.trim_start().starts_with("**Thinking**") {
                                     let clean_thought = Self::strip_thinking_prefix(raw_text);
                                     if thinking_part.is_none() && is_thinking_enabled {
                                         if crate::proxy::thinking_store::is_meaningful_thought(
                                             &clean_thought,
                                         ) {
-                                            // 铁律 I4：思考块绝不携带签名
+                                            // Iron Rule I4: Think blocks never carry signatures
                                             let t_obj = json!({
                                                 "text": clean_thought,
                                                 "thought": true,
@@ -256,7 +256,7 @@ impl InboundThinkingPipeline {
                                             thinking_part = Some(t_obj);
                                         }
                                     }
-                                    // 若已有思考块，该遗留思考块作为陈旧副本剥离，防止二次污染正文
+                                    // If there is already a thinking block, the remaining thinking block will be stripped off as an old copy to prevent secondary contamination of the text.
                                     continue;
                                 }
 
@@ -267,7 +267,7 @@ impl InboundThinkingPipeline {
                         }
                     }
 
-                    // 核心前缀保序：首位强制存在且仅存在一个 thinking_part，其余正文与工具调用紧随其后
+                    // Core prefix order preservation: the first one is mandatory and there is only one thinking_part, and the rest of the text and tool calls follow closely.
                     let mut new_parts = Vec::with_capacity(parts.len() + 1);
                     if let Some(tp) = thinking_part {
                         new_parts.push(tp);
@@ -275,15 +275,15 @@ impl InboundThinkingPipeline {
                     new_parts.extend(extra_thinking_parts);
                     new_parts.extend(other_parts);
 
-                    // [2026-09-27] 占位思考块被丢弃时的签名转移：
-                    // 若该轮思考块全部为占位/空（无 thinking_part），或占位块带真实签名，
-                    // 把签名挂到第一个非思考 part（锚点）——该锚点可能是正文 text 也可能
-                    // 是 functionCall。finalize 的 place_turn_signature 会按「锚点=首个
-                    // 非思考 part」规则最终归位；若此处已挂，place 也会摘用。
+                    // [2026-09-27] Signature transfer when placeholder block is discarded:
+                    // If all the thinking blocks in this round are placeholders/empty (no thinking_part), or the placeholder blocks have real signatures,
+                    // Hang the signature on the first non-thinking part (anchor) - the anchor may be text or
+                    // is functionCall. The place_turn_signature of finalize will press "anchor=first
+                    // The "non-thinking part" rule is finally returned to its place; if it is already hung here, place will also be used.
                     //
-                    // ⚠️ 必须在 other_parts 合并之后查找锚点：占位思考丢弃后，若该轮
-                    // 首个非思考 part 是正文 text（含 extra_thinking 无、thinking_part 无时），
-                    // 锚点只存在于 other_parts —— 过早查找会漏挂签名。
+                    // ⚠️ The anchor point must be found after other_parts is merged: after the placeholder thinking is discarded, if this round
+                    // The first non-thinking part is the text (including extra_thinking when none and thinking_part when none),
+                    // Anchors only exist in other_parts - a premature search will miss the signature.
                     if let Some(sig) = placeholder_sig.take() {
                         if let Some(anchor) = new_parts
                             .iter_mut()
@@ -297,8 +297,8 @@ impl InboundThinkingPipeline {
 
                     *parts = new_parts;
                 } else {
-                    // role == "user" 的通用进站治理：多模态工具响应 (functionResponse) 深度解构
-                    // 确保全协议 (OpenAI / Claude / Gemini / Responses) 的工具结果中夹带的图片均被提升为独立的 inlineData 视觉感知输入
+                    // Universal inbound management of role == "user": in-depth deconstruction of multi-modal tool response (functionResponse)
+                    // Ensure that the images included in the tool results of all protocols (OpenAI / Claude / Gemini / Responses) are promoted to independent inlineData visual perception input
                     let mut extra_inline_parts = Vec::new();
                     for part in parts.iter_mut() {
                         if let Some(fr) = part.get_mut("functionResponse") {
@@ -321,8 +321,8 @@ impl InboundThinkingPipeline {
             }
         }
 
-        // 2. 状态机无损复活 (Hydration)
-        // 开思考时全局复活；关思考时若包含工具调用，亦执行复活以取回历史工具防伪签名
+        // 2. Lossless resurrection of state machine (Hydration)
+        // Global resurrection when thinking is turned on; if tool calls are included when thinking is turned off, resurrection is also performed to retrieve historical tool anti-counterfeiting signatures
         let has_function_call = contents.iter().any(|c| {
             c.get("parts")
                 .and_then(|p| p.as_array())
@@ -340,16 +340,16 @@ impl InboundThinkingPipeline {
             }
         }
 
-        // 3. 终审把关与脱敏规范化 (Finalize)
+        // 3. Final review and desensitization standardization (Finalize)
         crate::proxy::thinking_store::finalize_gemini_contents_thinking_with_model(
             contents,
             is_thinking_enabled,
             Some(target_model),
         );
 
-        // 4. 工具回执 role 归一化（对齐官方 Antigravity 形态）。
-        //    必须放在**末位**：若前置，回执轮会进入上面的 `is_model` 分支，
-        //    从而跳过 `role == "user"` 分支里的多模态解构（图片提升为 inlineData）。
+        // 4. Tool receipt role normalization (aligned with the official Antigravity form).
+        //    Must be placed in the **last position**: if placed in front, the receipt wheel will enter the `is_model` branch above,
+        //    Thus skipping the multimodal deconstruction in the `role == "user"` branch (the image is promoted to inlineData).
         Self::normalize_function_response_roles(contents);
     }
 }

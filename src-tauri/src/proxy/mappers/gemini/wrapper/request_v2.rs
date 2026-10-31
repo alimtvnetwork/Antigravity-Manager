@@ -14,40 +14,40 @@ pub fn wrap_request_v2(
     mapped_model: &str,
     account_id: Option<&str>,
     session_id: Option<&str>,
-    token: Option<&crate::proxy::token_manager::ProxyToken>, // [NEW] 动态规格注入
+    token: Option<&crate::proxy::token_manager::ProxyToken>, // [NEW] Dynamic specification injection
     token_manager: Option<&std::sync::Arc<crate::proxy::TokenManager>>,
-    // [NEW] Layer-3 后台摘要专用的上游客户端。
-    // 必须由 handler 传入 `&state.upstream`，它才能按账号解析代理池（`client_cache`）
-    // 并随上游代理热更新生效；传 `None` 时 Layer-3 不触发。
+    // [NEW] Dedicated upstream client for Layer-3 backend digests.
+    // `&state.upstream` must be passed in by the handler so that it can parse the proxy pool (`client_cache`) by account
+    // It will take effect with the hot update of the upstream proxy; Layer-3 will not be triggered when `None` is passed.
     upstream: Option<&std::sync::Arc<crate::proxy::upstream::client::UpstreamClient>>,
 ) -> Value {
-    // 优先使用传入的 mapped_model，其次尝试从 body 获取
+    // First use the incoming mapped_model, and secondly try to get it from body
     let original_model = body
         .get("model")
         .and_then(|v| v.as_str())
         .unwrap_or(mapped_model);
 
-    // 如果 mapped_model 是空的，则使用 original_model
+    // If mapped_model is empty, original_model is used
     let final_model_name = if !mapped_model.is_empty() {
         mapped_model
     } else {
         original_model
     };
 
-    // [ADDED v4.1.24] 计算 message_count 供 requestId 使用
+    // [ADDED v4.1.24] Calculate message_count for use by requestId
     let _message_count = body
         .get("contents")
         .and_then(|c| c.as_array())
         .map(|a| a.len())
         .unwrap_or(1);
 
-    // 复制 body 以便修改
+    // Copy body for modification
     let mut inner_request = body.clone();
 
-    // 深度清理 [undefined] 字符串 (Cherry Studio 等客户端常见注入)
+    // Deep cleaning [undefined] string (common injection in clients such as Cherry Studio)
     crate::proxy::mappers::common_utils::deep_clean_undefined(&mut inner_request, 0);
 
-    // [PIPELINE] 统一清洗提示词与风控伪 Header（兼容第三方聚合器如 New API 以 Gemini 原生协议转入时的特征残留）
+    // [PIPELINE] Unified cleaning prompt words and risk control pseudo-Headers (compatible with feature residues when third-party aggregators such as New API transfer in with Gemini native protocol)
     crate::proxy::mappers::prompt_sanitizer::PromptSanitizer::sanitize_gemini_payload(
         &mut inner_request,
     );

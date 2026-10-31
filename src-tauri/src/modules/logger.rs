@@ -35,8 +35,16 @@ pub fn get_log_dir() -> Result<PathBuf, String> {
     Ok(log_dir)
 }
 
-/// Initialize the log system
+static LOGGER_INIT: std::sync::Once = std::sync::Once::new();
+
+/// Initialize the log system (idempotent, runs at most once per process)
 pub fn init_logger() {
+    LOGGER_INIT.call_once(|| {
+        init_logger_inner();
+    });
+}
+
+fn init_logger_inner() {
     // Capture log macro logs
     // Justification: best-effort call; failure logged without changing control flow
     crate::error::record_ignored(tracing_log::LogTracer::init(), "init");
@@ -117,6 +125,18 @@ pub fn init_logger() {
         } else {
             "unknown panic payload".to_string()
         };
+
+        // Standard OS pipe closure (e.g. piped into `head`, `less`, or closed stdout) is normal
+        // CLI termination and must not be logged as a critical panic or crash stack trace.
+        if payload.contains("The pipe is being closed")
+            || payload.contains("Broken pipe")
+            || payload.contains("failed printing to stdout")
+            || payload.contains("os error 232")
+            || payload.contains("os error 32")
+        {
+            std::process::exit(0);
+        }
+
         let timestamp = chrono::Local::now().to_rfc3339();
         let pid = std::process::id();
         let thread = std::thread::current();
@@ -325,23 +345,26 @@ pub fn log_error(message: &str) {
 }
 
 /// Mask sensitive email addresses for logs, telemetry, and external notifications.
-/// Example: `riseup.asia.team@gmail.com` -> `rise***@***`
+/// Displays 4 characters from local part first and hides `@gmail` domains.
+/// Example: `riseup.asia.team@gmail.com` -> `rise***`
 pub fn mask_email(email: &str) -> String {
     let trimmed = email.trim();
     if trimmed.is_empty() {
         return "***".to_string();
     }
-    if let Some((local, _domain)) = trimmed.split_once('@') {
-        if local.len() <= 2 {
-            format!("{}***@***", &local[..1.min(local.len())])
+    if let Some((local, domain)) = trimmed.split_once('@') {
+        let shown = 4.min(local.len()).max(1);
+        let prefix = &local[..shown];
+        let lower_domain = domain.to_ascii_lowercase();
+        if lower_domain.contains("gmail") || lower_domain.contains("googlemail") {
+            format!("{prefix}***")
         } else {
-            let shown = 4.min(local.len().saturating_sub(2)).max(1);
-            format!("{}***@***", &local[..shown])
+            format!("{prefix}***@{domain}")
         }
-    } else if trimmed.len() <= 3 {
-        "***".to_string()
+    } else if trimmed.len() <= 4 {
+        format!("{trimmed}***")
     } else {
-        format!("{}***", &trimmed[..3])
+        format!("{}***", &trimmed[..4])
     }
 }
 
@@ -394,4 +417,68 @@ pub fn log_instance_prompt_audit(
         rationale,
     );
     info!("{line}");
+}
+
+static FILTER_NOISY_TELEMETRY: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(true);
+
+/// Enable or disable filtering of noisy system telemetry (HEARTBEAT, TOKEN_USAGE, TELEMETRY).
+pub fn set_filter_noisy_telemetry(enabled: bool) {
+    FILTER_NOISY_TELEMETRY.store(enabled, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// Check if noisy system telemetry filtering is enabled.
+pub fn is_filter_noisy_telemetry_enabled() -> bool {
+    FILTER_NOISY_TELEMETRY.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+/// Check if a log line or message represents noisy background telemetry.
+pub fn is_noisy_system_telemetry(msg: &str) -> bool {
+    let lower = msg.to_ascii_lowercase();
+    lower.contains("heartbeat")
+        || lower.contains("token_usage")
+        || lower.contains("telemetry")
+        || lower.contains("[heartbeat]")
+        || lower.contains("[token_usage]")
+        || lower.contains("[telemetry]")
+}
+
+/// Check if a log message should be filtered out from active consoles and streams.
+pub fn should_filter_log(msg: &str) -> bool {
+    if is_filter_noisy_telemetry_enabled() {
+        is_noisy_system_telemetry(msg)
+    } else {
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_noisy_system_telemetry() {
+        assert!(is_noisy_system_telemetry(
+            "Heartbeat ping received from node W1"
+        ));
+        assert!(is_noisy_system_telemetry("TOKEN_USAGE: 1250 tokens used"));
+        assert!(is_noisy_system_telemetry(
+            "[TELEMETRY] Reported 5 instances"
+        ));
+        assert!(!is_noisy_system_telemetry(
+            "Switched account to user@example.com"
+        ));
+        assert!(!is_noisy_system_telemetry("Prompt dispatched successfully"));
+    }
+
+    #[test]
+    fn test_should_filter_log() {
+        set_filter_noisy_telemetry(true);
+        assert!(should_filter_log("HEARTBEAT tick"));
+        assert!(!should_filter_log("Normal operation completed"));
+
+        set_filter_noisy_telemetry(false);
+        assert!(!should_filter_log("HEARTBEAT tick"));
+        set_filter_noisy_telemetry(true); // reset
+    }
 }

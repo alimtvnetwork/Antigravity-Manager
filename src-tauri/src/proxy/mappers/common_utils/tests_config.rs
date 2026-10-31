@@ -4,10 +4,10 @@ use super::*;
 
 use super::*;
 
-// ============ requestId 与 session_id 的关系 ============
+// ============ The relationship between requestId and session_id ============
 
-/// 会话段必须**稳定**（同一 session 多次请求共享，贴近官方 conversationId 语义），
-/// 但整体 ID 每次唯一（含 unixMs + 轨迹段 → 幂等隔离）。
+/// The session segment must be **stable** (the same session can be shared multiple times, close to the official conversationId semantics),
+/// But the overall ID is unique every time (including unixMs + track segment → idempotent isolation).
 #[test]
 fn test_official_request_id_stable_conversation_unique_overall() {
     let a = build_official_request_id("sess-aaaabbbbccccdddd", 3);
@@ -15,30 +15,33 @@ fn test_official_request_id_stable_conversation_unique_overall() {
     assert_eq!(
         a.split('/').nth(1),
         b.split('/').nth(1),
-        "同一 session 的会话段必须稳定"
+        "Session segments of the same session must be stable"
     );
-    assert_ne!(a, b, "整体 requestId 必须每次唯一（幂等隔离）");
+    assert_ne!(
+        a, b,
+        "The overall requestId must be unique every time (idempotent isolation)"
+    );
     assert_eq!(
         a.split('/').count(),
         5,
-        "官方形态为 5 段：agent/conversation/unixMs/trajectory/step"
+        "The official form is 5 steps: agent/conversation/unixMs/trajectory/step"
     );
     assert!(a.starts_with("agent/"));
     assert!(a.ends_with("/3"));
 }
 
-/// requestId **不得**泄露网关内部 blended session_id 的原文。
+/// requestId **must** not reveal the original text of the gateway's internal blended session_id.
 #[test]
 fn test_official_request_id_never_exposes_raw_session() {
     let sid = "sess-deadbeefcafe1234";
     let id = build_official_request_id(sid, 1);
     assert!(
         !id.contains(sid),
-        "requestId 不得包含 session_id 原文（应为单向哈希派生）"
+        "requestId must not contain session_id original text (should be one-way hash derived)"
     );
 }
 
-/// 不同会话（主 agent / 子 agent 并发）必须产出不同会话段 —— 隔离性保持。
+/// Different sessions (main agent/sub-agent concurrency) must produce different session segments - isolation is maintained.
 #[test]
 fn test_official_request_id_separates_concurrent_sessions() {
     let main = build_official_request_id("sess-main-00000001", 1);
@@ -46,11 +49,11 @@ fn test_official_request_id_separates_concurrent_sessions() {
     assert_ne!(
         main.split('/').nth(1),
         sub.split('/').nth(1),
-        "不同 session 的会话段必须不同（主子 agent 隔离）"
+        "The session segments of different sessions must be different (master-subagent isolation)"
     );
 }
 
-/// 空 session 时退化为随机会话段，不 panic 且仍为 5 段。
+/// When the session is empty, it degenerates into random session segments, does not panic, and is still 5 segments.
 #[test]
 fn test_official_request_id_handles_empty_session() {
     let id = build_official_request_id("", 7);

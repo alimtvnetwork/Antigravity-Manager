@@ -71,7 +71,7 @@ pub(crate) async fn completions_handle_error(
         error_text
     );
 
-    // 3. 统一流水线判定与标记限流状态(用于 UI 显示)
+    // 3. Unified pipeline judgment and marking of current limiting status (for UI display)
     let classification = crate::proxy::pipeline::UpstreamClassification::classify(
         status_code,
         &error_text,
@@ -142,7 +142,7 @@ pub(crate) async fn completions_handle_error(
         pool_size,
     );
 
-    // 执行退备
+    // Execute backup
     if apply_retry_strategy(
         strategy.clone(),
         attempt,
@@ -164,7 +164,7 @@ pub(crate) async fn completions_handle_error(
         *force_rotate = should_rotate_account(status_code, Some(&strategy));
         return CompletionsOutcome::ContinueLoop;
     } else {
-        // 不可重试
+        // Not retryable
         let protocol = if is_responses_api {
             "responses"
         } else {

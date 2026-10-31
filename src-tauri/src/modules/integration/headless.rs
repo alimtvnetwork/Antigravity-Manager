@@ -2,7 +2,7 @@ use crate::models::Account;
 
 use super::*;
 
-/// Headless/Docker 实现：仅执行数据层操作，忽略 UI 和进程控制
+/// Headless/Docker implementation: only perform data layer operations, ignore UI and process control
 pub struct HeadlessIntegration;
 
 impl SystemIntegration for HeadlessIntegration {

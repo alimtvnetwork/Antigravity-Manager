@@ -1,4 +1,4 @@
-//! 账号加载：批量加载、单账号重载、移除账号、磁盘状态探测。
+//! Account loading: batch loading, single account reloading, account removal, disk status detection.
 
 use super::types::OnDiskAccountState;
 use super::TokenManager;
@@ -6,12 +6,15 @@ use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 
 impl TokenManager {
-    /// 从主应用账号目录加载所有账号
+    /// Load all accounts from the main application account directory
     pub async fn load_accounts(&self) -> Result<usize, String> {
         let accounts_dir = self.resolved_data_dir().join("accounts");
 
         if !accounts_dir.exists() {
-            return Err(format!("账号目录不存在: {:?}", accounts_dir));
+            return Err(format!(
+                "Account directory does not exist: {:?}",
+                accounts_dir
+            ));
         }
 
         // Reload should reflect current on-disk state (accounts can be added/removed/disabled).
@@ -23,15 +26,15 @@ impl TokenManager {
             *last_used = None;
         }
 
-        let entries =
-            std::fs::read_dir(&accounts_dir).map_err(|e| format!("读取账号目录失败: {}", e))?;
+        let entries = std::fs::read_dir(&accounts_dir)
+            .map_err(|e| format!("Failed to read account directory: {}", e))?;
 
         let mut count = 0;
 
         for entry in entries {
             let entry = entry.map_err(|e| {
                 self.sync_image_scheduler_accounts();
-                format!("读取目录项失败: {}", e)
+                format!("Failed to read directory entry: {}", e)
             })?;
             let path = entry.path();
 
@@ -39,7 +42,7 @@ impl TokenManager {
                 continue;
             }
 
-            // 尝试加载账号
+            // Try loading account
             match self.load_single_account(&path).await {
                 Ok(Some(token)) => {
                     let account_id = token.account_id.clone();
@@ -47,10 +50,10 @@ impl TokenManager {
                     count += 1;
                 }
                 Ok(None) => {
-                    // 跳过无效账号
+                    // Skip invalid accounts
                 }
                 Err(e) => {
-                    tracing::warn!("加载账号失败 {:?}: {}", path, e);
+                    tracing::warn!("Failed to load account {:?} : {}", path, e);
                 }
             }
         }
@@ -59,14 +62,14 @@ impl TokenManager {
         Ok(count)
     }
 
-    /// 重新加载指定账号（用于配额更新后的实时同步）
+    /// Reload the specified account (for real-time synchronization after quota update)
     pub async fn reload_account(&self, account_id: &str) -> Result<(), String> {
         let path = self
             .data_dir
             .join("accounts")
             .join(format!("{}.json", account_id));
         if !path.exists() {
-            return Err(format!("账号文件不存在: {:?}", path));
+            return Err(format!("Account file does not exist: {:?}", path));
         }
 
         match self.load_single_account(&path).await {
@@ -76,24 +79,24 @@ impl TokenManager {
                 Ok(())
             }
             Ok(None) => {
-                // [FIX] 账号被禁用或不可用时，从内存池中彻底移除 (Issue #1565)
+                // [FIX] Completely remove account from memory pool when disabled or unavailable (Issue #1565)
                 // load_single_account returning None means the account should be skipped in its
                 // current state (disabled / proxy_disabled / quota_protection / validation_blocked...).
                 self.remove_account(account_id);
                 Ok(())
             }
-            Err(e) => Err(format!("同步账号失败: {}", e)),
+            Err(e) => Err(format!("Account synchronization failed: {}", e)),
         }
     }
 
-    /// 重新加载所有账号
+    /// Reload all accounts
     pub async fn reload_all_accounts(&self) -> Result<usize, String> {
         self.load_accounts().await
     }
 
-    /// 从内存中彻底移除指定账号及其关联数据 (Issue #1477)
+    /// Completely remove the specified account and its associated data from memory (Issue #1477)
     pub fn remove_account(&self, account_id: &str) {
-        // ... (省略原有逻辑)
+        // ... (omitting original logic)
         if self.tokens.remove(account_id).is_some() {
             tracing::info!("[Proxy] Removed account {} from memory cache", account_id);
         }

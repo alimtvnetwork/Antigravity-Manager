@@ -8,11 +8,101 @@ use antigravity_tools_lib::modules::{
 };
 use chrono::Utc;
 
+pub(crate) fn route_instances_backup(
+    args: &[String],
+    non_flag_args: &[String],
+    _is_json: bool,
+) -> bool {
+    // Subcommand: agm instances backup [inst]
+    let matches_backup = |s: &str| {
+        s.eq_ignore_ascii_case("backup")
+            || s.eq_ignore_ascii_case("backup-running")
+            || s.eq_ignore_ascii_case("backup-running-prompts")
+            || s.eq_ignore_ascii_case("brp")
+    };
+
+    if let Some(_pos) = non_flag_args.iter().position(|s| matches_backup(s)) {
+        if let Some(arg_idx) = args.iter().position(|s| matches_backup(s)) {
+            let rest = if arg_idx + 1 < args.len() {
+                &args[arg_idx + 1..]
+            } else {
+                &[]
+            };
+            crate::running_backup_cmds::cmd_backup_running_prompts(rest);
+            return true;
+        }
+    }
+    false
+}
+
+pub(crate) fn route_instances_restore(
+    args: &[String],
+    non_flag_args: &[String],
+    _is_json: bool,
+) -> bool {
+    // Subcommand: agm instances restore [inst]
+    let matches_restore = |s: &str| {
+        s.eq_ignore_ascii_case("restore")
+            || s.eq_ignore_ascii_case("restore-running")
+            || s.eq_ignore_ascii_case("restore-running-prompts")
+            || s.eq_ignore_ascii_case("rrp")
+    };
+
+    if let Some(_pos) = non_flag_args.iter().position(|s| matches_restore(s)) {
+        if let Some(arg_idx) = args.iter().position(|s| matches_restore(s)) {
+            let rest = if arg_idx + 1 < args.len() {
+                &args[arg_idx + 1..]
+            } else {
+                &[]
+            };
+            crate::running_backup_cmds::cmd_restore_running_prompts(rest);
+            return true;
+        }
+    }
+    false
+}
+
+pub(crate) fn route_instances_running(
+    args: &[String],
+    non_flag_args: &[String],
+    _is_json: bool,
+) -> bool {
+    // Subcommand: agm instances running [inst]
+    let matches_running = |s: &str| {
+        s.eq_ignore_ascii_case("running")
+            || s.eq_ignore_ascii_case("running-prompts")
+            || s.eq_ignore_ascii_case("rp")
+    };
+
+    if let Some(_pos) = non_flag_args.iter().position(|s| matches_running(s)) {
+        if let Some(arg_idx) = args.iter().position(|s| matches_running(s)) {
+            let rest = if arg_idx + 1 < args.len() {
+                &args[arg_idx + 1..]
+            } else {
+                &[]
+            };
+            crate::running_prompts_cmds::cmd_running_prompts(rest);
+            return true;
+        }
+    }
+    false
+}
+
 pub(crate) fn route_instances_duplicate(
     args: &[String],
     non_flag_args: &[String],
     is_json: bool,
 ) -> bool {
+    if route_instances_backup(args, non_flag_args, is_json) {
+        return true;
+    }
+    if route_instances_restore(args, non_flag_args, is_json) {
+        return true;
+    }
+    if route_instances_running(args, non_flag_args, is_json) {
+        return true;
+    }
+
     // Subcommand: agm instances duplicate / clone
     if !non_flag_args.is_empty()
         && (non_flag_args[0].eq_ignore_ascii_case("duplicate")
@@ -411,9 +501,23 @@ pub(crate) fn route_instances_stop(
             }
         };
 
-        if let Err(err) = instance::refuse_if_caller_instance(&resolved_id) {
-            eprintln!("[ERROR] {err}");
-            std::process::exit(2);
+        let has_force = args.iter().any(|a| a == "--force" || a == "-f");
+        if !has_force {
+            if let Some(caller_id) = instance::close::detect_caller_instance_id() {
+                if caller_id == resolved_id || caller_id == target_spec {
+                    eprintln!(
+                        "[ERROR] Target instance '{}' is your currently running IDE instance! Aborting to prevent terminating your own session. Pass --force to override.",
+                        resolved_id
+                    );
+                    std::process::exit(2);
+                }
+            }
+            if let Err(err) = instance::refuse_if_caller_instance(&resolved_id) {
+                eprintln!("[ERROR] {err}");
+                std::process::exit(2);
+            }
+        } else {
+            std::env::set_var("AGM_FORCE_CALLER_OVERRIDE", "1");
         }
         println!(
             "[*] Stopping instance '{}' (resolved from '{}')...",

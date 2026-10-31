@@ -14,6 +14,17 @@ use std::process::{Command, Stdio};
 use std::time::Duration;
 use uuid::Uuid;
 
+pub const MIN_GOAL_HEARTBEAT_INTERVAL_SECS: u64 = 30;
+
+/// Clamp interval to at least MIN_GOAL_HEARTBEAT_INTERVAL_SECS (default 30s)
+pub fn clamp_heartbeat_interval(interval_secs: u64) -> u64 {
+    if interval_secs == 0 {
+        MIN_GOAL_HEARTBEAT_INTERVAL_SECS
+    } else {
+        interval_secs.max(MIN_GOAL_HEARTBEAT_INTERVAL_SECS)
+    }
+}
+
 /// Start an active prompt goal writing current date & time every 5 seconds to a specific file
 pub fn start_prompt_goal_heartbeat(
     instance_id: &str,
@@ -29,9 +40,12 @@ pub fn start_prompt_goal_heartbeat(
         crate::error::record_ignored(fs::create_dir_all(&ws_dir), "create workspace directory");
     }
 
-    let interval = if interval_secs == 0 { 5 } else { interval_secs };
+    let interval = clamp_heartbeat_interval(interval_secs);
     let prompt_text = if prompt.trim().is_empty() {
-        "Continuous 5-second prompt goal heartbeat verification".to_string()
+        format!(
+            "Continuous {}-second prompt goal heartbeat verification",
+            interval
+        )
     } else {
         prompt.trim().to_string()
     };
@@ -111,6 +125,25 @@ pub fn start_prompt_goal_heartbeat(
         "save prompt goal before worker spawn",
     );
 
+    let (extracted_img, img_paths) = super::detection::extract_image_payload_or_path(&prompt_text);
+    let image_count = if !img_paths.is_empty() {
+        img_paths.len()
+    } else if extracted_img.is_some() {
+        1
+    } else {
+        0
+    };
+    let byte_size = prompt_text.len();
+    let session_conv_id = format!("goal-session-{}", instance_id);
+    let seq_code = super::sequences::get_sequence_code_for_conversation(&session_conv_id);
+    tracing::info!(
+        "[PROMPT_BACKUP] Backed up running prompt for instance {} (seq: {:?}, images: {}, bytes: {})",
+        instance_id,
+        seq_code,
+        image_count,
+        byte_size
+    );
+
     // Spawn detached goal worker process
     if let Ok(cur_exe) = std::env::current_exe() {
         let mut cmd = Command::new(&cur_exe);
@@ -171,7 +204,7 @@ pub fn run_prompt_goal_worker_loop(
 ) {
     let ws_dir = PathBuf::from(repo_path);
     let config_path = ws_dir.join(".antigravity_goal_heartbeat.json");
-    let interval = if interval_secs == 0 { 5 } else { interval_secs };
+    let interval = clamp_heartbeat_interval(interval_secs);
     let my_pid = std::process::id();
 
     loop {
@@ -338,6 +371,90 @@ pub fn stop_prompt_goal_workers_for_instance(instance_id: &str, data_dir: &str) 
         }
     }
 
+    // Preserve stopped/interrupted active prompts for this instance as 'backed_up' in repo_prompts.db
+    // Justification: stopped or interrupted prompts must be preserved as 'backed_up'
+    // for subsequent restore instead of claiming fake completion.
+    let now = Utc::now().timestamp();
+    if let Ok(conn) = super::schema::connect_db() {
+        let is_default = instance_id == "default" || instance_id == "__default__";
+        let update_res = if is_default {
+            conn.execute(
+                "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 \
+                 WHERE (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '') \
+                   AND status IN ('running', 'in_flight')",
+                rusqlite::params![now],
+            )
+        } else if instance_id == "all" {
+            conn.execute(
+                "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 \
+                 WHERE status IN ('running', 'in_flight')",
+                rusqlite::params![now],
+            )
+        } else {
+            conn.execute(
+                "UPDATE active_prompts SET status = 'backed_up', updated_at = ?1 \
+                 WHERE instance_id = ?2 AND status IN ('running', 'in_flight')",
+                rusqlite::params![now, instance_id],
+            )
+        };
+        match &update_res {
+            Ok(count) if *count > 0 => {
+                crate::modules::logger::log_info(&format!(
+                    "[RepoDB] Preserved {} running/in_flight prompt(s) as 'backed_up' for instance '{}' upon stopping goal workers (ready for restore)",
+                    count, instance_id
+                ));
+            }
+            Ok(_) => {}
+            Err(e) => {
+                crate::modules::logger::log_warn(&format!(
+                    "[RepoDB] Failed to preserve active_prompts as 'backed_up' for instance '{}': {}",
+                    instance_id, e
+                ));
+            }
+        }
+        // Justification: preserving active prompts as backed_up is auxiliary to worker process termination
+        crate::error::record_ignored(
+            update_res,
+            "preserve active_prompts as backed_up in stop_prompt_goal_workers_for_instance",
+        );
+    }
+
+    // Update AGM_INSTANCE_STATUS.md to STOPPED in all workspace folders for this instance
+    let workspaces = if let Ok(registry) = crate::modules::instance::load_registry() {
+        if let Some(inst) = registry
+            .instances
+            .iter()
+            .find(|i| i.id == instance_id || (instance_id == "default" && i.is_default))
+        {
+            crate::modules::instance::get_instance_workspace_folders(instance_id, &inst.data_dir)
+        } else {
+            Vec::new()
+        }
+    } else {
+        Vec::new()
+    };
+    for ws in &workspaces {
+        let ws_dir = Path::new(ws);
+        let cfg_path = ws_dir.join(".antigravity_goal_heartbeat.json");
+        let (prompt_text, hb_file, email) = if let Ok(c) = fs::read_to_string(&cfg_path) {
+            if let Ok(cfg) = serde_json::from_str::<PromptGoalHeartbeatConfig>(&c) {
+                (cfg.prompt_content, cfg.heartbeat_file, cfg.account_email)
+            } else {
+                ("".to_string(), "".to_string(), "".to_string())
+            }
+        } else {
+            ("".to_string(), "".to_string(), "".to_string())
+        };
+        update_workspace_status_file(
+            ws_dir,
+            instance_id,
+            &email,
+            &prompt_text,
+            &hb_file,
+            "STOPPED",
+        );
+    }
+
     crate::modules::logger::log_info(&format!(
         "[PromptGoal] Stopped {} prompt goal worker(s) for instance '{}'",
         stopped, instance_id
@@ -345,42 +462,97 @@ pub fn stop_prompt_goal_workers_for_instance(instance_id: &str, data_dir: &str) 
     stopped
 }
 
+/// Check heartbeat timestamp freshness and read the last non-empty line
+fn check_heartbeat_freshness(
+    file_path: &str,
+    interval_secs: u64,
+    now: i64,
+) -> (bool, Option<String>) {
+    let hb_p = Path::new(file_path);
+    if !hb_p.exists() {
+        return (false, None);
+    }
+
+    let is_fresh = fs::metadata(hb_p)
+        .ok()
+        .and_then(|meta| meta.modified().ok())
+        .map(|modified| {
+            let dt: chrono::DateTime<Utc> = modified.into();
+            let age = now - dt.timestamp();
+            age <= (interval_secs as i64 + 4)
+        })
+        .unwrap_or(false);
+
+    let last_line = fs::read_to_string(hb_p).ok().and_then(|content| {
+        content
+            .lines()
+            .rev()
+            .find(|l| !l.trim().is_empty())
+            .map(|s| s.to_string())
+    });
+
+    (is_fresh, last_line)
+}
+
 /// Inspect prompt goal status across workspaces for an instance
 pub fn inspect_prompt_goal_status(
-    _instance_id: &str,
+    instance_id: &str,
     workspaces: &[String],
 ) -> (bool, Option<String>, Option<String>) {
     let now = Utc::now().timestamp();
     for ws in workspaces {
         let ws_p = Path::new(ws);
         let cfg_p = ws_p.join(".antigravity_goal_heartbeat.json");
-        if cfg_p.exists() {
-            if let Ok(c) = fs::read_to_string(&cfg_p) {
-                if let Ok(cfg) = serde_json::from_str::<PromptGoalHeartbeatConfig>(&c) {
-                    let hb_p = Path::new(&cfg.heartbeat_file);
-                    let mut is_fresh = false;
-                    let mut last_line = None;
-                    if hb_p.exists() {
-                        if let Ok(meta) = fs::metadata(hb_p) {
-                            if let Ok(modified) = meta.modified() {
-                                let dt: chrono::DateTime<Utc> = modified.into();
-                                let age = now - dt.timestamp();
-                                if age <= (cfg.interval_secs as i64 + 4) {
-                                    is_fresh = true;
-                                }
-                            }
-                        }
-                        if let Ok(content) = fs::read_to_string(hb_p) {
-                            last_line = content
-                                .lines()
-                                .rev()
-                                .find(|l| !l.trim().is_empty())
-                                .map(|s| s.to_string());
-                        }
+        if !cfg_p.exists() {
+            continue;
+        }
+        let Ok(c) = fs::read_to_string(&cfg_p) else {
+            continue;
+        };
+        let Ok(cfg) = serde_json::from_str::<PromptGoalHeartbeatConfig>(&c) else {
+            continue;
+        };
+
+        let is_default_target = instance_id == "default" || instance_id == "__default__";
+        let is_default_cfg = cfg.instance_id == "default"
+            || cfg.instance_id == "__default__"
+            || cfg.instance_id.is_empty();
+        let is_inst_match = instance_id == "all"
+            || (is_default_target && is_default_cfg)
+            || (!cfg.instance_id.is_empty() && cfg.instance_id == instance_id);
+        if !is_inst_match {
+            continue;
+        }
+
+        let is_pid_alive = cfg
+            .worker_pid
+            .map(crate::modules::instance::is_pid_alive_os)
+            .unwrap_or(false);
+
+        let (mut is_fresh, last_line) =
+            check_heartbeat_freshness(&cfg.heartbeat_file, cfg.interval_secs, now);
+
+        // Inspect .antigravity_goal_prompt.log / heartbeat line instance tags
+        if is_fresh {
+            if let Some(ref line) = last_line {
+                if line.contains("instance=") {
+                    let is_matching_tag = if is_default_target {
+                        line.contains("instance=default")
+                            || line.contains("instance=__default__")
+                            || line.contains("instance= ")
+                    } else {
+                        line.contains(&format!("instance={}", instance_id))
+                    };
+                    if !is_matching_tag && instance_id != "all" {
+                        is_fresh = false;
                     }
-                    return (is_fresh, Some(cfg.heartbeat_file), last_line);
                 }
             }
+        }
+
+        let is_fully_active = is_fresh && is_pid_alive;
+        if is_fully_active {
+            return (true, Some(cfg.heartbeat_file), last_line);
         }
     }
     (false, None, None)
@@ -390,7 +562,11 @@ pub fn inspect_prompt_goal_status(
 pub fn ensure_prompt_goals_running_for_instance(instance_id: &str) -> usize {
     let mut reinvoked = 0;
     let workspaces = if let Ok(registry) = crate::modules::instance::load_registry() {
-        if let Some(inst) = registry.instances.iter().find(|i| i.id == instance_id) {
+        if let Some(inst) = registry
+            .instances
+            .iter()
+            .find(|i| i.id == instance_id || (instance_id == "default" && i.is_default))
+        {
             crate::modules::instance::get_instance_workspace_folders(instance_id, &inst.data_dir)
         } else {
             Vec::new()
@@ -403,46 +579,124 @@ pub fn ensure_prompt_goals_running_for_instance(instance_id: &str) -> usize {
     for ws in &workspaces {
         let ws_p = Path::new(ws);
         let cfg_p = ws_p.join(".antigravity_goal_heartbeat.json");
-        if cfg_p.exists() {
-            if let Ok(c) = fs::read_to_string(&cfg_p) {
-                if let Ok(cfg) = serde_json::from_str::<PromptGoalHeartbeatConfig>(&c) {
-                    let hb_p = Path::new(&cfg.heartbeat_file);
-                    let mut is_alive = false;
-                    if hb_p.exists() {
-                        if let Ok(meta) = fs::metadata(hb_p) {
-                            if let Ok(mod_time) = meta.modified() {
-                                let dt: chrono::DateTime<Utc> = mod_time.into();
-                                if (now - dt.timestamp()) <= (cfg.interval_secs as i64 + 4) {
-                                    is_alive = true;
-                                }
-                            }
-                        }
-                    }
-                    if !is_alive {
-                        crate::modules::logger::log_info(&format!(
-                            "[PromptGoal] Prompt goal heartbeat stopped in '{}', auto-reinvoking for instance '{}'...",
-                            ws, instance_id
-                        ));
-                        if let Ok(registry) = crate::modules::instance::load_registry() {
-                            if let Some(inst) =
-                                registry.instances.iter().find(|i| i.id == instance_id)
-                            {
-                                if let Ok(_) = start_prompt_goal_heartbeat(
-                                    instance_id,
-                                    &inst.data_dir,
-                                    ws,
-                                    &cfg.heartbeat_file,
-                                    &cfg.prompt_content,
-                                    cfg.interval_secs,
-                                ) {
-                                    reinvoked += 1;
-                                }
-                            }
-                        }
+        if !cfg_p.exists() {
+            continue;
+        }
+        let Ok(c) = fs::read_to_string(&cfg_p) else {
+            continue;
+        };
+        let Ok(cfg) = serde_json::from_str::<PromptGoalHeartbeatConfig>(&c) else {
+            continue;
+        };
+
+        let is_default_target = instance_id == "default" || instance_id == "__default__";
+        let is_default_cfg = cfg.instance_id == "default"
+            || cfg.instance_id == "__default__"
+            || cfg.instance_id.is_empty();
+        let is_inst_match = instance_id == "all"
+            || (is_default_target && is_default_cfg)
+            || (!cfg.instance_id.is_empty() && cfg.instance_id == instance_id);
+        if !is_inst_match {
+            continue;
+        }
+
+        let is_pid_alive = cfg
+            .worker_pid
+            .map(crate::modules::instance::is_pid_alive_os)
+            .unwrap_or(false);
+        let (is_fresh, _) = check_heartbeat_freshness(&cfg.heartbeat_file, cfg.interval_secs, now);
+        let is_alive = is_fresh && is_pid_alive;
+
+        if !is_alive {
+            crate::modules::logger::log_info(&format!(
+                "[PromptGoal] Prompt goal heartbeat stopped in '{}', auto-reinvoking for instance '{}'...",
+                ws, instance_id
+            ));
+            if let Ok(registry) = crate::modules::instance::load_registry() {
+                if let Some(inst) = registry
+                    .instances
+                    .iter()
+                    .find(|i| i.id == instance_id || (instance_id == "default" && i.is_default))
+                {
+                    if let Ok(_) = start_prompt_goal_heartbeat(
+                        instance_id,
+                        &inst.data_dir,
+                        ws,
+                        &cfg.heartbeat_file,
+                        &cfg.prompt_content,
+                        cfg.interval_secs,
+                    ) {
+                        reinvoked += 1;
+                        let (extracted_img, img_paths) =
+                            super::detection::extract_image_payload_or_path(&cfg.prompt_content);
+                        let image_count = if !img_paths.is_empty() {
+                            img_paths.len()
+                        } else if extracted_img.is_some() {
+                            1
+                        } else {
+                            0
+                        };
+                        let byte_size = cfg.prompt_content.len();
+                        tracing::info!(
+                            "[PROMPT_RESTORE] Restoring running prompt for instance {} from backup (images: {}, bytes: {})",
+                            instance_id,
+                            image_count,
+                            byte_size
+                        );
                     }
                 }
             }
         }
     }
     reinvoked
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_clamp_heartbeat_interval() {
+        assert_eq!(clamp_heartbeat_interval(0), 30);
+        assert_eq!(clamp_heartbeat_interval(10), 30);
+        assert_eq!(clamp_heartbeat_interval(30), 30);
+        assert_eq!(clamp_heartbeat_interval(45), 45);
+    }
+
+    #[test]
+    fn test_goal_heartbeat_config_and_audit_log() {
+        let prompt_text = "Prompt goal test with attached diagram file:///d:/temp/diagram.png";
+        let (extracted_img, img_paths) =
+            super::super::detection::extract_image_payload_or_path(prompt_text);
+        assert_eq!(img_paths.len(), 1);
+        let image_count = if !img_paths.is_empty() {
+            img_paths.len()
+        } else if extracted_img.is_some() {
+            1
+        } else {
+            0
+        };
+        assert_eq!(image_count, 1);
+        assert_eq!(prompt_text.len(), 66);
+
+        let cfg = PromptGoalHeartbeatConfig {
+            prompt_id: "goal-test-1".to_string(),
+            instance_id: "default".to_string(),
+            data_dir: "d:/data".to_string(),
+            repo_path: "d:/work/test".to_string(),
+            prompt_content: prompt_text.to_string(),
+            heartbeat_file: "d:/work/test/.hb.log".to_string(),
+            interval_secs: 30,
+            account_email: "test@example.com".to_string(),
+            worker_pid: Some(1234),
+            started_at: 1000,
+            last_heartbeat_at: Some(1030),
+        };
+
+        let json_str = serde_json::to_string(&cfg).expect("serialize cfg");
+        let parsed: PromptGoalHeartbeatConfig =
+            serde_json::from_str(&json_str).expect("deserialize cfg");
+        assert_eq!(parsed.prompt_id, "goal-test-1");
+        assert_eq!(parsed.account_email, "test@example.com");
+    }
 }

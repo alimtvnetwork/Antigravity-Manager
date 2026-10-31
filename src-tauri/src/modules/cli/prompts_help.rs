@@ -20,8 +20,8 @@ pub(crate) fn print_prompts_cli_help() {
     println!(
         "  reset-tree, reset-db [-i <inst>] [--json] Clear the prompt tree cache and keep prompts"
     );
-    println!("  send, run <prompt> [-i <inst>] [-r <repo>] Dispatch prompt immediately via Smart Process Cache");
-    println!("  enqueue, queue <prompt> [-i <inst>] [-r <repo>] Enqueue prompt into FIFO execution queue");
+    println!("  send, run <prompt> [-i <inst>] [-r <repo>] [--conversation <id>] Dispatch prompt immediately");
+    println!("  enqueue, queue <prompt> [-i <inst>] [-r <repo>] [--conversation <id>] Enqueue prompt into FIFO execution queue");
     println!(
         "  backup [-i <inst>] [--json]                Backup running prompts to SQLite database"
     );
@@ -30,6 +30,7 @@ pub(crate) fn print_prompts_cli_help() {
     println!("Options:");
     println!("  --instance, -i <id>       Target instance profile (default: active/default)");
     println!("  --repo, -r <path>         Target workspace directory (default: current directory)");
+    println!("  --conversation <id>       Resume this conversation. Omit to use the open composer. Pass new to start a chat.");
     println!("  --all, -a                 List prompts across all registered instances");
     println!("  --running                 Filter tree to actively running prompts only");
     println!("  --limit, -l <N>           Limit number of prompts to restore (default: 20)");

@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::Path;
-// codesign 仅 macOS 分支使用（patch_agy_binary 重签名）
+// codesign is only used by the macOS branch (patch_agy_binary re-signed)
 #[cfg(target_os = "macos")]
 use std::process::Command;
 

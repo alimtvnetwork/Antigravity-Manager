@@ -1,13 +1,13 @@
-// Claude 辅助函数
-// JSON Schema 清理、签名处理等
+// Claude helper function
+// JSON Schema cleaning, signature processing, etc.
 
-// 已移除未使用的 Value 导入
+// Unused Value import removed
 
-// 将 JSON Schema 中的类型名称转为大写 (Gemini 要求)
-// 例如: "string" -> "STRING", "integer" -> "INTEGER"
-// 已移除未使用的 uppercase_schema_types 函数
+// Convert type names in JSON Schema to uppercase (required by Gemini)
+// For example: "string" -> "STRING", "integer" -> "INTEGER"
+// Removed unused uppercase_schema_types function
 
-/// 根据模型名称获取上下文 Token 限制
+/// Get context token limit based on model name
 pub fn get_context_limit_for_model(model: &str) -> u32 {
     if model.contains("pro") {
         2_097_152 // 2M for Pro
@@ -39,8 +39,8 @@ pub fn to_claude_usage(
     }
 }
 
-// 提取 thoughtSignature
-// 已移除未使用的 extract_thought_signature 函数
+// Extract thoughtSignature
+// Removed unused extract_thought_signature function
 
 #[cfg(test)]
 mod tests {
@@ -62,7 +62,7 @@ mod tests {
         assert!(claude_usage.input_tokens < 200);
         assert_eq!(claude_usage.output_tokens, 50);
 
-        // 测试 50% 负载 (500k) - 应该显示 ~30%
+        // Test 50% load (500k) - should show ~30%
         let usage_50 = UsageMetadata {
             prompt_token_count: Some(500_000),
             candidates_token_count: Some(10),
@@ -73,7 +73,7 @@ mod tests {
         // 50% * 0.6 = 30% of 195k = 58,500
         assert!(res_50.input_tokens > 55_000 && res_50.input_tokens < 62_000);
 
-        // 测试 70% 负载 (700k) - 应该显示 ~50%
+        // Test 70% load (700k) - should show ~50%
         let usage_70 = UsageMetadata {
             prompt_token_count: Some(700_000),
             candidates_token_count: Some(10),
@@ -84,7 +84,7 @@ mod tests {
         // 50% of 195k = 97,500
         assert!(res_70.input_tokens > 90_000 && res_70.input_tokens < 105_000);
 
-        // 测试 85% 负载 (850k) - 应该显示 ~70%
+        // Tested at 85% load (850k) - should show ~70%
         let usage_85 = UsageMetadata {
             prompt_token_count: Some(850_000),
             candidates_token_count: Some(10),
@@ -95,7 +95,7 @@ mod tests {
         // 70% of 195k = 136,500
         assert!(res_85.input_tokens > 130_000 && res_85.input_tokens < 145_000);
 
-        // 测试 100% 负载 (1M) - 应该显示 ~97%
+        // Test 100% load (1M) - should show ~97%
         let usage_100 = UsageMetadata {
             prompt_token_count: Some(1_000_000),
             candidates_token_count: Some(10),

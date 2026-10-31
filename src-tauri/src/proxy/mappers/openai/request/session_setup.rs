@@ -1,5 +1,5 @@
 // Session setup phase (split from request.rs).
-// OpenAI → Gemini 请求转换
+// OpenAI → Gemini request conversion
 use super::super::models::*;
 use crate::proxy::model_specs;
 use crate::proxy::token_manager::ProxyToken;
@@ -73,7 +73,7 @@ pub(crate) fn phase_setup(
         .unwrap_or(routing_session_id)
         .to_string();
     let message_count = request.messages.len();
-    // 将 OpenAI 工具转为 Value 数组以便探测
+    // Convert OpenAI tool to Value array for detection
     let tools_val = request
         .tools
         .as_ref()
@@ -95,7 +95,7 @@ pub(crate) fn phase_setup(
     let is_under_v3 = crate::proxy::model_specs::is_gemini_under_v3(mapped_model)
         || crate::proxy::model_specs::is_gemini_under_v3(&request.model);
 
-    // [FIX] 仅当模型名称显式包含 "-thinking" 或 Gemini 3+ 思维模型时才视为 Gemini 思维模型
+    // [FIX] Only considered Gemini thinking model if model name explicitly contains "-thinking" or Gemini 3+ thinking model
     let is_gemini_3_thinking = !is_under_v3
         && mapped_model_lower.contains("gemini")
         && (mapped_model_lower.contains("-thinking")
@@ -103,7 +103,7 @@ pub(crate) fn phase_setup(
             || mapped_model_lower.contains("gemini-pro")
             || mapped_model_lower.contains("-pro-agent"))
         && !mapped_model_lower.contains("claude");
-    // [FIX #2167] gemini-*-flash 支持 thinking (需为 Gemini 3 及以上版本)
+    // [FIX #2167] gemini-*-flash supports thinking (requires Gemini 3 and above)
     let is_gemini_flash_thinking = !is_under_v3
         && crate::proxy::model_specs::is_gemini_v3_or_above(mapped_model)
         && mapped_model_lower.contains("gemini")
@@ -137,9 +137,9 @@ pub(crate) fn phase_setup(
         || is_gemini_flash_thinking
         || force_server_thinking;
 
-    // [NEW] 决定是否开启 Thinking 功能（纯服务端权威 vs 客户端直接控制）:
-    // 网关控制模式下：仅按映射后的模型 ID / 强制思考启发式开启，忽略客户端 thinking.type / budget / effort。
-    // 客户端直接控制模式下：若客户端显式关闭思考（type: disabled 或 budget: 0 或 effort: none），尊重客户端设置。
+    // [NEW] Decide whether to enable the Thinking function (pure server authority vs direct client control):
+    // In gateway control mode: Only the mapped model ID/forced thinking heuristic is turned on, and the client thinking.type/budget/effort is ignored.
+    // In direct client control mode: If the client explicitly turns off thinking (type: disabled or budget: 0 or effort: none), the client settings are respected.
     let client_switch = crate::proxy::pipeline::extract_client_thinking_switch(
         request
             .thinking

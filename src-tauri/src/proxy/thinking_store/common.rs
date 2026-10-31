@@ -12,7 +12,7 @@ pub(crate) fn idle_ttl() -> Duration {
     Duration::from_secs(days.saturating_mul(24 * 60 * 60))
 }
 
-// 收集所有的 model 轮次元信息
+// Collect all model round meta information
 pub(crate) struct ModelTurnMeta {
     pub(crate) content_idx: usize,
     pub(crate) visible: String,

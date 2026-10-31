@@ -1,6 +1,6 @@
 # Memory Index (`.ai-memory/memory/`)
 
-- Updated: 2026-10-17T03:00:00Z
+- Updated: 2026-10-30T02:53:00Z
 - Full historical index: [01-index.md](./01-index.md). Every file listed here is also listed there.
 - Read order for the whole repo: [../what-to-read.md](../what-to-read.md). Task register: [../plans/readme.md](../plans/readme.md) "Recent Completed Tasks Register".
 
@@ -37,6 +37,9 @@
 | 27 | [learned/27-e2e-instance-autoswitch-prompt-playbook.md](./learned/27-e2e-instance-autoswitch-prompt-playbook.md) | Mandatory playbook when the user says end-to-end testing, instance testing, or auto-switch testing. Instance testing includes auto-switch, opening the instance, prompt preview, and entering a prompt. RCA of the OOM loop, CLI hang, update toast, 15% threshold, Supabase mocks, and email dedupe, plus the checklist. |
 | 28 | [learned/28-telegram-project-picker-and-node-cache.md](./learned/28-telegram-project-picker-and-node-cache.md) | Pointer to RCA 18. `/send` pages eight projects by newest conversation, title not id, This machine in green, node names cached 24 hours. Do not reorder `list_all_prompts`. |
 | 29 | [learned/29-dispatch-menu-hover-stays-inside.md](./learned/29-dispatch-menu-hover-stays-inside.md) | Pointer to RCA 20. Destination hover is clipped because a browser `title` opens past the right edge. Use `DispatchFieldHint` inside the menu. Do not put `title` back on the Send or Copy popovers. |
+| 30 | [learned/30-prompt-send-preemption-ide-title-sync-and-theme-polish.md](./learned/30-prompt-send-preemption-ide-title-sync-and-theme-polish.md) | Prompt Send preemption via CDP cancelInvocation, Antigravity Language Server protobuf raw_summary nullification on title rename, resizable tree splitter, theme adaptability (One Dark Pro), and portaled tooltip collision guards |
+| 31 | [learned/31-prompt-tree-copy-skill-refs-telegram-e2e-and-json-switch.md](./learned/31-prompt-tree-copy-skill-refs-telegram-e2e-and-json-switch.md) | Prompt Tree Copy is verbatim full text; skill refs are not attachments; Telegram 236 live ping/observe/shot/CSV; isolated switch+restore without `--json`; Create Profile dark-glass + 100 Steps UI; issue 66 JSON switch fake success (FIXED `v4.278.0`) |
+| 32 | [learned/32-prompt-tree-enqueue-count-and-v4-279-0.md](./learned/32-prompt-tree-enqueue-count-and-v4-279-0.md) | Enqueue/rerun show queued turns on click; selected-turn overlay keeps QUEUED; no 600s recency gate; tagged `v4.279.0`; issue 67 |
 
 **Plan 140 execution (not learned memory):** implement via [../plans/subtasks/140-per-instance-prompt-attribution-backup-queue/06-blind-executor/00-start-here.md](../plans/subtasks/140-per-instance-prompt-attribution-backup-queue/06-blind-executor/00-start-here.md) and steps 01 to 22. Design background: [../plans/140-per-instance-prompt-attribution-backup-queue.md](../plans/140-per-instance-prompt-attribution-backup-queue.md).
 
@@ -45,3 +48,4 @@ Note: `.ai-memory/learned/23-28` (outside this folder) are a separate older seri
 ## Other topic folders
 
 `avoid/`, `constraints/`, `done/`, `features/`, `issues/`, `preferences/`, `project/`, `sessions/`, `specs/`, `standards/`, `suggestions/`, `transactions/`, `workflow/`. Their files are indexed in [01-index.md](./01-index.md).
+| [learned/01-recent-session-2026-10-29.md](learned/01-recent-session-2026-10-29.md) | 2026-10-29 warm-up gate session, gitmap IDE setup, and repo-cache heatmaps. |

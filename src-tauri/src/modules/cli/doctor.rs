@@ -2,9 +2,7 @@ use crate::modules::{account, auto_switcher, config, instance, repo_db};
 
 use super::*;
 
-pub fn handle_doctor_subcommand(args: &[String]) {
-    let is_json = is_flag_present(args, &["--json", "-j"]);
-
+pub fn generate_doctor_report() -> DoctorReport {
     // 1. Node name & Local IP
     let node_name = crate::modules::email_watcher::detect_machine_name();
     let local_ip = crate::modules::supabase_sync::get_local_ip();
@@ -127,7 +125,7 @@ pub fn handle_doctor_subcommand(args: &[String]) {
         "degraded".to_string()
     };
 
-    let report = DoctorReport {
+    DoctorReport {
         status: overall_status,
         node_name,
         local_ip,
@@ -140,7 +138,12 @@ pub fn handle_doctor_subcommand(args: &[String]) {
         antigravity_path: ag_exe_opt,
         running_pids,
         checks,
-    };
+    }
+}
+
+pub fn handle_doctor_subcommand(args: &[String]) {
+    let is_json = is_flag_present(args, &["--json", "-j"]);
+    let report = generate_doctor_report();
 
     if is_json {
         CliEnvelope::ok("doctor", None, report).print_and_exit();

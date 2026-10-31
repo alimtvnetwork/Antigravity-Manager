@@ -1,4 +1,62 @@
 use crate::proxy::config::{ProxyAuthMode, ProxyConfig, SecurityMonitorConfig};
+use std::net::IpAddr;
+
+/// Imp-53: Checks if an IP address belongs to a specified CIDR block (e.g. "192.168.1.0/24")
+pub fn is_ip_in_cidr(ip: &IpAddr, cidr: &str) -> bool {
+    let parts: Vec<&str> = cidr.trim().split('/').collect();
+    if parts.is_empty() {
+        return false;
+    }
+
+    let network_ip: IpAddr = match parts[0].parse() {
+        Ok(ip) => ip,
+        Err(_) => return false,
+    };
+
+    let prefix_len: u32 = if parts.len() > 1 {
+        match parts[1].parse() {
+            Ok(len) => len,
+            Err(_) => return false,
+        }
+    } else {
+        match network_ip {
+            IpAddr::V4(_) => 32,
+            IpAddr::V6(_) => 128,
+        }
+    };
+
+    match (ip, network_ip) {
+        (IpAddr::V4(ip4), IpAddr::V4(net4)) => {
+            if prefix_len > 32 {
+                return false;
+            }
+            if prefix_len == 0 {
+                return true;
+            }
+            let mask = !((1u32 << (32 - prefix_len)) - 1);
+            (u32::from(*ip4) & mask) == (u32::from(net4) & mask)
+        }
+        (IpAddr::V6(ip6), IpAddr::V6(net6)) => {
+            if prefix_len > 128 {
+                return false;
+            }
+            if prefix_len == 0 {
+                return true;
+            }
+            let mask = !((1u128 << (128 - prefix_len)) - 1);
+            (u128::from(*ip6) & mask) == (u128::from(net6) & mask)
+        }
+        _ => false,
+    }
+}
+
+/// Imp-53: Checks if an IP matches any CIDR rule in a list
+pub fn is_ip_allowed_by_cidr_list(ip: &IpAddr, cidr_list: &[String]) -> bool {
+    if cidr_list.is_empty() {
+        return true;
+    }
+    cidr_list.iter().any(|cidr| is_ip_in_cidr(ip, cidr))
+}
 
 #[derive(Debug, Clone)]
 pub struct ProxySecurityConfig {

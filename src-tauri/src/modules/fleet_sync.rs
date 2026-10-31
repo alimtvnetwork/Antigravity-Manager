@@ -495,12 +495,7 @@ pub fn generate_local_fleet_sync_payload() -> Result<FleetSyncPayload, AppError>
         }
     };
 
-    let short_id = if node_id.len() > 6 {
-        &node_id[..6]
-    } else {
-        &node_id
-    };
-    let node_alias = sysinfo::System::host_name().unwrap_or_else(|| format!("Node-{}", short_id));
+    let node_alias = crate::modules::supabase_sync::resolve_local_node_alias();
     let local_ip = get_local_ip();
     let os_info = format!("{} {}", std::env::consts::OS, std::env::consts::ARCH);
     let agm_version = env!("CARGO_PKG_VERSION").to_string();

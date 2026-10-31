@@ -8,6 +8,28 @@ use std::path::PathBuf;
 
 use super::*;
 
+async fn handle_improvements_callback(token: &str, chat_id: i64, data: &str) -> bool {
+    let Some(action) = crate::modules::improvements::parse_improvements_callback(data) else {
+        return false;
+    };
+    let rest = match action {
+        "plan" => "plan",
+        "next" => "next",
+        "detail" => "detail",
+        "check" => "check",
+        _ => "status",
+    };
+    let reply = super::processing::format_improvements_command_reply("improvements", rest);
+    let markup = crate::modules::improvements::telegram_markup();
+    // Justification: callback action already applied to the ledger; a Telegram
+    // send failure is logged and does not roll back Plan/Next/Status.
+    crate::error::record_ignored(
+        send_telegram_message_with_markup(token, chat_id, &reply, Some(markup), false).await,
+        "send improvements callback reply",
+    );
+    true
+}
+
 /// Normalize a `cmd:` inline-keyboard payload into the `/command …` text the
 /// command pipeline expects. Both spellings exist in the wild (`cmd:/send`
 /// from the report markups, `cmd:fleet` from the ping markup), so every
@@ -21,35 +43,82 @@ pub(crate) fn normalize_cmd_callback_payload(data: &str) -> String {
     }
 }
 
+/// Global pooled HTTP client for Telegram operations, reusing TCP/TLS connections
+pub static TELEGRAM_HTTP_CLIENT: once_cell::sync::Lazy<reqwest::Client> =
+    once_cell::sync::Lazy::new(|| {
+        reqwest::Client::builder()
+            .pool_max_idle_per_host(10)
+            .pool_idle_timeout(Duration::from_secs(90))
+            .tcp_keepalive(Duration::from_secs(30))
+            .connect_timeout(Duration::from_secs(10))
+            .timeout(Duration::from_secs(35))
+            .build()
+            .unwrap_or_else(|e| {
+                tracing::error!("[TelegramClient] Failed to build pooled client: {e}");
+                reqwest::Client::new()
+            })
+    });
+
+/// Immediately answer callback query so Telegram client dismisses button spinner without waiting
+pub(crate) async fn answer_callback_query(token: &str, cb_id: &str) {
+    let clean_token = token.trim();
+    let clean_cb = cb_id.trim();
+    if clean_token.is_empty() || clean_cb.is_empty() {
+        return;
+    }
+    let ans_url = format!(
+        "https://api.telegram.org/bot{}/answerCallbackQuery",
+        clean_token
+    );
+    // Justification: best-effort callback query answer to dismiss button spinners immediately; failure logged without changing control flow
+    crate::error::record_ignored(
+        TELEGRAM_HTTP_CLIENT
+            .post(&ans_url)
+            .json(&json!({ "callback_query_id": clean_cb }))
+            .send()
+            .await,
+        "answerCallbackQuery",
+    );
+}
+
+/// Send chat action (e.g. "typing") to indicate background processing immediately to the user
+pub(crate) async fn send_chat_action(token: &str, chat_id: i64, action: &str) {
+    let clean_token = token.trim();
+    if clean_token.is_empty() || chat_id == 0 {
+        return;
+    }
+    let url = format!("https://api.telegram.org/bot{}/sendChatAction", clean_token);
+    // Justification: best-effort chat action indicator; failure logged without changing control flow
+    crate::error::record_ignored(
+        TELEGRAM_HTTP_CLIENT
+            .post(&url)
+            .json(&json!({
+                "chat_id": chat_id,
+                "action": action
+            }))
+            .send()
+            .await,
+        "sendChatAction",
+    );
+}
+
 /// Handle `send:*` inline-keyboard callbacks for the `/send` two-step flow.
 /// Returns true when the callback belonged to the flow (caller should `continue`).
-async fn deliver_send_flow_callback(
-    token: &str,
-    chat_id: i64,
-    cb_id: &str,
-    data: &str,
-    client: &reqwest::Client,
-) -> bool {
+async fn deliver_send_flow_callback(token: &str, chat_id: i64, cb_id: &str, data: &str) -> bool {
     if !data.starts_with("send:") {
         return false;
     }
+    // Dismiss button spinner immediately before evaluating send-flow state
+    answer_callback_query(token, cb_id).await;
+
     let (reply, markup) = super::send_flow::handle_send_callback(chat_id, data).await;
     // Justification: the picker reply is already computed and flow state is
     // updated; a Telegram send failure is logged without changing the flow.
-    crate::error::record_ignored(
-        send_telegram_message_with_markup(token, chat_id, &reply, markup, false).await,
-        "send /send picker reply",
-    );
-    if !cb_id.is_empty() {
-        let ans_url = format!("https://api.telegram.org/bot{}/answerCallbackQuery", token);
-        // Justification: best-effort send; failure logged without changing control flow
+    // If reply is empty (e.g. this node dropped callback intended for another machine), do not send a message.
+    if !reply.trim().is_empty() {
         crate::error::record_ignored(
-            client
-                .post(&ans_url)
-                .json(&json!({ "callback_query_id": cb_id }))
-                .send()
-                .await,
-            "answerCallbackQuery",
+            send_telegram_message_with_markup(token, chat_id, &reply, markup, false).await,
+            "send /send picker reply",
         );
     }
     true
@@ -131,7 +200,9 @@ async fn deliver_ui_or_command(
 ) -> Option<String> {
     // `/send` two-step flow: once the destination is locked, the next plain-text
     // message is the prompt. Commands (leading `/`) always pass through.
-    if let Some(send) = super::send_flow::consume_send_prompt(token, chat_id, text_raw).await {
+    if let Some(send) =
+        super::send_flow::consume_send_prompt(token, chat_id, text_raw, saved_media_opt).await
+    {
         // Justification: the send-flow reply is already computed; a Telegram
         // send failure is logged and does not change the dispatched prompt.
         crate::error::record_ignored(
@@ -142,33 +213,93 @@ async fn deliver_ui_or_command(
         return Some(send.reply);
     }
 
+    let trimmed_raw = text_raw.trim();
+    if trimmed_raw.starts_with("im:") {
+        if handle_improvements_callback(token, chat_id, trimmed_raw).await {
+            return Some("ok".to_string());
+        }
+        return None;
+    }
+    if trimmed_raw.starts_with("i:") {
+        if super::instance_cards::handle_instance_callback(token, chat_id, trimmed_raw).await {
+            return Some("ok".to_string());
+        }
+        return None;
+    }
+
+    if super::instance_cards::should_fanout_status(text_raw) {
+        return super::instance_cards::deliver_instance_status_fanout(token, chat_id).await;
+    }
+
     // Check if command requests CSV/JSON document attachment upload
     if let Some((export_target, export_fmt)) = detect_telegram_export_request(text_raw) {
         match reports_a::generate_export_document(&export_target, &export_fmt) {
             Ok(doc) => {
-                if let Err(err) = send_telegram_document(
+                let uploaded = match send_telegram_document(
                     token,
                     chat_id,
                     &doc.file_name,
                     &doc.bytes,
-                    &doc.caption,
-                    doc.markup.clone(),
+                    "",
+                    None,
                 )
                 .await
                 {
-                    let fallback = format!(
-                        "{}\n⚠️ <i>Document upload fallback:</i> <code>{}</code>",
-                        doc.caption,
-                        crate::modules::notification_hub::escape_telegram_html(&err)
-                    );
-                    // Justification: fallback message when document upload fails; logged via record_ignored
-                    crate::error::record_ignored(
-                        send_telegram_message_with_markup(
-                            token, chat_id, &fallback, doc.markup, false,
-                        )
-                        .await,
-                        "send export fallback message",
-                    );
+                    Ok(()) => Ok(()),
+                    Err(err) => send_telegram_document(
+                        token,
+                        chat_id,
+                        &doc.file_name,
+                        &doc.bytes,
+                        &doc.caption,
+                        None,
+                    )
+                    .await
+                    .map_err(|err2| format!("{err}; retry: {err2}")),
+                };
+                match uploaded {
+                    Ok(()) => {
+                        if let Some(markup) = doc.markup.clone() {
+                            let follow = format!(
+                                "✅ <b>Download attached:</b> <code>{}</code> ({} bytes)",
+                                crate::modules::notification_hub::escape_telegram_html(
+                                    &doc.file_name
+                                ),
+                                doc.bytes.len()
+                            );
+                            crate::error::record_ignored(
+                                send_telegram_message_with_markup(
+                                    token,
+                                    chat_id,
+                                    &follow,
+                                    Some(markup),
+                                    false,
+                                )
+                                .await,
+                                "send export follow-up buttons",
+                            );
+                        }
+                    }
+                    Err(err) => {
+                        let preview: String = String::from_utf8_lossy(&doc.bytes)
+                            .chars()
+                            .take(800)
+                            .collect();
+                        let fallback = format!(
+                            "{}\n⚠️ <i>Document upload failed:</i> <code>{}</code>\n<code>{}</code>",
+                            doc.caption,
+                            crate::modules::notification_hub::escape_telegram_html(&err),
+                            crate::modules::notification_hub::escape_telegram_html(&preview)
+                        );
+                        // Justification: both document attempts failed; surface CSV text so the operator still has the data.
+                        crate::error::record_ignored(
+                            send_telegram_message_with_markup(
+                                token, chat_id, &fallback, None, false,
+                            )
+                            .await,
+                            "send export fallback message",
+                        );
+                    }
                 }
                 return Some(doc.caption);
             }
@@ -256,13 +387,16 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
                             {
                                 "text": "📋 Copy Markdown",
                                 "copy_text": {
-                                    "text": format!("![image]({})", url)
+                                    "text": clamp_telegram_copy_text(
+                                        &format!("![image]({})", url),
+                                        TELEGRAM_COPY_TEXT_MAX,
+                                    )
                                 }
                             },
                             {
                                 "text": "🔗 Copy URL",
                                 "copy_text": {
-                                    "text": url
+                                    "text": clamp_telegram_copy_text(url, TELEGRAM_COPY_TEXT_MAX)
                                 }
                             }
                         ]
@@ -283,7 +417,25 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
     }
 
     // 2. Command with text
-    let base_reply = process_telegram_command_text(trimmed).await;
+    let effective_text = if let Some((img_path, public_url_opt)) = saved_media_opt.as_ref() {
+        let local_str = img_path.to_string_lossy();
+        let media_ref: &str = public_url_opt.as_deref().unwrap_or(&local_str);
+        if !trimmed.contains(media_ref)
+            && (trimmed.starts_with("/prompt")
+                || trimmed.starts_with("prompt")
+                || trimmed.starts_with("/pt")
+                || trimmed.starts_with("/send")
+                || trimmed.starts_with("C0")
+                || trimmed.starts_with("P0"))
+        {
+            format!("{}\n\n![attached-image](<{}>)", trimmed, media_ref)
+        } else {
+            trimmed.to_string()
+        }
+    } else {
+        trimmed.to_string()
+    };
+    let base_reply = process_telegram_command_text(&effective_text).await;
     let (cmd_raw, rest) = match trimmed.split_once(char::is_whitespace) {
         Some((c, r)) => (c, r.trim()),
         None => (trimmed, ""),
@@ -296,7 +448,47 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
         .to_lowercase();
 
     let mut markup_opt = match cmd_base.as_str() {
-        "expand" | "exp" => reports_b::resolve_expand_prompt_markup(rest),
+        "backup" | "backpack" | "backup_prompt" | "backup_prompts" | "backup_running" | "brp" => {
+            Some(json!({
+                "inline_keyboard": [
+                    [
+                        { "text": "📦 Backup Prompts", "callback_data": "cmd:/backup" },
+                        { "text": "♻️ Restore Prompts", "callback_data": "cmd:/restore" }
+                    ],
+                    [
+                        { "text": "🖼️ Send with Images", "callback_data": "cmd:/send images" },
+                        { "text": "📋 Backups List", "callback_data": "cmd:/backup list" }
+                    ]
+                ]
+            }))
+        }
+        "restore" | "rrp" | "resend" => Some(json!({
+            "inline_keyboard": [
+                [
+                    { "text": "♻️ Restore Prompts", "callback_data": "cmd:/restore" },
+                    { "text": "📦 Backup Prompts", "callback_data": "cmd:/backup" }
+                ],
+                [
+                    { "text": "🌲 Tree View", "callback_data": "cmd:/tree" },
+                    { "text": "⚡ Active Prompts", "callback_data": "cmd:/active" }
+                ]
+            ]
+        })),
+        "tree" | "treeview" | "active" => Some(json!({
+            "inline_keyboard": [
+                [
+                    { "text": "🌲 Expand Tree", "callback_data": "cmd:/tree" },
+                    { "text": "⚡ Active Prompts", "callback_data": "cmd:/active" }
+                ],
+                [
+                    { "text": "📦 Backup Prompts", "callback_data": "cmd:/backup" },
+                    { "text": "♻️ Restore Prompts", "callback_data": "cmd:/restore" }
+                ]
+            ]
+        })),
+        "expand" | "exp" | "inspect" | "ins" | "show" | "view" => {
+            reports_b::resolve_expand_prompt_markup(rest)
+        }
         "history" | "hist" => Some(super::prompt_history::format_prompt_history(8).1),
         "fleet" | "whoami" => Some(json!({
             "inline_keyboard": [
@@ -339,15 +531,15 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
         "status" | "observe" => Some(json!({
             "inline_keyboard": [
                 [
-                    { "text": "💰 Account Balances", "callback_data": "cmd:/balance" },
-                    { "text": "🚀 Prompt Wizard (/send)", "callback_data": "cmd:/send" }
+                    { "text": "💰 Balance", "callback_data": "cmd:/balance" },
+                    { "text": "📸 Screenshots", "callback_data": "cmd:/screenshot" }
                 ],
                 [
-                    { "text": "📥 Accounts CSV", "callback_data": "cmd:/export accounts csv" },
-                    { "text": "📥 Instances CSV", "callback_data": "cmd:/export instances csv" }
+                    { "text": "📥 Instances CSV", "callback_data": "cmd:/export instances csv" },
+                    { "text": "📥 Prompts CSV", "callback_data": "cmd:/export prompts csv" }
                 ],
                 [
-                    { "text": "🖥️ SSH Nodes", "callback_data": "cmd:/nodes" },
+                    { "text": "🚀 Send", "callback_data": "cmd:/send" },
                     { "text": "🔄 Refresh Status", "callback_data": "cmd:/status" }
                 ]
             ]
@@ -364,7 +556,22 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
                 ]
             ]
         })),
+        "prompt" | "pt" => Some(json!({
+            "inline_keyboard": [
+                [
+                    { "text": "⚡ Active Prompts", "callback_data": "cmd:/active" },
+                    { "text": "🌲 Expand Tree", "callback_data": "cmd:/tree" }
+                ],
+                [
+                    { "text": "📦 Backup Prompts", "callback_data": "cmd:/backup" },
+                    { "text": "♻️ Restore Prompts", "callback_data": "cmd:/restore" }
+                ]
+            ]
+        })),
         "help" | "start" => Some(super::ui_remote::help_copy_markup()),
+        "improvements" | "improve" | "next10" | "next-10" => {
+            Some(crate::modules::improvements::telegram_markup())
+        }
         "send" => {
             if rest.trim().eq_ignore_ascii_case("cancel") {
                 None
@@ -377,9 +584,33 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
                 [
                     { "text": "🌐 Fleet Identity", "callback_data": "cmd:fleet" },
                     { "text": "📊 Live Observe", "callback_data": "cmd:observe" }
+                ],
+                [
+                    { "text": "📦 Backup Prompts", "callback_data": "cmd:/backup" },
+                    { "text": "♻️ Restore Prompts", "callback_data": "cmd:/restore" }
                 ]
             ]
         })),
+        s if (s.starts_with('c')
+            || s.starts_with('p')
+            || s.starts_with("agm:c")
+            || s.starts_with("agm:p")
+            || s.starts_with("gm:#")
+            || s.starts_with("gm:")) =>
+        {
+            Some(json!({
+                "inline_keyboard": [
+                    [
+                        { "text": "⚡ Active Prompts", "callback_data": "cmd:/active" },
+                        { "text": "🌲 Expand Tree", "callback_data": "cmd:/tree" }
+                    ],
+                    [
+                        { "text": "📦 Backup Prompts", "callback_data": "cmd:/backup" },
+                        { "text": "♻️ Restore Prompts", "callback_data": "cmd:/restore" }
+                    ]
+                ]
+            }))
+        }
         _ => None,
     };
 
@@ -405,13 +636,16 @@ pub(crate) async fn resolve_telegram_command_reply_and_markup(
                             {
                                 "text": "📋 Copy Markdown",
                                 "copy_text": {
-                                    "text": format!("![image]({})", url)
+                                    "text": clamp_telegram_copy_text(
+                                        &format!("![image]({})", url),
+                                        TELEGRAM_COPY_TEXT_MAX,
+                                    )
                                 }
                             },
                             {
                                 "text": "🔗 Copy URL",
                                 "copy_text": {
-                                    "text": url.clone()
+                                    "text": clamp_telegram_copy_text(url, TELEGRAM_COPY_TEXT_MAX)
                                 }
                             }
                         ]
@@ -433,13 +667,8 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
         return Err(AppError::Config("Telegram bot token is empty".to_string()));
     }
 
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(15))
-        .build()
-        .map_err(|e| AppError::Network(e.to_string(), None))?;
-
     let url = format!("https://api.telegram.org/bot{}/getUpdates", clean_token);
-    let resp = client
+    let resp = TELEGRAM_HTTP_CLIENT
         .get(&url)
         .send()
         .await
@@ -473,8 +702,33 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
                 let data = cb["data"].as_str().unwrap_or("").trim();
 
                 if chat_id != 0 && !data.is_empty() {
-                    if deliver_send_flow_callback(&clean_token, chat_id, cb_id, data, &client).await
-                    {
+                    // Immediately answer callback query so Telegram button spinners dismiss instantly
+                    answer_callback_query(&clean_token, cb_id).await;
+
+                    if deliver_send_flow_callback(&clean_token, chat_id, cb_id, data).await {
+                        continue;
+                    }
+
+                    if data.starts_with("i:") {
+                        if config.allowed_chat_id.is_none() {
+                            config.allowed_chat_id = Some(chat_id);
+                            config.is_enabled = true;
+                            crate::error::record_ignored(save_config(&config), "save_config");
+                        }
+                        if let Some(allowed) = config.allowed_chat_id {
+                            if chat_id == allowed {
+                                send_chat_action(&clean_token, chat_id, "typing").await;
+                                if super::instance_cards::handle_instance_callback(
+                                    &clean_token,
+                                    chat_id,
+                                    data,
+                                )
+                                .await
+                                {
+                                    processed.push((chat_id, data.to_string(), "ok".to_string()));
+                                }
+                            }
+                        }
                         continue;
                     }
 
@@ -487,28 +741,13 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
 
                     if let Some(allowed) = config.allowed_chat_id {
                         if chat_id == allowed {
+                            send_chat_action(&clean_token, chat_id, "typing").await;
                             let cmd_str = normalize_cmd_callback_payload(data);
 
                             if let Some(reply) =
                                 deliver_ui_or_command(&clean_token, chat_id, &cmd_str, &None).await
                             {
                                 processed.push((chat_id, cmd_str, reply));
-                            }
-
-                            if !cb_id.is_empty() {
-                                let ans_url = format!(
-                                    "https://api.telegram.org/bot{}/answerCallbackQuery",
-                                    clean_token
-                                );
-                                // Justification: best-effort send; failure logged without changing control flow
-                                crate::error::record_ignored(
-                                    client
-                                        .post(&ans_url)
-                                        .json(&json!({ "callback_query_id": cb_id }))
-                                        .send()
-                                        .await,
-                                    "answerCallbackQuery",
-                                );
                             }
                         }
                     }
@@ -545,6 +784,9 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
                 }
             }
 
+            // Send "typing" chat action immediately when command or message is received
+            send_chat_action(&clean_token, chat_id, "typing").await;
+
             let reply =
                 deliver_ui_or_command(&clean_token, chat_id, text_raw, &saved_media_opt).await;
             if let Some(reply) = reply {
@@ -561,7 +803,10 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
             last_id + 1
         );
         // Justification: best-effort send; failure logged without changing control flow
-        crate::error::record_ignored(client.get(&ack_url).send().await, "send via get");
+        crate::error::record_ignored(
+            TELEGRAM_HTTP_CLIENT.get(&ack_url).send().await,
+            "send via get",
+        );
     }
 
     Ok(processed)
@@ -571,15 +816,22 @@ pub async fn poll_telegram_updates_once() -> Result<Vec<(i64, String, String)>, 
 pub fn start_telegram_daemon() {
     let is_already_running = TELEGRAM_RUNNING.swap(true, Ordering::SeqCst);
     if is_already_running {
+        crate::modules::telegram_inbound::notify_telegram_daemon();
         return;
     }
 
     tauri::async_runtime::spawn(async move {
-        // Enforce 60-second startup quiet period: nothing runs until 1 minute after launch
-        tokio::time::sleep(Duration::from_secs(60)).await;
+        // Start Telegram inbound polling immediately upon launch (sub-second turnaround)
+        tokio::time::sleep(Duration::from_millis(500)).await;
         let mut last_update_id = 0i64;
 
         loop {
+            if !TELEGRAM_RUNNING.load(Ordering::SeqCst) {
+                let mut st = LAST_TELEGRAM_STATUS.write().await;
+                st.is_running = false;
+                break;
+            }
+
             let is_enabled_flag = {
                 let config = load_config().unwrap_or_default();
                 config.is_enabled && !config.bot_token.trim().is_empty()
@@ -590,7 +842,12 @@ pub fn start_telegram_daemon() {
                     let mut st = LAST_TELEGRAM_STATUS.write().await;
                     st.is_running = false;
                 }
-                tokio::time::sleep(Duration::from_secs(60)).await;
+                tokio::select! {
+                    _ = tokio::time::sleep(Duration::from_secs(60)) => {},
+                    _ = crate::modules::telegram_inbound::TELEGRAM_DAEMON_NOTIFIER.notified() => {
+                        tracing::info!("[TelegramDaemon] Reactive wakeup from disabled state");
+                    }
+                }
                 continue;
             }
 
@@ -608,27 +865,20 @@ pub fn start_telegram_daemon() {
             };
 
             if clean_token.is_empty() {
-                tokio::time::sleep(Duration::from_secs(30)).await;
+                tokio::select! {
+                    _ = tokio::time::sleep(Duration::from_secs(30)) => {},
+                    _ = crate::modules::telegram_inbound::TELEGRAM_DAEMON_NOTIFIER.notified() => {
+                        tracing::info!("[TelegramDaemon] Reactive wakeup from empty-token state");
+                    }
+                }
                 continue;
             }
-
-            let http_client = match reqwest::Client::builder()
-                .timeout(Duration::from_secs(35))
-                .build()
-            {
-                Ok(c) => c,
-                Err(_) => {
-                    tokio::time::sleep(Duration::from_secs(10)).await;
-                    continue;
-                }
-            };
 
             // Long-poll getUpdates with 25-second server timeout
             let poll_url = if last_update_id > 0 {
                 format!(
                     "https://api.telegram.org/bot{}/getUpdates?offset={}&timeout=25",
-                    clean_token,
-                    last_update_id + 1
+                    clean_token, last_update_id
                 )
             } else {
                 format!(
@@ -637,7 +887,7 @@ pub fn start_telegram_daemon() {
                 )
             };
 
-            let resp_result = http_client.get(&poll_url).send().await;
+            let resp_result = TELEGRAM_HTTP_CLIENT.get(&poll_url).send().await;
             match resp_result {
                 Ok(resp) => {
                     if resp.status().is_success() {
@@ -645,25 +895,26 @@ pub fn start_telegram_daemon() {
                             if let Some(updates) = body["result"].as_array() {
                                 for update in updates {
                                     if let Some(up_id) = update["update_id"].as_i64() {
-                                        if up_id > last_update_id {
-                                            last_update_id = up_id;
-                                        }
+                                        last_update_id = last_update_id.max(up_id + 1);
                                     }
 
                                     // 1. Handle callback query in background loop
                                     if let Some(cb) = update.get("callback_query") {
-                                        let cb_id = cb["id"].as_str().unwrap_or("");
+                                        let cb_id = cb["id"].as_str().unwrap_or("").to_string();
                                         let chat_id =
                                             cb["message"]["chat"]["id"].as_i64().unwrap_or(0);
-                                        let data = cb["data"].as_str().unwrap_or("").trim();
+                                        let data =
+                                            cb["data"].as_str().unwrap_or("").trim().to_string();
 
                                         if chat_id != 0 && !data.is_empty() {
+                                            // Immediately answer callback query so Telegram button spinners dismiss instantly
+                                            answer_callback_query(&clean_token, &cb_id).await;
+
                                             if deliver_send_flow_callback(
                                                 &clean_token,
                                                 chat_id,
-                                                cb_id,
-                                                data,
-                                                &http_client,
+                                                &cb_id,
+                                                &data,
                                             )
                                             .await
                                             {
@@ -682,55 +933,53 @@ pub fn start_telegram_daemon() {
 
                                             if let Some(allowed) = config.allowed_chat_id {
                                                 if chat_id == allowed {
+                                                    // Send "typing" action to indicate command dispatch
+                                                    send_chat_action(
+                                                        &clean_token,
+                                                        chat_id,
+                                                        "typing",
+                                                    )
+                                                    .await;
+
                                                     // Same unified pipeline the one-shot poller
                                                     // uses, so `cmd:` buttons behave identically on
                                                     // both paths (exports, UI actions, and the
                                                     // unknown-action fallback included).
-                                                    let cmd_str =
-                                                        normalize_cmd_callback_payload(data);
-                                                    let delivered = deliver_ui_or_command(
-                                                        &clean_token,
-                                                        chat_id,
-                                                        &cmd_str,
-                                                        &None,
-                                                    )
-                                                    .await;
+                                                    let token_clone = clean_token.clone();
+                                                    let data_clone = data.clone();
+                                                    tauri::async_runtime::spawn(async move {
+                                                        let cmd_str =
+                                                            normalize_cmd_callback_payload(
+                                                                &data_clone,
+                                                            );
+                                                        let delivered = deliver_ui_or_command(
+                                                            &token_clone,
+                                                            chat_id,
+                                                            &cmd_str,
+                                                            &None,
+                                                        )
+                                                        .await;
 
-                                                    if delivered.is_none()
-                                                        && data.starts_with("cmd:")
-                                                    {
-                                                        // Justification: a tapped button must never
-                                                        // die silently; an unrecognized payload is
-                                                        // surfaced to the user and the failure is
-                                                        // logged without changing control flow.
-                                                        crate::error::record_ignored(
-                                                            send_telegram_message_with_markup(
-                                                                &clean_token,
-                                                                chat_id,
-                                                                "That button is no longer valid — send a fresh command to get new buttons.",
-                                                                None,
-                                                                false,
-                                                            )
-                                                            .await,
-                                                            "send unknown callback action notice",
-                                                        );
-                                                    }
-
-                                                    if !cb_id.is_empty() {
-                                                        let ans_url = format!(
-                                                            "https://api.telegram.org/bot{}/answerCallbackQuery",
-                                                            clean_token
-                                                        );
-                                                        // Justification: best-effort send; failure logged without changing control flow
-                                                        crate::error::record_ignored(
-                                                            http_client
-                                                                .post(&ans_url)
-                                                                .json(&json!({ "callback_query_id": cb_id }))
-                                                                .send()
+                                                        if delivered.is_none()
+                                                            && data_clone.starts_with("cmd:")
+                                                        {
+                                                            // Justification: a tapped button must never
+                                                            // die silently; an unrecognized payload is
+                                                            // surfaced to the user and the failure is
+                                                            // logged without changing control flow.
+                                                            crate::error::record_ignored(
+                                                                send_telegram_message_with_markup(
+                                                                    &token_clone,
+                                                                    chat_id,
+                                                                    "That button is no longer valid — send a fresh command to get new buttons.",
+                                                                    None,
+                                                                    false,
+                                                                )
                                                                 .await,
-                                                            "answerCallbackQuery",
-                                                        );
-                                                    }
+                                                                "send unknown callback action notice",
+                                                            );
+                                                        }
+                                                    });
                                                 }
                                             }
                                         }
@@ -747,8 +996,7 @@ pub fn start_telegram_daemon() {
                                         .trim();
 
                                     let saved_media_opt =
-                                        download_and_store_telegram_photo(&config.bot_token, msg)
-                                            .await;
+                                        download_and_store_telegram_photo(&clean_token, msg).await;
 
                                     if chat_id == 0
                                         || (text_raw.is_empty() && saved_media_opt.is_none())
@@ -774,19 +1022,33 @@ pub fn start_telegram_daemon() {
                                         }
                                     }
 
+                                    // Send "typing" chat action immediately when command or message is received
+                                    send_chat_action(&clean_token, chat_id, "typing").await;
+
                                     {
                                         let mut st = LAST_TELEGRAM_STATUS.write().await;
                                         st.last_message_received = Some(text_raw.to_string());
                                         st.last_update_id = last_update_id;
                                     }
 
-                                    let _ = deliver_ui_or_command(
-                                        &config.bot_token,
-                                        chat_id,
-                                        text_raw,
-                                        &saved_media_opt,
-                                    )
-                                    .await;
+                                    let token_clone = clean_token.clone();
+                                    let media_clone = saved_media_opt.clone();
+                                    let text_clone = text_raw.to_string();
+                                    tauri::async_runtime::spawn(async move {
+                                        let delivered = deliver_ui_or_command(
+                                            &token_clone,
+                                            chat_id,
+                                            &text_clone,
+                                            &media_clone,
+                                        )
+                                        .await;
+                                        if delivered.is_none() {
+                                            tracing::debug!(
+                                                "[TelegramDaemon] deliver_ui_or_command produced no reply for chat {}",
+                                                chat_id
+                                            );
+                                        }
+                                    });
                                 }
                             }
                         }

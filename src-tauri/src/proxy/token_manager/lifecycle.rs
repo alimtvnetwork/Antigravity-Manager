@@ -1,4 +1,4 @@
-//! 生命周期管理：构造、后台清理任务、优雅关闭、调度器注册。
+//! Life cycle management: construction, background cleanup tasks, graceful shutdown, scheduler registration.
 
 use super::TokenManager;
 use crate::proxy::rate_limit::RateLimitTracker;
@@ -16,7 +16,7 @@ impl TokenManager {
         self.data_dir.clone()
     }
 
-    /// 创建新的 TokenManager
+    /// Create a new TokenManager
     pub fn new(data_dir: PathBuf) -> Self {
         Self {
             tokens: Arc::new(DashMap::new()),
@@ -32,7 +32,7 @@ impl TokenManager {
                 crate::models::CircuitBreakerConfig::default(),
             )),
             refresh_locks: Arc::new(DashMap::new()),
-            load_code_assist_inflight: Arc::new(DashMap::new()), // 初始化 inflight 表
+            load_code_assist_inflight: Arc::new(DashMap::new()), // Initialize inflight table
             invalid_grant_failures: Arc::new(DashMap::new()),
             auto_cleanup_handle: Arc::new(tokio::sync::Mutex::new(None)),
             cancel_token: CancellationToken::new(),
@@ -65,7 +65,7 @@ impl TokenManager {
         }
     }
 
-    /// 启动限流记录自动清理后台任务（每15秒检查并清除过期记录）
+    /// Start current-limiting record automatic cleaning background task (check and clear expired records every 15 seconds)
     pub async fn start_auto_cleanup(&self) {
         let tracker = self.rate_limit_tracker.clone();
         let cancel = self.cancel_token.child_token();
@@ -91,7 +91,7 @@ impl TokenManager {
             }
         });
 
-        // 先 abort 旧任务（防止任务泄漏），再存储新 handle
+        // Abort the old task first (to prevent task leakage), and then store the new handle
         let mut guard = self.auto_cleanup_handle.lock().await;
         if let Some(old) = guard.take() {
             old.abort();
@@ -102,17 +102,17 @@ impl TokenManager {
         tracing::info!("Rate limit auto-cleanup task started (interval: 15s)");
     }
 
-    /// 先发送取消信号，再带超时等待任务完成
+    /// Send a cancellation signal first, then wait for the task to complete with a timeout
     ///
-    /// # 参数
-    /// * `timeout` - 等待任务完成的超时时间
+    /// # Parameters
+    /// * `timeout` - timeout to wait for task completion
     pub async fn graceful_shutdown(&self, timeout: std::time::Duration) {
         tracing::info!("Initiating graceful shutdown of background tasks...");
 
-        // 发送取消信号给所有后台任务
+        // Send cancellation signal to all background tasks
         self.cancel_token.cancel();
 
-        // 带超时等待任务完成
+        // Wait for task completion with timeout
         match tokio::time::timeout(timeout, self.abort_background_tasks()).await {
             Ok(_) => tracing::info!("All background tasks cleaned up gracefully"),
             Err(_) => tracing::warn!(
@@ -122,17 +122,17 @@ impl TokenManager {
         }
     }
 
-    /// 中止并等待所有后台任务完成
-    /// abort() 仅设置取消标志，必须 await 确认清理完成
+    /// Abort and wait for all background tasks to complete
+    /// abort() only sets the cancellation flag and must await confirmation that cleanup is complete
     pub async fn abort_background_tasks(&self) {
         Self::abort_task(&self.auto_cleanup_handle, "Auto-cleanup task").await;
     }
 
-    /// 中止单个后台任务并记录结果
+    /// Abort a single background task and log the results
     ///
-    /// # 参数
-    /// * `handle` - 任务句柄的 Mutex 引用
-    /// * `task_name` - 任务名称（用于日志）
+    /// # Parameters
+    /// * `handle` - Mutex reference to the task handle
+    /// * `task_name` - task name (for logging)
     async fn abort_task(
         handle: &tokio::sync::Mutex<Option<tokio::task::JoinHandle<()>>>,
         task_name: &str,
@@ -153,7 +153,7 @@ impl TokenManager {
         self.tokens.len()
     }
 
-    /// 获取当前 Token 池内有效账号数量
+    /// Get the number of valid accounts in the current Token pool
     pub fn tokens_count(&self) -> usize {
         self.tokens.len()
     }

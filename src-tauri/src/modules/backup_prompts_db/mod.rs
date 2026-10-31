@@ -4,6 +4,8 @@ pub mod green_projects;
 pub mod listing;
 pub mod restore;
 pub mod tests;
+#[cfg(test)]
+pub mod tests_prompt_restore_honesty;
 pub mod types;
 
 pub use backup::*;

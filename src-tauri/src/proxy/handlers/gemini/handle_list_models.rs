@@ -5,12 +5,12 @@ pub async fn handle_list_models(
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     use crate::proxy::common::model_mapping::get_all_dynamic_models;
 
-    // 获取所有动态模型列表（与 /v1/models 一致）
+    // Get a list of all dynamic models (consistent with /v1/models)
     let only_raw = *state.only_raw_quota_models.read().await;
     let model_ids =
         get_all_dynamic_models(&state.custom_mapping, Some(&state.token_manager), only_raw).await;
 
-    // 转换为 Gemini API 格式
+    // Convert to Gemini API format
     let models: Vec<_> = model_ids
         .into_iter()
         .map(|id| {
@@ -47,10 +47,10 @@ pub async fn handle_count_tokens(
     execute_count_tokens(state, model_name, body).await
 }
 
-/// 核心 countTokens 实现：透明代理到上游 v1internal:countTokens
+/// Core countTokens implementation: transparent proxy to upstream v1internal:countTokens
 ///
-/// 获取有效 OAuth Token，将标准 Gemini 请求体包装为 v1internal 格式后转发，
-/// 返回真实的 token 计数，而不是硬编码的 0
+/// Obtain a valid OAuth Token, wrap the standard Gemini request body into v1internal format and forward it.
+/// Returns the true token count instead of the hardcoded 0
 pub async fn execute_count_tokens(
     state: AppState,
     model_name: String,
@@ -58,13 +58,13 @@ pub async fn execute_count_tokens(
 ) -> Response {
     // [DEFENSE] Sanitize all inlineData in Gemini native request payload (filter or downgrade empty data/corrupted images)
     crate::proxy::mappers::common_utils::sanitize_gemini_payload_inline_data(&mut body);
-    // 1. 模型路由解析
+    // 1. Model routing analysis
     let mapped_model = crate::proxy::common::model_mapping::resolve_model_route(
         &model_name,
         &*state.custom_mapping.read().await,
     );
 
-    // 2. 解析请求配置并获取 Token
+    // 2. Parse the request configuration and obtain the Token
     let config = crate::proxy::mappers::common_utils::resolve_request_config(
         &model_name,
         &mapped_model,
@@ -99,10 +99,10 @@ pub async fn execute_count_tokens(
         }
     };
 
-    // 3. 包装为 v1internal 格式
-    // [已验证] countTokens 与 generateContent 不同: 顶层只允许 "request" 键,
-    // 携带 model/project 会被上游 400 拒绝 (Unknown name "model"/"project");
-    // request 内的 safetySettings 同样不被接受 (对齐 CLIProxyAPI 的处理)
+    // 3. Packaged in v1internal format
+    // [Verified] countTokens is different from generateContent: only "request" keys are allowed at the top level,
+    // Carrying model/project will be rejected by the upstream 400 (Unknown name "model"/"project");
+    // safetySettings in request are also not accepted (aligned with CLIProxyAPI processing)
     let mut inner_body = body;
     if let Some(obj) = inner_body.as_object_mut() {
         obj.remove("safetySettings");
@@ -111,7 +111,7 @@ pub async fn execute_count_tokens(
         "request": inner_body,
     });
 
-    // 4. 调用上游 v1internal:countTokens
+    // 4. Call upstream v1internal:countTokens
     let call_result = match state
         .upstream
         .call_v1_internal_with_headers(
@@ -157,7 +157,7 @@ pub async fn execute_count_tokens(
         }
     };
 
-    // 5. 提取 totalTokens (兼容 wrapped / unwrapped 两种响应格式)
+    // 5. Extract totalTokens (compatible with wrapped / unwrapped two response formats)
     let total_tokens = gemini_resp
         .get("response")
         .and_then(|r| r.get("totalTokens"))
@@ -165,7 +165,7 @@ pub async fn execute_count_tokens(
         .and_then(|v| v.as_i64())
         .unwrap_or(0);
 
-    // 6. 返回标准 Gemini REST 响应
+    // 6. Return standard Gemini REST response
     (
         StatusCode::OK,
         [

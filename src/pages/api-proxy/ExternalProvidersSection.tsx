@@ -127,7 +127,7 @@ export function ExternalProvidersSection({
                 updateExperimentalConfig={updateExperimentalConfig}
             />
 
-            {/* 公网访问 (Cloudflared) - 仅在桌面端显示 */}
+            {/* Public access (Cloudflared) - only shown on desktop */}
             <CloudflaredSection
                 config={config}
                 t={t}

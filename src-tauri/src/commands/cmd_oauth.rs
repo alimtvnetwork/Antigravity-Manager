@@ -5,14 +5,14 @@ pub async fn start_oauth_login(
     app_handle: tauri::AppHandle,
     oauth_client_key: Option<String>,
 ) -> Result<Account, String> {
-    modules::logger::log_info("开始 OAuth 授权流程...");
+    modules::logger::log_info("Begin the OAuth authorization process...");
     let service = modules::account_service::AccountService::new(
         crate::modules::integration::SystemManager::Desktop(app_handle.clone()),
     );
 
     let mut account = service.start_oauth_login(oauth_client_key).await?;
 
-    // 自动触发刷新额度
+    // Automatically trigger refresh quota
     // Justification: quota auto-refresh after OAuth login is opportunistic; the login already succeeded
     crate::error::record_ignored(
         internal_refresh_account_quota(&app_handle, &mut account).await,
@@ -32,17 +32,17 @@ pub async fn start_oauth_login(
     Ok(account)
 }
 
-/// 完成 OAuth 授权（不自动打开浏览器）
+/// Complete OAuth authorization (without automatically opening the browser)
 #[tauri::command]
 pub async fn complete_oauth_login(app_handle: tauri::AppHandle) -> Result<Account, String> {
-    modules::logger::log_info("完成 OAuth 授权流程 (manual)...");
+    modules::logger::log_info("Complete the OAuth authorization process (manual)...");
     let service = modules::account_service::AccountService::new(
         crate::modules::integration::SystemManager::Desktop(app_handle.clone()),
     );
 
     let mut account = service.complete_oauth_login().await?;
 
-    // 自动触发刷新额度
+    // Automatically trigger refresh quota
     // Justification: quota auto-refresh after manual OAuth completion is opportunistic; the login already succeeded
     crate::error::record_ignored(
         internal_refresh_account_quota(&app_handle, &mut account).await,
@@ -62,7 +62,7 @@ pub async fn complete_oauth_login(app_handle: tauri::AppHandle) -> Result<Accoun
     Ok(account)
 }
 
-/// 预生成 OAuth 授权链接 (不打开浏览器)
+/// Pre-generated OAuth authorization link (without opening the browser)
 #[tauri::command]
 pub async fn prepare_oauth_url(
     app_handle: tauri::AppHandle,
@@ -80,10 +80,10 @@ pub async fn cancel_oauth_login() -> Result<(), String> {
     Ok(())
 }
 
-/// 手动提交 OAuth Code (用于 Docker/远程环境无法自动回调时)
+/// Manually submit OAuth Code (used when Docker/remote environment cannot automatically call back)
 #[tauri::command]
 pub async fn submit_oauth_code(code: String, state: Option<String>) -> Result<(), String> {
-    modules::logger::log_info("收到手动提交 OAuth Code 请求");
+    modules::logger::log_info("Received manual submission of OAuth Code request");
     modules::oauth_server::submit_oauth_code(code, state).await
 }
 
@@ -103,4 +103,4 @@ pub async fn set_active_oauth_client(client_key: String) -> Result<(), String> {
     crate::modules::oauth::set_active_oauth_client_key(&client_key)
 }
 
-// --- 导入命令 ---
+// ---Import command ---

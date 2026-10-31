@@ -39,7 +39,12 @@ param(
     [Alias("Run")]
     [switch]$Quick,
     [switch]$Fast,
-    [switch]$OptimizeIO
+    [switch]$OptimizeIO,
+    [switch]$DryRun,
+    [switch]$CliOnly,
+    [switch]$Clean,
+    [switch]$NoInstall,
+    [string]$Drive = "C:"
 )
 
 $ErrorActionPreference = "Stop"
@@ -88,6 +93,15 @@ if ($args.Count -gt 0 -and ($args[0].ToLower().TrimStart('-').TrimStart('/') -in
     $cargoArgs = @("run", "--bin", "agm", "--manifest-path", (Join-Path $ScriptDir "src-tauri\Cargo.toml"), "--") + $args
     & cargo @cargoArgs
     exit $LASTEXITCODE
+}
+
+# Delegate -Build directly to dedicated build runner (build.ps1)
+if ($Build) {
+    $buildScript = Join-Path $ScriptDir "build.ps1"
+    if (Test-Path $buildScript) {
+        & $buildScript @PSBoundParameters
+        exit $LASTEXITCODE
+    }
 }
 
 Write-Host ""
@@ -210,6 +224,11 @@ if ($OptimizeIO) {
 Set-Location -Path $ScriptDir
 
 if ($Build) {
+    $buildScript = Join-Path $ScriptDir "build.ps1"
+    if (Test-Path $buildScript) {
+        & $buildScript @PSBoundParameters
+        exit $LASTEXITCODE
+    }
     Write-Step "Executing parallel production build (npm run tauri build)..."
     npm run tauri build
 } elseif ($DebugMode) {

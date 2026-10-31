@@ -95,6 +95,10 @@ pub fn start_pruner_worker() {
             // Run pruner check every 5 minutes
             tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
 
+            if supabase_sync::is_supabase_circuit_open() {
+                continue;
+            }
+
             let config = match supabase_sync::load_config() {
                 Ok(c) => c,
                 Err(_) => continue,

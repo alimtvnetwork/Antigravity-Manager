@@ -32,7 +32,7 @@ fn test_process_sse_line_with_text() {
     let chunks = result.unwrap();
     assert!(!chunks.is_empty());
 
-    // 应该包含 message_start 和 text delta
+    // should contain message_start and text delta
     let all_text: String = chunks
         .iter()
         .map(|b| String::from_utf8(b.to_vec()).unwrap_or_default())
@@ -47,9 +47,9 @@ fn test_process_sse_line_with_text() {
 async fn test_thinking_only_interruption_recovery() {
     use futures::StreamExt;
 
-    // 1. 模拟一个只发送 Thinking 然后就结束的流
+    // 1. Simulate a flow that only sends Thinking and then ends.
     let mock_stream = async_stream::stream! {
-        // 发送 Thinking 块
+        // Send Thinking block
         let thinking_json = serde_json::json!({
             "candidates": [{
                 "content": {
@@ -61,10 +61,10 @@ async fn test_thinking_only_interruption_recovery() {
         });
         yield Ok::<_, String>(bytes::Bytes::from(format!("data: {}\n\n", thinking_json)));
 
-        // 然后突然结束 (没有 Text, 没有 Usage, 直接 None)
+        // Then it ends abruptly (no Text, no Usage, just None)
     };
 
-    // 2. 创建转换后的流
+    // 2. Create the transformed stream
     let mut claude_stream = create_claude_sse_stream(
         Box::pin(mock_stream),
         "trace_test".to_string(),
@@ -78,7 +78,7 @@ async fn test_thinking_only_interruption_recovery() {
         Vec::new(), // registered_tool_names
     );
 
-    // 3. 收集输出
+    // 3. Collect output
     let mut all_chunks = Vec::new();
     while let Some(result) = claude_stream.next().await {
         if let Ok(bytes) = result {
@@ -87,14 +87,14 @@ async fn test_thinking_only_interruption_recovery() {
     }
     let output = all_chunks.join("");
 
-    // 4. 验证恢复逻辑
-    // 必须包含 Thinking
+    // 4. Verify recovery logic
+    // Must contain Thinking
     assert!(output.contains("Thinking..."));
 
-    // 必须包含恢复的系统提示
+    // Must contain system prompts for recovery
     assert!(output.contains("Recovered by Antigravity"));
 
-    // 必须包含模拟的 Usage
+    // Must contain simulated Usage
     assert!(output.contains("\"usage\":"));
     assert!(output.contains("\"output_tokens\":100")); // Should contain the recovery usage
 }

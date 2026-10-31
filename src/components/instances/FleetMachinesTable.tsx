@@ -1,8 +1,9 @@
-import { Server, RotateCw, Eye, EyeOff } from 'lucide-react';
+import { Server, RotateCw, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { useFleetMachines } from './fleet/useFleetMachines';
 import { FleetMachineRow } from './fleet/FleetMachineRow';
 import { FleetDisabledState, FleetLoadingState, FleetEmptyState } from './fleet/FleetTableStates';
+import { SendFleetPromptModal } from './fleet/SendFleetPromptModal';
 
 // Re-exported for backward compatibility (tests + external consumers import from here).
 export { maskEmailAddress, formatRelativeHeartbeat } from './fleet/fleetFormatUtils';
@@ -13,18 +14,23 @@ export function FleetMachinesTable() {
         machines,
         isLoading,
         isRefreshing,
+        isResettingCluster,
         isSyncEnabled,
         showAllEmails,
         unmaskedRows,
         copiedIp,
         countdown,
+        promptMachine,
         setShowAllEmails,
         handleManualRefresh,
+        handleResetCluster,
         handleCopyIp,
         toggleRowMask,
+        handleOpenPromptModal,
+        handleClosePromptModal,
     } = useFleetMachines();
 
-    if (!isLoading && !isSyncEnabled) {
+    if (!isLoading && !isSyncEnabled && machines.length === 0) {
         return <FleetDisabledState />;
     }
 
@@ -47,14 +53,21 @@ export function FleetMachinesTable() {
                     <div>
                         <div className="flex items-center gap-2">
                             <h3 className="font-semibold text-sm text-slate-100">
-                                Other Machines / Fleet Nodes
+                                Shared Cluster / Fleet Nodes
                             </h3>
                             <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
                                 {machines.length}
                             </span>
+                            {!isSyncEnabled && (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                    Local Mesh
+                                </span>
+                            )}
                         </div>
                         <p className="text-[11px] text-slate-400">
-                            Real-time multi-machine cluster state synced via Supabase
+                            {isSyncEnabled
+                                ? 'Real-time multi-machine cluster state synced via Supabase & SSH Mesh'
+                                : 'Registered SSH Fleet Nodes (Local Mesh Mode)'}
                         </p>
                     </div>
                 </div>
@@ -82,6 +95,18 @@ export function FleetMachinesTable() {
                         <span>{showAllEmails ? 'Mask' : 'Reveal'}</span>
                     </button>
 
+                    {/* Reset Cluster button */}
+                    <button
+                        type="button"
+                        onClick={handleResetCluster}
+                        disabled={isResettingCluster || isRefreshing}
+                        className="px-2.5 py-1 text-slate-300 hover:text-white hover:bg-slate-700/50 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        title="Reset Cluster Nodes to Canonical Defaults (w1, main, u1, w2, w3, w4)"
+                    >
+                        <RotateCcw className={cn('w-3.5 h-3.5 text-amber-400', isResettingCluster && 'animate-spin')} />
+                        <span>Reset Cluster</span>
+                    </button>
+
                     {/* Manual refresh button */}
                     <button
                         type="button"
@@ -101,12 +126,12 @@ export function FleetMachinesTable() {
                 <table className="w-full text-left text-xs">
                     <thead>
                         <tr className="border-b border-slate-700/40 dark:border-slate-800/60 bg-slate-950/40 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                            <th className="px-3.5 py-2.5 min-w-[170px]">Machine & Status</th>
-                            <th className="px-3.5 py-2.5 min-w-[140px]">IP Address</th>
-                            <th className="px-3.5 py-2.5 min-w-[180px]">Running Instance(s)</th>
-                            <th className="px-3.5 py-2.5 min-w-[190px]">Bound Account Email(s)</th>
-                            <th className="px-3.5 py-2.5 min-w-[130px]">Running Prompts</th>
+                            <th className="px-3.5 py-2.5 min-w-[180px]">Machine &amp; Status</th>
+                            <th className="px-3.5 py-2.5 min-w-[220px]">Connected Google Account(s)</th>
+                            <th className="px-3.5 py-2.5 min-w-[200px]">Active Instance(s)</th>
+                            <th className="px-3.5 py-2.5 min-w-[120px]">Running Prompts</th>
                             <th className="px-3.5 py-2.5 text-right min-w-[110px]">Last Seen</th>
+                            <th className="px-3.5 py-2.5 text-right min-w-[120px]">Action</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/40 font-medium">
@@ -118,11 +143,15 @@ export function FleetMachinesTable() {
                                 copiedIp={copiedIp}
                                 onCopyIp={handleCopyIp}
                                 onToggleMask={toggleRowMask}
+                                onOpenPromptModal={handleOpenPromptModal}
                             />
                         ))}
                     </tbody>
                 </table>
             </div>
+
+            {/* Cross-machine Prompt Dispatch Modal */}
+            <SendFleetPromptModal machine={promptMachine} onClose={handleClosePromptModal} />
         </div>
     );
 }

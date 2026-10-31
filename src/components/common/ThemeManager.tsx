@@ -7,6 +7,22 @@ import { isLinux } from '../../utils/env';
 import { findPalette, THEME_PALETTES } from './themePalettes';
 import { useErrorStore } from '../../stores/error-store';
 
+function hexToRgb(hex: string): string | null {
+    const clean = hex.replace('#', '').trim();
+    if (clean.length === 3) {
+        const r = parseInt(clean[0] + clean[0], 16);
+        const g = parseInt(clean[1] + clean[1], 16);
+        const b = parseInt(clean[2] + clean[2], 16);
+        if (!isNaN(r) && !isNaN(g) && !isNaN(b)) return `${r}, ${g}, ${b}`;
+    } else if (clean.length === 6) {
+        const r = parseInt(clean.substring(0, 2), 16);
+        const g = parseInt(clean.substring(2, 4), 16);
+        const b = parseInt(clean.substring(4, 6), 16);
+        if (!isNaN(r) && !isNaN(g) && !isNaN(b)) return `${r}, ${g}, ${b}`;
+    }
+    return null;
+}
+
 export default function ThemeManager() {
     const { config, loadConfig } = useConfigStore();
 
@@ -72,6 +88,38 @@ export default function ThemeManager() {
             root.style.setProperty('--app-surface-hover', surfaceHover);
             root.style.setProperty('--app-primary-hover', primaryHover);
             root.style.setProperty('--app-border-hover', borderHover);
+
+            // RGB variable definitions for Tailwind opacity modifiers
+            const bgRgb = hexToRgb(palette.bg) || (isDark ? '9, 6, 17' : '255, 255, 255');
+            const surfaceRgb = hexToRgb(palette.surface) || (isDark ? '24, 24, 27' : '248, 250, 252');
+            const primaryRgb = hexToRgb(palette.primary) || '59, 130, 246';
+            const borderRgb = isDark ? '51, 65, 85' : '226, 232, 240';
+
+            root.style.setProperty('--app-bg-rgb', bgRgb);
+            root.style.setProperty('--app-surface-rgb', surfaceRgb);
+            root.style.setProperty('--app-primary-rgb', primaryRgb);
+            root.style.setProperty('--app-border-rgb', borderRgb);
+
+            // Synchronize --ui-* product tokens with active theme palette
+            if (palette.id === 'dark' || palette.id === 'system') {
+                root.style.setProperty('--ui-canvas', '#090611');
+                root.style.setProperty('--ui-surface-1', '#171025');
+                root.style.setProperty('--ui-surface-2', '#211631');
+                root.style.setProperty('--ui-surface-hover', '#2a1c3f');
+                root.style.setProperty('--ui-border-subtle', '#40285e');
+                root.style.setProperty('--ui-border-emphasis', '#7c3aed');
+                root.style.setProperty('--ui-interactive', '#7c3aed');
+                root.style.setProperty('--ui-text-primary', '#f5f0ff');
+            } else {
+                root.style.setProperty('--ui-canvas', palette.bg);
+                root.style.setProperty('--ui-surface-1', palette.surface);
+                root.style.setProperty('--ui-surface-2', surfaceHover);
+                root.style.setProperty('--ui-surface-hover', surfaceHover);
+                root.style.setProperty('--ui-border-subtle', isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)');
+                root.style.setProperty('--ui-border-emphasis', palette.primary);
+                root.style.setProperty('--ui-interactive', palette.primary);
+                root.style.setProperty('--ui-text-primary', palette.fg);
+            }
 
             // Set Tauri window background color
             // Skip on Linux due to crash with transparent windows + softbuffer

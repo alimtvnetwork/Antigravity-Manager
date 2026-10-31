@@ -5,6 +5,8 @@ use tracing::{error, info, warn};
 
 mod commands;
 
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 pub mod constants;
 
 pub mod error;
@@ -15,6 +17,8 @@ mod linux_graphics;
 pub mod models;
 
 pub mod modules;
+
+pub mod prompts;
 
 mod proxy; // Proxy service module
 

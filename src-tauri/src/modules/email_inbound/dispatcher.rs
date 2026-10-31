@@ -5,6 +5,16 @@ use uuid::Uuid;
 
 use super::*;
 
+/// Helper to check whether an inbound email action represents a heavy system operation.
+pub fn is_heavy_action_type(action: &InboundAction) -> bool {
+    matches!(
+        action,
+        InboundAction::AccountRotate { .. }
+            | InboundAction::SystemClean { .. }
+            | InboundAction::UpdateExecution { .. }
+    )
+}
+
 pub fn execute_inbound_action(
     msg: &RawEmailMessage,
     action: InboundAction,
@@ -62,37 +72,31 @@ pub fn execute_inbound_action(
     }
 
     // 2b. SQLite 10-Minute Rate Limit for Heavy Actions
-    let is_heavy_action = matches!(
-        action,
-        InboundAction::AccountRotate { .. }
-            | InboundAction::SystemClean { .. }
-            | InboundAction::UpdateExecution { .. }
-    );
-    if is_heavy_action {
-        if let Ok(true) = email_vault_db::is_rate_limited_in_sqlite(&msg.from, &action_slug, 600) {
-            let rate_limited_msg = format!(
-                "Action '{:?}' rate-limited by SQLite audit guard (10-minute cooldown).",
-                action
-            );
-            crate::modules::logger::log_info(&format!("[InboundEmail] {}", rate_limited_msg));
-            let audit = EmailInboundAuditLog {
-                id: Uuid::new_v4().to_string(),
-                message_id: msg.message_id.clone(),
-                sender_email: msg.from.clone(),
-                subject: msg.subject.clone(),
-                action_type: action_slug,
-                action_payload: msg.body.chars().take(255).collect(),
-                execution_status: "rate_limited_10m".to_string(),
-                execution_result: rate_limited_msg.clone(),
-                received_at: now,
-            };
-            // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
-            crate::error::record_ignored(
-                email_vault_db::record_inbound_audit_log(audit),
-                "record_inbound_audit_log",
-            );
-            return Ok(rate_limited_msg);
-        }
+    if is_heavy_action_type(&action)
+        && email_vault_db::is_rate_limited_in_sqlite(&msg.from, &action_slug, 600) == Ok(true)
+    {
+        let rate_limited_msg = format!(
+            "Action '{:?}' rate-limited by SQLite audit guard (10-minute cooldown).",
+            action
+        );
+        crate::modules::logger::log_info(&format!("[InboundEmail] {}", rate_limited_msg));
+        let audit = EmailInboundAuditLog {
+            id: Uuid::new_v4().to_string(),
+            message_id: msg.message_id.clone(),
+            sender_email: msg.from.clone(),
+            subject: msg.subject.clone(),
+            action_type: action_slug,
+            action_payload: msg.body.chars().take(255).collect(),
+            execution_status: "rate_limited_10m".to_string(),
+            execution_result: rate_limited_msg.clone(),
+            received_at: now,
+        };
+        // Justification: best-effort persistence/sync/notification; failure logged, in-memory state remains authoritative for this run
+        crate::error::record_ignored(
+            email_vault_db::record_inbound_audit_log(audit),
+            "record_inbound_audit_log",
+        );
+        return Ok(rate_limited_msg);
     }
 
     let mut action_str = "unknown".to_string();

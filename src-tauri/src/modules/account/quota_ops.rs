@@ -77,7 +77,7 @@ pub fn update_account_quota(account_id: &str, quota: QuotaData) -> Result<(), St
                 }
             }
         } else {
-            // [FIX] 当配额保护在全局关闭时，清空受保护模型列表，避免遗留历史锁
+            // [FIX] When quota protection is turned off globally, clear the protected model list to avoid legacy history locks
             if !account.protected_models.is_empty() {
                 crate::modules::logger::log_info(&format!(
                     "[Quota] Quota protection disabled globally, clearing protected models for {}",
@@ -112,7 +112,7 @@ pub fn update_account_quota(account_id: &str, quota: QuotaData) -> Result<(), St
     // Save account first
     save_account(&account)?;
 
-    // [FIX] 同时更新索引文件中的摘要信息，确保列表页图标即时刷新
+    // [FIX] Update the summary information in the index file at the same time to ensure that the icons on the list page are refreshed immediately
     {
         if let Ok(mut index) = load_account_index() {
             if let Some(summary) = index.accounts.iter_mut().find(|a| a.id == account_id) {

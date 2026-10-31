@@ -1,18 +1,18 @@
 use super::*;
 use crate::proxy::handlers::claude::consts::INTERNAL_BACKGROUND_TASK;
 
-// ===== 后台任务检测辅助函数 =====
+// ===== Background task detection auxiliary function =====
 
-/// 后台任务类型
+/// Background task type
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum BackgroundTaskType {
-    TitleGeneration,    // 标题生成
-    SimpleSummary,      // 简单摘要
-    ContextCompression, // 上下文压缩
-    PromptSuggestion,   // 提示建议
-    SystemMessage,      // 系统消息
-    EnvironmentProbe,   // 环境探测
+    TitleGeneration,    // Title generation
+    SimpleSummary,      // simple summary
+    ContextCompression, // Context compression
+    PromptSuggestion,   // Tips and suggestions
+    SystemMessage,      // System messages
+    EnvironmentProbe,   // Environmental detection
 }
 
 #[allow(dead_code)]
@@ -24,8 +24,8 @@ const TITLE_KEYWORDS: &[&str] = &[
     "Create a brief title",
     "title for the conversation",
     "conversation title",
-    "生成标题",
-    "为对话起个标题",
+    "generate title",
+    "Give the conversation a title",
 ];
 
 #[allow(dead_code)]
@@ -72,12 +72,12 @@ fn detect_background_task_type(request: &ClaudeRequest) -> Option<BackgroundTask
     let last_user_msg = extract_last_user_message_for_detection(request)?;
     let preview = last_user_msg.chars().take(500).collect::<String>();
 
-    // 长度过滤：后台任务通常不超过 800 字符
+    // Length filtering: background tasks are typically no longer than 800 characters
     if last_user_msg.len() > 800 {
         return None;
     }
 
-    // 按优先级匹配
+    // Match by priority
     if matches_keywords(&preview, SYSTEM_KEYWORDS) {
         return Some(BackgroundTaskType::SystemMessage);
     }

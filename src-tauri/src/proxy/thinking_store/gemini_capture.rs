@@ -41,9 +41,9 @@ pub fn hydrate_gemini_contents_with_model(
     }
     let store = ThinkingStore::global();
     store.touch_session(store_key);
-    // 优先执行拓扑还原，保证历史已有记录对齐为真实真签名
+    // Prioritize topology restoration to ensure that historical records are aligned with real signatures
     let restored = store.restore_gemini_contents_with_model(store_key, contents, target_model);
-    // 只有在完成还原后，若仍有客户端自带的合法实质思考块，才安全吸纳进库
+    // Only after the restoration is completed, if there are still legal substantive thinking blocks that come with the client, can they be safely absorbed into the database.
     if contents_have_capturable_thought(contents) {
         store.ingest_from_contents(store_key, contents);
     }
@@ -121,7 +121,7 @@ pub fn capture_gemini_response_with_preceding(
     }
 }
 
-/// 四大协议统一思考补齐管线：确保所有 Gemini contents 中的 model 轮次在开启思考时，必须具备合法的思考块与签名
+/// The four major protocols unify the thinking and completion pipeline: ensure that all model rounds in Gemini contents must have legal thinking blocks and signatures when starting thinking.
 pub fn finalize_gemini_contents_thinking(contents: &mut [Value], is_thinking_enabled: bool) {
     finalize_gemini_contents_thinking_with_model(contents, is_thinking_enabled, None);
 }
@@ -131,7 +131,7 @@ pub fn finalize_gemini_contents_thinking_with_model(
     is_thinking_enabled: bool,
     target_model: Option<&str>,
 ) {
-    // 预先计算每一轮的前置因果锚点 (causal anchor)，以便无 ID 的 Gemini 原生工具调用也能合成确定性 ID
+    // Precompute causal anchors for each round so that calls to Gemini's native tools without IDs can also synthesize deterministic IDs
     let anchors: Vec<String> = (0..contents.len())
         .map(|i| {
             let preceding = if i > 0 { contents.get(i - 1) } else { None };
@@ -147,7 +147,7 @@ pub fn finalize_gemini_contents_thinking_with_model(
         );
 
         if !is_model {
-            // 非 model 轮次（如 user 轮次的 functionResponse）：清洗可能混入的误标签名
+            // Non-model rounds (such as functionResponse of user rounds): clean up possible incorrect tag names that may be mixed in
             if let Some(parts) = msg.get_mut("parts").and_then(|p| p.as_array_mut()) {
                 for part in parts.iter_mut() {
                     if let Some(obj) = part.as_object_mut() {
@@ -167,11 +167,11 @@ pub fn finalize_gemini_contents_thinking_with_model(
 
             for mut part in parts.drain(..) {
                 if let Some(obj) = part.as_object_mut() {
-                    // 统一清洗向 Google 发送的非标准蛇形字段
+                    // Unified cleaning of non-standard snake fields sent to Google
                     obj.remove("thought_signature");
                 }
-                // 铁律：只认 thought: true。functionCall 与纯正文都会携带 thoughtSignature，
-                // 绝不能仅凭签名判定为思考块，否则会漏补首位 thought、关思考时误删工具。
+                // Iron rule: only recognize thought: true. Both functionCall and plain text will carry thoughtSignature.
+                // It must not be judged as a thinking block based on the signature alone, otherwise the first thought will be missed and the tool will be accidentally deleted when thinking.
                 let is_thought = is_thought_part(&part);
                 if is_thought {
                     thinking_parts.push(part);
@@ -184,10 +184,10 @@ pub fn finalize_gemini_contents_thinking_with_model(
                 .map(|m| m.to_lowercase().contains("claude"))
                 .unwrap_or(false);
 
-            // 1. 提取当前轮次已有合法的真实签名 (纯检查当前轮部件自带签名)
-            // [DECOUPLE 2026-09-26] 不再假设「签名只在 functionCall 上」——官方新规：
-            // 任何轮的第一个非思考 part（正文 text 或 functionCall）都可能携带签名。
-            // 凡非思考 part 自带合法签名即为 turn_real_sig。
+            // 1. Extract the legal real signature of the current round (purely check the signature of the current round component)
+            // [DECOUPLE 2026-09-26] No longer assume that "the signature is only on functionCall" - official new rules:
+            // The first non-thinking part of any round (text or functionCall) may carry a signature.
+            // Any non-thinking part comes with a legal signature, which is turn_real_sig.
             let turn_real_sig: Option<String> = other_parts.iter().find_map(|p| {
                 if p.get("functionCall").is_some() || p.get("text").is_some() {
                     let sig = p
@@ -207,11 +207,11 @@ pub fn finalize_gemini_contents_thinking_with_model(
                 }
             });
 
-            // 1.1 [FIX 2026-09-26] Gemini 目标下，纯 fc 轮（第一个非思考 part 是 functionCall）若自身
-            //     未携带签名，必须从签名缓存按 tool_id 回填——官方/上游规则：
-            //     「每轮第一个非思考 part 必须带 thought_signature，后续 part 可不带」。
-            //     现场 400 铁证：`Function call is missing a thought_signature... call default_api:grep, position 4`，
-            //     而该 tool_id 的签名其实已在 tool_signatures 缓存 (1384 B)，只是组装时从未按 id 回填。
+            // 1.1 [FIX 2026-09-26] Under Gemini target, pure fc round (the first non-thinking part is functionCall) if itself
+            //     No signature is carried, and must be backfilled by tool_id from the signature cache - official/upstream rules:
+            //     "The first non-thinking part of each round must have thought_signature, and subsequent parts do not need to have it."
+            //     400 on-site irrefutable evidence: `Function call is missing a thought_signature... call default_api:grep, position 4`,
+            //     The signature of tool_id is actually cached in tool_signatures (1384 B), but it is never backfilled by id during assembly.
             let cached_tool_sig: Option<String> = if !is_claude_turn && turn_real_sig.is_none() {
                 other_parts.iter().find_map(|p| {
                     let fc = p.get("functionCall")?;
@@ -224,11 +224,11 @@ pub fn finalize_gemini_contents_thinking_with_model(
                 None
             };
 
-            // 2. 签名归位（终审出站门禁 Gatekeeper）：
-            // 核心铁律：签名只写在「该轮第一个非思考 part」上，其余 part 一律删除签名字段。
-            // 依据 3 份官方报文 / 23 处签名：每轮至多 1 个签名、必落锚点；哨兵出现 0 次。
+            // 2. Signature return (final outbound gatekeeper):
+            // The core iron rule: the signature is only written on the "first non-thinking part of the round", and the signature field is deleted in all other parts.
+            // Based on 3 official messages / 23 signatures: no more than 1 signature per round, must land at the anchor point; sentry appears 0 times.
             if is_claude_turn {
-                // Claude 模型：Anthropic 官方规范要求签名必须且只能在思考块上，工具调用绝不携带签名，更不塞假哨兵
+                // Claude model: Anthropic official specifications require that signatures must and can only be on the thinking block. Tool calls must never carry signatures, let alone fake sentinels.
                 for part in other_parts.iter_mut() {
                     if let Some(obj) = part.as_object_mut() {
                         obj.remove("thoughtSignature");
@@ -236,10 +236,10 @@ pub fn finalize_gemini_contents_thinking_with_model(
                     }
                 }
             } else {
-                // Gemini 原生：真签名优先原样保留，缺失才使用回填来源，都没有则留空。
-                // 回填来源优先级：当前轮自带 turn_real_sig → 按 tool_id 查签名缓存 cached_tool_sig。
-                // （客户端重传的历史 fc 轮不自带签名，但 tool_signatures 缓存里有，必须回填，
-                //   否则「第一个非思考 part=fc 且无签名」会被上游 400 拒绝。）
+                // Gemini native: The real signature is given priority to be kept as it is. If it is missing, the backfill source will be used. If there is none, it will be left blank.
+                // Backfill source priority: the current round comes with turn_real_sig → check the signature cache cached_tool_sig by tool_id.
+                // (The historical fc round retransmitted by the client does not have its own signature, but it is in the tool_signatures cache and must be backfilled.
+                //   Otherwise "the first non-thinking part=fc and no signature" will be rejected by the upstream 400. )
                 let fallback = turn_real_sig
                     .as_deref()
                     .filter(|s| is_likely_gemini_signature(s))
@@ -251,11 +251,11 @@ pub fn finalize_gemini_contents_thinking_with_model(
                 place_turn_signature(&mut other_parts, fallback);
             }
 
-            // 3. 治理思考块 (thinking_parts)
+            // 3. Governance Thinking Parts (thinking_parts)
             if is_thinking_enabled {
                 if is_claude_turn {
-                    // Claude 模型：Anthropic 引擎强制要求签名必须且只能在思考块上！
-                    // 工具调用 (functionCall) 彻底剥离签名，绝不注入假哨兵
+                    // Claude Model: The Anthropic engine enforces that signatures must and can only be on think blocks!
+                    // Tool calls (functionCall) completely strip signatures and never inject fake sentinels
                     if thinking_parts.is_empty() {
                         if let Some(ref real_sig) = turn_real_sig {
                             if is_claude_signature(real_sig) {
@@ -302,9 +302,9 @@ pub fn finalize_gemini_contents_thinking_with_model(
                                 }
                                 valid_thinking.push(tp);
                             } else {
-                                // 无合法签名的思考块（如 Gemini 历史思考块跨切至 Claude）：
-                                // Anthropic 强制要求思考块签名必须合法。无合法 Claude 签名时，
-                                // 将思考内容降级为带 <think> 标签的正文文本置于首位，既完整保留思考上下文，又彻底规避 Anthropic 400 校验报错！
+                                // Thinking blocks without legal signatures (such as Gemini historical thinking blocks that cross-cut to Claude):
+                                // Anthropic enforces that think block signatures must be valid. When there is no valid Claude signature,
+                                // Downgrade the thinking content to the main text with the <think> tag and put it first. This not only retains the thinking context completely, but also completely avoids Anthropic 400 verification errors!
                                 if let Some(text) = tp.get("text").and_then(|t| t.as_str()) {
                                     if text != "..." && !text.trim().is_empty() {
                                         let wrapped = if text.trim_start().starts_with("<think>") {
@@ -320,12 +320,12 @@ pub fn finalize_gemini_contents_thinking_with_model(
                         thinking_parts = valid_thinking;
                     }
                 } else {
-                    // Gemini 原生：思考块绝不携带签名（铁律 I4），且**绝不凭空注入**占位思考块。
+                    // Gemini native: Thought blocks never carry signatures (iron rule I4), and placeholder think blocks are never injected out of thin air.
                     //
-                    // 官方报文里 functionCall 轮是"纯净"的 —— 只有 functionCall，没有任何
-                    // thought part（33 个 model 轮里 thought × functionCall 共现 0 次）。
-                    // 注入 {text:"...", thought:true} 会制造出官方从不产生的排列，
-                    // 并把签名锚点从 parts[0] 挤到 parts[1]。
+                    // In the official message, the functionCall wheel is "pure" - only functionCall, without any
+                    // thought part (thought × functionCall appears 0 times in 33 model rounds).
+                    // Injecting {text:"...", thought:true} creates a permutation that is never produced officially,
+                    // And squeeze the signature anchor from parts[0] to parts[1].
                     for tp in thinking_parts.iter_mut() {
                         if let Some(obj) = tp.as_object_mut() {
                             obj.remove("thoughtSignature");
@@ -334,13 +334,13 @@ pub fn finalize_gemini_contents_thinking_with_model(
                     }
                 }
 
-                // 思考块始终强制排在最前面，其他部件紧随其后
+                // The think block is always forced to come first, with other components following closely behind.
                 parts.extend(thinking_parts);
             } else {
-                // 当思考模式为关时：
-                // 1. 绝不主动注入任何占位思考块（如 "..."）；
-                // 2. 若含有实质性思考内容的思考块，单次出站降级为普通文本以防丢失语义，摘除 thought: true 标记；
-                // 3. 纯占位符则直接剔除，绝不上送 thought: true 结构
+                // When thinking mode is off:
+                // 1. Never actively inject any placeholder blocks (such as "...");
+                // 2. If the thinking block contains substantive thinking content, the single outbound message will be downgraded to ordinary text to prevent loss of semantics, and the thought: true mark will be removed;
+                // 3. Pure placeholders are directly eliminated and never sent to the thought: true structure.
                 for tp in thinking_parts {
                     let text = tp.get("text").and_then(|t| t.as_str()).unwrap_or("");
                     if is_meaningful_thought(text) {

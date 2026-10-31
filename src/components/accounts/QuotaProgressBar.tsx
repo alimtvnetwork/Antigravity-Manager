@@ -37,18 +37,69 @@ export function QuotaProgressBar({
     const clamped = Math.min(100, Math.max(0, Number.isFinite(percentage) ? percentage : 0));
 
     const getPercentColorClass = (pct: number) => {
-        if (pct >= 50) return 'text-emerald-700 dark:text-[var(--ui-success)]';
-        if (pct >= 25) return 'text-amber-700 dark:text-[var(--ui-warning)]';
-        return 'text-rose-600 dark:text-[var(--ui-danger)]';
+        if (pct >= 80) return 'text-emerald-500 dark:text-emerald-400';
+        if (pct >= 60) return 'text-teal-500 dark:text-teal-400';
+        if (pct >= 40) return 'text-amber-500 dark:text-amber-400';
+        if (pct >= 20) return 'text-orange-500 dark:text-orange-400';
+        return 'text-rose-500 dark:text-rose-400';
+    };
+
+    const getMilestoneNodeStyle = (cp: number, isFilled: boolean) => {
+        if (!isFilled) {
+            return {
+                bg: undefined,
+                border: 'transparent',
+                shadow: 'inset 0 1px 2px rgba(0,0,0,0.2)',
+                iconColor: 'text-slate-400 dark:text-white/35',
+            };
+        }
+        if (cp <= 20) {
+            return {
+                bg: '#ef4444',
+                border: '#ef4444',
+                shadow: '0 0 8px rgba(239, 68, 68, 0.6)',
+                iconColor: 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]',
+            };
+        }
+        if (cp <= 40) {
+            return {
+                bg: '#f97316',
+                border: '#f97316',
+                shadow: '0 0 8px rgba(249, 115, 22, 0.6)',
+                iconColor: 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]',
+            };
+        }
+        if (cp <= 60) {
+            return {
+                bg: '#eab308',
+                border: '#eab308',
+                shadow: '0 0 8px rgba(234, 179, 8, 0.6)',
+                iconColor: 'text-slate-900 drop-shadow-[0_1px_1px_rgba(255,255,255,0.4)]',
+            };
+        }
+        if (cp <= 80) {
+            return {
+                bg: '#10b981',
+                border: '#059669',
+                shadow: '0 0 6px rgba(16, 185, 129, 0.4)',
+                iconColor: 'text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]',
+            };
+        }
+        return {
+            bg: '#10b981',
+            border: '#059669',
+            shadow: '0 0 6px rgba(16, 185, 129, 0.4)',
+            iconColor: 'text-white',
+        };
     };
 
     const getTimeColorClass = (time?: string) => {
         if (!time) return 'text-gray-400 dark:text-gray-500';
         const color = getTimeRemainingColor(time);
         switch (color) {
-            case 'success': return 'text-emerald-700 dark:text-[var(--ui-success)]';
-            case 'warning': return 'text-amber-700 dark:text-[var(--ui-warning)]';
-            default: return 'text-blue-700 dark:text-blue-400';
+            case 'success': return 'text-emerald-600 dark:text-emerald-400';
+            case 'warning': return 'text-amber-600 dark:text-amber-400';
+            default: return 'text-blue-600 dark:text-blue-400';
         }
     };
 
@@ -60,8 +111,9 @@ export function QuotaProgressBar({
     return (
         <div
             id="agm-progress-container"
+            data-ui-name="quota-progress-container"
             className={cn(
-                "w-full flex items-center opacity-85 hover:opacity-100 group-hover:opacity-100 transition-all duration-200 hover:drop-shadow-[0_0_3px_rgba(26,241,141,0.18)] group-hover:drop-shadow-[0_0_3px_rgba(26,241,141,0.18)]",
+                "w-full flex items-center opacity-85 hover:opacity-100 group-hover:opacity-100 transition-all duration-200",
                 compact ? "gap-1" : "gap-2",
                 className
             )}
@@ -84,6 +136,7 @@ export function QuotaProgressBar({
             <div className="relative flex-1 min-w-[126px] flex items-center">
                 <div
                     id="agm-progress-track"
+                    data-ui-name="quota-progress-track"
                     className={cn(
                         "relative w-full rounded-full overflow-hidden bg-slate-200 dark:bg-[var(--ui-quota-track)] border border-slate-300 dark:border-[var(--ui-quota-track-border)] shadow-none",
                         heightClassName
@@ -98,7 +151,10 @@ export function QuotaProgressBar({
                     <div
                         id="agm-progress-fill"
                         className="absolute inset-0"
-                        style={{ background: 'var(--ui-quota-gradient)' }}
+                        style={{
+                            background:
+                                'var(--ui-quota-gradient, linear-gradient(90deg, #ef4444 0%, #ef4444 20%, #f97316 20%, #f97316 40%, #eab308 40%, #eab308 60%, #10b981 60%, #10b981 80%, #1af18d 80%, #1af18d 100%))',
+                        }}
                         aria-hidden="true"
                     />
                     {/* Mask covering the unfilled portion */}
@@ -109,30 +165,39 @@ export function QuotaProgressBar({
                     />
                 </div>
 
-                {/* Ambient neon glow element */}
+                {/* Ambient glow element */}
                 <div
                     id="agm-progress-glow"
-                    className="absolute inset-0 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity duration-200 shadow-[0_0_5px_rgba(26,241,141,0.22)]"
+                    className="absolute inset-0 rounded-full pointer-events-none opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity duration-200 shadow-[0_0_4px_rgba(16,185,129,0.15)]"
                 />
 
                 {/* Milestone Checkpoint Nodes (protruding nodes, centered vertically) */}
                 {showCheckpoints && sortedCheckpoints.map((cp, idx) => {
                     const isFilled = clamped >= cp;
+                    const nodeStyle = getMilestoneNodeStyle(cp, isFilled);
 
                     return (
                         <div
                             key={cp}
                             id={`agm-progress-node-${idx + 1}`}
+                            data-ui-name="quota-milestone-node"
+                            data-ui-id={`milestone-${cp}`}
                             className={cn(
                                 "agm-progress-node absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full flex items-center justify-center transition-all duration-300 z-10 pointer-events-none border-[1.5px]",
                                 compact ? "w-4 h-4" : "w-5 h-5",
                                 isFilled
-                                    ? "border-transparent shadow-[0_2px_8px_rgba(0,0,0,0.35)] group-hover:shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                                    ? "shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
                                     : "bg-slate-300/50 dark:bg-white/10 border-transparent shadow-[inset_0_1px_2px_rgba(0,0,0,0.2)]"
                             )}
                             style={{
                                 left: `${cp}%`,
-                                ...(isFilled ? { backgroundColor: '#10b981' } : {}),
+                                ...(isFilled
+                                    ? {
+                                          backgroundColor: nodeStyle.bg,
+                                          borderColor: nodeStyle.border,
+                                          boxShadow: nodeStyle.shadow,
+                                      }
+                                    : {}),
                             }}
                             title={`Milestone ${cp}%`}
                         >
@@ -140,7 +205,7 @@ export function QuotaProgressBar({
                                 className={cn(
                                     "pointer-events-none transition-colors duration-200",
                                     compact ? "w-2.5 h-2.5" : "w-3 h-3",
-                                    isFilled ? "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" : "text-slate-400 dark:text-white/35"
+                                    nodeStyle.iconColor
                                 )}
                                 viewBox="0 0 16 16"
                                 fill="none"
@@ -157,12 +222,12 @@ export function QuotaProgressBar({
             </div>
 
             {/* Single Column for Remaining Time and Percentage */}
-            <div className={cn("flex flex-col items-end shrink-0", compact ? "leading-none" : "leading-tight")}>
+            <div className={cn("flex flex-col items-end shrink-0 gap-0.5", compact ? "leading-none" : "leading-tight")}>
                 {resetTime ? (
                     <span
                         className={cn(
                             "font-bold flex items-center gap-0.5 font-mono",
-                            compact ? "text-[9px]" : "text-[10px]",
+                            compact ? "text-[8.5px]" : "text-[9.5px]",
                             getTimeColorClass(resetTime)
                         )}
                         title={`Resets in ${formatTimeRemaining(resetTime)}`}
@@ -197,7 +262,11 @@ export function QuotaProgressBar({
                             {clamped}%
                         </span>
                     ) : (
-                        <span className={cn("font-black font-mono", compact ? "text-[9px]" : "text-[10px]", getPercentColorClass(clamped))}>
+                        <span className={cn(
+                            "font-black font-mono",
+                            compact ? "text-[9px]" : "text-[10px]",
+                            getPercentColorClass(clamped)
+                        )}>
                             {clamped}%
                         </span>
                     )}
