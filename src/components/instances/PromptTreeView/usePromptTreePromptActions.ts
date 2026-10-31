@@ -884,6 +884,29 @@ ${activePromptText}
 
             setActionMsg('Prompt enqueued to IDE behind current task!');
             setTimeout(() => setActionMsg(null), 3500);
+
+            if (isTauri()) {
+                try {
+                    await invoke('invalidate_prompt_tree_cache', { instanceId: targetInstId }).catch(async () => {
+                        await invoke('reset_prompt_tree_cache', { instanceId: targetInstId });
+                    });
+                } catch (cacheErr) {
+                    useErrorStore.getState().trackWarning(cacheErr, {
+                        source: 'usePromptTreePromptActions.handleEnqueuePrompt',
+                        triggerAction: 'invalidate_prompt_tree_cache',
+                    });
+                }
+            }
+            if (loadTree) {
+                try {
+                    await loadTree(false, true);
+                } catch (loadErr) {
+                    useErrorStore.getState().trackWarning(loadErr, {
+                        source: 'usePromptTreePromptActions.handleEnqueuePrompt',
+                        triggerAction: 'loadTree',
+                    });
+                }
+            }
         } catch (err: unknown) {
             const errorObj = err instanceof Error ? err : new Error(String(err) || 'Failed to enqueue prompt');
             persistClientCrash(errorObj, 'PromptTreeViewModal.handleEnqueuePrompt');
@@ -900,7 +923,7 @@ ${activePromptText}
         treeData, archivedProjectIds, setSelectedProject,
         editedPromptText, activePromptText, activePromptTextRef, confirmationSuffix,
         conversationTargetMode, newConversationTitle, instanceId, selectConversation,
-        setIsEnqueueing, setActionMsg, setError, setTreeData, setSelectedConversation,
+        setIsEnqueueing, setActionMsg, setError, setTreeData, setSelectedConversation, loadTree,
     ]);
 
     const handleFocusIde = useCallback(async () => {

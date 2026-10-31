@@ -1,5 +1,17 @@
 # Changelog
 
+## [v4.280.0] - 2026-10-31
+
+### Fixed
+- Resolved queue deadlock where enqueued prompts never fired into the running Antigravity IDE due to premature idle checks and missing status transitions; enqueued prompts and multi-round reruns now submit directly into the active Antigravity IDE composer via DevTools CDP with `cancel_running_first: false`, staging immediately as native enqueued turns in the IDE; transitions prompt status to `dispatched` upon successful injection to eliminate duplicate execution (Thanks to @aukgit)
+- Eliminated zombie liveness locks in `src-tauri/src/modules/repo_db/liveness.rs` by bounding Gate 4 summary recency window from 600s down to 90s, allowing the queue scheduler to process pending tasks without 10-minute delays (Thanks to @aukgit)
+- Corrected transcript turn status evaluation in `src-tauri/src/modules/repo_db/transcript.rs` so completed historical turns T1..TN are accurately marked `COMPLETED` (`is_queued = false, is_running = false`), preventing false `+10 queued` turn inflation and broken queue badges (Thanks to @aukgit)
+
+### Improved
+- Wired immediate cache invalidation and tree reload (`loadTree(false, true)`) into `handleEnqueuePrompt` in `src/components/instances/PromptTreeView/usePromptTreePromptActions.ts` so the prompt tree reflects dispatched turns without delay (Thanks to @aukgit)
+
+---
+
 ## [v4.279.6] - 2026-10-31
 
 ### Added
@@ -1614,6 +1626,11 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.280.0 (2026-10-31)**:
+        -   **[Enqueue & Rerun IDE Direct Dispatch & Turn Status Deadlock Fix] Deliver enqueued prompts and reruns directly into active Antigravity IDE (Thanks to @aukgit)**:
+            -   **Description**: Resolved queue deadlock in `src-tauri/src/modules/repo_db/queue.rs` and `agy.rs` where enqueued prompts never fired into the running Antigravity IDE due to premature idle checks and missing status transitions; enqueued prompts and multi-round reruns now submit directly into the active Antigravity IDE composer via DevTools CDP with `cancel_running_first: false`, staging immediately as native enqueued turns in the IDE; transitions prompt status to `dispatched` upon successful injection to eliminate duplicate execution; bounds Gate 4 summary recency window in `liveness.rs` to 90s to prevent zombie liveness locks; and eliminates transcript turn inversion in `transcript.rs` where historical turns T2–T11 were falsely marked `QUEUED`. (Thanks to @aukgit)
+
+
     *   **v4.279.1 (2026-10-30)**:
         -   **[Flywheel E5001 & Next Breakdown] Packaged Instances status no longer requires AGM source prompts (Thanks to @aukgit)**:
             -   **Description**: `improvements_status` ledgers on the instance workspace instead of the install cwd; Next breakdown lists pending plans/issues from every bound workspace. Frontend status never opens the E5001 modal. (Thanks to @aukgit)

@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.279.1)
+> Professional AI Account Management & Protocol Proxy System (v4.280.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.279.1-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.280.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.280.0**: Enqueue & Rerun IDE Direct Dispatch & Turn Status Deadlock Fix — Resolved queue deadlock in `src-tauri/src/modules/repo_db/queue.rs` and `agy.rs` where enqueued prompts never fired into the running Antigravity IDE due to premature idle checks and missing status transitions; enqueued prompts and multi-round reruns now submit directly into the active Antigravity IDE composer via DevTools CDP with `cancel_running_first: false`, staging immediately as native enqueued turns in the IDE; transitions prompt status to `dispatched` upon successful injection to eliminate duplicate execution; bounds Gate 4 summary recency window in `liveness.rs` to 90s to prevent zombie liveness locks; and eliminates transcript turn inversion in `transcript.rs` where historical turns T2–T11 were falsely marked `QUEUED`. (Thanks to @aukgit)
 
 > Latest version **v4.279.1**: Flywheel E5001 & Next Breakdown — packaged `/instances` no longer fails `improvements_status` when the install cwd lacks `01-prompts/30-improvements`; `src-tauri/src/modules/improvements/roots.rs` ledgers on the instance workspace and `src/services/improvementsService.ts` returns `emptyFlywheelState()` instead of opening the E5001 modal; Next breakdown lists pending plans/issues from every bound workspace. Frontend `improvementsFlywheelUtils` 6 passed. (Thanks to @aukgit)
 

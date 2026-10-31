@@ -1024,13 +1024,21 @@ pub fn extract_conversation_prompt_turns(
                     break;
                 }
             }
-            if last_model_is_done && matched_idx + 1 < n {
-                Some(matched_idx + 1)
+            if last_model_is_done {
+                if matched_idx + 1 < n {
+                    Some(matched_idx + 1)
+                } else {
+                    // All turns have completed terminal model responses
+                    None
+                }
             } else {
                 Some(matched_idx)
             }
+        } else if n > 0 {
+            // No model step recorded yet; the latest user prompt is actively executing
+            Some(n - 1)
         } else {
-            Some(0)
+            None
         }
     } else {
         None
@@ -1060,12 +1068,12 @@ pub fn extract_conversation_prompt_turns(
                 } else {
                     turn.created_at
                 };
-                let is_recent = turn_sec > 0 && (now - turn_sec <= 600);
+                let is_recent = turn_sec > 0 && (now - turn_sec <= 300);
                 let is_beyond_last_completed = match last_completed_model_step_idx {
                     Some(last_comp) => turn.step_index > last_comp,
-                    None => true,
+                    None => false,
                 };
-                if is_beyond_last_completed && (is_conv_running || (is_inst_alive && is_recent)) {
+                if is_beyond_last_completed && is_conv_running && is_inst_alive && is_recent {
                     ("QUEUED".to_string(), false, true)
                 } else {
                     ("COMPLETED".to_string(), false, false)

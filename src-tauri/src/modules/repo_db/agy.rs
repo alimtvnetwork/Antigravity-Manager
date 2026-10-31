@@ -1133,6 +1133,15 @@ pub fn enqueue_prompt_for_instance(
                     "[RepoDB] enqueue_prompt_for_instance injected prompt '{}' directly via live DevTools CDP into running IDE (cancel_running_first: false)",
                     active_prompt.id
                 ));
+                // Update status to 'dispatched' so it does not stay in SQLite as 'queued'
+                // and avoids double-dispatch by the background scheduler!
+                active_prompt.status = "dispatched".to_string();
+                active_prompt.updated_at = Utc::now().timestamp();
+                // Justification: updating dispatched status in SQLite cache after successful CDP injection is best-effort
+                crate::error::record_ignored(
+                    save_or_requeue_prompt(&active_prompt),
+                    "update dispatched status in sqlite after successful CDP enqueue injection",
+                );
             }
             Err(ref cdp_err) => {
                 crate::modules::logger::log_warn(&format!(

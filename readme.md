@@ -22,7 +22,11 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
+<<<<<<< Updated upstream
     <img src="https://img.shields.io/badge/Version-v4.279.6-3B82F6?style=flat-square" alt="Version v4.279.6">
+=======
+    <img src="https://img.shields.io/badge/Version-v4.280.0-3B82F6?style=flat-square" alt="Version v4.280.0">
+>>>>>>> Stashed changes
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,7 +120,11 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
+<<<<<<< Updated upstream
 **Bar 2: Version-Based Installation (v4.279.6)**
+=======
+**Bar 2: Version-Based Installation (v4.280.0)**
+>>>>>>> Stashed changes
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.258.0/install.ps1))) -Version "v4.258.0"
 ```
@@ -646,6 +654,8 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
 ## 📝 Changelog
+
+> Latest version **v4.280.0**: Enqueue & Rerun IDE Direct Dispatch & Turn Status Deadlock Fix — Resolved queue deadlock in `src-tauri/src/modules/repo_db/queue.rs` and `agy.rs` where enqueued prompts never fired into the running Antigravity IDE due to premature idle checks and missing status transitions; enqueued prompts and multi-round reruns now submit directly into the active Antigravity IDE composer via DevTools CDP with `cancel_running_first: false`, staging immediately as native enqueued turns in the IDE; transitions prompt status to `dispatched` upon successful injection to eliminate duplicate execution; bounds Gate 4 summary recency window in `liveness.rs` to 90s to prevent zombie liveness locks; and eliminates transcript turn inversion in `transcript.rs` where historical turns T2–T11 were falsely marked `QUEUED`. (Thanks to @aukgit)
 
 > Latest version **v4.279.6**: Flywheel E5001 & Next Breakdown — packaged `/instances` no longer fails `improvements_status` when the install cwd lacks `01-prompts/30-improvements`; `src-tauri/src/modules/improvements/roots.rs` ledgers on the instance workspace and `src/services/improvementsService.ts` returns `emptyFlywheelState()` instead of opening the E5001 modal; Next breakdown lists pending plans/issues from every bound workspace. Frontend `improvementsFlywheelUtils` 6 passed. (Thanks to @aukgit)
 

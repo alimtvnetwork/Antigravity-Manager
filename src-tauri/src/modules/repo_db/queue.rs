@@ -132,7 +132,11 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| project_id.clone());
 
-        if is_running {
+        let (is_inst_running, _, _) =
+            crate::modules::instance::is_instance_process_running_smart(&inst_id);
+
+        // If the instance is NOT running an IDE, we must strictly respect the idle check to avoid colliding agy CLI runs
+        if is_running && !is_inst_running {
             crate::modules::logger::log_info(&format!(
                 "[PromptQueueScheduler] Project '{}' ({}) is currently active/busy; enqueued prompts remain queued",
                 clean_project_name, project_id
@@ -269,6 +273,13 @@ pub fn check_and_dispatch_enqueued_prompts(target_instance: Option<&str>) -> Res
 
         let sent = if dispatched_via_cdp {
             Ok(())
+        } else if is_running {
+            // Cannot fallback to agy CLI while the project is active in a background worker
+            crate::modules::logger::log_info(&format!(
+                "[PromptQueueScheduler] Project '{}' is busy and CDP dispatch was not possible; enqueued prompt '{}' remains queued",
+                clean_project_name, prompt.id
+            ));
+            continue;
         } else {
             spawn_prompt_via_agy(&prompt)
         };

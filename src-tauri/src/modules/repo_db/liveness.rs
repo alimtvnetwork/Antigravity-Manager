@@ -149,7 +149,7 @@ pub fn collect_active_workspace_uris_for_instance(norm_inst: &str) -> HashSet<St
                         }
 
                         let conv_time = parse_flexible_timestamp(&_last_time_str);
-                        let max_allowed_elapsed = if not_fully_idle > 0 { 600 } else { 60 };
+                        let max_allowed_elapsed = if not_fully_idle > 0 { 90 } else { 45 };
                         let is_recent = conv_time > 0 && (now - conv_time <= max_allowed_elapsed);
 
                         if !is_recent {
