@@ -189,6 +189,31 @@ pub fn collect_active_workspace_uris_for_instance(norm_inst: &str) -> HashSet<St
         }
     }
 
+    if let Ok(conn) = connect_db() {
+        if let Ok(mut stmt) = conn.prepare(
+            "SELECT repo_path FROM active_prompts \
+             WHERE status IN ('running', 'in_flight', 'dispatched', 'queued', 'enqueued_ide', 'pending') \
+               AND (?1 = 'all' OR instance_id = ?1 OR (?1 = 'default' AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL)))"
+        ) {
+            if let Ok(rows) = stmt.query_map(rusqlite::params![norm_inst], |r| r.get::<_, String>(0)) {
+                for path in rows.flatten() {
+                    let clean_p = normalize_path_for_compare(&path);
+                    let folder_name = Path::new(&clean_p)
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("")
+                        .to_lowercase();
+                    if !clean_p.is_empty() {
+                        active_uris.insert(clean_p);
+                    }
+                    if !folder_name.is_empty() {
+                        active_uris.insert(folder_name);
+                    }
+                }
+            }
+        }
+    }
+
     active_uris
 }
 
@@ -306,17 +331,17 @@ pub fn is_prompt_running_for_project_with_summaries(
     if let Ok(conn) = connect_db() {
         let running_found: bool = conn
             .query_row(
-                "SELECT id FROM active_prompts 
-                 WHERE (project_id = ?1 OR repo_path = ?1 OR project_id LIKE ?1 || '__%') 
-                   AND (
-                     ?2 = 'all' 
-                     OR (
-                       (?2 = 'default' AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL) AND (project_id NOT LIKE '%__%' OR project_id LIKE '%__default' OR project_id LIKE '%____default__'))
-                       OR (instance_id = ?2 AND (project_id NOT LIKE '%__%' OR project_id LIKE '%__' || ?2))
-                     )
-                   )
-                   AND status = 'running'
-                   AND updated_at >= ?3
+                "SELECT id FROM active_prompts \
+                 WHERE (project_id = ?1 OR repo_path = ?1 OR project_id LIKE ?1 || '__%') \
+                   AND ( \
+                     ?2 = 'all' \
+                     OR ( \
+                       (?2 = 'default' AND (instance_id = 'default' OR instance_id = '__default__' OR instance_id = '' OR instance_id IS NULL) AND (project_id NOT LIKE '%__%' OR project_id LIKE '%__default' OR project_id LIKE '%____default__')) \
+                       OR (instance_id = ?2 AND (project_id NOT LIKE '%__%' OR project_id LIKE '%__' || ?2)) \
+                     ) \
+                   ) \
+                   AND status IN ('running', 'in_flight', 'dispatched') \
+                   AND updated_at >= ?3 \
                  ORDER BY created_at ASC, id ASC LIMIT 1",
                 params![project_id, norm_inst, now - 300],
                 |_| Ok(true),

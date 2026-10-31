@@ -40,7 +40,7 @@ pub fn count_enqueued_prompts(target_instance: Option<&str>) -> usize {
         let count: usize = conn
             .query_row(
                 "SELECT COUNT(*) FROM active_prompts 
-                 WHERE status IN ('backed_up', 'queued', 'pending', 'in_progress')
+                 WHERE status IN ('backed_up', 'queued', 'pending', 'in_progress', 'enqueued_ide', 'dispatched')
                    AND (?1 = 'all' OR instance_id = ?1 OR (?1 = 'default' AND (instance_id = 'default' OR instance_id = '__default__')))",
                 rusqlite::params![norm_target],
                 |r| r.get(0),
@@ -50,7 +50,7 @@ pub fn count_enqueued_prompts(target_instance: Option<&str>) -> usize {
     } else {
         let count: usize = conn
             .query_row(
-                "SELECT COUNT(*) FROM active_prompts WHERE status IN ('backed_up', 'queued', 'pending', 'in_progress')",
+                "SELECT COUNT(*) FROM active_prompts WHERE status IN ('backed_up', 'queued', 'pending', 'in_progress', 'enqueued_ide', 'dispatched')",
                 [],
                 |r| r.get(0),
             )

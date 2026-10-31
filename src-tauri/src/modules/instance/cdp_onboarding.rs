@@ -921,30 +921,65 @@ pub fn cancel_active_task_via_cdp_for_instance(instance_id: &str) -> bool {
 }
 
 const EXTRACT_QUEUED_MESSAGES_JS: &str = r#"(() => {
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
-    let n, targetSpan = null;
-    while (n = walker.nextNode()) {
-        const val = n.nodeValue.trim();
-        if (val === 'Queued Messages' || val.startsWith('Queued Messages')) {
-            targetSpan = n.parentElement;
-            break;
-        }
-    }
-    if (!targetSpan) return [];
-    let container = targetSpan;
-    for (let i = 0; i < 5; i++) {
-        if (container.parentElement && !container.parentElement.tagName.includes('BODY')) {
-            container = container.parentElement;
-        }
-    }
     const items = [];
-    const messageEls = container.querySelectorAll('.whitespace-pre-wrap, [class*="line-clamp"], div[title]');
-    for (const el of messageEls) {
-        const t = (el.innerText || el.textContent || '').trim();
-        if (t && !t.includes('Queued Messages') && !t.includes('Sends after agent') && !items.includes(t)) {
-            items.push(t);
+    // 1. Scan for any element containing 'Queued Messages' or matching queue card selectors
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+    let n;
+    const containers = [];
+    while (n = walker.nextNode()) {
+        const val = (n.nodeValue || '').trim().toLowerCase();
+        if (val.includes('queued message') || val.includes('queued messages') || val.includes('queued turn')) {
+            let p = n.parentElement;
+            for (let i = 0; i < 4 && p && !p.tagName.includes('BODY'); i++) {
+                p = p.parentElement;
+            }
+            if (p && !containers.includes(p)) {
+                containers.push(p);
+            }
         }
     }
+    const cardSelectors = ['[data-testid*="queued"]', '[aria-label*="queued" i]', '[class*="queued-messages"]', '[class*="queuedMessages"]'];
+    for (const sel of cardSelectors) {
+        document.querySelectorAll(sel).forEach(el => {
+            if (!containers.includes(el)) containers.push(el);
+        });
+    }
+
+    for (const container of containers) {
+        const messageEls = container.querySelectorAll('.whitespace-pre-wrap, [class*="line-clamp"], div[title], [data-quotable="true"]');
+        for (const el of messageEls) {
+            const t = (el.innerText || el.textContent || '').trim();
+            if (t && !/queued\s*message/i.test(t) && !t.includes('Sends after agent') && !items.includes(t)) {
+                items.push(t);
+            }
+        }
+    }
+
+    // 2. React Fiber inspection fallback: scan inputs or containers for queued messages props
+    if (items.length === 0) {
+        const inputs = document.querySelectorAll('[aria-label="Message input"], [role="combobox"], [data-testid="send-button"]');
+        for (const inp of inputs) {
+            const key = Object.keys(inp).find(k => k.startsWith('__reactFiber$'));
+            let cur = key ? inp[key] : null;
+            while (cur) {
+                const p = cur.memoizedProps;
+                if (p) {
+                    for (const propName of ['queuedMessages', 'queuedTurns', 'queuedItems', 'queue']) {
+                        if (Array.isArray(p[propName])) {
+                            for (const q of p[propName]) {
+                                const text = typeof q === 'string' ? q : (q?.text || q?.content || q?.prompt || '');
+                                const clean = (text || '').trim();
+                                if (clean && !items.includes(clean)) items.push(clean);
+                            }
+                        }
+                    }
+                }
+                cur = cur.return;
+            }
+            if (items.length > 0) break;
+        }
+    }
+
     return items;
 })()"#;
 

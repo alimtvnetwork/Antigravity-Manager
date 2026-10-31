@@ -1,5 +1,16 @@
 # Changelog
 
+## [v4.283.0] - 2026-10-31
+
+### Fixed
+- **Multi-Instance Running & Enqueued Prompt Detection Parity**: Resolved issue where enqueued prompts failed to appear in Prompt Tree View or multi-instance UI; expanded `is_queued_or_pending_status` in `src-tauri/src/modules/repo_db/tree_node_conv.rs` to include `enqueued_ide`, `dispatched`, and `in_progress`, preventing ghost conversation pruning from dropping enqueued IDE turns (Thanks to @aukgit)
+- **Universal Multi-Instance Liveness & Queue Retention**: Unified project liveness evaluation in `src-tauri/src/modules/repo_db/tree_nodes.rs` using `is_owning_instance_alive` with `find_pids_for_data_dir` fallback, eliminating false `INSTANCE_PROCESS_DEAD` overrides on secondary profiles; updated `only_running` filter in `tree_nodes.rs` to affirmatively preserve projects and conversations with active queued prompts (`c.is_queued` or `p.is_queued`), preventing enqueued tasks from disappearing when filtering by running tasks (Thanks to @aukgit)
+- **Resilient DevTools CDP Composer Queue Harvester**: Enhanced `EXTRACT_QUEUED_MESSAGES_JS` in `src-tauri/src/modules/instance/cdp_onboarding.rs` with case-insensitive text matching, dedicated card selectors (`[data-testid*="queued"]`, `[aria-label*="queued" i]`), and React Fiber state inspection (`queuedMessages`, `queuedTurns`), ensuring queued prompt extraction succeeds even when IDE is focused on subagent tabs or custom view layouts (Thanks to @aukgit)
+- **Queue Count & Live Query Harmonization**: Updated `count_enqueued_prompts` in `src-tauri/src/modules/repo_db/queue.rs`, `list_all_prompts`, and `get_live_project_execution_info` in `project_queries.rs` to query and prioritize `enqueued_ide` alongside `queued` and `running`; updated `discover_fallback_projects` in `tree_phases.rs` to synthesize projects for `enqueued_ide` prompts (Thanks to @aukgit)
+- **Frontend Queue Status Recognition**: Extended `isQueuedTurn` in `src/components/instances/PromptTreeView/usePromptTreeData.ts` to recognize `ENQUEUED_IDE`, `DISPATCHED`, `PENDING`, and `is_queued: true`, keeping queued turns and badge counts visible across optimistic updates and tree reloads (Thanks to @aukgit)
+
+---
+
 ## [v4.282.0] - 2026-10-31
 
 ### Fixed
@@ -1663,9 +1674,12 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.283.0 (2026-10-31)**:
+        -   **[Multi-Instance Prompt Queue & Liveness] Enqueued Prompts Detection & Multi-Instance Liveness Parity**:
+            -   **Description**: Resolved enqueued prompt invisibility in multi-instance UI by expanding `enqueued_ide` status recognition, resilient DevTools CDP queue harvesting, and universal liveness preservation across single and secondary instances (Thanks to @aukgit).
     *   **v4.282.0 (2026-10-31)**:
-        -   **[Feature Category] Main Update Summary (PR #xxx)**:
-            -   **Description**: Please document update details here; credit contributors inline as `(Thanks to @aukgit)`.
+        -   **[Prompt Running Status & CDP Harvester] Enforce Running Status Supremacy & IDE Composer Queue Extraction**:
+            -   **Description**: Enforced affirmative running status over intermediate transcript markers and added DevTools CDP composer queued message harvesting (Thanks to @aukgit).
 
 
     *   **v4.281.0 (2026-10-31)**:

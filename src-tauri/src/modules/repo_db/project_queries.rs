@@ -51,7 +51,7 @@ pub fn list_all_prompts() -> Result<Vec<ActivePrompt>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, project_id, instance_id, repo_path, prompt_content, model, session_id, status, created_at, updated_at, image_payload 
-             FROM active_prompts ORDER BY CASE WHEN status IN ('queued', 'running', 'dispatched', 'in_flight') THEN 0 ELSE 1 END ASC, created_at ASC, id ASC LIMIT 500",
+             FROM active_prompts ORDER BY CASE WHEN status IN ('queued', 'enqueued_ide', 'running', 'dispatched', 'in_flight', 'pending') THEN 0 ELSE 1 END ASC, created_at ASC, id ASC LIMIT 500",
         )
         .map_err(|e| format!("Failed to prepare list prompts query: {}", e))?;
 
@@ -209,7 +209,7 @@ pub fn get_live_project_execution_info() -> Vec<ProjectExecutionInfo> {
     // 2. Inspect active_prompts in repo_prompts.db for any in-flight prompts
     if let Ok(conn) = connect_db() {
         if let Ok(mut stmt) = conn.prepare(
-            "SELECT instance_id, repo_path, prompt_content, status, updated_at FROM active_prompts WHERE status = 'running' OR status = 'queued'",
+            "SELECT instance_id, repo_path, prompt_content, status, updated_at FROM active_prompts WHERE status IN ('running', 'queued', 'enqueued_ide', 'dispatched', 'in_flight', 'pending')",
         ) {
             let rows = stmt.query_map([], |row| {
                 Ok((

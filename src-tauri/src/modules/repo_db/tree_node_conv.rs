@@ -138,8 +138,15 @@ pub(crate) fn should_retain_unrunning_conversation(only_running: bool, is_runnin
     is_running
 }
 
-fn is_queued_or_pending_status(status: &str) -> bool {
-    const QUEUED_STATUSES: &[&str] = &["queued", "queue", "pending"];
+pub(crate) fn is_queued_or_pending_status(status: &str) -> bool {
+    const QUEUED_STATUSES: &[&str] = &[
+        "queued",
+        "queue",
+        "pending",
+        "enqueued_ide",
+        "dispatched",
+        "in_progress",
+    ];
     status.equals_any_ignore_case(QUEUED_STATUSES)
 }
 
@@ -217,6 +224,11 @@ pub(crate) fn is_owning_instance_alive(
         let is_inst_running =
             crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid);
         if is_inst_running {
+            return true;
+        }
+        let pids =
+            crate::modules::instance::find_pids_for_data_dir(&inst.data_dir, inst.is_default);
+        if !pids.is_empty() {
             return true;
         }
         let is_global_running = crate::modules::process::is_antigravity_running(None);
@@ -994,6 +1006,8 @@ mod tests {
         assert!(is_queued_or_pending_status("QUEUED"));
         assert!(is_queued_or_pending_status("queued"));
         assert!(is_queued_or_pending_status("pending"));
+        assert!(is_queued_or_pending_status("enqueued_ide"));
+        assert!(is_queued_or_pending_status("dispatched"));
         assert!(!is_queued_or_pending_status("running"));
     }
 

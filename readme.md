@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.282.0-3B82F6?style=flat-square" alt="Version v4.282.0">
+    <img src="https://img.shields.io/badge/Version-v4.283.0-3B82F6?style=flat-square" alt="Version v4.283.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,7 +116,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.282.0)**
+**Bar 2: Version-Based Installation (v4.283.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.258.0/install.ps1))) -Version "v4.258.0"
 ```
@@ -659,6 +659,8 @@ Every raster icon is exported with a 100% transparent background (`#00000000`) f
 > Explore the full brand kit, contrast mockups, and color palette tokens in [assets/readme.md](assets/readme.md) and [assets/colors-themes/palette.md](assets/colors-themes/palette.md).
 
 ## 📝 Changelog
+
+> Latest version **v4.283.0**: Multi-Instance Running & Enqueued Prompt Detection Parity & Resilient DevTools CDP Harvester — Resolved enqueued prompt invisibility in multi-instance UI by expanding `is_queued_or_pending_status` in `src-tauri/src/modules/repo_db/tree_node_conv.rs` to include `enqueued_ide`, `dispatched`, and `in_progress`, preventing ghost conversation pruning from dropping enqueued IDE turns; unified project liveness evaluation in `tree_nodes.rs` using `is_owning_instance_alive` with `find_pids_for_data_dir` fallback, eliminating false `INSTANCE_PROCESS_DEAD` overrides on secondary profiles; updated `only_running` filter in `tree_nodes.rs` to affirmatively preserve projects and conversations with active queued prompts (`c.is_queued` or `p.is_queued`), preventing enqueued tasks from disappearing when filtering by running tasks; upgraded `EXTRACT_QUEUED_MESSAGES_JS` in `cdp_onboarding.rs` with case-insensitive text matching, dedicated card selectors (`[data-testid*="queued"]`, `[aria-label*="queued" i]`), and React Fiber state inspection (`queuedMessages`, `queuedTurns`) ensuring queued prompt extraction succeeds even when IDE is focused on subagent tabs or custom view layouts; harmonized queue counts and queries in `queue.rs`, `project_queries.rs`, and `tree_phases.rs` to query and prioritize `enqueued_ide` alongside `queued` and `running`; and extended `isQueuedTurn` in frontend `usePromptTreeData.ts` to recognize `ENQUEUED_IDE`, `DISPATCHED`, and `PENDING`. (Thanks to @aukgit)
 
 > Latest version **v4.282.0**: Running Status Detection Supremacy, Live CDP Queued Messages Harvester & Review Queue Fix — Enforced affirmative database run status and live process supremacy in `src-tauri/src/modules/repo_db/tree_collect.rs` and `transcript.rs` so actively working IDE instances never falsely flip to `IDLE now` due to intermediate planner completions; implemented live DevTools CDP composer queued messages harvesting in `src-tauri/src/modules/instance/cdp_onboarding.rs` (`extract_queued_composer_messages_for_instance`), extracting in-memory queued prompts staged in the active IDE ("Queued Messages N Sends after agent finishes working") and rendering them immediately under the active conversation as `QUEUED` turns in `tree_node_conv.rs`; extended in-flight TTL from 120s to 3600s in `tree_phases.rs` and persisted status as `enqueued_ide` in `agy.rs` to eliminate premature queue item erasure; corrected `queuedPromptCount` in `usePromptTreeData.ts` to strictly return 0 when hydrated turns contain no queued turns, eliminating spurious `1 prompt(s) enqueued in FIFO queue for this conversation` banners during idle prompt review; removed `"in_progress"` from queue status definitions in `tree_collect.rs` and `tree_node_conv.rs` to classify active executions as running; and preserved original task prompt text in `DetailHeader.tsx` during rerun enqueue operations, replacing internal nudge strings with actual prompt summaries in action toasts and optimistic tree turns. (Thanks to @aukgit)
 

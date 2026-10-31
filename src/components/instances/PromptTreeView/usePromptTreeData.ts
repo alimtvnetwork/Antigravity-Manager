@@ -219,7 +219,8 @@ function queuedTurnKey(p: { status: string; prompt_text: string }): string {
 }
 
 export function isQueuedTurn(p: { is_queued?: boolean; status: string }): boolean {
-    return Boolean(p.is_queued) || String(p.status).toUpperCase() === 'QUEUED';
+    const s = String(p.status || '').toUpperCase();
+    return Boolean(p.is_queued) || s === 'QUEUED' || s === 'ENQUEUED_IDE' || s === 'DISPATCHED' || s === 'PENDING';
 }
 
 export function queuedPromptCount(conv: { is_queued?: boolean; prompts?: Array<{ is_queued?: boolean; status: string }> } | null | undefined): number {

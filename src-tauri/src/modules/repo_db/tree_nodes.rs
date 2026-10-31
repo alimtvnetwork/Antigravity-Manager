@@ -42,17 +42,8 @@ pub(crate) fn build_project_tree_node(
         return None;
     }
 
-    let is_inst_alive = if proj.instance_id == "default" || proj.instance_id == "__default__" {
-        crate::modules::process::is_antigravity_running(None)
-    } else if let Some(inst) = registry
-        .instances
-        .iter()
-        .find(|i| i.id == proj.instance_id || i.name == proj.instance_id)
-    {
-        crate::modules::instance::is_instance_running(&inst.id, &inst.data_dir, inst.pid)
-    } else {
-        false
-    };
+    let is_inst_alive =
+        super::tree_node_conv::is_owning_instance_alive(&proj.instance_id, registry);
 
     let p_seq = if let Some(ref conn) = conn_opt {
         ensure_project_sequence_in_conn(
@@ -171,8 +162,11 @@ pub(crate) fn build_project_tree_node(
     );
 
     if only_running {
-        let has_any_running_conv = conv_nodes.iter().any(|c| c.is_running);
-        if !proj_is_running && !has_any_running_conv {
+        let has_any_active_or_queued_conv = conv_nodes.iter().any(|c| c.is_running || c.is_queued);
+        let has_any_queued_turn = conv_nodes
+            .iter()
+            .any(|c| c.prompts.iter().any(|p| p.is_queued));
+        if !proj_is_running && !has_any_active_or_queued_conv && !has_any_queued_turn {
             return None;
         }
     }

@@ -210,7 +210,7 @@ pub(crate) fn discover_fallback_projects(
     if let Ok(conn) = connect_db() {
         let active_sql = "SELECT project_id, instance_id, repo_path, status, updated_at \
                           FROM active_prompts \
-                          WHERE status IN ('running', 'in_flight', 'dispatched', 'queued') \
+                          WHERE status IN ('running', 'in_flight', 'dispatched', 'queued', 'enqueued_ide', 'pending', 'in_progress') \
                           ORDER BY created_at ASC, id ASC";
         let mut stmt_opt = conn.prepare(active_sql).ok();
         if let Some(ref mut stmt) = stmt_opt {
