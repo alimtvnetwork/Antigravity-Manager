@@ -1,5 +1,5 @@
 # Antigravity Tools 🚀
-> Professional AI Account Management & Protocol Proxy System (v4.284.0)
+> Professional AI Account Management & Protocol Proxy System (v4.285.0)
 
 <div align="center">
   <img src="public/icon.png" alt="Antigravity Logo" width="120" height="120" style="border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
@@ -10,7 +10,7 @@
 
   <p>
     <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-      <img src="https://img.shields.io/badge/Version-4.284.0-blue?style=flat-square" alt="Version">
+      <img src="https://img.shields.io/badge/Version-4.285.0-blue?style=flat-square" alt="Version">
     </a>
     <img src="https://img.shields.io/badge/Tauri-v2-orange?style=flat-square" alt="Tauri">
     <img src="https://img.shields.io/badge/Backend-Rust-red?style=flat-square" alt="Rust">
@@ -545,6 +545,8 @@ In clients that support OpenAI protocol (e.g., Cherry Studio), you can configure
 </details>
 
 ## 📝 Changelog
+
+> Latest version **v4.285.0**: GitMap Pipeline Telemetry Audit & Cache Healing — Diagnosed and verified CI/CD pipeline runs using GitMap telemetry (`gitmap pe`), cleared stale pipeline database cache, verified 100% green status across all recent CI and Release workflows on `main`, and synchronized all version manifests to 4.285.0. (Thanks to @aukgit)
 
 > Latest version **v4.284.0**: Manifest-First Version Resolution, Rogue v5 Gate & CI/CD Fix — Enforced single source of truth versioning across `.agents/scripts/38-sync-prompts-skills-scripts.py` and `03-ai-scripts/38-sync-prompts-skills-scripts.py`; ensured `version.json` and `package.json` are evaluated first before falling back to git tags, preventing upstream release tags from hijacking the repository's canonical 4.x track; preserved major version 4 progression (`v4.284.0`), strictly gating major version 5 until explicitly commanded; purged all legacy `v5*` GitHub releases, remote tags, and local tags across all environments; documented 4-part RCA in `02-spec/22-app-issues/39-rogue-v5-release-root-cause-analysis-and-manifest-first-fix.md`; directly integrated the 100 Improvements Flywheel and Next Breakdown options into the Prompt Tree View; added Capsule C (`[✨ Next Breakdown | 100 | v]`) into `src/components/instances/PromptTreeView/DetailHeader.tsx` action bar alongside Copy and Dispatch capsules; added "Next Breakdown (100 Improvements)" option to the Unified Dispatch Configuration Popover; created `src/components/instances/PromptTreeView/ImprovementsBreakdownModal.tsx` providing wave visualization, slot progress (`5/5 slots`), active task hints, category selector (`system`, `ui`, `code`, `ideas`), Dry Run inspection, and direct markdown export; added "Next Breakdown (100 Steps)" to `ConversationContextMenu.tsx` and "Plan 100 Improvements..." to `ProjectContextMenu.tsx`; and restored green CI on main by fixing compile and borrow errors (missing `rolling_4h_quota` field, use-after-move in manual rotation, and E0500 double borrow in tree node conversion). (Thanks to @aukgit)
 

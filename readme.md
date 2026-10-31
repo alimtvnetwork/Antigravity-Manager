@@ -22,7 +22,7 @@
 <p align="center">
   <!-- STAMP:BADGES -->
   <a href="https://github.com/alimtvnetwork/Antigravity-Manager/releases">
-    <img src="https://img.shields.io/badge/Version-v4.284.0-3B82F6?style=flat-square" alt="Version v4.284.0">
+    <img src="https://img.shields.io/badge/Version-v4.285.0-3B82F6?style=flat-square" alt="Version v4.285.0">
   </a>
 
   <img src="https://img.shields.io/badge/Tauri-v2-FF6E3C?style=flat-square" alt="Tauri v2">
@@ -116,7 +116,7 @@ Our universal installation script detects your operating system, CPU architectur
 irm https://raw.githubusercontent.com/alimtvnetwork/Antigravity-Manager/main/install.ps1 | iex
 ```
 
-**Bar 2: Version-Based Installation (v4.284.0)**
+**Bar 2: Version-Based Installation (v4.285.0)**
 ```powershell
 & ([scriptblock]::Create((irm https://github.com/alimtvnetwork/Antigravity-Manager/releases/download/v4.258.0/install.ps1))) -Version "v4.258.0"
 ```
@@ -542,6 +542,8 @@ env WEBKIT_DISABLE_DMABUF_RENDERER=1 ANTIGRAVITY_FORCE_WAYLAND=1 antigravity-too
   - **Cold-Start IDE 5-Second Stabilization Ladder & Send Reliability**: Upgraded `src-tauri/src/modules/instance/smart_run.rs` and `src-tauri/src/modules/repo_db/agy.rs` with an adaptive 5-second process stabilization ladder and CDP retry mechanism for cold-started IDE instances, eliminating lost prompts when dispatching to closed IDEs. (Thanks to @aukgit)
   - **Prompt Tree Image Rendering & Queued/Running Visibility**: Added Tauri v2 `core:asset:default` capability permission in `src-tauri/capabilities/default.json` and resolved relative image paths against project `repo_path` before passing to `convertFileSrc` in `clipboard.ts` and `PromptMarkdownPreview.tsx`; protected queued prompts from stale conversation demotion in `conversationGuards.ts`; synthesized running/queued projects from `active_prompts` in `src-tauri/src/modules/repo_db/tree_phases.rs`, ensuring the left panel is never empty when prompts are in flight. (Thanks to @aukgit)
   - **Expand Full / Fold Tab Switch Persistence**: Fixed UI bug in `src/components/instances/PromptTreeView/DetailTabs.tsx` where switching from the Input to Output tab caused the `Expand Full` toggle to unmount; decoupled `hasExpandToggle` so output text can be expanded to full height seamlessly. (Thanks to @aukgit)
+- **v4.285.0** (2026-10-31):
+  - **GitMap Pipeline Telemetry Audit & Cache Healing**: Diagnosed and verified CI/CD pipeline runs using GitMap telemetry (`gitmap pe`), cleared stale pipeline database cache, verified 100% green status across all recent CI and Release workflows on `main`, and validated zero unresolved errors or borrow conflicts. (Thanks to @aukgit)
 - **v4.284.0** (2026-10-31):
   - **Manifest-First Version Resolution & Rogue v5 Gate**: Enforced single source of truth versioning across `.agents/scripts/38-sync-prompts-skills-scripts.py` and `03-ai-scripts/38-sync-prompts-skills-scripts.py`; ensured `version.json` and `package.json` are evaluated first before falling back to git tags, preventing upstream release tags from hijacking the repository's canonical 4.x track; preserved major version 4 progression (`v4.284.0`), strictly gating major version 5 until explicitly commanded; purged all legacy `v5*` GitHub releases, remote tags, and local tags across all environments; and documented 4-part RCA in `02-spec/22-app-issues/39-rogue-v5-release-root-cause-analysis-and-manifest-first-fix.md`. (Thanks to @aukgit)
   - **Next 100 Improvements Flywheel Integration in Prompt Tree View**: Directly integrated the 100 Improvements Flywheel and Next Breakdown options into the Prompt Tree View; added Capsule C (`[✨ Next Breakdown | 100 | v]`) into `src/components/instances/PromptTreeView/DetailHeader.tsx` action bar alongside Copy and Dispatch capsules; added "Next Breakdown (100 Improvements)" option to the Unified Dispatch Configuration Popover; added `src/components/instances/PromptTreeView/ImprovementsBreakdownModal.tsx` providing wave visualization, slot progress (`5/5 slots`), active task hints, category selector (`system`, `ui`, `code`, `ideas`), Dry Run inspection, and direct markdown export; and added "Next Breakdown (100 Steps)" to `ConversationContextMenu.tsx` and "Plan 100 Improvements..." to `ProjectContextMenu.tsx`. (Thanks to @aukgit)

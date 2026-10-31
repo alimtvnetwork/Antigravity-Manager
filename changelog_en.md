@@ -3,6 +3,10 @@
 > Complete version history for Antigravity Tools. Return to project home at [README_EN.md](README_EN.md).
 
 *   **Version History**:
+    *   **v4.285.0 (2026-10-31)**:
+        -   **[GitMap Pipeline Telemetry Audit & Cache Healing] Real-time CI/CD telemetry audit and 100% green pipeline clearance (Thanks to @aukgit)**:
+            -   **Description**: Diagnosed and verified CI/CD pipeline runs using GitMap telemetry (`gitmap pe`), cleared stale pipeline database cache, verified 100% green status across all recent CI and Release workflows on `main`, and synchronized all version manifests to 4.285.0 (Thanks to @aukgit).
+
     *   **v4.284.0 (2026-10-31)**:
         -   **[Manifest-First Version Resolution & Rogue v5 Gate] Single source of truth versioning and 4.x progression defense (Thanks to @aukgit)**:
             -   **Description**: Enforced single source of truth versioning across `.agents/scripts/38-sync-prompts-skills-scripts.py` and `03-ai-scripts/38-sync-prompts-skills-scripts.py`; ensured `version.json` and `package.json` are evaluated first before falling back to git tags, preventing upstream release tags from hijacking the repository's canonical 4.x track; preserved major version 4 progression (`v4.284.0`), strictly gating major version 5 until explicitly commanded; purged all legacy `v5*` GitHub releases, remote tags, and local tags across all environments; and documented 4-part RCA in `02-spec/22-app-issues/39-rogue-v5-release-root-cause-analysis-and-manifest-first-fix.md` (Thanks to @aukgit).
